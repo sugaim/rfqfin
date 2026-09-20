@@ -1,4 +1,5 @@
 using Rfq.Application;
+using Rfq.Api;
 using Rfq.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,7 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddRfqApplication();
 builder.Services.AddRfqInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<ICurrentUser, DevelopmentCurrentUser>();
 
 var app = builder.Build();
 

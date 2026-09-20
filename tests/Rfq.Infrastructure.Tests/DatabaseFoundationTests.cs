@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Rfq.Domain;
 using Xunit;
 
 namespace Rfq.Infrastructure.Tests;
@@ -55,6 +56,40 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
 
         Assert.True(await context.Database.CanConnectAsync());
         Assert.Equal(0, await context.SeedMarkers.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateAndReadDraftRoundTripsThroughPostgreSql()
+    {
+        await RecreateDatabaseAsync();
+        var salesUserId = UserId.Create("sales-roundtrip");
+        var createdAt = new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero);
+
+        await using (var writeContext = fixture.CreateContext())
+        {
+            var repository = new RfqCaseRepository(writeContext);
+            var unitOfWork = new EfUnitOfWork(writeContext);
+            repository.Add(RfqCase.CreateDraft(
+                ClientId.Create("client-roundtrip"),
+                SecurityId.Create("security-roundtrip"),
+                salesUserId,
+                createdAt));
+
+            await unitOfWork.SaveChangesAsync();
+        }
+
+        await using (var readContext = fixture.CreateContext())
+        {
+            var repository = new RfqCaseRepository(readContext);
+            var rows = await repository.GetActiveSalesRfqsAsync(salesUserId);
+
+            var row = Assert.Single(rows);
+            Assert.Equal("client-roundtrip", row.ClientId);
+            Assert.Equal("security-roundtrip", row.SecurityId);
+            Assert.Equal("Draft", row.RfqStatus);
+            Assert.Equal("Draft", row.RevisionStatus);
+            Assert.Equal(createdAt, row.CreatedAt);
+        }
     }
 
     private async Task RecreateDatabaseAsync()

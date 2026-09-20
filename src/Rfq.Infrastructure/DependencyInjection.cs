@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Rfq.Application;
 
 namespace Rfq.Infrastructure;
 
@@ -16,6 +17,8 @@ public static class DependencyInjection
         services.AddDbContext<RfqDbContext>(options =>
             DatabaseConfiguration.Configure(options, connectionString));
         services.AddSingleton(TimeProvider.System);
+        services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<DevelopmentDataSeeder>();
         services.AddScoped<DatabaseOperations>();
 
