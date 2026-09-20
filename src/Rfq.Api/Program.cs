@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddRfqApplication();
-builder.Services.AddRfqInfrastructure();
+builder.Services.AddRfqInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 

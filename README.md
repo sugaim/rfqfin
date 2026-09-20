@@ -16,6 +16,12 @@ Start PostgreSQL:
 docker compose up -d
 ```
 
+Reset the guarded local development database, apply migrations, and seed it:
+
+```bash
+dotnet run --project src/Rfq.DbTool -- reset-dev
+```
+
 Restore and build the backend:
 
 ```bash
@@ -37,10 +43,13 @@ npm install
 npm run dev
 ```
 
-The current bootstrap exposes `GET /api/health` and OpenAPI at
-`/openapi/v1.json`. Database commands are placeholders until implementation
-step 02; list them with:
+The API exposes `GET /api/health` and OpenAPI at `/openapi/v1.json`.
+Database commands are available through:
 
 ```bash
 dotnet run --project src/Rfq.DbTool -- --help
 ```
+
+`reset-dev` is intentionally guarded: it requires the Development environment
+and accepts only the local database named `rfq`. The default DbTool launch
+profile and Docker Compose connection satisfy those checks.
