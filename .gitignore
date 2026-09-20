@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+TestResults/
+
+# Frontend
+node_modules/
+dist/
+coverage/
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local configuration
+.env
+.env.local
+appsettings.Development.local.json
