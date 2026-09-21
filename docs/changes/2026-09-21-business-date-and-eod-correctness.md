@@ -15,12 +15,15 @@ Domain state, the API contract, or UTC timestamp storage.
 
 ## EOD
 
-- Treats EOD as a current desk-wide remaining-work view rather than a historical snapshot.
+- Combines a current desk-wide Open count with close events from the selected desk-local date;
+  it does not rebuild a historical snapshot.
 - Removes the RFQ `CreatedAt` date restriction.
 - Restricts rows to RFQs assigned to Traders on the current user's desk.
-- Aggregates current `Active` / `Presented` as Open and current `Hit` / `Away` as their
-  corresponding outcome counts.
-- Excludes lifecycle states that contribute no remaining-work or outcome count.
+- Aggregates current `Active` / `Presented` RFQs as Open, regardless of creation date.
+- Counts `ClosedHit` / `ClosedAway` events whose `OccurredAt` is within the selected date's
+  desk-local `[00:00, next 00:00)` range converted to UTC.
+- Keeps the existing `OutcomeCorrected` behavior and does not reinterpret it as a new close.
+- Uses the existing event timestamp and adds no `ClosedAt` column.
 
 ## Verification coverage
 
@@ -28,4 +31,5 @@ Domain state, the API contract, or UTC timestamp storage.
 - Inclusion of the full `To` date and exclusion at the following local midnight.
 - UTC dates that differ from the desk-local calendar date.
 - Inclusion of older open RFQs in EOD.
-- Current Hit/Away aggregation and exclusion of another desk's RFQs.
+- Hit/Away inclusion only on the selected local date, including both JST boundaries.
+- Exclusion of prior-day outcomes and another desk's RFQs/events.

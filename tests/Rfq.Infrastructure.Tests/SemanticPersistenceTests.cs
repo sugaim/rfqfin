@@ -216,7 +216,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
     }
 
     [Fact]
-    public async Task Eod_is_a_current_desk_wide_remaining_work_view()
+    public async Task Eod_combines_current_open_rfqs_with_close_events_on_the_desk_local_date()
     {
         await RecreateAndSeed();
         await using (var arrange = fixture.CreateContext())
@@ -238,15 +238,13 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
                 .SetProperty(item => item.Lifecycle, RfqLifecycleKind.Cancelled)
                 .SetProperty(item => item.RfqStatus, RfqStatus.Cancelled));
             var rows = await arrange.CaseCurrents.OrderBy(item => item.CaseId)
-                .Take(4).ToArrayAsync();
+                .Take(6).ToArrayAsync();
             rows[0].Lifecycle = RfqLifecycleKind.Open;
             rows[0].RfqStatus = RfqStatus.Active;
             rows[1].Lifecycle = RfqLifecycleKind.Closed;
             rows[1].RfqStatus = RfqStatus.Hit;
             rows[2].Lifecycle = RfqLifecycleKind.Closed;
             rows[2].RfqStatus = RfqStatus.Away;
-            rows[3].Lifecycle = RfqLifecycleKind.Open;
-            rows[3].RfqStatus = RfqStatus.Active;
             foreach (var row in rows)
             {
                 row.ContactOwnerId = "sales-dev";
@@ -258,18 +256,52 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(
                     item => item.CreatedAt,
                     new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+
+            var nextEventId = (await arrange.Events.MaxAsync(item => (long?)item.EventId) ?? 0) + 1;
+            AddRfqEvent(arrange, nextEventId++, rows[1].CaseId, RfqTransitionKind.ClosedHit,
+                new DateTimeOffset(2026, 9, 20, 15, 0, 0, TimeSpan.Zero));
+            AddRfqEvent(arrange, nextEventId++, rows[2].CaseId, RfqTransitionKind.ClosedAway,
+                new DateTimeOffset(2026, 9, 21, 14, 59, 59, TimeSpan.Zero));
+            AddRfqEvent(arrange, nextEventId++, rows[3].CaseId, RfqTransitionKind.ClosedHit,
+                new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero));
+            AddRfqEvent(arrange, nextEventId++, rows[4].CaseId, RfqTransitionKind.ClosedHit,
+                new DateTimeOffset(2026, 9, 20, 14, 59, 59, TimeSpan.Zero));
+            AddRfqEvent(arrange, nextEventId, rows[5].CaseId, RfqTransitionKind.ClosedAway,
+                new DateTimeOffset(2026, 9, 21, 15, 0, 0, TimeSpan.Zero));
             await arrange.SaveChangesAsync();
         }
 
         await using var read = fixture.CreateContext();
         var queries = new PostgreSqlOperationalQueries(
             read, CurrentSales(), TimeProvider.System);
-        var item = Assert.Single(await queries.GetEodAsync(new DateOnly(2030, 1, 1)));
+        var item = Assert.Single(await queries.GetEodAsync(new DateOnly(2026, 9, 21)));
 
         Assert.Equal(UserId.Create("sales-dev"), item.ContactOwnerId);
         Assert.Equal(1, item.Open);
         Assert.Equal(1, item.Hit);
         Assert.Equal(1, item.Away);
+    }
+
+    private static void AddRfqEvent(
+        RfqDbContext context,
+        long eventId,
+        long caseId,
+        RfqTransitionKind type,
+        DateTimeOffset occurredAt)
+    {
+        context.Events.Add(new EventEntity
+        {
+            EventId = eventId,
+            OccurredAt = occurredAt,
+            ActorUserId = "trader-a",
+        });
+        context.RfqEvents.Add(new RfqEventEntity
+        {
+            EventId = eventId,
+            CaseId = caseId,
+            Type = type.ToString(),
+            PayloadJson = "{}",
+        });
     }
 
     private async Task RecreateAndSeed()
