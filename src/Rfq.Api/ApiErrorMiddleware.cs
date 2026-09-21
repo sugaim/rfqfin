@@ -4,7 +4,9 @@ using Rfq.Domain;
 
 namespace Rfq.Api;
 
-public sealed class ApiErrorMiddleware(RequestDelegate next)
+public sealed class ApiErrorMiddleware(
+    RequestDelegate next,
+    ILogger<ApiErrorMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context)
     {
@@ -23,12 +25,18 @@ public sealed class ApiErrorMiddleware(RequestDelegate next)
                 ArgumentException => (400, "Validation"),
                 _ => (500, "InternalServerError"),
             };
+            if (status == StatusCodes.Status500InternalServerError)
+                logger.LogError(exception, "An unexpected error occurred while processing an HTTP request.");
+
+            var detail = status == StatusCodes.Status500InternalServerError
+                ? "An unexpected error occurred."
+                : exception.Message;
             context.Response.StatusCode = status;
             await context.Response.WriteAsJsonAsync(new ProblemDetails
             {
                 Status = status,
                 Title = code,
-                Detail = exception.Message,
+                Detail = detail,
                 Extensions = { ["code"] = code },
             });
         }
