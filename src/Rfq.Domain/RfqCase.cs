@@ -54,11 +54,17 @@ public sealed class RfqCase
 
     public long CurrentVersion { get; private set; }
 
-    public RfqStatus Status => Lifecycle is OpenRfq ? RfqStatus.Active : RfqStatus.Draft;
+    public RfqStatus Status => Lifecycle is OpenRfq open
+        ? open.Status == OpenRfqStatus.Presented
+            ? RfqStatus.Presented
+            : RfqStatus.Active
+        : RfqStatus.Draft;
 
     public QuoteStatus? QuoteStatus => (Lifecycle as OpenRfq)?.QuoteStatus;
 
     public QuoteRequestReason? QuoteRequestReason => (Lifecycle as OpenRfq)?.QuoteRequestReason;
+
+    public QuoteId? CurrentQuoteId => (Lifecycle as OpenRfq)?.CurrentQuoteId;
 
     public RfqLifecycle Lifecycle { get; private set; }
 
@@ -253,6 +259,68 @@ public sealed class RfqCase
         SetOwnership(traderId, true);
     }
 
+    public void ConfirmQuote(
+        QuoteId quoteId,
+        RevisionId revisionId,
+        long expectedVersion)
+    {
+        var open = EnsureOpen(expectedVersion);
+        if (open.Status != OpenRfqStatus.Active)
+        {
+            throw new InvalidOperationException("A Presented RFQ cannot confirm a quote.");
+        }
+
+        if (open.CurrentRevisionId != revisionId)
+        {
+            throw new InvalidOperationException(
+                "The WorkingQuote does not belong to the current Revision.");
+        }
+
+        if (open.QuoteStatus != Domain.QuoteStatus.Requested
+            || open.CurrentQuoteId is not null)
+        {
+            throw new InvalidOperationException(
+                "A current ConfirmedQuote is already active.");
+        }
+
+        CurrentVersion++;
+        Lifecycle = new OpenRfq(
+            open.CurrentRevisionId,
+            open.ContactOwnerId,
+            open.AssignedTraderId,
+            Domain.QuoteStatus.Quoted,
+            null,
+            open.Owned,
+            OpenRfqStatus.Active,
+            quoteId);
+    }
+
+    public void Present(long expectedVersion)
+    {
+        var open = EnsureOpen(expectedVersion);
+        if (open.Status != OpenRfqStatus.Active)
+        {
+            throw new InvalidOperationException("Only an Active RFQ can be Presented.");
+        }
+
+        EnsureCurrentConfirmedQuote(open);
+        CurrentVersion++;
+        Lifecycle = CopyOpen(open, OpenRfqStatus.Presented);
+    }
+
+    public void Unpresent(long expectedVersion)
+    {
+        var open = EnsureOpen(expectedVersion);
+        if (open.Status != OpenRfqStatus.Presented)
+        {
+            throw new InvalidOperationException("Only a Presented RFQ can be Unpresented.");
+        }
+
+        EnsureCurrentConfirmedQuote(open);
+        CurrentVersion++;
+        Lifecycle = CopyOpen(open, OpenRfqStatus.Active);
+    }
+
     private void OpenInitialRevision()
     {
         Lifecycle = new OpenRfq(
@@ -275,15 +343,7 @@ public sealed class RfqCase
 
     private void EnsureOpenCurrent(long expectedVersion)
     {
-        if (Lifecycle is not OpenRfq)
-        {
-            throw new InvalidOperationException("Ownership can only change for an Open RFQ.");
-        }
-
-        if (CurrentVersion != expectedVersion)
-        {
-            throw new InvalidOperationException("The RFQ Case was changed by another user.");
-        }
+        _ = EnsureOpen(expectedVersion);
     }
 
     private void SetOwnership(UserId assignedTraderId, bool owned)
@@ -298,8 +358,45 @@ public sealed class RfqCase
             assignedTraderId,
             open.QuoteStatus,
             open.QuoteRequestReason,
-            owned);
+            owned,
+            open.Status,
+            open.CurrentQuoteId);
     }
+
+    private OpenRfq EnsureOpen(long expectedVersion)
+    {
+        if (Lifecycle is not OpenRfq open)
+        {
+            throw new InvalidOperationException("The RFQ Case is not Open.");
+        }
+
+        if (CurrentVersion != expectedVersion)
+        {
+            throw new InvalidOperationException("The RFQ Case was changed by another user.");
+        }
+
+        return open;
+    }
+
+    private static void EnsureCurrentConfirmedQuote(OpenRfq open)
+    {
+        if (open.QuoteStatus != Domain.QuoteStatus.Quoted
+            || open.CurrentQuoteId is null)
+        {
+            throw new InvalidOperationException(
+                "Presentation requires a current valid ConfirmedQuote.");
+        }
+    }
+
+    private static OpenRfq CopyOpen(OpenRfq open, OpenRfqStatus status) => new(
+        open.CurrentRevisionId,
+        open.ContactOwnerId,
+        open.AssignedTraderId,
+        open.QuoteStatus,
+        open.QuoteRequestReason,
+        open.Owned,
+        status,
+        open.CurrentQuoteId);
 
     private static void ValidateConfirmation(
         decimal? notional,

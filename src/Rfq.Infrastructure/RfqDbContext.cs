@@ -29,6 +29,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
 
     internal DbSet<WorkingQuoteEntity> WorkingQuotes => Set<WorkingQuoteEntity>();
 
+    internal DbSet<ConfirmedQuoteEntity> ConfirmedQuotes => Set<ConfirmedQuoteEntity>();
+
     internal DbSet<CalculationFailureLogEntity> CalculationFailureLogs =>
         Set<CalculationFailureLogEntity>();
 
@@ -150,6 +152,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .HasMaxLength(30);
         current.Property(entity => entity.CurrentRevisionId)
             .HasColumnName("current_revision_id");
+        current.Property(entity => entity.CurrentQuoteId)
+            .HasColumnName("current_quote_id");
         current.Property(entity => entity.Version)
             .HasColumnName("version")
             .IsConcurrencyToken();
@@ -198,6 +202,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
         user.Property(entity => entity.Roles)
             .HasColumnName("roles")
             .HasColumnType("text[]");
+        user.Property(entity => entity.DefaultQuoteExpiryMinutes)
+            .HasColumnName("default_quote_expiry_minutes");
         user.HasOne<DeskEntity>()
             .WithMany()
             .HasForeignKey(entity => entity.DeskId)
@@ -328,6 +334,57 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .HasForeignKey<WorkingQuoteEntity>(entity => entity.RevisionId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        var confirmedQuote = modelBuilder.Entity<ConfirmedQuoteEntity>();
+        confirmedQuote.ToTable("confirmed_quotes");
+        confirmedQuote.HasKey(entity => entity.QuoteId);
+        confirmedQuote.Property(entity => entity.QuoteId)
+            .HasColumnName("quote_id")
+            .ValueGeneratedNever();
+        confirmedQuote.Property(entity => entity.RevisionId)
+            .HasColumnName("revision_id");
+        confirmedQuote.Property(entity => entity.SecurityId)
+            .HasColumnName("security_id")
+            .HasMaxLength(100);
+        confirmedQuote.Property(entity => entity.SettlementDate)
+            .HasColumnName("settlement_date")
+            .HasColumnType("date");
+        confirmedQuote.Property(entity => entity.ConfirmedBy)
+            .HasColumnName("confirmed_by")
+            .HasMaxLength(100);
+        confirmedQuote.Property(entity => entity.ConfirmedAt)
+            .HasColumnName("confirmed_at")
+            .HasColumnType("timestamp with time zone");
+        confirmedQuote.Property(entity => entity.Mode)
+            .HasColumnName("mode")
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        confirmedQuote.Property(entity => entity.CalculatedPayloadJson)
+            .HasColumnName("calculated_payload")
+            .HasColumnType("jsonb");
+        confirmedQuote.Property(entity => entity.ManualPayloadJson)
+            .HasColumnName("manual_payload")
+            .HasColumnType("jsonb");
+        confirmedQuote.Property(entity => entity.ExpiryMinutes)
+            .HasColumnName("expiry_minutes");
+        confirmedQuote.Property(entity => entity.ExpiresAt)
+            .HasColumnName("expires_at")
+            .HasColumnType("timestamp with time zone");
+        confirmedQuote.Property(entity => entity.RequestReasonAnswered)
+            .HasColumnName("request_reason_answered")
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        confirmedQuote.HasOne(entity => entity.Revision)
+            .WithMany()
+            .HasForeignKey(entity => entity.RevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        confirmedQuote.HasIndex(entity => new { entity.RevisionId, entity.ConfirmedAt })
+            .HasDatabaseName("ix_confirmed_quotes_revision_id_confirmed_at");
+
+        current.HasOne(entity => entity.CurrentQuote)
+            .WithMany()
+            .HasForeignKey(entity => entity.CurrentQuoteId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         var calculationFailure = modelBuilder.Entity<CalculationFailureLogEntity>();
         calculationFailure.ToTable("calculation_failure_logs");
         calculationFailure.HasKey(entity => entity.FailureLogId);
@@ -415,6 +472,8 @@ internal sealed class CaseCurrentEntity
 
     public Guid CurrentRevisionId { get; set; }
 
+    public Guid? CurrentQuoteId { get; set; }
+
     public long Version { get; set; }
 
     public string ContactOwnerId { get; set; } = string.Empty;
@@ -426,6 +485,8 @@ internal sealed class CaseCurrentEntity
     public RfqCaseEntity RfqCase { get; set; } = null!;
 
     public RfqRevisionEntity CurrentRevision { get; set; } = null!;
+
+    public ConfirmedQuoteEntity? CurrentQuote { get; set; }
 }
 
 internal sealed class RfqRevisionEntity
@@ -479,6 +540,23 @@ internal sealed class WorkingQuoteEntity
 
     public string UpdatedBy { get; set; } = string.Empty;
 
+    public RfqRevisionEntity Revision { get; set; } = null!;
+}
+
+internal sealed class ConfirmedQuoteEntity
+{
+    public Guid QuoteId { get; set; }
+    public Guid RevisionId { get; set; }
+    public string SecurityId { get; set; } = string.Empty;
+    public DateOnly SettlementDate { get; set; }
+    public string ConfirmedBy { get; set; } = string.Empty;
+    public DateTimeOffset ConfirmedAt { get; set; }
+    public WorkingQuoteMode Mode { get; set; }
+    public string? CalculatedPayloadJson { get; set; }
+    public string? ManualPayloadJson { get; set; }
+    public int? ExpiryMinutes { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public QuoteRequestReason RequestReasonAnswered { get; set; }
     public RfqRevisionEntity Revision { get; set; } = null!;
 }
 

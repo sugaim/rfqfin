@@ -12,6 +12,8 @@ public sealed record SalesRfqListItem(
     string? QuoteStatus,
     string? QuoteRequestReason,
     Guid CurrentRevisionId,
+    Guid? CurrentQuoteId,
+    long CurrentVersion,
     string RevisionStatus,
     string ContactOwnerId,
     string AssignedTraderId,

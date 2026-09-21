@@ -18,6 +18,8 @@ internal sealed class MasterUserEntity
     public string DeskId { get; set; } = string.Empty;
 
     public string[] Roles { get; set; } = [];
+
+    public int? DefaultQuoteExpiryMinutes { get; set; }
 }
 
 internal sealed class CategoryEntity

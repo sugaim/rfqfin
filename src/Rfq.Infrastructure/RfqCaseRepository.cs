@@ -48,6 +48,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                 QuoteRequestReason = rfqCase.QuoteRequestReason,
                 CurrentRevisionId = revision.RevisionId,
                 CurrentRevision = revision,
+                CurrentQuoteId = rfqCase.CurrentQuoteId?.Value,
                 Version = rfqCase.CurrentVersion,
                 ContactOwnerId = rfqCase.ContactOwnerId.Value,
                 AssignedTraderId = rfqCase.AssignedTraderId.Value,
@@ -101,7 +102,17 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                 entity.Current.QuoteStatus
                     ?? throw new InvalidOperationException("Open RFQ is missing QuoteStatus."),
                 entity.Current.QuoteRequestReason,
-                entity.Current.Owned),
+                entity.Current.Owned,
+                entity.Current.RfqStatus switch
+                {
+                    RfqStatus.Active => OpenRfqStatus.Active,
+                    RfqStatus.Presented => OpenRfqStatus.Presented,
+                    _ => throw new InvalidOperationException(
+                        "Open RFQ has an invalid RFQ status."),
+                },
+                entity.Current.CurrentQuoteId is null
+                    ? null
+                    : new QuoteId(entity.Current.CurrentQuoteId.Value)),
             _ => throw new InvalidOperationException("Unsupported RFQ lifecycle."),
         };
 
@@ -145,6 +156,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         entity.Current.QuoteStatus = rfqCase.QuoteStatus;
         entity.Current.QuoteRequestReason = rfqCase.QuoteRequestReason;
         entity.Current.CurrentRevisionId = rfqCase.InitialRevision.RevisionId.Value;
+        entity.Current.CurrentQuoteId = rfqCase.CurrentQuoteId?.Value;
         entity.Current.ContactOwnerId = rfqCase.ContactOwnerId.Value;
         entity.Current.AssignedTraderId = rfqCase.AssignedTraderId.Value;
         entity.Current.Owned = rfqCase.Owned;
@@ -191,6 +203,8 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                     ? null
                     : entity.Current.QuoteRequestReason.Value.ToString(),
                 entity.Current.CurrentRevisionId,
+                entity.Current.CurrentQuoteId,
+                entity.Current.Version,
                 entity.Current.CurrentRevision.Status.ToString(),
                 entity.Current.ContactOwnerId,
                 entity.Current.AssignedTraderId,
@@ -224,6 +238,10 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         var clientIds = cases.Select(item => item.ClientId).Distinct().ToArray();
         var securityIds = cases.Select(item => item.SecurityId).Distinct().ToArray();
         var revisionIds = cases.Select(item => item.Current.CurrentRevisionId).ToArray();
+        var currentQuoteIds = cases
+            .Where(item => item.Current.CurrentQuoteId != null)
+            .Select(item => item.Current.CurrentQuoteId!.Value)
+            .ToArray();
         var clients = await dbContext.Clients
             .AsNoTracking()
             .Where(item => clientIds.Contains(item.ClientId))
@@ -236,6 +254,10 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             .AsNoTracking()
             .Where(item => revisionIds.Contains(item.RevisionId))
             .ToDictionaryAsync(item => item.RevisionId, cancellationToken);
+        var confirmedQuotes = await dbContext.ConfirmedQuotes
+            .AsNoTracking()
+            .Where(item => currentQuoteIds.Contains(item.QuoteId))
+            .ToDictionaryAsync(item => item.QuoteId, cancellationToken);
 
         return cases.Select(entity =>
         {
@@ -243,6 +265,11 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             securities.TryGetValue(entity.SecurityId, out var security);
             quotes.TryGetValue(entity.Current.CurrentRevisionId, out var quoteEntity);
             var quote = quoteEntity is null ? null : WorkingQuoteMapper.ToDomain(quoteEntity);
+            ConfirmedQuoteEntity? confirmedQuote = null;
+            if (entity.Current.CurrentQuoteId is not null)
+            {
+                confirmedQuotes.TryGetValue(entity.Current.CurrentQuoteId.Value, out confirmedQuote);
+            }
             return new TraderRfqListItem(
                 entity.CaseId,
                 entity.ClientId,
@@ -259,6 +286,9 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                     ? null
                     : entity.Current.QuoteRequestReason.Value.ToString(),
                 entity.Current.CurrentRevisionId,
+                entity.Current.CurrentQuoteId,
+                confirmedQuote?.ConfirmedAt,
+                confirmedQuote?.ExpiresAt,
                 entity.Current.CurrentRevision.QuoteSeedRevisionId,
                 entity.Current.ContactOwnerId,
                 entity.Current.AssignedTraderId,

@@ -12,7 +12,9 @@ public sealed record OpenRfq : RfqLifecycle
         UserId assignedTraderId,
         QuoteStatus quoteStatus,
         QuoteRequestReason? quoteRequestReason,
-        bool owned)
+        bool owned,
+        OpenRfqStatus status = OpenRfqStatus.Active,
+        QuoteId? currentQuoteId = null)
     {
         if (quoteStatus == QuoteStatus.Requested && quoteRequestReason is null)
         {
@@ -28,12 +30,35 @@ public sealed record OpenRfq : RfqLifecycle
                 nameof(quoteRequestReason));
         }
 
+        if (quoteStatus == QuoteStatus.Requested && currentQuoteId is not null)
+        {
+            throw new ArgumentException(
+                "A Requested RFQ cannot have a current ConfirmedQuote.",
+                nameof(currentQuoteId));
+        }
+
+        if (quoteStatus == QuoteStatus.Quoted && currentQuoteId is null)
+        {
+            throw new ArgumentException(
+                "A Quoted RFQ requires a current ConfirmedQuote.",
+                nameof(currentQuoteId));
+        }
+
+        if (status == OpenRfqStatus.Presented && quoteStatus != QuoteStatus.Quoted)
+        {
+            throw new ArgumentException(
+                "Presented requires QuoteStatus Quoted.",
+                nameof(status));
+        }
+
         CurrentRevisionId = currentRevisionId;
         ContactOwnerId = contactOwnerId;
         AssignedTraderId = assignedTraderId;
         QuoteStatus = quoteStatus;
         QuoteRequestReason = quoteRequestReason;
         Owned = owned;
+        Status = status;
+        CurrentQuoteId = currentQuoteId;
     }
 
     public RevisionId CurrentRevisionId { get; }
@@ -47,6 +72,16 @@ public sealed record OpenRfq : RfqLifecycle
     public QuoteRequestReason? QuoteRequestReason { get; }
 
     public bool Owned { get; }
+
+    public OpenRfqStatus Status { get; }
+
+    public QuoteId? CurrentQuoteId { get; }
+}
+
+public enum OpenRfqStatus
+{
+    Active,
+    Presented,
 }
 
 public enum RfqLifecycleKind

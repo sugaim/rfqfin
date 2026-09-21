@@ -12,7 +12,9 @@ public sealed class RfqsController(
     ConfirmInitialDraft confirmInitialDraft,
     ConfirmNewRfq confirmNewRfq,
     DiscardInitialDraft discardInitialDraft,
-    GetActiveSalesRfqs getActiveSalesRfqs) : ControllerBase
+    GetActiveSalesRfqs getActiveSalesRfqs,
+    PresentQuote presentQuote,
+    UnpresentQuote unpresentQuote) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<InitialRfqResponse>> Create(
@@ -121,6 +123,8 @@ public sealed class RfqsController(
             item.QuoteStatus,
             item.QuoteRequestReason,
             item.CurrentRevisionId,
+            item.CurrentQuoteId,
+            item.CurrentVersion,
             item.RevisionStatus,
             item.ContactOwnerId,
             item.AssignedTraderId,
@@ -130,6 +134,33 @@ public sealed class RfqsController(
             item.SalesAndTradingMessage,
             item.Version,
             item.CreatedAt)));
+    }
+
+    [HttpPost("{caseId:long}/present")]
+    public Task<ActionResult<PresentationResult>> Present(
+        long caseId,
+        PresentationRequest request,
+        CancellationToken cancellationToken) => ExecutePresentationAsync(() =>
+            presentQuote.ExecuteAsync(caseId, request.ExpectedCurrentVersion, cancellationToken));
+
+    [HttpPost("{caseId:long}/unpresent")]
+    public Task<ActionResult<PresentationResult>> Unpresent(
+        long caseId,
+        PresentationRequest request,
+        CancellationToken cancellationToken) => ExecutePresentationAsync(() =>
+            unpresentQuote.ExecuteAsync(caseId, request.ExpectedCurrentVersion, cancellationToken));
+
+    private async Task<ActionResult<PresentationResult>> ExecutePresentationAsync(
+        Func<Task<PresentationResult>> action)
+    {
+        try
+        {
+            return Ok(await action());
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
+        }
     }
 
     private static CreateDraftCommand ToCommand(CreateDraftRequest request) => new(
@@ -204,6 +235,9 @@ public sealed record UpdateInitialDraftRequest(
 public sealed record DiscardInitialDraftRequest(
     [Range(1, long.MaxValue)] long ExpectedVersion);
 
+public sealed record PresentationRequest(
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
+
 public sealed record InitialRfqResponse(
     long CaseId,
     Guid RevisionId,
@@ -233,6 +267,8 @@ public sealed record SalesRfqResponse(
     string? QuoteStatus,
     string? QuoteRequestReason,
     Guid CurrentRevisionId,
+    Guid? CurrentQuoteId,
+    long CurrentVersion,
     string RevisionStatus,
     string ContactOwnerId,
     string AssignedTraderId,

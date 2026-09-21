@@ -5,16 +5,25 @@ namespace Rfq.Api.Controllers;
 
 [ApiController]
 [Route("api/current-user")]
-public sealed class CurrentUserController(ICurrentUser currentUser) : ControllerBase
+public sealed class CurrentUserController(
+    ICurrentUser currentUser,
+    IUserDirectory userDirectory) : ControllerBase
 {
     [HttpGet]
-    public ActionResult<CurrentUserResponse> Get() => Ok(new CurrentUserResponse(
-        currentUser.User.UserId.Value,
-        currentUser.User.Roles.Select(role => role.ToString()).Order().ToArray(),
-        currentUser.User.DeskId));
+    public async Task<ActionResult<CurrentUserResponse>> Get(
+        CancellationToken cancellationToken)
+    {
+        var user = await userDirectory.ResolveAsync(currentUser.User.UserId, cancellationToken);
+        return Ok(new CurrentUserResponse(
+            currentUser.User.UserId.Value,
+            currentUser.User.Roles.Select(role => role.ToString()).Order().ToArray(),
+            currentUser.User.DeskId,
+            user?.DefaultQuoteExpiryMinutes));
+    }
 }
 
 public sealed record CurrentUserResponse(
     string UserId,
     IReadOnlyList<string> Roles,
-    string DeskId);
+    string DeskId,
+    int? DefaultQuoteExpiryMinutes);

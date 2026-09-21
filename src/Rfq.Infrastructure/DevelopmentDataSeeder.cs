@@ -74,6 +74,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 Name = "国債 トレーダー",
                 DeskId = "jpy-credit",
                 Roles = ["Trader"],
+                DefaultQuoteExpiryMinutes = 5,
             },
             new MasterUserEntity
             {
@@ -81,6 +82,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 Name = "社債 トレーダー",
                 DeskId = "jpy-credit",
                 Roles = ["Trader"],
+                DefaultQuoteExpiryMinutes = null,
             });
 
         dbContext.Categories.AddRange(

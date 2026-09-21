@@ -23,6 +23,11 @@ public readonly record struct RevisionId(Guid Value)
     public static RevisionId New() => new(Guid.NewGuid());
 }
 
+public readonly record struct QuoteId(Guid Value)
+{
+    public static QuoteId New() => new(Guid.NewGuid());
+}
+
 public sealed record ClientId
 {
     private ClientId(string value)

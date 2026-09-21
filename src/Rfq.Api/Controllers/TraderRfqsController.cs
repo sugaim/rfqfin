@@ -15,7 +15,8 @@ public sealed class TraderRfqsController(
     TakeOverRfq takeOverRfq,
     CalculateWorkingQuote calculateWorkingQuote,
     ChangeWorkingQuoteMode changeWorkingQuoteMode,
-    UpdateManualWorkingQuote updateManualWorkingQuote) : ControllerBase
+    UpdateManualWorkingQuote updateManualWorkingQuote,
+    ConfirmQuote confirmQuote) : ControllerBase
 {
     [HttpGet("active")]
     public async Task<ActionResult<IReadOnlyList<TraderRfqListItem>>> GetActive(
@@ -124,6 +125,18 @@ public sealed class TraderRfqsController(
                 request.ExpectedWorkingQuoteVersion,
                 cancellationToken));
 
+    [HttpPost("{caseId:long}/confirm-quote")]
+    public Task<ActionResult<ConfirmQuoteResult>> ConfirmQuote(
+        long caseId,
+        ConfirmQuoteRequest request,
+        CancellationToken cancellationToken) => ExecuteConfirmAsync(() =>
+            confirmQuote.ExecuteAsync(
+                caseId,
+                request.ExpiryMinutes,
+                request.ExpectedCurrentVersion,
+                request.ExpectedWorkingQuoteVersion,
+                cancellationToken));
+
     private async Task<ActionResult<OwnershipResult>> ExecuteAsync(
         Func<Task<OwnershipResult>> action)
     {
@@ -155,6 +168,19 @@ public sealed class TraderRfqsController(
             problem.Extensions["code"] = exception.Code;
             problem.Extensions["failureLogId"] = exception.FailureLogId;
             return UnprocessableEntity(problem);
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
+        }
+    }
+
+    private async Task<ActionResult<ConfirmQuoteResult>> ExecuteConfirmAsync(
+        Func<Task<ConfirmQuoteResult>> action)
+    {
+        try
+        {
+            return Ok(await action());
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -207,5 +233,10 @@ public sealed record ChangeWorkingQuoteModeRequest(
 public sealed record UpdateManualWorkingQuoteRequest(
     decimal? Price,
     decimal? FinalSimpleYield,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    [Range(1, long.MaxValue)] long ExpectedWorkingQuoteVersion);
+
+public sealed record ConfirmQuoteRequest(
+    [Range(1, int.MaxValue)] int? ExpiryMinutes,
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
     [Range(1, long.MaxValue)] long ExpectedWorkingQuoteVersion);

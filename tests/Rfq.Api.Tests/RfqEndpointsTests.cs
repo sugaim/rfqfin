@@ -219,9 +219,64 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         var restoredCalculated = await AssertWorkingQuoteOkAsync(calculatedModeResponse);
         Assert.Equal(calculated.Calculated, restoredCalculated.Calculated);
 
+        var confirmQuoteResponse = await traderA.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/confirm-quote",
+            new
+            {
+                ExpiryMinutes = 5,
+                ExpectedCurrentVersion = pickedUp.CurrentVersion,
+                ExpectedWorkingQuoteVersion = restoredCalculated.Version,
+            });
+        var confirmedQuote = await AssertQuoteConfirmedAsync(confirmQuoteResponse);
+        Assert.Equal("Quoted", confirmedQuote.QuoteStatus);
+        Assert.Equal("Active", confirmedQuote.RfqStatus);
+        Assert.Equal(restoredCalculated.Calculated, confirmedQuote.Calculated);
+        Assert.Equal(confirmedQuote.ExpiresAt, confirmedQuote.ConfirmedAt?.AddMinutes(5));
+
+        var secondConfirm = await traderA.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/confirm-quote",
+            new
+            {
+                ExpiryMinutes = 5,
+                ExpectedCurrentVersion = confirmedQuote.CurrentVersion,
+                ExpectedWorkingQuoteVersion = restoredCalculated.Version,
+            });
+        Assert.Equal(HttpStatusCode.Conflict, secondConfirm.StatusCode);
+
+        var editQuoted = await traderA.PutAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/working-quote/calculate",
+            new
+            {
+                Driver = "Price",
+                Value = 98m,
+                SimpleYieldSlide = 0m,
+                ExpectedCurrentVersion = confirmedQuote.CurrentVersion,
+                ExpectedWorkingQuoteVersion = restoredCalculated.Version,
+            });
+        Assert.Equal(HttpStatusCode.Conflict, editQuoted.StatusCode);
+
+        var forbiddenPresent = await traderA.PostAsJsonAsync(
+            $"/api/rfqs/{created.CaseId}/present",
+            new { ExpectedCurrentVersion = confirmedQuote.CurrentVersion });
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenPresent.StatusCode);
+
+        var presentResponse = await sales.PostAsJsonAsync(
+            $"/api/rfqs/{created.CaseId}/present",
+            new { ExpectedCurrentVersion = confirmedQuote.CurrentVersion });
+        var presented = await AssertPresentationOkAsync(presentResponse);
+        Assert.Equal("Presented", presented.RfqStatus);
+        Assert.Equal("Quoted", presented.QuoteStatus);
+
+        var unpresentResponse = await sales.PostAsJsonAsync(
+            $"/api/rfqs/{created.CaseId}/unpresent",
+            new { ExpectedCurrentVersion = presented.CurrentVersion });
+        var unpresented = await AssertPresentationOkAsync(unpresentResponse);
+        Assert.Equal("Active", unpresented.RfqStatus);
+        Assert.Equal(confirmedQuote.QuoteId, unpresented.QuoteId);
+
         var release = await traderA.PostAsJsonAsync(
             $"/api/trader/rfqs/{created.CaseId}/release",
-            new { ExpectedVersion = pickedUp.CurrentVersion });
+            new { ExpectedVersion = unpresented.CurrentVersion });
         var released = await AssertOwnershipOkAsync(release);
         Assert.False(released.Owned);
 
@@ -354,6 +409,28 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             await response.Content.ReadFromJsonAsync<WorkingQuoteBody>());
     }
 
+    private static async Task<ConfirmQuoteBody> AssertQuoteConfirmedAsync(
+        HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.OK,
+            $"Expected 200 OK but received {(int)response.StatusCode}: {responseBody}");
+        return Assert.IsType<ConfirmQuoteBody>(
+            await response.Content.ReadFromJsonAsync<ConfirmQuoteBody>());
+    }
+
+    private static async Task<PresentationBody> AssertPresentationOkAsync(
+        HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.OK,
+            $"Expected 200 OK but received {(int)response.StatusCode}: {responseBody}");
+        return Assert.IsType<PresentationBody>(
+            await response.Content.ReadFromJsonAsync<PresentationBody>());
+    }
+
     private sealed record InitialRfqBody(
         long CaseId,
         Guid RevisionId,
@@ -421,6 +498,27 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     private sealed record ManualQuoteBody(
         decimal? Price,
         decimal? FinalSimpleYield);
+
+    private sealed record ConfirmQuoteBody(
+        long CaseId,
+        Guid QuoteId,
+        Guid RevisionId,
+        string RfqStatus,
+        string QuoteStatus,
+        string Mode,
+        CalculatedQuoteBody? Calculated,
+        ManualQuoteBody? Manual,
+        int? ExpiryMinutes,
+        DateTimeOffset? ConfirmedAt,
+        DateTimeOffset? ExpiresAt,
+        long CurrentVersion);
+
+    private sealed record PresentationBody(
+        long CaseId,
+        Guid QuoteId,
+        string RfqStatus,
+        string QuoteStatus,
+        long CurrentVersion);
 
     private sealed record SecurityBody(string SecurityId);
     private sealed record ClientBody(string ClientId);

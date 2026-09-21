@@ -39,7 +39,8 @@ public sealed class MastersController(
                 user.UserId,
                 user.Name,
                 user.Roles.Select(item => item.ToString()).Order().ToArray(),
-                user.DeskId)));
+                user.DeskId,
+                user.DefaultQuoteExpiryMinutes)));
     }
 }
 
@@ -47,4 +48,5 @@ public sealed record UserSummaryResponse(
     string UserId,
     string Name,
     IReadOnlyList<string> Roles,
-    string DeskId);
+    string DeskId,
+    int? DefaultQuoteExpiryMinutes);

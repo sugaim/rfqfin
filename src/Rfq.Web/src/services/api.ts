@@ -51,6 +51,8 @@ export interface SalesRfq {
   quoteStatus: string | null
   quoteRequestReason: string | null
   currentRevisionId: string
+  currentQuoteId: string | null
+  currentVersion: number
   revisionStatus: string
   contactOwnerId: string
   assignedTraderId: string
@@ -83,6 +85,7 @@ export interface UserSummary {
   name: string
   roles: string[]
   deskId: string
+  defaultQuoteExpiryMinutes: number | null
 }
 
 export interface RfqDefaults {
@@ -105,6 +108,7 @@ export interface CurrentUserResponse {
   userId: string
   roles: string[]
   deskId: string
+  defaultQuoteExpiryMinutes: number | null
 }
 
 export interface TraderRfq {
@@ -119,6 +123,9 @@ export interface TraderRfq {
   quoteStatus: string | null
   quoteRequestReason: string | null
   currentRevisionId: string
+  currentQuoteId: string | null
+  confirmedAt: string | null
+  expiresAt: string | null
   quoteSeedRevisionId: string | null
   contactOwnerId: string
   assignedTraderId: string
@@ -165,6 +172,29 @@ export interface OwnershipResult {
   caseId: number
   assignedTraderId: string
   owned: boolean
+  currentVersion: number
+}
+
+export interface ConfirmQuoteResult {
+  caseId: number
+  quoteId: string
+  revisionId: string
+  rfqStatus: string
+  quoteStatus: string
+  mode: 'Calculated' | 'Manual'
+  calculated: CalculatedQuotePayload | null
+  manual: ManualQuotePayload | null
+  confirmedAt: string
+  expiryMinutes: number | null
+  expiresAt: string | null
+  currentVersion: number
+}
+
+export interface PresentationResult {
+  caseId: number
+  quoteId: string
+  rfqStatus: string
+  quoteStatus: string
   currentVersion: number
 }
 
@@ -323,6 +353,41 @@ export const api = createApi({
         body,
       }),
     }),
+    confirmQuote: builder.mutation<
+      ConfirmQuoteResult,
+      {
+        caseId: number
+        expiryMinutes: number | null
+        expectedCurrentVersion: number
+        expectedWorkingQuoteVersion: number
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/trader/rfqs/${caseId}/confirm-quote`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    presentQuote: builder.mutation<
+      PresentationResult,
+      { caseId: number; expectedCurrentVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/present`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    unpresentQuote: builder.mutation<
+      PresentationResult,
+      { caseId: number; expectedCurrentVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/unpresent`,
+        method: 'POST',
+        body,
+      }),
+    }),
     searchClients: builder.query<ClientSearchResult[], string>({
       query: (q) => ({ url: '/masters/clients/search', params: { q } }),
       keepUnusedDataFor: 0,
@@ -348,6 +413,7 @@ export const {
   useAssignTraderMutation,
   useCalculateWorkingQuoteMutation,
   useChangeWorkingQuoteModeMutation,
+  useConfirmQuoteMutation,
   useConfirmDraftMutation,
   useConfirmNewRfqMutation,
   useCreateDraftMutation,
@@ -362,8 +428,10 @@ export const {
   useLazySearchClientsQuery,
   useLazySearchSecuritiesQuery,
   usePickUpRfqMutation,
+  usePresentQuoteMutation,
   useReleaseRfqMutation,
   useTakeOverRfqMutation,
   useUpdateManualWorkingQuoteMutation,
+  useUnpresentQuoteMutation,
   useUpdateDraftMutation,
 } = api

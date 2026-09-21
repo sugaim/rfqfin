@@ -29,6 +29,10 @@ public interface IRfqAuthorization
     void EnsureCanTakeOver(CurrentUser user, RfqCase rfqCase, bool confirmed);
 
     void EnsureCanQuote(CurrentUser user, QuoteAuthorizationState state);
+
+    void EnsureCanConfirmQuote(CurrentUser user, RfqCase rfqCase);
+
+    void EnsureCanPresent(CurrentUser user, RfqCase rfqCase);
 }
 
 public sealed class RfqAuthorization : IRfqAuthorization
@@ -129,6 +133,33 @@ public sealed class RfqAuthorization : IRfqAuthorization
         {
             throw new InvalidOperationException(
                 "WorkingQuote editing requires QuoteStatus Requested.");
+        }
+    }
+
+    public void EnsureCanConfirmQuote(CurrentUser user, RfqCase rfqCase)
+    {
+        EnsureRole(user, UserRole.Trader);
+        EnsureOpen(rfqCase);
+        if (!rfqCase.Owned || rfqCase.AssignedTraderId != user.UserId)
+        {
+            throw new UnauthorizedAccessException(
+                "Only the owning Trader can Confirm the WorkingQuote.");
+        }
+
+        if (rfqCase.QuoteStatus != Domain.QuoteStatus.Requested)
+        {
+            throw new InvalidOperationException(
+                "Quote Confirm requires QuoteStatus Requested.");
+        }
+    }
+
+    public void EnsureCanPresent(CurrentUser user, RfqCase rfqCase)
+    {
+        EnsureOpen(rfqCase);
+        if (rfqCase.ContactOwnerId != user.UserId)
+        {
+            throw new UnauthorizedAccessException(
+                "Only the current Contact Owner can Present or Unpresent the RFQ.");
         }
     }
 

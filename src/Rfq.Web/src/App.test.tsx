@@ -5,10 +5,12 @@ import type { ClientSearchResult, RfqDefaults, SalesRfq, SecuritySearchResult, T
 
 type GridRow = SalesRfq | TraderRfq
 type GridColumn = {
+  field?: string
   colId?: string
   valueGetter?: (params: { data: GridRow }) => unknown
   valueFormatter?: (params: { value: unknown }) => unknown
   cellEditor?: string
+  editable?: (params: { data: GridRow }) => boolean
 }
 
 vi.mock('ag-grid-react', () => ({
@@ -47,14 +49,18 @@ vi.mock('ag-grid-react', () => ({
               Edit Price {row.caseId}
             </button>
           )}
-          {columnDefs?.filter((column) => column.colId).map((column) => {
-            const value = column.valueGetter?.({ data: row })
+          {columnDefs?.filter((column) => column.colId || column.field === 'currentQuoteId').map((column) => {
+            const columnKey = column.colId ?? column.field!
+            const value = column.valueGetter
+              ? column.valueGetter({ data: row })
+              : (row as unknown as Record<string, unknown>)[columnKey]
             const display = column.valueFormatter?.({ value }) ?? value ?? ''
             return (
               <output
-                key={column.colId}
-                data-testid={`grid-${row.caseId}-${column.colId}`}
+                key={columnKey}
+                data-testid={`grid-${row.caseId}-${columnKey}`}
                 data-cell-editor={column.cellEditor ?? ''}
+                data-editable={column.editable?.({ data: row }) ? 'true' : 'false'}
               >
                 {String(display)}
               </output>
@@ -97,6 +103,7 @@ const baseProps: SalesScreenProps = {
   clients,
   securities,
   traders: [{ userId: 'trader-a', name: '国債 トレーダー' }],
+  currentUserId: 'sales-dev',
   isLoading: false,
   isError: false,
   isMutating: false,
@@ -108,6 +115,8 @@ const baseProps: SalesScreenProps = {
   onConfirmNew: vi.fn().mockResolvedValue(undefined),
   onConfirmDraft: vi.fn().mockResolvedValue(undefined),
   onDiscard: vi.fn().mockResolvedValue(undefined),
+  onPresent: vi.fn().mockResolvedValue(undefined),
+  onUnpresent: vi.fn().mockResolvedValue(undefined),
   onReload: vi.fn(),
 }
 
@@ -123,6 +132,8 @@ const draftRow: SalesRfq = {
   quoteStatus: null,
   quoteRequestReason: null,
   currentRevisionId: 'revision-1',
+  currentQuoteId: null,
+  currentVersion: 3,
   revisionStatus: 'Draft',
   contactOwnerId: 'sales-dev',
   assignedTraderId: 'trader-a',
@@ -219,6 +230,45 @@ describe('SalesScreen', () => {
       expectedVersion: 3,
     }))
   })
+
+  it('lets the Contact Owner Present an Active quoted RFQ', async () => {
+    const onPresent = vi.fn().mockResolvedValue(undefined)
+    const quoted = {
+      ...draftRow,
+      rfqStatus: 'Active',
+      revisionStatus: 'Confirmed',
+      quoteStatus: 'Quoted',
+      quoteRequestReason: null,
+      currentQuoteId: '00000000-0000-0000-0000-000000000301',
+      currentVersion: 7,
+    }
+    render(<SalesScreen {...baseProps} rfqs={[quoted]} onPresent={onPresent} />)
+    fireEvent.click(screen.getByText(/client-grid/))
+    fireEvent.click(screen.getByRole('button', { name: 'Present' }))
+
+    await waitFor(() => expect(onPresent).toHaveBeenCalledWith(101, 7))
+  })
+
+  it('shows the current quote ID in the same abbreviated form as Trader', () => {
+    render(
+      <SalesScreen
+        {...baseProps}
+        rfqs={[{
+          ...draftRow,
+          rfqStatus: 'Active',
+          revisionStatus: 'Confirmed',
+          quoteStatus: 'Quoted',
+          quoteRequestReason: null,
+          currentQuoteId: '12345678-1234-1234-1234-123456789abc',
+        }]}
+      />,
+    )
+
+    expect(screen.getByTestId('grid-101-currentQuoteId')).toHaveTextContent('12345678')
+    expect(screen.getByTestId('grid-101-currentQuoteId')).not.toHaveTextContent(
+      '12345678-1234-1234-1234-123456789abc',
+    )
+  })
 })
 
 const traderRow: TraderRfq = {
@@ -233,6 +283,9 @@ const traderRow: TraderRfq = {
   quoteStatus: 'Requested',
   quoteRequestReason: 'Initial',
   currentRevisionId: '00000000-0000-0000-0000-000000000201',
+  currentQuoteId: null,
+  confirmedAt: null,
+  expiresAt: null,
   quoteSeedRevisionId: null,
   contactOwnerId: 'sales-dev',
   assignedTraderId: 'trader-a',
@@ -254,6 +307,7 @@ const traderProps: TraderScreenProps = {
     { userId: 'trader-b', name: 'Trader B' },
   ],
   currentUserId: 'trader-a',
+  defaultExpiryMinutes: 5,
   isLoading: false,
   isError: false,
   isMutating: false,
@@ -264,6 +318,7 @@ const traderProps: TraderScreenProps = {
   onCalculate: vi.fn().mockResolvedValue(undefined),
   onChangeMode: vi.fn().mockResolvedValue(undefined),
   onUpdateManual: vi.fn().mockResolvedValue(undefined),
+  onConfirmQuote: vi.fn().mockResolvedValue(undefined),
   onReload: vi.fn(),
 }
 
@@ -405,5 +460,58 @@ describe('TraderScreen', () => {
     ]) {
       expect(screen.getByTestId(`grid-201-${column}`)).toBeEmptyDOMElement()
     }
+  })
+
+  it('confirms a populated quote using the trader default expiry', async () => {
+    const onConfirmQuote = vi.fn().mockResolvedValue(undefined)
+    const populated = {
+      ...traderRow,
+      owned: true,
+      calculated: {
+        driver: 'Price' as const,
+        driverValue: 99.5,
+        price: 99.5,
+        bbgYield: 0.8,
+        baseSimpleYield: 0.81,
+        simpleYieldSlide: 0.03,
+        finalSimpleYield: 0.84,
+        internalYield: 0.83,
+        gSpread: 5,
+        asw: 8,
+      },
+    }
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[populated]}
+        onConfirmQuote={onConfirmQuote}
+      />,
+    )
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Quote' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
+
+    await waitFor(() => expect(onConfirmQuote).toHaveBeenCalledWith(
+      expect.objectContaining({ caseId: 201 }),
+      5,
+    ))
+  })
+
+  it('locks quote editing after QuoteStatus becomes Quoted', () => {
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{
+          ...traderRow,
+          owned: true,
+          quoteStatus: 'Quoted',
+          quoteRequestReason: null,
+          currentQuoteId: '00000000-0000-0000-0000-000000000301',
+        }]}
+      />,
+    )
+
+    expect(screen.getByTestId('grid-201-price')).toHaveAttribute('data-editable', 'false')
+    expect(screen.getByRole('button', { name: 'Confirm Quote' })).toBeDisabled()
   })
 })

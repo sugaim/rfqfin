@@ -232,7 +232,8 @@ public sealed class PostgreSqlUserDirectory(RfqDbContext dbContext) : IUserDirec
         user.Roles
             .Select(role => Enum.Parse<UserRole>(role, ignoreCase: false))
             .ToHashSet(),
-        user.DeskId);
+        user.DeskId,
+        user.DefaultQuoteExpiryMinutes);
 }
 
 public sealed class PostgreSqlCategoryRouting(RfqDbContext dbContext) : ICategoryRouting

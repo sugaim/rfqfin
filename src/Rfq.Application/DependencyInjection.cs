@@ -24,6 +24,9 @@ public static class DependencyInjection
         services.AddScoped<CalculateWorkingQuote>();
         services.AddScoped<ChangeWorkingQuoteMode>();
         services.AddScoped<UpdateManualWorkingQuote>();
+        services.AddScoped<ConfirmQuote>();
+        services.AddScoped<PresentQuote>();
+        services.AddScoped<UnpresentQuote>();
 
         return services;
     }

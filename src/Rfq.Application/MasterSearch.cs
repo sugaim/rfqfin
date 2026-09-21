@@ -22,7 +22,8 @@ public sealed record UserSummary(
     string UserId,
     string Name,
     IReadOnlySet<UserRole> Roles,
-    string DeskId);
+    string DeskId,
+    int? DefaultQuoteExpiryMinutes = null);
 
 public interface ISecuritySearch
 {

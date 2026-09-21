@@ -5,13 +5,13 @@ import { AgGridReact } from 'ag-grid-react'
 import {
   useAssignTraderMutation,
   useCalculateWorkingQuoteMutation, useChangeWorkingQuoteModeMutation,
-  useConfirmDraftMutation, useConfirmNewRfqMutation, useCreateDraftMutation,
+  useConfirmDraftMutation, useConfirmNewRfqMutation, useConfirmQuoteMutation, useCreateDraftMutation,
   useDiscardDraftMutation, useGetActiveSalesRfqsQuery, useGetActiveTraderRfqsQuery,
   useGetCurrentUserQuery, useGetHealthQuery,
   useGetSystemDateQuery, useGetUsersQuery, useLazyResolveRfqDefaultsQuery,
   useLazySearchClientsQuery, useLazySearchSecuritiesQuery, usePickUpRfqMutation,
-  useReleaseRfqMutation, useTakeOverRfqMutation, useUpdateDraftMutation,
-  useUpdateManualWorkingQuoteMutation,
+  usePresentQuoteMutation, useReleaseRfqMutation, useTakeOverRfqMutation,
+  useUnpresentQuoteMutation, useUpdateDraftMutation, useUpdateManualWorkingQuoteMutation,
   type ClientSearchResult, type CreateDraftRequest, type RfqDefaults,
   type SalesRfq, type SecuritySearchResult, type TraderRfq, type UpdateDraftRequest,
 } from './services/api'
@@ -91,6 +91,7 @@ export interface SalesScreenProps {
   clients: ClientSearchResult[]
   securities: SecuritySearchResult[]
   traders: { userId: string; name: string }[]
+  currentUserId: string
   isLoading: boolean
   isError: boolean
   isMutating: boolean
@@ -102,17 +103,20 @@ export interface SalesScreenProps {
   onConfirmNew: (request: CreateDraftRequest) => Promise<void>
   onConfirmDraft: (caseId: number, request: UpdateDraftRequest) => Promise<void>
   onDiscard: (caseId: number, expectedVersion: number) => Promise<void>
+  onPresent: (caseId: number, expectedCurrentVersion: number) => Promise<void>
+  onUnpresent: (caseId: number, expectedCurrentVersion: number) => Promise<void>
   onReload: () => void | Promise<unknown>
 }
 
 export function SalesScreen(props: SalesScreenProps) {
   const {
-    rfqs, clients, securities, traders, isLoading, isError, isMutating,
+    rfqs, clients, securities, traders, currentUserId, isLoading, isError, isMutating,
     onClientSearch, onSecuritySearch, onResolveDefaults, onCreate, onUpdate,
-    onConfirmNew, onConfirmDraft, onDiscard, onReload,
+    onConfirmNew, onConfirmDraft, onDiscard, onPresent, onUnpresent, onReload,
   } = props
   const [form] = Form.useForm<RfqFormValues>()
   const [editingDraft, setEditingDraft] = useState<SalesRfq | null>(null)
+  const [selectedRfq, setSelectedRfq] = useState<SalesRfq | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [defaultsError, setDefaultsError] = useState(false)
   const [isResolvingDefaults, setIsResolvingDefaults] = useState(false)
@@ -139,6 +143,12 @@ export function SalesScreen(props: SalesScreenProps) {
     { field: 'revisionStatus', headerName: 'Revision', minWidth: 120 },
     { field: 'quoteStatus', headerName: 'Quote Status', minWidth: 130 },
     { field: 'quoteRequestReason', headerName: 'Reason', minWidth: 120 },
+    {
+      field: 'currentQuoteId',
+      headerName: 'Current Quote',
+      minWidth: 140,
+      valueFormatter: ({ value }) => value ? String(value).slice(0, 8) : '',
+    },
     { field: 'createdAt', headerName: 'Created', minWidth: 190, valueFormatter: ({ value }) => value ? new Date(String(value)).toLocaleString() : '' },
   ], [])
 
@@ -180,6 +190,7 @@ export function SalesScreen(props: SalesScreenProps) {
 
   const finishAction = async () => {
     setEditingDraft(null)
+    setSelectedRfq(null)
     form.resetFields()
     setDefaultsError(false)
     await onReload()
@@ -227,13 +238,20 @@ export function SalesScreen(props: SalesScreenProps) {
 
   const startNew = () => {
     setEditingDraft(null)
+    setSelectedRfq(null)
     form.resetFields()
     setActionError(null)
     setDefaultsError(false)
   }
 
   const editSelectedDraft = ({ data }: RowClickedEvent<SalesRfq>) => {
-    if (!data || data.revisionStatus !== 'Draft') return
+    if (!data) return
+    setSelectedRfq(data)
+    if (data.revisionStatus !== 'Draft') {
+      setEditingDraft(null)
+      form.resetFields()
+      return
+    }
     setEditingDraft(data)
     setActionError(null)
     setDefaultsError(false)
@@ -287,7 +305,36 @@ export function SalesScreen(props: SalesScreenProps) {
         </Spin>
       </Card>
 
-      <Card className="rfq-grid-card" title="Active RFQs" extra={<Button onClick={() => void onReload()}>Reload</Button>}>
+      <Card
+        className="rfq-grid-card"
+        title="Active RFQs"
+        extra={(
+          <Space>
+            <Button
+              disabled={!selectedRfq
+                || selectedRfq.contactOwnerId !== currentUserId
+                || selectedRfq.rfqStatus !== 'Active'
+                || selectedRfq.quoteStatus !== 'Quoted'
+                || isMutating}
+              onClick={() => selectedRfq
+                && void runAction(() => onPresent(selectedRfq.caseId, selectedRfq.currentVersion))}
+            >
+              Present
+            </Button>
+            <Button
+              disabled={!selectedRfq
+                || selectedRfq.contactOwnerId !== currentUserId
+                || selectedRfq.rfqStatus !== 'Presented'
+                || isMutating}
+              onClick={() => selectedRfq
+                && void runAction(() => onUnpresent(selectedRfq.caseId, selectedRfq.currentVersion))}
+            >
+              Unpresent
+            </Button>
+            <Button onClick={() => void onReload()}>Reload</Button>
+          </Space>
+        )}
+      >
         {isError && <Alert type="error" showIcon message="RFQs could not be loaded." className="grid-alert" />}
         <Spin spinning={isLoading}>
           <div className="rfq-grid" data-testid="rfq-grid">
@@ -303,6 +350,7 @@ export interface TraderScreenProps {
   rfqs: TraderRfq[]
   traders: { userId: string; name: string }[]
   currentUserId: string
+  defaultExpiryMinutes: number | null
   isLoading: boolean
   isError: boolean
   isMutating: boolean
@@ -322,6 +370,7 @@ export interface TraderScreenProps {
     price: number | null,
     finalSimpleYield: number | null,
   ) => Promise<void>
+  onConfirmQuote: (row: TraderRfq, expiryMinutes: number | null) => Promise<void>
   onReload: () => void | Promise<unknown>
 }
 
@@ -329,6 +378,7 @@ export function TraderScreen({
   rfqs,
   traders,
   currentUserId,
+  defaultExpiryMinutes,
   isLoading,
   isError,
   isMutating,
@@ -339,6 +389,7 @@ export function TraderScreen({
   onCalculate,
   onChangeMode,
   onUpdateManual,
+  onConfirmQuote,
   onReload,
 }: TraderScreenProps) {
   const [selected, setSelected] = useState<TraderRfq | null>(null)
@@ -346,6 +397,7 @@ export function TraderScreen({
   const [targetTraderId, setTargetTraderId] = useState<string>()
   const [actionError, setActionError] = useState(false)
   const [calculationStatus, setCalculationStatus] = useState<Record<number, string>>({})
+  const [expirySelections, setExpirySelections] = useState<Record<number, string>>({})
   const canEditQuote = (row?: TraderRfq) => Boolean(
     row
     && row.owned
@@ -366,10 +418,19 @@ export function TraderScreen({
     },
     { field: 'assignedTraderId', headerName: 'Assigned Trader', minWidth: 150 },
     { field: 'owned', headerName: 'Owned', minWidth: 100, valueFormatter: ({ value }) => value ? 'Yes' : 'No' },
+    { field: 'rfqStatus', headerName: 'RFQ Status', minWidth: 130 },
     { field: 'quoteStatus', headerName: 'Quote Status', minWidth: 130 },
     { field: 'quoteRequestReason', headerName: 'Reason', minWidth: 120 },
     { field: 'settlementDate', headerName: 'Settlement', minWidth: 130 },
     { field: 'workingQuoteMode', headerName: 'Mode', minWidth: 110 },
+    {
+      field: 'currentQuoteId',
+      headerName: 'Current Confirmed Quote',
+      minWidth: 210,
+      valueFormatter: ({ value }) => value ? String(value).slice(0, 8) : '',
+    },
+    { field: 'confirmedAt', headerName: 'Confirmed At', minWidth: 190, valueFormatter: ({ value }) => value ? new Date(String(value)).toLocaleString() : '' },
+    { field: 'expiresAt', headerName: 'Expires At', minWidth: 190, valueFormatter: ({ value }) => value ? new Date(String(value)).toLocaleString() : 'None' },
     {
       colId: 'price',
       headerName: 'Price',
@@ -526,6 +587,16 @@ export function TraderScreen({
 
   const pickUpNeedsConfirmation = pickUpTargets.length > 1
     || pickUpTargets.some((row) => row.assignedTraderId !== currentUserId)
+  const selectedExpiry = selected
+    ? expirySelections[selected.caseId] ?? (defaultExpiryMinutes?.toString() ?? 'none')
+    : undefined
+  const canConfirmQuote = Boolean(
+    selected
+    && canEditQuote(selected)
+    && (selected.workingQuoteMode === 'Calculated'
+      ? selected.calculated != null
+      : selected.manual?.price != null && selected.manual.finalSimpleYield != null),
+  )
 
   return (
     <Card
@@ -600,6 +671,33 @@ export function TraderScreen({
           }}
           style={{ width: 140 }}
         />
+        <Select
+          aria-label="Quote expiry"
+          value={selectedExpiry}
+          disabled={!selected || !canEditQuote(selected) || isMutating}
+          options={[
+            { value: 'none', label: 'Expiry: None' },
+            { value: '5', label: 'Expiry: 5 min' },
+            { value: '15', label: 'Expiry: 15 min' },
+            { value: '30', label: 'Expiry: 30 min' },
+          ]}
+          onChange={(value) => selected && setExpirySelections((current) => ({
+            ...current,
+            [selected.caseId]: value,
+          }))}
+          style={{ width: 150 }}
+        />
+        <Popconfirm
+          title={selected ? `Confirm quote for Case ${selected.caseId}?` : 'Confirm quote?'}
+          onConfirm={() => selected && void runAction(() => onConfirmQuote(
+            selected,
+            selectedExpiry === 'none' ? null : Number(selectedExpiry),
+          ))}
+        >
+          <Button type="primary" disabled={!canConfirmQuote || isMutating}>
+            Confirm Quote
+          </Button>
+        </Popconfirm>
       </Space>
       <Spin spinning={isLoading}>
         <div className="rfq-grid" data-testid="trader-rfq-grid">
@@ -648,6 +746,9 @@ export function App() {
   const [calculateWorkingQuote, calculateState] = useCalculateWorkingQuoteMutation()
   const [changeWorkingQuoteMode, changeModeState] = useChangeWorkingQuoteModeMutation()
   const [updateManualWorkingQuote, updateManualState] = useUpdateManualWorkingQuoteMutation()
+  const [confirmQuote, confirmQuoteState] = useConfirmQuoteMutation()
+  const [presentQuote, presentState] = usePresentQuoteMutation()
+  const [unpresentQuote, unpresentState] = useUnpresentQuoteMutation()
   const [searchClients] = useLazySearchClientsQuery()
   const [searchSecurities] = useLazySearchSecuritiesQuery()
   const [resolveDefaults] = useLazyResolveRfqDefaultsQuery()
@@ -657,7 +758,15 @@ export function App() {
   const systemDate = systemDateQuery.isLoading ? 'checking' : systemDateQuery.isError ? 'unavailable' : systemDateQuery.data?.date
   const handleClientSearch = async (query: string) => setClients(query.trim() ? await searchClients(query).unwrap() : [])
   const handleSecuritySearch = async (query: string) => setSecurities(query.trim() ? await searchSecurities(query).unwrap() : [])
-  const isMutating = [createState, updateState, confirmNewState, confirmState, discardState].some((state) => state.isLoading)
+  const isMutating = [
+    createState,
+    updateState,
+    confirmNewState,
+    confirmState,
+    discardState,
+    presentState,
+    unpresentState,
+  ].some((state) => state.isLoading)
   const isOwnershipMutating = [
     pickUpState,
     releaseState,
@@ -666,6 +775,7 @@ export function App() {
     calculateState,
     changeModeState,
     updateManualState,
+    confirmQuoteState,
   ].some((state) => state.isLoading)
   const traders = (tradersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))
 
@@ -689,6 +799,7 @@ export function App() {
           clients={clients}
           securities={securities}
           traders={traders}
+          currentUserId={currentUserQuery.data?.userId ?? configuredIdentity}
           isLoading={rfqsQuery.isLoading || rfqsQuery.isFetching}
           isError={rfqsQuery.isError}
           isMutating={isMutating}
@@ -700,6 +811,10 @@ export function App() {
           onConfirmNew={(request) => confirmNewRfq(request).unwrap().then(() => undefined)}
           onConfirmDraft={(caseId, body) => confirmDraft({ caseId, body }).unwrap().then(() => undefined)}
           onDiscard={(caseId, expectedVersion) => discardDraft({ caseId, expectedVersion }).unwrap()}
+          onPresent={(caseId, expectedCurrentVersion) =>
+            presentQuote({ caseId, expectedCurrentVersion }).unwrap().then(() => undefined)}
+          onUnpresent={(caseId, expectedCurrentVersion) =>
+            unpresentQuote({ caseId, expectedCurrentVersion }).unwrap().then(() => undefined)}
           onReload={rfqsQuery.refetch}
         />
       )}
@@ -708,6 +823,7 @@ export function App() {
           rfqs={traderRfqsQuery.data ?? []}
           traders={traders}
           currentUserId={currentUserQuery.data?.userId ?? configuredIdentity}
+          defaultExpiryMinutes={currentUserQuery.data?.defaultQuoteExpiryMinutes ?? null}
           isLoading={traderRfqsQuery.isLoading || traderRfqsQuery.isFetching}
           isError={traderRfqsQuery.isError}
           isMutating={isOwnershipMutating}
@@ -740,6 +856,13 @@ export function App() {
               caseId: row.caseId,
               price,
               finalSimpleYield,
+              expectedCurrentVersion: row.currentVersion,
+              expectedWorkingQuoteVersion: row.workingQuoteVersion,
+            }).unwrap().then(() => undefined)}
+          onConfirmQuote={(row, expiryMinutes) =>
+            confirmQuote({
+              caseId: row.caseId,
+              expiryMinutes,
               expectedCurrentVersion: row.currentVersion,
               expectedWorkingQuoteVersion: row.workingQuoteVersion,
             }).unwrap().then(() => undefined)}
