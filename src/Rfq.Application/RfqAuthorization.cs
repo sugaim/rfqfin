@@ -33,6 +33,16 @@ public interface IRfqAuthorization
     void EnsureCanConfirmQuote(CurrentUser user, RfqCase rfqCase);
 
     void EnsureCanPresent(CurrentUser user, RfqCase rfqCase);
+
+    void EnsureCanClose(CurrentUser user, RfqCase rfqCase);
+
+    void EnsureCanCorrectOutcome(CurrentUser user, RfqCase rfqCase);
+
+    void EnsureCanChangeContactOwner(CurrentUser user, RfqCase rfqCase);
+
+    void EnsureCanUpdateSalesMemo(CurrentUser user);
+
+    void EnsureCanUpdateTraderMemo(CurrentUser user);
 }
 
 public sealed class RfqAuthorization : IRfqAuthorization
@@ -163,6 +173,30 @@ public sealed class RfqAuthorization : IRfqAuthorization
         }
     }
 
+    public void EnsureCanClose(CurrentUser user, RfqCase rfqCase)
+    {
+        EnsureContactOwnerIdentity(user, rfqCase, "Close");
+        EnsureOpen(rfqCase);
+    }
+
+    public void EnsureCanCorrectOutcome(CurrentUser user, RfqCase rfqCase)
+    {
+        EnsureContactOwnerIdentity(user, rfqCase, "correct the outcome of");
+        if (rfqCase.Lifecycle is not ClosedRfq)
+        {
+            throw new InvalidOperationException("Only a Closed RFQ outcome can be corrected.");
+        }
+    }
+
+    public void EnsureCanChangeContactOwner(CurrentUser user, RfqCase rfqCase) =>
+        EnsureContactOwnerIdentity(user, rfqCase, "change the Contact Owner of");
+
+    public void EnsureCanUpdateSalesMemo(CurrentUser user) =>
+        EnsureRole(user, UserRole.Sales);
+
+    public void EnsureCanUpdateTraderMemo(CurrentUser user) =>
+        EnsureRole(user, UserRole.Trader);
+
     private static void EnsureContactOwner(CurrentUser user, RfqCase rfqCase)
     {
         EnsureRole(user, UserRole.Sales);
@@ -170,6 +204,18 @@ public sealed class RfqAuthorization : IRfqAuthorization
         {
             throw new UnauthorizedAccessException(
                 "Only the current Contact Owner can change the Revision.");
+        }
+    }
+
+    private static void EnsureContactOwnerIdentity(
+        CurrentUser user,
+        RfqCase rfqCase,
+        string operation)
+    {
+        if (rfqCase.ContactOwnerId != user.UserId)
+        {
+            throw new UnauthorizedAccessException(
+                $"Only the current Contact Owner can {operation} the RFQ.");
         }
     }
 

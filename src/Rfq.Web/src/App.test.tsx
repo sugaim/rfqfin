@@ -103,6 +103,11 @@ const baseProps: SalesScreenProps = {
   clients,
   securities,
   traders: [{ userId: 'trader-a', name: '国債 トレーダー' }],
+  users: [
+    { userId: 'sales-dev', name: '開発 営業' },
+    { userId: 'sales-a', name: '営業 一郎' },
+    { userId: 'trader-a', name: '国債 トレーダー' },
+  ],
   currentUserId: 'sales-dev',
   isLoading: false,
   isError: false,
@@ -117,6 +122,11 @@ const baseProps: SalesScreenProps = {
   onDiscard: vi.fn().mockResolvedValue(undefined),
   onPresent: vi.fn().mockResolvedValue(undefined),
   onUnpresent: vi.fn().mockResolvedValue(undefined),
+  onClose: vi.fn().mockResolvedValue(undefined),
+  onBulkClose: vi.fn().mockResolvedValue([]),
+  onCorrectOutcome: vi.fn().mockResolvedValue(undefined),
+  onChangeContactOwner: vi.fn().mockResolvedValue(undefined),
+  onUpdateMemo: vi.fn().mockResolvedValue(undefined),
   onReload: vi.fn(),
 }
 
@@ -133,6 +143,7 @@ const draftRow: SalesRfq = {
   quoteRequestReason: null,
   currentRevisionId: 'revision-1',
   currentQuoteId: null,
+  closedQuoteId: null,
   currentVersion: 3,
   revisionStatus: 'Draft',
   contactOwnerId: 'sales-dev',
@@ -141,6 +152,8 @@ const draftRow: SalesRfq = {
   standardSettlementDate: '2026-09-23',
   notional: 100000000,
   salesAndTradingMessage: 'initial note',
+  salesMemo: '',
+  memoVersion: 1,
   version: 3,
   createdAt: '2026-09-21T00:00:00Z',
 }
@@ -269,6 +282,63 @@ describe('SalesScreen', () => {
       '12345678-1234-1234-1234-123456789abc',
     )
   })
+
+  it('lets the Contact Owner close a quoted RFQ without presentation', async () => {
+    const onClose = vi.fn().mockResolvedValue(undefined)
+    render(
+      <SalesScreen
+        {...baseProps}
+        onClose={onClose}
+        rfqs={[{
+          ...draftRow,
+          rfqStatus: 'Active',
+          revisionStatus: 'Confirmed',
+          quoteStatus: 'Quoted',
+          quoteRequestReason: null,
+          currentQuoteId: '12345678-1234-1234-1234-123456789abc',
+          currentVersion: 7,
+        }]}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(/client-grid/))
+    fireEvent.click(screen.getByRole('button', { name: 'Hit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith(101, 'Hit', 7))
+  })
+
+  it('updates the Sales-only Memo after close', async () => {
+    const onUpdateMemo = vi.fn().mockResolvedValue(undefined)
+    render(
+      <SalesScreen
+        {...baseProps}
+        onUpdateMemo={onUpdateMemo}
+        rfqs={[{
+          ...draftRow,
+          rfqStatus: 'Away',
+          revisionStatus: 'Confirmed',
+          quoteStatus: null,
+          currentQuoteId: null,
+          closedQuoteId: '12345678-1234-1234-1234-123456789abc',
+          salesMemo: 'existing note',
+          memoVersion: 3,
+        }]}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(/client-grid/))
+    fireEvent.change(screen.getByLabelText('Sales-only Memo'), {
+      target: { value: 'post-close follow-up' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Sales Memo' }))
+
+    await waitFor(() => expect(onUpdateMemo).toHaveBeenCalledWith(
+      101,
+      'post-close follow-up',
+      3,
+    ))
+  })
 })
 
 const traderRow: TraderRfq = {
@@ -284,6 +354,7 @@ const traderRow: TraderRfq = {
   quoteRequestReason: 'Initial',
   currentRevisionId: '00000000-0000-0000-0000-000000000201',
   currentQuoteId: null,
+  closedQuoteId: null,
   confirmedAt: null,
   expiresAt: null,
   quoteSeedRevisionId: null,
@@ -297,6 +368,8 @@ const traderRow: TraderRfq = {
   calculated: null,
   manual: null,
   workingQuoteVersion: 1,
+  traderMemo: '',
+  memoVersion: 1,
   createdAt: '2026-09-21T00:00:00Z',
 }
 
@@ -305,6 +378,11 @@ const traderProps: TraderScreenProps = {
   traders: [
     { userId: 'trader-a', name: 'Trader A' },
     { userId: 'trader-b', name: 'Trader B' },
+  ],
+  users: [
+    { userId: 'sales-dev', name: '開発 営業' },
+    { userId: 'trader-a', name: '国債 トレーダー' },
+    { userId: 'trader-b', name: '社債 トレーダー' },
   ],
   currentUserId: 'trader-a',
   defaultExpiryMinutes: 5,
@@ -319,6 +397,11 @@ const traderProps: TraderScreenProps = {
   onChangeMode: vi.fn().mockResolvedValue(undefined),
   onUpdateManual: vi.fn().mockResolvedValue(undefined),
   onConfirmQuote: vi.fn().mockResolvedValue(undefined),
+  onClose: vi.fn().mockResolvedValue(undefined),
+  onBulkClose: vi.fn().mockResolvedValue([]),
+  onCorrectOutcome: vi.fn().mockResolvedValue(undefined),
+  onChangeContactOwner: vi.fn().mockResolvedValue(undefined),
+  onUpdateMemo: vi.fn().mockResolvedValue(undefined),
   onReload: vi.fn(),
 }
 
@@ -513,5 +596,38 @@ describe('TraderScreen', () => {
 
     expect(screen.getByTestId('grid-201-price')).toHaveAttribute('data-editable', 'false')
     expect(screen.getByRole('button', { name: 'Confirm Quote' })).toBeDisabled()
+  })
+
+  it('updates the Trader-only Memo after close', async () => {
+    const onUpdateMemo = vi.fn().mockResolvedValue(undefined)
+    render(
+      <TraderScreen
+        {...traderProps}
+        onUpdateMemo={onUpdateMemo}
+        rfqs={[{
+          ...traderRow,
+          rfqStatus: 'Hit',
+          quoteStatus: null,
+          quoteRequestReason: null,
+          currentQuoteId: null,
+          closedQuoteId: '00000000-0000-0000-0000-000000000301',
+          owned: false,
+          traderMemo: 'existing desk note',
+          memoVersion: 4,
+        }]}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+    fireEvent.change(screen.getByLabelText('Trader-only Memo'), {
+      target: { value: 'post-close desk note' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Trader Memo' }))
+
+    await waitFor(() => expect(onUpdateMemo).toHaveBeenCalledWith(
+      201,
+      'post-close desk note',
+      4,
+    ))
   })
 })

@@ -22,7 +22,9 @@ public static class DependencyInjection
         services.AddScoped<IWorkingQuoteEnsurer, WorkingQuoteEnsurer>();
         services.AddScoped<IWorkingQuoteRepository, WorkingQuoteRepository>();
         services.AddScoped<IConfirmedQuoteRepository, ConfirmedQuoteRepository>();
+        services.AddScoped<ICaseMemoRepository, CaseMemoRepository>();
         services.AddSingleton<IQuoteEventSink, DeferredQuoteEventSink>();
+        services.AddSingleton<IRfqEventSink, DeferredRfqEventSink>();
         services.AddSingleton<ICalculationClient, MockCalculationClient>();
         services.AddScoped<ISecuritySearch, PostgreSqlSecuritySearch>();
         services.AddScoped<IClientSearch, PostgreSqlClientSearch>();

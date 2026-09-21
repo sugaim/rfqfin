@@ -4,6 +4,38 @@ public abstract record RfqLifecycle;
 
 public sealed record DraftRfq(RevisionId CurrentRevisionId) : RfqLifecycle;
 
+public sealed record ClosedRfq : RfqLifecycle
+{
+    public ClosedRfq(
+        RevisionId currentRevisionId,
+        UserId contactOwnerId,
+        UserId assignedTraderId,
+        QuoteId closedQuoteId,
+        RfqStatus outcome)
+    {
+        if (outcome is not RfqStatus.Hit and not RfqStatus.Away)
+        {
+            throw new ArgumentException("A Closed RFQ outcome must be Hit or Away.", nameof(outcome));
+        }
+
+        CurrentRevisionId = currentRevisionId;
+        ContactOwnerId = contactOwnerId;
+        AssignedTraderId = assignedTraderId;
+        ClosedQuoteId = closedQuoteId;
+        Outcome = outcome;
+    }
+
+    public RevisionId CurrentRevisionId { get; }
+
+    public UserId ContactOwnerId { get; }
+
+    public UserId AssignedTraderId { get; }
+
+    public QuoteId ClosedQuoteId { get; }
+
+    public RfqStatus Outcome { get; }
+}
+
 public sealed record OpenRfq : RfqLifecycle
 {
     public OpenRfq(
@@ -88,6 +120,7 @@ public enum RfqLifecycleKind
 {
     Draft,
     Open,
+    Closed,
 }
 
 public enum RfqStatus

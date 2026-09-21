@@ -13,6 +13,7 @@ public sealed record SalesRfqListItem(
     string? QuoteRequestReason,
     Guid CurrentRevisionId,
     Guid? CurrentQuoteId,
+    Guid? ClosedQuoteId,
     long CurrentVersion,
     string RevisionStatus,
     string ContactOwnerId,
@@ -21,6 +22,8 @@ public sealed record SalesRfqListItem(
     DateOnly StandardSettlementDate,
     decimal? Notional,
     string SalesAndTradingMessage,
+    string SalesMemo,
+    long MemoVersion,
     long Version,
     DateTimeOffset CreatedAt);
 

@@ -31,6 +31,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
 
     internal DbSet<ConfirmedQuoteEntity> ConfirmedQuotes => Set<ConfirmedQuoteEntity>();
 
+    internal DbSet<CaseMemoEntity> CaseMemos => Set<CaseMemoEntity>();
+
     internal DbSet<CalculationFailureLogEntity> CalculationFailureLogs =>
         Set<CalculationFailureLogEntity>();
 
@@ -154,6 +156,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .HasColumnName("current_revision_id");
         current.Property(entity => entity.CurrentQuoteId)
             .HasColumnName("current_quote_id");
+        current.Property(entity => entity.ClosedQuoteId)
+            .HasColumnName("closed_quote_id");
         current.Property(entity => entity.Version)
             .HasColumnName("version")
             .IsConcurrencyToken();
@@ -384,6 +388,28 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .WithMany()
             .HasForeignKey(entity => entity.CurrentQuoteId)
             .OnDelete(DeleteBehavior.Restrict);
+        current.HasOne(entity => entity.ClosedQuote)
+            .WithMany()
+            .HasForeignKey(entity => entity.ClosedQuoteId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        var caseMemo = modelBuilder.Entity<CaseMemoEntity>();
+        caseMemo.ToTable("case_memos");
+        caseMemo.HasKey(entity => entity.CaseId);
+        caseMemo.Property(entity => entity.CaseId)
+            .HasColumnName("case_id")
+            .ValueGeneratedNever();
+        caseMemo.Property(entity => entity.SalesMemo)
+            .HasColumnName("sales_memo");
+        caseMemo.Property(entity => entity.TraderMemo)
+            .HasColumnName("trader_memo");
+        caseMemo.Property(entity => entity.Version)
+            .HasColumnName("version")
+            .IsConcurrencyToken();
+        caseMemo.HasOne(entity => entity.RfqCase)
+            .WithOne(entity => entity.Memo)
+            .HasForeignKey<CaseMemoEntity>(entity => entity.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         var calculationFailure = modelBuilder.Entity<CalculationFailureLogEntity>();
         calculationFailure.ToTable("calculation_failure_logs");
@@ -456,6 +482,8 @@ internal sealed class RfqCaseEntity
     public List<RfqRevisionEntity> Revisions { get; set; } = [];
 
     public CaseCurrentEntity Current { get; set; } = null!;
+
+    public CaseMemoEntity Memo { get; set; } = null!;
 }
 
 internal sealed class CaseCurrentEntity
@@ -474,6 +502,8 @@ internal sealed class CaseCurrentEntity
 
     public Guid? CurrentQuoteId { get; set; }
 
+    public Guid? ClosedQuoteId { get; set; }
+
     public long Version { get; set; }
 
     public string ContactOwnerId { get; set; } = string.Empty;
@@ -487,6 +517,21 @@ internal sealed class CaseCurrentEntity
     public RfqRevisionEntity CurrentRevision { get; set; } = null!;
 
     public ConfirmedQuoteEntity? CurrentQuote { get; set; }
+
+    public ConfirmedQuoteEntity? ClosedQuote { get; set; }
+}
+
+internal sealed class CaseMemoEntity
+{
+    public long CaseId { get; set; }
+
+    public string SalesMemo { get; set; } = string.Empty;
+
+    public string TraderMemo { get; set; } = string.Empty;
+
+    public long Version { get; set; }
+
+    public RfqCaseEntity RfqCase { get; set; } = null!;
 }
 
 internal sealed class RfqRevisionEntity

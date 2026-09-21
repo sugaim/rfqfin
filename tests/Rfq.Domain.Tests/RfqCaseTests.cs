@@ -148,6 +148,91 @@ public sealed class RfqCaseTests
             rfqCase.PickUp(UserId.Create("trader-1"), 1));
     }
 
+    [Fact]
+    public void CloseRequiresCurrentQuoteAndRetainsItAsClosedQuote()
+    {
+        var rfqCase = CreateValidDraft(UserId.Create("sales-1"));
+        rfqCase.ConfirmInitial(
+            new DateOnly(2026, 9, 21),
+            UserId.Create("sales-1"),
+            DateTimeOffset.UtcNow,
+            rfqCase.InitialRevision.Version);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            rfqCase.Close(RfqStatus.Hit, rfqCase.CurrentVersion));
+
+        rfqCase.PickUp(UserId.Create("trader-1"), rfqCase.CurrentVersion);
+        var quoteId = QuoteId.New();
+        rfqCase.ConfirmQuote(
+            quoteId,
+            rfqCase.InitialRevision.RevisionId,
+            rfqCase.CurrentVersion);
+        rfqCase.Close(RfqStatus.Hit, rfqCase.CurrentVersion);
+
+        var closed = Assert.IsType<ClosedRfq>(rfqCase.Lifecycle);
+        Assert.Equal(RfqStatus.Hit, rfqCase.Status);
+        Assert.Equal(quoteId, closed.ClosedQuoteId);
+        Assert.Equal(quoteId, rfqCase.ClosedQuoteId);
+        Assert.Null(rfqCase.CurrentQuoteId);
+        Assert.Null(rfqCase.QuoteStatus);
+        Assert.False(rfqCase.Owned);
+    }
+
+    [Fact]
+    public void CloseDiscardsPendingDraftAndOutcomeCorrectionIsExplicit()
+    {
+        var sales = UserId.Create("sales-1");
+        var original = CreateValidDraft(sales);
+        original.ConfirmInitial(
+            new DateOnly(2026, 9, 21),
+            sales,
+            DateTimeOffset.UtcNow,
+            original.InitialRevision.Version);
+        var quoteId = QuoteId.New();
+        original.ConfirmQuote(
+            quoteId,
+            original.InitialRevision.RevisionId,
+            original.CurrentVersion);
+        var pending = RfqRevision.Restore(
+            RevisionId.New(),
+            original.CaseId,
+            RevisionStatus.Draft,
+            120_000_000m,
+            new DateOnly(2026, 9, 25),
+            new DateOnly(2026, 9, 23),
+            "pending amendment",
+            null,
+            1,
+            DateTimeOffset.UtcNow,
+            sales,
+            null,
+            null);
+        var rfqCase = RfqCase.Restore(
+            original.CaseId,
+            original.ClientId,
+            original.SecurityId,
+            original.CategorySnapshot,
+            original.CreatedAt,
+            original.CreatedBy,
+            original.SalesId,
+            original.ContactOwnerId,
+            original.AssignedTraderId,
+            original.Owned,
+            original.CurrentVersion,
+            original.InitialRevision,
+            original.Lifecycle,
+            pending);
+
+        rfqCase.Close(RfqStatus.Away, rfqCase.CurrentVersion);
+
+        Assert.Equal(RevisionStatus.Discarded, pending.Status);
+        Assert.Throws<InvalidOperationException>(() =>
+            rfqCase.CorrectOutcome(RfqStatus.Away, rfqCase.CurrentVersion));
+        rfqCase.CorrectOutcome(RfqStatus.Hit, rfqCase.CurrentVersion);
+        Assert.Equal(RfqStatus.Hit, rfqCase.Status);
+        Assert.Equal(quoteId, rfqCase.ClosedQuoteId);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

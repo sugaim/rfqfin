@@ -52,6 +52,7 @@ export interface SalesRfq {
   quoteRequestReason: string | null
   currentRevisionId: string
   currentQuoteId: string | null
+  closedQuoteId: string | null
   currentVersion: number
   revisionStatus: string
   contactOwnerId: string
@@ -60,6 +61,8 @@ export interface SalesRfq {
   standardSettlementDate: string
   notional: number | null
   salesAndTradingMessage: string
+  salesMemo: string
+  memoVersion: number
   version: number
   createdAt: string
 }
@@ -124,6 +127,7 @@ export interface TraderRfq {
   quoteRequestReason: string | null
   currentRevisionId: string
   currentQuoteId: string | null
+  closedQuoteId: string | null
   confirmedAt: string | null
   expiresAt: string | null
   quoteSeedRevisionId: string | null
@@ -137,6 +141,8 @@ export interface TraderRfq {
   calculated: CalculatedQuotePayload | null
   manual: ManualQuotePayload | null
   workingQuoteVersion: number
+  traderMemo: string
+  memoVersion: number
   createdAt: string
 }
 
@@ -196,6 +202,33 @@ export interface PresentationResult {
   rfqStatus: string
   quoteStatus: string
   currentVersion: number
+}
+
+export interface CloseRfqResult {
+  caseId: number
+  rfqStatus: 'Hit' | 'Away'
+  closedQuoteId: string
+  owned: boolean
+  currentVersion: number
+}
+
+export interface BulkCloseItemResult {
+  caseId: number
+  result: 'Closed' | 'Skipped' | 'Failed'
+  rfqStatus: string | null
+  error: string | null
+}
+
+export interface ContactOwnerResult {
+  caseId: number
+  contactOwnerId: string
+  currentVersion: number
+}
+
+export interface CaseMemoResult {
+  caseId: number
+  memo: string
+  version: number
 }
 
 export const api = createApi({
@@ -388,6 +421,75 @@ export const api = createApi({
         body,
       }),
     }),
+    closeRfq: builder.mutation<
+      CloseRfqResult,
+      { caseId: number; outcome: 'Hit' | 'Away'; expectedCurrentVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/close`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    bulkCloseRfqs: builder.mutation<
+      BulkCloseItemResult[],
+      {
+        outcome: 'Hit' | 'Away'
+        items: { caseId: number; expectedCurrentVersion: number }[]
+      }
+    >({
+      query: (body) => ({ url: '/rfqs/bulk-close', method: 'POST', body }),
+    }),
+    correctRfqOutcome: builder.mutation<
+      CloseRfqResult,
+      {
+        caseId: number
+        outcome: 'Hit' | 'Away'
+        reason?: string
+        expectedCurrentVersion: number
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/correct-outcome`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    changeContactOwner: builder.mutation<
+      ContactOwnerResult,
+      {
+        caseId: number
+        targetUserId: string
+        expectedCurrentVersion: number
+        confirmed: boolean
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/contact-owner`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    updateSalesMemo: builder.mutation<
+      CaseMemoResult,
+      { caseId: number; memo: string; expectedVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/sales-memo`,
+        method: 'PUT',
+        body,
+      }),
+    }),
+    updateTraderMemo: builder.mutation<
+      CaseMemoResult,
+      { caseId: number; memo: string; expectedVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/trader-memo`,
+        method: 'PUT',
+        body,
+      }),
+    }),
     searchClients: builder.query<ClientSearchResult[], string>({
       query: (q) => ({ url: '/masters/clients/search', params: { q } }),
       keepUnusedDataFor: 0,
@@ -396,8 +498,8 @@ export const api = createApi({
       query: (q) => ({ url: '/masters/securities/search', params: { q } }),
       keepUnusedDataFor: 0,
     }),
-    getUsers: builder.query<UserSummary[], string>({
-      query: (role) => ({ url: '/masters/users', params: { role } }),
+    getUsers: builder.query<UserSummary[], string | void>({
+      query: (role) => ({ url: '/masters/users', params: role ? { role } : undefined }),
     }),
     resolveRfqDefaults: builder.query<
       RfqDefaults,
@@ -411,12 +513,16 @@ export const api = createApi({
 
 export const {
   useAssignTraderMutation,
+  useBulkCloseRfqsMutation,
   useCalculateWorkingQuoteMutation,
+  useChangeContactOwnerMutation,
   useChangeWorkingQuoteModeMutation,
+  useCloseRfqMutation,
   useConfirmQuoteMutation,
   useConfirmDraftMutation,
   useConfirmNewRfqMutation,
   useCreateDraftMutation,
+  useCorrectRfqOutcomeMutation,
   useDiscardDraftMutation,
   useGetActiveTraderRfqsQuery,
   useGetActiveSalesRfqsQuery,
@@ -431,6 +537,8 @@ export const {
   usePresentQuoteMutation,
   useReleaseRfqMutation,
   useTakeOverRfqMutation,
+  useUpdateSalesMemoMutation,
+  useUpdateTraderMemoMutation,
   useUpdateManualWorkingQuoteMutation,
   useUnpresentQuoteMutation,
   useUpdateDraftMutation,

@@ -27,6 +27,12 @@ public static class DependencyInjection
         services.AddScoped<ConfirmQuote>();
         services.AddScoped<PresentQuote>();
         services.AddScoped<UnpresentQuote>();
+        services.AddScoped<CloseRfq>();
+        services.AddScoped<BulkCloseRfqs>();
+        services.AddScoped<CorrectRfqOutcome>();
+        services.AddScoped<ChangeContactOwner>();
+        services.AddScoped<UpdateSalesMemo>();
+        services.AddScoped<UpdateTraderMemo>();
 
         return services;
     }

@@ -15,6 +15,7 @@ public sealed record TraderRfqListItem(
     string? QuoteRequestReason,
     Guid CurrentRevisionId,
     Guid? CurrentQuoteId,
+    Guid? ClosedQuoteId,
     DateTimeOffset? ConfirmedAt,
     DateTimeOffset? ExpiresAt,
     Guid? QuoteSeedRevisionId,
@@ -28,6 +29,8 @@ public sealed record TraderRfqListItem(
     CalculatedQuotePayload? Calculated,
     ManualQuotePayload? Manual,
     long WorkingQuoteVersion,
+    string TraderMemo,
+    long MemoVersion,
     DateTimeOffset CreatedAt);
 
 public sealed record OwnershipResult(

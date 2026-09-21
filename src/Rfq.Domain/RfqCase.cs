@@ -15,7 +15,8 @@ public sealed class RfqCase
         bool owned,
         long currentVersion,
         RfqRevision initialRevision,
-        RfqLifecycle lifecycle)
+        RfqLifecycle lifecycle,
+        RfqRevision? pendingDraftRevision)
     {
         CaseId = caseId;
         ClientId = clientId;
@@ -30,6 +31,7 @@ public sealed class RfqCase
         CurrentVersion = currentVersion;
         InitialRevision = initialRevision;
         Lifecycle = lifecycle;
+        PendingDraftRevision = pendingDraftRevision;
     }
 
     public CaseId CaseId { get; }
@@ -46,7 +48,7 @@ public sealed class RfqCase
 
     public UserId SalesId { get; }
 
-    public UserId ContactOwnerId { get; }
+    public UserId ContactOwnerId { get; private set; }
 
     public UserId AssignedTraderId { get; private set; }
 
@@ -58,7 +60,9 @@ public sealed class RfqCase
         ? open.Status == OpenRfqStatus.Presented
             ? RfqStatus.Presented
             : RfqStatus.Active
-        : RfqStatus.Draft;
+        : Lifecycle is ClosedRfq closed
+            ? closed.Outcome
+            : RfqStatus.Draft;
 
     public QuoteStatus? QuoteStatus => (Lifecycle as OpenRfq)?.QuoteStatus;
 
@@ -66,9 +70,13 @@ public sealed class RfqCase
 
     public QuoteId? CurrentQuoteId => (Lifecycle as OpenRfq)?.CurrentQuoteId;
 
+    public QuoteId? ClosedQuoteId => (Lifecycle as ClosedRfq)?.ClosedQuoteId;
+
     public RfqLifecycle Lifecycle { get; private set; }
 
     public RfqRevision InitialRevision { get; }
+
+    public RfqRevision? PendingDraftRevision { get; private set; }
 
     public static RfqCase CreateDraft(
         CaseId caseId,
@@ -112,7 +120,8 @@ public sealed class RfqCase
             false,
             1,
             initialRevision,
-            new DraftRfq(initialRevision.RevisionId));
+            new DraftRfq(initialRevision.RevisionId),
+            null);
     }
 
     public static RfqCase Restore(
@@ -128,7 +137,8 @@ public sealed class RfqCase
         bool owned,
         long currentVersion,
         RfqRevision initialRevision,
-        RfqLifecycle lifecycle)
+        RfqLifecycle lifecycle,
+        RfqRevision? pendingDraftRevision = null)
     {
         return new RfqCase(
             caseId,
@@ -143,7 +153,8 @@ public sealed class RfqCase
             owned,
             currentVersion,
             initialRevision,
-            lifecycle);
+            lifecycle,
+            pendingDraftRevision);
     }
 
     public void UpdateInitialDraft(
@@ -321,6 +332,90 @@ public sealed class RfqCase
         Lifecycle = CopyOpen(open, OpenRfqStatus.Active);
     }
 
+    public void Close(RfqStatus outcome, long expectedVersion)
+    {
+        if (outcome is not RfqStatus.Hit and not RfqStatus.Away)
+        {
+            throw new ArgumentException("Close outcome must be Hit or Away.", nameof(outcome));
+        }
+
+        var open = EnsureOpen(expectedVersion);
+        EnsureCurrentConfirmedQuote(open);
+        var closedQuoteId = open.CurrentQuoteId!.Value;
+        if (PendingDraftRevision is not null)
+        {
+            PendingDraftRevision.Discard(PendingDraftRevision.Version);
+        }
+
+        Owned = false;
+        CurrentVersion++;
+        Lifecycle = new ClosedRfq(
+            open.CurrentRevisionId,
+            ContactOwnerId,
+            AssignedTraderId,
+            closedQuoteId,
+            outcome);
+    }
+
+    public void CorrectOutcome(RfqStatus outcome, long expectedVersion)
+    {
+        if (Lifecycle is not ClosedRfq closed)
+        {
+            throw new InvalidOperationException("Only a Closed RFQ outcome can be corrected.");
+        }
+
+        EnsureCurrentVersion(expectedVersion);
+        if (outcome is not RfqStatus.Hit and not RfqStatus.Away)
+        {
+            throw new ArgumentException("Corrected outcome must be Hit or Away.", nameof(outcome));
+        }
+
+        if (closed.Outcome == outcome)
+        {
+            throw new InvalidOperationException("Outcome correction must change Hit to Away or Away to Hit.");
+        }
+
+        CurrentVersion++;
+        Lifecycle = new ClosedRfq(
+            closed.CurrentRevisionId,
+            ContactOwnerId,
+            AssignedTraderId,
+            closed.ClosedQuoteId,
+            outcome);
+    }
+
+    public void ChangeContactOwner(UserId contactOwnerId, long expectedVersion)
+    {
+        ArgumentNullException.ThrowIfNull(contactOwnerId);
+        EnsureCurrentVersion(expectedVersion);
+        if (ContactOwnerId == contactOwnerId)
+        {
+            throw new InvalidOperationException("The selected user is already the Contact Owner.");
+        }
+
+        ContactOwnerId = contactOwnerId;
+        CurrentVersion++;
+        Lifecycle = Lifecycle switch
+        {
+            OpenRfq open => new OpenRfq(
+                open.CurrentRevisionId,
+                contactOwnerId,
+                open.AssignedTraderId,
+                open.QuoteStatus,
+                open.QuoteRequestReason,
+                open.Owned,
+                open.Status,
+                open.CurrentQuoteId),
+            ClosedRfq closed => new ClosedRfq(
+                closed.CurrentRevisionId,
+                contactOwnerId,
+                closed.AssignedTraderId,
+                closed.ClosedQuoteId,
+                closed.Outcome),
+            _ => Lifecycle,
+        };
+    }
+
     private void OpenInitialRevision()
     {
         Lifecycle = new OpenRfq(
@@ -370,12 +465,17 @@ public sealed class RfqCase
             throw new InvalidOperationException("The RFQ Case is not Open.");
         }
 
+        EnsureCurrentVersion(expectedVersion);
+
+        return open;
+    }
+
+    private void EnsureCurrentVersion(long expectedVersion)
+    {
         if (CurrentVersion != expectedVersion)
         {
             throw new InvalidOperationException("The RFQ Case was changed by another user.");
         }
-
-        return open;
     }
 
     private static void EnsureCurrentConfirmedQuote(OpenRfq open)

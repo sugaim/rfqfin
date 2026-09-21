@@ -345,6 +345,99 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     }
 
     [Fact]
+    public async Task HitAwayContactOwnerAndRoleMemosCompleteTheHappyPath()
+    {
+        using var sales = CreateClient("sales-dev");
+        using var trader = CreateClient("trader-a");
+        var hitCase = await CreateQuotedCaseAsync(sales, trader, "client-001");
+        var awayCase = await CreateQuotedCaseAsync(sales, trader, "client-002");
+
+        var hitResponse = await sales.PostAsJsonAsync(
+            $"/api/rfqs/{hitCase.CaseId}/close",
+            new { Outcome = "Hit", ExpectedCurrentVersion = hitCase.CurrentVersion });
+        var hit = await AssertCaseClosedAsync(hitResponse);
+        Assert.Equal("Hit", hit.RfqStatus);
+        Assert.Equal(hitCase.QuoteId, hit.ClosedQuoteId);
+        Assert.False(hit.Owned);
+
+        var awayResponse = await sales.PostAsJsonAsync(
+            $"/api/rfqs/{awayCase.CaseId}/close",
+            new { Outcome = "Away", ExpectedCurrentVersion = awayCase.CurrentVersion });
+        var away = await AssertCaseClosedAsync(awayResponse);
+        Assert.Equal("Away", away.RfqStatus);
+
+        var closedOperation = await trader.PostAsJsonAsync(
+            $"/api/trader/rfqs/{hit.CaseId}/release",
+            new { ExpectedVersion = hit.CurrentVersion });
+        Assert.Equal(HttpStatusCode.Conflict, closedOperation.StatusCode);
+
+        var salesMemoResponse = await sales.PutAsJsonAsync(
+            $"/api/rfqs/{hit.CaseId}/sales-memo",
+            new { Memo = "customer follow-up", ExpectedVersion = 1 });
+        var salesMemo = await AssertMemoOkAsync(salesMemoResponse);
+        Assert.Equal("customer follow-up", salesMemo.Memo);
+
+        var forbiddenSalesMemo = await trader.PutAsJsonAsync(
+            $"/api/rfqs/{hit.CaseId}/sales-memo",
+            new { Memo = "forbidden", ExpectedVersion = salesMemo.Version });
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenSalesMemo.StatusCode);
+
+        var traderMemoResponse = await trader.PutAsJsonAsync(
+            $"/api/rfqs/{hit.CaseId}/trader-memo",
+            new { Memo = "desk follow-up", ExpectedVersion = salesMemo.Version });
+        var traderMemo = await AssertMemoOkAsync(traderMemoResponse);
+        Assert.Equal("desk follow-up", traderMemo.Memo);
+
+        var correctionResponse = await sales.PostAsJsonAsync(
+            $"/api/rfqs/{hit.CaseId}/correct-outcome",
+            new
+            {
+                Outcome = "Away",
+                Reason = "customer clarification",
+                ExpectedCurrentVersion = hit.CurrentVersion,
+            });
+        var corrected = await AssertCaseClosedAsync(correctionResponse);
+        Assert.Equal("Away", corrected.RfqStatus);
+        Assert.Equal(hit.ClosedQuoteId, corrected.ClosedQuoteId);
+
+        var handoffResponse = await sales.PostAsJsonAsync(
+            $"/api/rfqs/{hit.CaseId}/contact-owner",
+            new
+            {
+                TargetUserId = "trader-a",
+                ExpectedCurrentVersion = corrected.CurrentVersion,
+                Confirmed = true,
+            });
+        var handoffBody = await handoffResponse.Content.ReadFromJsonAsync<ContactOwnerBody>();
+        Assert.Equal(HttpStatusCode.OK, handoffResponse.StatusCode);
+        Assert.Equal("trader-a", handoffBody?.ContactOwnerId);
+
+        var previousOwnerCorrection = await sales.PostAsJsonAsync(
+            $"/api/rfqs/{hit.CaseId}/correct-outcome",
+            new
+            {
+                Outcome = "Hit",
+                ExpectedCurrentVersion = handoffBody?.CurrentVersion,
+            });
+        Assert.Equal(HttpStatusCode.Forbidden, previousOwnerCorrection.StatusCode);
+
+        var salesRows = await sales.GetFromJsonAsync<List<ManagedSalesRfqBody>>(
+            "/api/rfqs/active-sales");
+        var closedSalesRow = Assert.Single(salesRows!, item => item.CaseId == hit.CaseId);
+        Assert.Equal("Away", closedSalesRow.RfqStatus);
+        Assert.Null(closedSalesRow.CurrentQuoteId);
+        Assert.Equal(hit.ClosedQuoteId, closedSalesRow.ClosedQuoteId);
+        Assert.Equal("customer follow-up", closedSalesRow.SalesMemo);
+        Assert.Equal(traderMemo.Version, closedSalesRow.MemoVersion);
+
+        var traderRows = await trader.GetFromJsonAsync<List<ManagedTraderRfqBody>>(
+            "/api/trader/rfqs/active");
+        var closedTraderRow = Assert.Single(traderRows!, item => item.CaseId == hit.CaseId);
+        Assert.Equal("Away", closedTraderRow.RfqStatus);
+        Assert.Equal("desk follow-up", closedTraderRow.TraderMemo);
+    }
+
+    [Fact]
     public async Task MasterSearchAndDefaultsEndpointsReturnSeededData()
     {
         using var client = fixture.Factory.CreateClient();
@@ -429,6 +522,72 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             $"Expected 200 OK but received {(int)response.StatusCode}: {responseBody}");
         return Assert.IsType<PresentationBody>(
             await response.Content.ReadFromJsonAsync<PresentationBody>());
+    }
+
+    private async Task<ConfirmQuoteBody> CreateQuotedCaseAsync(
+        HttpClient sales,
+        HttpClient trader,
+        string clientId)
+    {
+        var createResponse = await sales.PostAsJsonAsync(
+            "/api/rfqs/confirm",
+            new
+            {
+                ClientId = clientId,
+                SecurityId = "sec-jgb-375",
+                Notional = 100_000_000m,
+                SettlementDate = "2026-09-24",
+                AssignedTraderId = "trader-a",
+            });
+        var created = await AssertCreatedAsync(createResponse);
+        var rows = await trader.GetFromJsonAsync<List<TraderRfqBody>>(
+            "/api/trader/rfqs/active");
+        var row = Assert.Single(rows!, item => item.CaseId == created.CaseId);
+        var pickUpResponse = await trader.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/pick-up",
+            new { row.ExpectedVersion, Confirmed = false });
+        var pickedUp = await AssertOwnershipOkAsync(pickUpResponse);
+        var calculateResponse = await trader.PutAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/working-quote/calculate",
+            new
+            {
+                Driver = "Price",
+                Value = 99.5m,
+                SimpleYieldSlide = 0.03m,
+                ExpectedCurrentVersion = pickedUp.CurrentVersion,
+                ExpectedWorkingQuoteVersion = row.WorkingQuoteVersion,
+            });
+        var calculated = await AssertWorkingQuoteOkAsync(calculateResponse);
+        var confirmResponse = await trader.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/confirm-quote",
+            new
+            {
+                ExpiryMinutes = (int?)null,
+                ExpectedCurrentVersion = pickedUp.CurrentVersion,
+                ExpectedWorkingQuoteVersion = calculated.Version,
+            });
+        return await AssertQuoteConfirmedAsync(confirmResponse);
+    }
+
+    private static async Task<CloseRfqBody> AssertCaseClosedAsync(
+        HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.OK,
+            $"Expected 200 OK but received {(int)response.StatusCode}: {responseBody}");
+        return Assert.IsType<CloseRfqBody>(
+            await response.Content.ReadFromJsonAsync<CloseRfqBody>());
+    }
+
+    private static async Task<CaseMemoBody> AssertMemoOkAsync(HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.OK,
+            $"Expected 200 OK but received {(int)response.StatusCode}: {responseBody}");
+        return Assert.IsType<CaseMemoBody>(
+            await response.Content.ReadFromJsonAsync<CaseMemoBody>());
     }
 
     private sealed record InitialRfqBody(
@@ -519,6 +678,34 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         string RfqStatus,
         string QuoteStatus,
         long CurrentVersion);
+
+    private sealed record CloseRfqBody(
+        long CaseId,
+        string RfqStatus,
+        Guid ClosedQuoteId,
+        bool Owned,
+        long CurrentVersion);
+
+    private sealed record CaseMemoBody(long CaseId, string Memo, long Version);
+
+    private sealed record ContactOwnerBody(
+        long CaseId,
+        string ContactOwnerId,
+        long CurrentVersion);
+
+    private sealed record ManagedSalesRfqBody(
+        long CaseId,
+        string RfqStatus,
+        Guid? CurrentQuoteId,
+        Guid? ClosedQuoteId,
+        string SalesMemo,
+        long MemoVersion);
+
+    private sealed record ManagedTraderRfqBody(
+        long CaseId,
+        string RfqStatus,
+        string TraderMemo,
+        long MemoVersion);
 
     private sealed record SecurityBody(string SecurityId);
     private sealed record ClientBody(string ClientId);

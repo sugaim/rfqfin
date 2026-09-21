@@ -4,17 +4,24 @@ import type { CellEditRequestEvent, ColDef, RowClickedEvent } from 'ag-grid-comm
 import { AgGridReact } from 'ag-grid-react'
 import {
   useAssignTraderMutation,
-  useCalculateWorkingQuoteMutation, useChangeWorkingQuoteModeMutation,
-  useConfirmDraftMutation, useConfirmNewRfqMutation, useConfirmQuoteMutation, useCreateDraftMutation,
+  useBulkCloseRfqsMutation, useCalculateWorkingQuoteMutation, useChangeContactOwnerMutation,
+  useChangeWorkingQuoteModeMutation, useCloseRfqMutation,
+  useConfirmDraftMutation, useConfirmNewRfqMutation, useConfirmQuoteMutation, useCorrectRfqOutcomeMutation, useCreateDraftMutation,
   useDiscardDraftMutation, useGetActiveSalesRfqsQuery, useGetActiveTraderRfqsQuery,
   useGetCurrentUserQuery, useGetHealthQuery,
   useGetSystemDateQuery, useGetUsersQuery, useLazyResolveRfqDefaultsQuery,
   useLazySearchClientsQuery, useLazySearchSecuritiesQuery, usePickUpRfqMutation,
   usePresentQuoteMutation, useReleaseRfqMutation, useTakeOverRfqMutation,
   useUnpresentQuoteMutation, useUpdateDraftMutation, useUpdateManualWorkingQuoteMutation,
+  useUpdateSalesMemoMutation, useUpdateTraderMemoMutation,
+  type BulkCloseItemResult,
   type ClientSearchResult, type CreateDraftRequest, type RfqDefaults,
   type SalesRfq, type SecuritySearchResult, type TraderRfq, type UpdateDraftRequest,
 } from './services/api'
+
+type RfqOutcome = 'Hit' | 'Away'
+type UserOption = { userId: string; name: string }
+type CloseItem = { caseId: number; expectedCurrentVersion: number }
 
 const navigationItems = ['Sales', 'Trader', 'EOD'].map((label) => ({ key: label.toLowerCase(), label }))
 const million = 1_000_000
@@ -64,6 +71,7 @@ export function AppShell({
           onChange={onIdentityChange}
           options={[
             { value: 'sales-dev', label: 'Sales Dev' },
+            { value: 'sales-a', label: 'Sales A' },
             { value: 'trader-a', label: 'Trader A' },
             { value: 'trader-b', label: 'Trader B' },
           ]}
@@ -90,7 +98,8 @@ export interface SalesScreenProps {
   rfqs: SalesRfq[]
   clients: ClientSearchResult[]
   securities: SecuritySearchResult[]
-  traders: { userId: string; name: string }[]
+  traders: UserOption[]
+  users: UserOption[]
   currentUserId: string
   isLoading: boolean
   isError: boolean
@@ -105,18 +114,27 @@ export interface SalesScreenProps {
   onDiscard: (caseId: number, expectedVersion: number) => Promise<void>
   onPresent: (caseId: number, expectedCurrentVersion: number) => Promise<void>
   onUnpresent: (caseId: number, expectedCurrentVersion: number) => Promise<void>
+  onClose: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
+  onBulkClose: (items: CloseItem[], outcome: RfqOutcome) => Promise<BulkCloseItemResult[]>
+  onCorrectOutcome: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
+  onChangeContactOwner: (caseId: number, targetUserId: string, expectedCurrentVersion: number) => Promise<void>
+  onUpdateMemo: (caseId: number, memo: string, expectedVersion: number) => Promise<void>
   onReload: () => void | Promise<unknown>
 }
 
 export function SalesScreen(props: SalesScreenProps) {
   const {
-    rfqs, clients, securities, traders, currentUserId, isLoading, isError, isMutating,
+    rfqs, clients, securities, traders, users, currentUserId, isLoading, isError, isMutating,
     onClientSearch, onSecuritySearch, onResolveDefaults, onCreate, onUpdate,
-    onConfirmNew, onConfirmDraft, onDiscard, onPresent, onUnpresent, onReload,
+    onConfirmNew, onConfirmDraft, onDiscard, onPresent, onUnpresent, onClose,
+    onBulkClose, onCorrectOutcome, onChangeContactOwner, onUpdateMemo, onReload,
   } = props
   const [form] = Form.useForm<RfqFormValues>()
   const [editingDraft, setEditingDraft] = useState<SalesRfq | null>(null)
   const [selectedRfq, setSelectedRfq] = useState<SalesRfq | null>(null)
+  const [selectedRows, setSelectedRows] = useState<SalesRfq[]>([])
+  const [targetContactOwnerId, setTargetContactOwnerId] = useState<string>()
+  const [memoDraft, setMemoDraft] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
   const [defaultsError, setDefaultsError] = useState(false)
   const [isResolvingDefaults, setIsResolvingDefaults] = useState(false)
@@ -191,6 +209,9 @@ export function SalesScreen(props: SalesScreenProps) {
   const finishAction = async () => {
     setEditingDraft(null)
     setSelectedRfq(null)
+    setSelectedRows([])
+    setTargetContactOwnerId(undefined)
+    setMemoDraft('')
     form.resetFields()
     setDefaultsError(false)
     await onReload()
@@ -247,6 +268,8 @@ export function SalesScreen(props: SalesScreenProps) {
   const editSelectedDraft = ({ data }: RowClickedEvent<SalesRfq>) => {
     if (!data) return
     setSelectedRfq(data)
+    setTargetContactOwnerId(undefined)
+    setMemoDraft(data.salesMemo)
     if (data.revisionStatus !== 'Draft') {
       setEditingDraft(null)
       form.resetFields()
@@ -266,6 +289,37 @@ export function SalesScreen(props: SalesScreenProps) {
       notional: data.notional === null ? undefined : data.notional / million,
       salesAndTradingMessage: data.salesAndTradingMessage,
     })
+  }
+
+  const isContactOwner = selectedRfq?.contactOwnerId === currentUserId
+  const canClose = Boolean(
+    selectedRfq
+    && isContactOwner
+    && (selectedRfq.rfqStatus === 'Active' || selectedRfq.rfqStatus === 'Presented')
+    && selectedRfq.quoteStatus === 'Quoted',
+  )
+  const canCorrectOutcome = Boolean(
+    selectedRfq
+    && isContactOwner
+    && (selectedRfq.rfqStatus === 'Hit' || selectedRfq.rfqStatus === 'Away'),
+  )
+  const bulkClose = async (outcome: RfqOutcome) => {
+    setActionError(null)
+    try {
+      const results = await onBulkClose(
+        selectedRows.map((row) => ({
+          caseId: row.caseId,
+          expectedCurrentVersion: row.currentVersion,
+        })),
+        outcome,
+      )
+      const details = results.map((result) =>
+        `Case ${result.caseId}: ${result.result}${result.error ? ` (${result.error})` : ''}`)
+      void message.info(`Bulk ${outcome} — ${details.join('; ')}`)
+      await finishAction()
+    } catch {
+      setActionError('The bulk close could not be completed. Reload and try again.')
+    }
   }
 
   return (
@@ -307,9 +361,9 @@ export function SalesScreen(props: SalesScreenProps) {
 
       <Card
         className="rfq-grid-card"
-        title="Active RFQs"
+        title="RFQs"
         extra={(
-          <Space>
+          <Space wrap>
             <Button
               disabled={!selectedRfq
                 || selectedRfq.contactOwnerId !== currentUserId
@@ -331,6 +385,53 @@ export function SalesScreen(props: SalesScreenProps) {
             >
               Unpresent
             </Button>
+            <Popconfirm
+              title={selectedRfq ? `Close Case ${selectedRfq.caseId} as Hit?` : 'Close as Hit?'}
+              onConfirm={() => selectedRfq
+                && void runAction(() => onClose(
+                  selectedRfq.caseId,
+                  'Hit',
+                  selectedRfq.currentVersion,
+                ))}
+            >
+              <Button disabled={!canClose || isMutating}>Hit</Button>
+            </Popconfirm>
+            <Popconfirm
+              title={selectedRfq ? `Close Case ${selectedRfq.caseId} as Away?` : 'Close as Away?'}
+              onConfirm={() => selectedRfq
+                && void runAction(() => onClose(
+                  selectedRfq.caseId,
+                  'Away',
+                  selectedRfq.currentVersion,
+                ))}
+            >
+              <Button disabled={!canClose || isMutating}>Away</Button>
+            </Popconfirm>
+            <Popconfirm
+              title={selectedRfq
+                ? `Correct Case ${selectedRfq.caseId} to ${selectedRfq.rfqStatus === 'Hit' ? 'Away' : 'Hit'}?`
+                : 'Correct outcome?'}
+              onConfirm={() => selectedRfq
+                && void runAction(() => onCorrectOutcome(
+                  selectedRfq.caseId,
+                  selectedRfq.rfqStatus === 'Hit' ? 'Away' : 'Hit',
+                  selectedRfq.currentVersion,
+                ))}
+            >
+              <Button disabled={!canCorrectOutcome || isMutating}>Correct Outcome</Button>
+            </Popconfirm>
+            <Popconfirm
+              title={`Bulk close ${selectedRows.length} selected RFQs as Hit?`}
+              onConfirm={() => void bulkClose('Hit')}
+            >
+              <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Hit</Button>
+            </Popconfirm>
+            <Popconfirm
+              title={`Bulk close ${selectedRows.length} selected RFQs as Away?`}
+              onConfirm={() => void bulkClose('Away')}
+            >
+              <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Away</Button>
+            </Popconfirm>
             <Button onClick={() => void onReload()}>Reload</Button>
           </Space>
         )}
@@ -338,9 +439,72 @@ export function SalesScreen(props: SalesScreenProps) {
         {isError && <Alert type="error" showIcon message="RFQs could not be loaded." className="grid-alert" />}
         <Spin spinning={isLoading}>
           <div className="rfq-grid" data-testid="rfq-grid">
-            <AgGridReact<SalesRfq> rowData={rfqs} columnDefs={columns} getRowId={({ data }) => String(data.caseId)} onRowClicked={editSelectedDraft} rowClassRules={{ 'editable-draft-row': ({ data }) => data?.revisionStatus === 'Draft' }} defaultColDef={{ sortable: true, filter: true, resizable: true }} />
+            <AgGridReact<SalesRfq>
+              rowData={rfqs}
+              columnDefs={columns}
+              getRowId={({ data }) => String(data.caseId)}
+              onRowClicked={editSelectedDraft}
+              onSelectionChanged={({ api: gridApi }) => setSelectedRows(gridApi.getSelectedRows())}
+              rowSelection={{ mode: 'multiRow' }}
+              rowClassRules={{ 'editable-draft-row': ({ data }) => data?.revisionStatus === 'Draft' }}
+              defaultColDef={{ sortable: true, filter: true, resizable: true }}
+            />
           </div>
         </Spin>
+        {selectedRfq && (
+          <Card size="small" title={`Case ${selectedRfq.caseId} details`} className="case-details">
+            <Space wrap align="end">
+              <div>
+                <Typography.Text type="secondary">Contact Owner</Typography.Text>
+                <br />
+                <Select
+                  aria-label="Contact Owner"
+                  value={targetContactOwnerId}
+                  placeholder={selectedRfq.contactOwnerId}
+                  onChange={setTargetContactOwnerId}
+                  disabled={!isContactOwner || isMutating}
+                  options={users.map((user) => ({ value: user.userId, label: user.name }))}
+                  style={{ width: 190 }}
+                />
+              </div>
+              <Popconfirm
+                title={targetContactOwnerId
+                  ? `Hand off Case ${selectedRfq.caseId} to ${targetContactOwnerId}?`
+                  : 'Select a Contact Owner.'}
+                onConfirm={() => targetContactOwnerId
+                  && void runAction(() => onChangeContactOwner(
+                    selectedRfq.caseId,
+                    targetContactOwnerId,
+                    selectedRfq.currentVersion,
+                  ))}
+              >
+                <Button disabled={!isContactOwner || !targetContactOwnerId || isMutating}>
+                  Change Contact Owner
+                </Button>
+              </Popconfirm>
+            </Space>
+            <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>
+              Sales-only Memo
+            </Typography.Paragraph>
+            <Input.TextArea
+              aria-label="Sales-only Memo"
+              rows={3}
+              value={memoDraft}
+              onChange={(event) => setMemoDraft(event.target.value)}
+            />
+            <Button
+              style={{ marginTop: 8 }}
+              loading={isMutating}
+              onClick={() => void runAction(() => onUpdateMemo(
+                selectedRfq.caseId,
+                memoDraft,
+                selectedRfq.memoVersion,
+              ))}
+            >
+              Save Sales Memo
+            </Button>
+          </Card>
+        )}
       </Card>
     </div>
   )
@@ -348,7 +512,8 @@ export function SalesScreen(props: SalesScreenProps) {
 
 export interface TraderScreenProps {
   rfqs: TraderRfq[]
-  traders: { userId: string; name: string }[]
+  traders: UserOption[]
+  users: UserOption[]
   currentUserId: string
   defaultExpiryMinutes: number | null
   isLoading: boolean
@@ -371,12 +536,18 @@ export interface TraderScreenProps {
     finalSimpleYield: number | null,
   ) => Promise<void>
   onConfirmQuote: (row: TraderRfq, expiryMinutes: number | null) => Promise<void>
+  onClose: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
+  onBulkClose: (items: CloseItem[], outcome: RfqOutcome) => Promise<BulkCloseItemResult[]>
+  onCorrectOutcome: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
+  onChangeContactOwner: (caseId: number, targetUserId: string, expectedCurrentVersion: number) => Promise<void>
+  onUpdateMemo: (caseId: number, memo: string, expectedVersion: number) => Promise<void>
   onReload: () => void | Promise<unknown>
 }
 
 export function TraderScreen({
   rfqs,
   traders,
+  users,
   currentUserId,
   defaultExpiryMinutes,
   isLoading,
@@ -390,11 +561,18 @@ export function TraderScreen({
   onChangeMode,
   onUpdateManual,
   onConfirmQuote,
+  onClose,
+  onBulkClose,
+  onCorrectOutcome,
+  onChangeContactOwner,
+  onUpdateMemo,
   onReload,
 }: TraderScreenProps) {
   const [selected, setSelected] = useState<TraderRfq | null>(null)
   const [selectedRows, setSelectedRows] = useState<TraderRfq[]>([])
   const [targetTraderId, setTargetTraderId] = useState<string>()
+  const [targetContactOwnerId, setTargetContactOwnerId] = useState<string>()
+  const [memoDraft, setMemoDraft] = useState('')
   const [actionError, setActionError] = useState(false)
   const [calculationStatus, setCalculationStatus] = useState<Record<number, string>>({})
   const [expirySelections, setExpirySelections] = useState<Record<number, string>>({})
@@ -425,8 +603,9 @@ export function TraderScreen({
     { field: 'workingQuoteMode', headerName: 'Mode', minWidth: 110 },
     {
       field: 'currentQuoteId',
-      headerName: 'Current Confirmed Quote',
+      headerName: 'Confirmed Quote',
       minWidth: 210,
+      valueGetter: ({ data }) => data?.currentQuoteId ?? data?.closedQuoteId,
       valueFormatter: ({ value }) => value ? String(value).slice(0, 8) : '',
     },
     { field: 'confirmedAt', headerName: 'Confirmed At', minWidth: 190, valueFormatter: ({ value }) => value ? new Date(String(value)).toLocaleString() : '' },
@@ -510,6 +689,8 @@ export function TraderScreen({
       setSelected(null)
       setSelectedRows([])
       setTargetTraderId(undefined)
+      setTargetContactOwnerId(undefined)
+      setMemoDraft('')
       await onReload()
     } catch {
       setActionError(true)
@@ -517,8 +698,10 @@ export function TraderScreen({
   }
 
   const pickUpTargets = selectedRows.length > 1
-    ? selectedRows.filter((row) => !row.owned)
-    : selected && !selected.owned ? [selected] : []
+    ? selectedRows.filter((row) => !row.owned && row.rfqStatus !== 'Hit' && row.rfqStatus !== 'Away')
+    : selected && !selected.owned && selected.rfqStatus !== 'Hit' && selected.rfqStatus !== 'Away'
+      ? [selected]
+      : []
   const pickUp = () => runAction(async () => {
     await Promise.all(pickUpTargets.map((row) =>
       onPickUp(
@@ -597,11 +780,39 @@ export function TraderScreen({
       ? selected.calculated != null
       : selected.manual?.price != null && selected.manual.finalSimpleYield != null),
   )
+  const isContactOwner = selected?.contactOwnerId === currentUserId
+  const isSelectedOpen = Boolean(
+    selected && (selected.rfqStatus === 'Active' || selected.rfqStatus === 'Presented'),
+  )
+  const canClose = Boolean(isContactOwner && isSelectedOpen && selected?.quoteStatus === 'Quoted')
+  const canCorrectOutcome = Boolean(
+    isContactOwner && selected && (selected.rfqStatus === 'Hit' || selected.rfqStatus === 'Away'),
+  )
+  const bulkClose = async (outcome: RfqOutcome) => {
+    setActionError(false)
+    try {
+      const results = await onBulkClose(
+        selectedRows.map((row) => ({
+          caseId: row.caseId,
+          expectedCurrentVersion: row.currentVersion,
+        })),
+        outcome,
+      )
+      const details = results.map((result) =>
+        `Case ${result.caseId}: ${result.result}${result.error ? ` (${result.error})` : ''}`)
+      void message.info(`Bulk ${outcome} — ${details.join('; ')}`)
+      setSelected(null)
+      setSelectedRows([])
+      await onReload()
+    } catch {
+      setActionError(true)
+    }
+  }
 
   return (
     <Card
       className="trader-grid-card"
-      title="Active RFQs"
+      title="RFQs"
       extra={<Button onClick={() => void onReload()}>Reload</Button>}
     >
       {isError && <Alert type="error" showIcon message="Trader RFQs could not be loaded." className="grid-alert" />}
@@ -625,7 +836,7 @@ export function TraderScreen({
           </Button>
         )}
         <Button
-          disabled={!selected || !selected.owned || selected.assignedTraderId !== currentUserId || isMutating}
+          disabled={!selected || !isSelectedOpen || !selected.owned || selected.assignedTraderId !== currentUserId || isMutating}
           onClick={() => void release()}
         >
           Release
@@ -635,12 +846,12 @@ export function TraderScreen({
           placeholder="Assign to..."
           value={targetTraderId}
           onChange={setTargetTraderId}
-          disabled={!selected || selected.owned || isMutating}
+          disabled={!selected || !isSelectedOpen || selected.owned || isMutating}
           options={traders.map((trader) => ({ value: trader.userId, label: trader.name }))}
           style={{ width: 180 }}
         />
         <Button
-          disabled={!selected || selected.owned || !targetTraderId || isMutating}
+          disabled={!selected || !isSelectedOpen || selected.owned || !targetTraderId || isMutating}
           onClick={() => void assign()}
         >
           Assign
@@ -652,7 +863,7 @@ export function TraderScreen({
         >
           <Button
             danger
-            disabled={!selected || !selected.owned || selected.assignedTraderId === currentUserId || isMutating}
+            disabled={!selected || !isSelectedOpen || !selected.owned || selected.assignedTraderId === currentUserId || isMutating}
           >
             Take Over
           </Button>
@@ -698,6 +909,45 @@ export function TraderScreen({
             Confirm Quote
           </Button>
         </Popconfirm>
+        <Popconfirm
+          title={selected ? `Close Case ${selected.caseId} as Hit?` : 'Close as Hit?'}
+          onConfirm={() => selected
+            && void runAction(() => onClose(selected.caseId, 'Hit', selected.currentVersion))}
+        >
+          <Button disabled={!canClose || isMutating}>Hit</Button>
+        </Popconfirm>
+        <Popconfirm
+          title={selected ? `Close Case ${selected.caseId} as Away?` : 'Close as Away?'}
+          onConfirm={() => selected
+            && void runAction(() => onClose(selected.caseId, 'Away', selected.currentVersion))}
+        >
+          <Button disabled={!canClose || isMutating}>Away</Button>
+        </Popconfirm>
+        <Popconfirm
+          title={selected
+            ? `Correct Case ${selected.caseId} to ${selected.rfqStatus === 'Hit' ? 'Away' : 'Hit'}?`
+            : 'Correct outcome?'}
+          onConfirm={() => selected
+            && void runAction(() => onCorrectOutcome(
+              selected.caseId,
+              selected.rfqStatus === 'Hit' ? 'Away' : 'Hit',
+              selected.currentVersion,
+            ))}
+        >
+          <Button disabled={!canCorrectOutcome || isMutating}>Correct Outcome</Button>
+        </Popconfirm>
+        <Popconfirm
+          title={`Bulk close ${selectedRows.length} selected RFQs as Hit?`}
+          onConfirm={() => void bulkClose('Hit')}
+        >
+          <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Hit</Button>
+        </Popconfirm>
+        <Popconfirm
+          title={`Bulk close ${selectedRows.length} selected RFQs as Away?`}
+          onConfirm={() => void bulkClose('Away')}
+        >
+          <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Away</Button>
+        </Popconfirm>
       </Space>
       <Spin spinning={isLoading}>
         <div className="rfq-grid" data-testid="trader-rfq-grid">
@@ -708,6 +958,8 @@ export function TraderScreen({
             onRowClicked={({ data }) => {
               setSelected(data ?? null)
               setTargetTraderId(undefined)
+              setTargetContactOwnerId(undefined)
+              setMemoDraft(data?.traderMemo ?? '')
               setActionError(false)
             }}
             onSelectionChanged={({ api: gridApi }) =>
@@ -719,6 +971,60 @@ export function TraderScreen({
           />
         </div>
       </Spin>
+      {selected && (
+        <Card size="small" title={`Case ${selected.caseId} details`} className="case-details">
+          <Space wrap align="end">
+            <div>
+              <Typography.Text type="secondary">Contact Owner</Typography.Text>
+              <br />
+              <Select
+                aria-label="Contact Owner"
+                value={targetContactOwnerId}
+                placeholder={selected.contactOwnerId}
+                onChange={setTargetContactOwnerId}
+                disabled={!isContactOwner || isMutating}
+                options={users.map((user) => ({ value: user.userId, label: user.name }))}
+                style={{ width: 190 }}
+              />
+            </div>
+            <Popconfirm
+              title={targetContactOwnerId
+                ? `Hand off Case ${selected.caseId} to ${targetContactOwnerId}?`
+                : 'Select a Contact Owner.'}
+              onConfirm={() => targetContactOwnerId
+                && void runAction(() => onChangeContactOwner(
+                  selected.caseId,
+                  targetContactOwnerId,
+                  selected.currentVersion,
+                ))}
+            >
+              <Button disabled={!isContactOwner || !targetContactOwnerId || isMutating}>
+                Change Contact Owner
+              </Button>
+            </Popconfirm>
+          </Space>
+          <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>
+            Trader-only Memo
+          </Typography.Paragraph>
+          <Input.TextArea
+            aria-label="Trader-only Memo"
+            rows={3}
+            value={memoDraft}
+            onChange={(event) => setMemoDraft(event.target.value)}
+          />
+          <Button
+            style={{ marginTop: 8 }}
+            loading={isMutating}
+            onClick={() => void runAction(() => onUpdateMemo(
+              selected.caseId,
+              memoDraft,
+              selected.memoVersion,
+            ))}
+          >
+            Save Trader Memo
+          </Button>
+        </Card>
+      )}
     </Card>
   )
 }
@@ -733,7 +1039,7 @@ export function App() {
   const currentUserQuery = useGetCurrentUserQuery()
   const rfqsQuery = useGetActiveSalesRfqsQuery(undefined, { skip: activeView !== 'sales' })
   const traderRfqsQuery = useGetActiveTraderRfqsQuery(undefined, { skip: activeView !== 'trader' })
-  const tradersQuery = useGetUsersQuery('Trader')
+  const usersQuery = useGetUsersQuery()
   const [createDraft, createState] = useCreateDraftMutation()
   const [updateDraft, updateState] = useUpdateDraftMutation()
   const [confirmNewRfq, confirmNewState] = useConfirmNewRfqMutation()
@@ -749,6 +1055,12 @@ export function App() {
   const [confirmQuote, confirmQuoteState] = useConfirmQuoteMutation()
   const [presentQuote, presentState] = usePresentQuoteMutation()
   const [unpresentQuote, unpresentState] = useUnpresentQuoteMutation()
+  const [closeRfq, closeState] = useCloseRfqMutation()
+  const [bulkCloseRfqs, bulkCloseState] = useBulkCloseRfqsMutation()
+  const [correctRfqOutcome, correctOutcomeState] = useCorrectRfqOutcomeMutation()
+  const [changeContactOwner, changeContactOwnerState] = useChangeContactOwnerMutation()
+  const [updateSalesMemo, updateSalesMemoState] = useUpdateSalesMemoMutation()
+  const [updateTraderMemo, updateTraderMemoState] = useUpdateTraderMemoMutation()
   const [searchClients] = useLazySearchClientsQuery()
   const [searchSecurities] = useLazySearchSecuritiesQuery()
   const [resolveDefaults] = useLazyResolveRfqDefaultsQuery()
@@ -766,6 +1078,11 @@ export function App() {
     discardState,
     presentState,
     unpresentState,
+    closeState,
+    bulkCloseState,
+    correctOutcomeState,
+    changeContactOwnerState,
+    updateSalesMemoState,
   ].some((state) => state.isLoading)
   const isOwnershipMutating = [
     pickUpState,
@@ -776,8 +1093,36 @@ export function App() {
     changeModeState,
     updateManualState,
     confirmQuoteState,
+    closeState,
+    bulkCloseState,
+    correctOutcomeState,
+    changeContactOwnerState,
+    updateTraderMemoState,
   ].some((state) => state.isLoading)
-  const traders = (tradersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))
+  const users = (usersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))
+  const traders = (usersQuery.data ?? [])
+    .filter((user) => user.roles.includes('Trader'))
+    .map((user) => ({ userId: user.userId, name: user.name }))
+
+  const closeCase = (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) =>
+    closeRfq({ caseId, outcome, expectedCurrentVersion }).unwrap().then(() => undefined)
+  const bulkCloseCases = (items: CloseItem[], outcome: RfqOutcome) =>
+    bulkCloseRfqs({ items, outcome }).unwrap()
+  const correctOutcome = (
+    caseId: number,
+    outcome: RfqOutcome,
+    expectedCurrentVersion: number,
+  ) => correctRfqOutcome({ caseId, outcome, expectedCurrentVersion }).unwrap().then(() => undefined)
+  const handOffContactOwner = (
+    caseId: number,
+    targetUserId: string,
+    expectedCurrentVersion: number,
+  ) => changeContactOwner({
+    caseId,
+    targetUserId,
+    expectedCurrentVersion,
+    confirmed: true,
+  }).unwrap().then(() => undefined)
 
   const changeIdentity = (userId: string) => {
     window.localStorage.setItem('rfq-development-user', userId)
@@ -799,6 +1144,7 @@ export function App() {
           clients={clients}
           securities={securities}
           traders={traders}
+          users={users}
           currentUserId={currentUserQuery.data?.userId ?? configuredIdentity}
           isLoading={rfqsQuery.isLoading || rfqsQuery.isFetching}
           isError={rfqsQuery.isError}
@@ -815,6 +1161,12 @@ export function App() {
             presentQuote({ caseId, expectedCurrentVersion }).unwrap().then(() => undefined)}
           onUnpresent={(caseId, expectedCurrentVersion) =>
             unpresentQuote({ caseId, expectedCurrentVersion }).unwrap().then(() => undefined)}
+          onClose={closeCase}
+          onBulkClose={bulkCloseCases}
+          onCorrectOutcome={correctOutcome}
+          onChangeContactOwner={handOffContactOwner}
+          onUpdateMemo={(caseId, memo, expectedVersion) =>
+            updateSalesMemo({ caseId, memo, expectedVersion }).unwrap().then(() => undefined)}
           onReload={rfqsQuery.refetch}
         />
       )}
@@ -822,6 +1174,7 @@ export function App() {
         <TraderScreen
           rfqs={traderRfqsQuery.data ?? []}
           traders={traders}
+          users={users}
           currentUserId={currentUserQuery.data?.userId ?? configuredIdentity}
           defaultExpiryMinutes={currentUserQuery.data?.defaultQuoteExpiryMinutes ?? null}
           isLoading={traderRfqsQuery.isLoading || traderRfqsQuery.isFetching}
@@ -866,6 +1219,12 @@ export function App() {
               expectedCurrentVersion: row.currentVersion,
               expectedWorkingQuoteVersion: row.workingQuoteVersion,
             }).unwrap().then(() => undefined)}
+          onClose={closeCase}
+          onBulkClose={bulkCloseCases}
+          onCorrectOutcome={correctOutcome}
+          onChangeContactOwner={handOffContactOwner}
+          onUpdateMemo={(caseId, memo, expectedVersion) =>
+            updateTraderMemo({ caseId, memo, expectedVersion }).unwrap().then(() => undefined)}
           onReload={traderRfqsQuery.refetch}
         />
       )}

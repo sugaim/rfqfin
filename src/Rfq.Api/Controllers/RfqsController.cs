@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Rfq.Application;
+using Rfq.Domain;
 
 namespace Rfq.Api.Controllers;
 
@@ -14,7 +15,13 @@ public sealed class RfqsController(
     DiscardInitialDraft discardInitialDraft,
     GetActiveSalesRfqs getActiveSalesRfqs,
     PresentQuote presentQuote,
-    UnpresentQuote unpresentQuote) : ControllerBase
+    UnpresentQuote unpresentQuote,
+    CloseRfq closeRfq,
+    BulkCloseRfqs bulkCloseRfqs,
+    CorrectRfqOutcome correctRfqOutcome,
+    ChangeContactOwner changeContactOwner,
+    UpdateSalesMemo updateSalesMemo,
+    UpdateTraderMemo updateTraderMemo) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<InitialRfqResponse>> Create(
@@ -124,6 +131,7 @@ public sealed class RfqsController(
             item.QuoteRequestReason,
             item.CurrentRevisionId,
             item.CurrentQuoteId,
+            item.ClosedQuoteId,
             item.CurrentVersion,
             item.RevisionStatus,
             item.ContactOwnerId,
@@ -132,6 +140,8 @@ public sealed class RfqsController(
             item.StandardSettlementDate,
             item.Notional,
             item.SalesAndTradingMessage,
+            item.SalesMemo,
+            item.MemoVersion,
             item.Version,
             item.CreatedAt)));
     }
@@ -150,6 +160,74 @@ public sealed class RfqsController(
         CancellationToken cancellationToken) => ExecutePresentationAsync(() =>
             unpresentQuote.ExecuteAsync(caseId, request.ExpectedCurrentVersion, cancellationToken));
 
+    [HttpPost("{caseId:long}/close")]
+    public Task<ActionResult<CloseRfqResult>> Close(
+        long caseId,
+        CloseRfqRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            closeRfq.ExecuteAsync(
+                caseId,
+                ParseOutcome(request.Outcome),
+                request.ExpectedCurrentVersion,
+                cancellationToken));
+
+    [HttpPost("bulk-close")]
+    public Task<ActionResult<IReadOnlyList<BulkCloseItemResult>>> BulkClose(
+        BulkCloseRfqRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            bulkCloseRfqs.ExecuteAsync(
+                request.Items.Select(item => new BulkCloseItem(
+                    item.CaseId,
+                    item.ExpectedCurrentVersion)).ToArray(),
+                ParseOutcome(request.Outcome),
+                cancellationToken));
+
+    [HttpPost("{caseId:long}/correct-outcome")]
+    public Task<ActionResult<CloseRfqResult>> CorrectOutcome(
+        long caseId,
+        CorrectOutcomeRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            correctRfqOutcome.ExecuteAsync(
+                caseId,
+                ParseOutcome(request.Outcome),
+                request.Reason,
+                request.ExpectedCurrentVersion,
+                cancellationToken));
+
+    [HttpPost("{caseId:long}/contact-owner")]
+    public Task<ActionResult<ContactOwnerResult>> ChangeOwner(
+        long caseId,
+        ChangeContactOwnerRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            changeContactOwner.ExecuteAsync(
+                caseId,
+                request.TargetUserId,
+                request.ExpectedCurrentVersion,
+                request.Confirmed,
+                cancellationToken));
+
+    [HttpPut("{caseId:long}/sales-memo")]
+    public Task<ActionResult<CaseMemoResult>> UpdateSalesMemo(
+        long caseId,
+        UpdateMemoRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            updateSalesMemo.ExecuteAsync(
+                caseId,
+                request.Memo,
+                request.ExpectedVersion,
+                cancellationToken));
+
+    [HttpPut("{caseId:long}/trader-memo")]
+    public Task<ActionResult<CaseMemoResult>> UpdateTraderMemo(
+        long caseId,
+        UpdateMemoRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            updateTraderMemo.ExecuteAsync(
+                caseId,
+                request.Memo,
+                request.ExpectedVersion,
+                cancellationToken));
+
     private async Task<ActionResult<PresentationResult>> ExecutePresentationAsync(
         Func<Task<PresentationResult>> action)
     {
@@ -161,6 +239,29 @@ public sealed class RfqsController(
         {
             return ToProblem(exception);
         }
+    }
+
+    private async Task<ActionResult<T>> ExecuteCaseActionAsync<T>(Func<Task<T>> action)
+    {
+        try
+        {
+            return Ok(await action());
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
+        }
+    }
+
+    private static RfqStatus ParseOutcome(string outcome)
+    {
+        if (!Enum.TryParse<RfqStatus>(outcome, false, out var parsed)
+            || parsed is not RfqStatus.Hit and not RfqStatus.Away)
+        {
+            throw new ArgumentException("Outcome must be Hit or Away.", nameof(outcome));
+        }
+
+        return parsed;
     }
 
     private static CreateDraftCommand ToCommand(CreateDraftRequest request) => new(
@@ -238,6 +339,32 @@ public sealed record DiscardInitialDraftRequest(
 public sealed record PresentationRequest(
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
 
+public sealed record CloseRfqRequest(
+    [Required, MinLength(1)] string Outcome,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
+
+public sealed record BulkCloseRfqItemRequest(
+    [Range(1, long.MaxValue)] long CaseId,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
+
+public sealed record BulkCloseRfqRequest(
+    [Required, MinLength(1)] string Outcome,
+    [Required, MinLength(1)] IReadOnlyList<BulkCloseRfqItemRequest> Items);
+
+public sealed record CorrectOutcomeRequest(
+    [Required, MinLength(1)] string Outcome,
+    string? Reason,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
+
+public sealed record ChangeContactOwnerRequest(
+    [Required, MinLength(1)] string TargetUserId,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    bool Confirmed);
+
+public sealed record UpdateMemoRequest(
+    string? Memo,
+    [Range(1, long.MaxValue)] long ExpectedVersion);
+
 public sealed record InitialRfqResponse(
     long CaseId,
     Guid RevisionId,
@@ -268,6 +395,7 @@ public sealed record SalesRfqResponse(
     string? QuoteRequestReason,
     Guid CurrentRevisionId,
     Guid? CurrentQuoteId,
+    Guid? ClosedQuoteId,
     long CurrentVersion,
     string RevisionStatus,
     string ContactOwnerId,
@@ -276,5 +404,7 @@ public sealed record SalesRfqResponse(
     DateOnly StandardSettlementDate,
     decimal? Notional,
     string SalesAndTradingMessage,
+    string SalesMemo,
+    long MemoVersion,
     long Version,
     DateTimeOffset CreatedAt);
