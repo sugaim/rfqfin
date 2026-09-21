@@ -27,6 +27,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
 
     internal DbSet<SystemDateEntity> SystemDates => Set<SystemDateEntity>();
 
+    internal DbSet<WorkingQuoteEntity> WorkingQuotes => Set<WorkingQuoteEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasSequence<long>(PostgreSqlCaseIdGenerator.SequenceName);
@@ -95,6 +97,17 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
         revision.Property(entity => entity.StandardSettlementDate)
             .HasColumnName("standard_settlement_date")
             .HasColumnType("date");
+        revision.Property(entity => entity.Notional)
+            .HasColumnName("notional")
+            .HasPrecision(20, 2);
+        revision.Property(entity => entity.SalesAndTradingMessage)
+            .HasColumnName("sales_and_trading_message");
+        revision.Property(entity => entity.ConfirmedAt)
+            .HasColumnName("confirmed_at")
+            .HasColumnType("timestamp with time zone");
+        revision.Property(entity => entity.ConfirmedBy)
+            .HasColumnName("confirmed_by")
+            .HasMaxLength(100);
         revision.HasOne(entity => entity.RfqCase)
             .WithMany(entity => entity.Revisions)
             .HasForeignKey(entity => entity.CaseId)
@@ -116,6 +129,14 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .HasMaxLength(30);
         current.Property(entity => entity.RfqStatus)
             .HasColumnName("rfq_status")
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        current.Property(entity => entity.QuoteStatus)
+            .HasColumnName("quote_status")
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        current.Property(entity => entity.QuoteRequestReason)
+            .HasColumnName("quote_request_reason")
             .HasConversion<string>()
             .HasMaxLength(30);
         current.Property(entity => entity.CurrentRevisionId)
@@ -261,6 +282,26 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
         systemDate.Property(entity => entity.BusinessDate)
             .HasColumnName("business_date")
             .HasColumnType("date");
+
+        var workingQuote = modelBuilder.Entity<WorkingQuoteEntity>();
+        workingQuote.ToTable("working_quotes");
+        workingQuote.HasKey(entity => entity.RevisionId);
+        workingQuote.Property(entity => entity.RevisionId)
+            .HasColumnName("revision_id")
+            .ValueGeneratedNever();
+        workingQuote.Property(entity => entity.Version)
+            .HasColumnName("version")
+            .IsConcurrencyToken();
+        workingQuote.Property(entity => entity.CreatedAt)
+            .HasColumnName("created_at")
+            .HasColumnType("timestamp with time zone");
+        workingQuote.Property(entity => entity.CreatedBy)
+            .HasColumnName("created_by")
+            .HasMaxLength(100);
+        workingQuote.HasOne(entity => entity.Revision)
+            .WithOne()
+            .HasForeignKey<WorkingQuoteEntity>(entity => entity.RevisionId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -293,6 +334,10 @@ internal sealed class CaseCurrentEntity
 
     public RfqStatus RfqStatus { get; set; }
 
+    public QuoteStatus? QuoteStatus { get; set; }
+
+    public QuoteRequestReason? QuoteRequestReason { get; set; }
+
     public Guid CurrentRevisionId { get; set; }
 
     public long Version { get; set; }
@@ -322,9 +367,30 @@ internal sealed class RfqRevisionEntity
 
     public string CreatedBy { get; set; } = string.Empty;
 
-    public DateOnly SettlementDate { get; set; }
+    public DateOnly? SettlementDate { get; set; }
 
     public DateOnly StandardSettlementDate { get; set; }
 
+    public decimal? Notional { get; set; }
+
+    public string SalesAndTradingMessage { get; set; } = string.Empty;
+
+    public DateTimeOffset? ConfirmedAt { get; set; }
+
+    public string? ConfirmedBy { get; set; }
+
     public RfqCaseEntity RfqCase { get; set; } = null!;
+}
+
+internal sealed class WorkingQuoteEntity
+{
+    public Guid RevisionId { get; set; }
+
+    public long Version { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public string CreatedBy { get; set; } = string.Empty;
+
+    public RfqRevisionEntity Revision { get; set; } = null!;
 }

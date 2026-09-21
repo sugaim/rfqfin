@@ -7,19 +7,35 @@ export interface HealthResponse {
 export interface CreateDraftRequest {
   clientId: string
   securityId: string
-  settlementDate: string
-  assignedTraderId: string
+  notional?: number
+  settlementDate?: string
+  salesAndTradingMessage?: string
+  assignedTraderId?: string
 }
 
-export interface CreateDraftResponse {
+export interface UpdateDraftRequest {
+  notional?: number
+  settlementDate?: string
+  salesAndTradingMessage?: string
+  assignedTraderId?: string
+  expectedVersion: number
+}
+
+export interface InitialRfqResponse {
   caseId: number
   revisionId: string
   rfqStatus: string
+  revisionStatus: string
+  quoteStatus: string | null
+  quoteRequestReason: string | null
   categoryId: string
   contactOwnerId: string
   assignedTraderId: string
-  settlementDate: string
+  notional: number | null
+  settlementDate: string | null
   standardSettlementDate: string
+  salesAndTradingMessage: string
+  version: number
   createdAt: string
 }
 
@@ -32,12 +48,17 @@ export interface SalesRfq {
   securityBbgDisplay: string
   categoryId: string
   rfqStatus: string
+  quoteStatus: string | null
+  quoteRequestReason: string | null
   currentRevisionId: string
   revisionStatus: string
   contactOwnerId: string
   assignedTraderId: string
-  settlementDate: string
+  settlementDate: string | null
   standardSettlementDate: string
+  notional: number | null
+  salesAndTradingMessage: string
+  version: number
   createdAt: string
 }
 
@@ -93,11 +114,45 @@ export const api = createApi({
     getActiveSalesRfqs: builder.query<SalesRfq[], void>({
       query: () => '/rfqs/active-sales',
     }),
-    createDraft: builder.mutation<CreateDraftResponse, CreateDraftRequest>({
+    createDraft: builder.mutation<InitialRfqResponse, CreateDraftRequest>({
       query: (body) => ({
         url: '/rfqs',
         method: 'POST',
         body,
+      }),
+    }),
+    updateDraft: builder.mutation<
+      InitialRfqResponse,
+      { caseId: number; body: UpdateDraftRequest }
+    >({
+      query: ({ caseId, body }) => ({
+        url: `/rfqs/${caseId}/draft`,
+        method: 'PUT',
+        body,
+      }),
+    }),
+    confirmNewRfq: builder.mutation<InitialRfqResponse, CreateDraftRequest>({
+      query: (body) => ({
+        url: '/rfqs/confirm',
+        method: 'POST',
+        body,
+      }),
+    }),
+    confirmDraft: builder.mutation<
+      InitialRfqResponse,
+      { caseId: number; body: UpdateDraftRequest }
+    >({
+      query: ({ caseId, body }) => ({
+        url: `/rfqs/${caseId}/confirm`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    discardDraft: builder.mutation<void, { caseId: number; expectedVersion: number }>({
+      query: ({ caseId, expectedVersion }) => ({
+        url: `/rfqs/${caseId}/discard`,
+        method: 'POST',
+        body: { expectedVersion },
       }),
     }),
     searchClients: builder.query<ClientSearchResult[], string>({
@@ -122,7 +177,10 @@ export const api = createApi({
 })
 
 export const {
+  useConfirmDraftMutation,
+  useConfirmNewRfqMutation,
   useCreateDraftMutation,
+  useDiscardDraftMutation,
   useGetActiveSalesRfqsQuery,
   useGetHealthQuery,
   useGetSystemDateQuery,
@@ -130,4 +188,5 @@ export const {
   useLazyResolveRfqDefaultsQuery,
   useLazySearchClientsQuery,
   useLazySearchSecuritiesQuery,
+  useUpdateDraftMutation,
 } = api

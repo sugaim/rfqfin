@@ -9,6 +9,12 @@ public static class DependencyInjection
         services.AddScoped<CreateDraft>();
         services.AddScoped<GetActiveSalesRfqs>();
         services.AddScoped<ResolveRfqDefaults>();
+        services.AddScoped<AssignedTraderValidator>();
+        services.AddScoped<InitialRfqFactory>();
+        services.AddScoped<UpdateInitialDraft>();
+        services.AddScoped<ConfirmInitialDraft>();
+        services.AddScoped<ConfirmNewRfq>();
+        services.AddScoped<DiscardInitialDraft>();
 
         return services;
     }

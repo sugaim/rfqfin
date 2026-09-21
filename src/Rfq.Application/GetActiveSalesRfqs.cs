@@ -9,12 +9,17 @@ public sealed record SalesRfqListItem(
     string SecurityBbgDisplay,
     string CategoryId,
     string RfqStatus,
+    string? QuoteStatus,
+    string? QuoteRequestReason,
     Guid CurrentRevisionId,
     string RevisionStatus,
     string ContactOwnerId,
     string AssignedTraderId,
-    DateOnly SettlementDate,
+    DateOnly? SettlementDate,
     DateOnly StandardSettlementDate,
+    decimal? Notional,
+    string SalesAndTradingMessage,
+    long Version,
     DateTimeOffset CreatedAt);
 
 public sealed class GetActiveSalesRfqs(

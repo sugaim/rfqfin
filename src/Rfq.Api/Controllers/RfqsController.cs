@@ -8,48 +8,103 @@ namespace Rfq.Api.Controllers;
 [Route("api/rfqs")]
 public sealed class RfqsController(
     CreateDraft createDraft,
+    UpdateInitialDraft updateInitialDraft,
+    ConfirmInitialDraft confirmInitialDraft,
+    ConfirmNewRfq confirmNewRfq,
+    DiscardInitialDraft discardInitialDraft,
     GetActiveSalesRfqs getActiveSalesRfqs) : ControllerBase
 {
     [HttpPost]
-    [ProducesResponseType<CreateDraftResponse>(StatusCodes.Status201Created)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<CreateDraftResponse>> Create(
+    public async Task<ActionResult<InitialRfqResponse>> Create(
         CreateDraftRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var result = await createDraft.ExecuteAsync(
-                new CreateDraftCommand(
-                    request.ClientId,
-                    request.SecurityId,
-                    request.SettlementDate,
-                    request.AssignedTraderId),
-                cancellationToken);
-
-            var response = new CreateDraftResponse(
-                result.CaseId,
-                result.RevisionId,
-                result.RfqStatus,
-                result.CategoryId,
-                result.ContactOwnerId,
-                result.AssignedTraderId,
-                result.SettlementDate,
-                result.StandardSettlementDate,
-                result.CreatedAt);
-
-            return Created("/api/rfqs/active-sales", response);
+            var result = await createDraft.ExecuteAsync(ToCommand(request), cancellationToken);
+            return Created("/api/rfqs/active-sales", ToResponse(result));
         }
-        catch (Exception exception) when (
-            exception is ArgumentException or KeyNotFoundException or InvalidOperationException)
+        catch (Exception exception) when (IsExpected(exception))
         {
-            ModelState.AddModelError("request", exception.Message);
-            return ValidationProblem(ModelState);
+            return ToProblem(exception);
+        }
+    }
+
+    [HttpPost("confirm")]
+    public async Task<ActionResult<InitialRfqResponse>> ConfirmNew(
+        CreateDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await confirmNewRfq.ExecuteAsync(ToCommand(request), cancellationToken);
+            return Created("/api/rfqs/active-sales", ToResponse(result));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
+        }
+    }
+
+    [HttpPut("{caseId:long}/draft")]
+    public async Task<ActionResult<InitialRfqResponse>> UpdateDraft(
+        long caseId,
+        UpdateInitialDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await updateInitialDraft.ExecuteAsync(
+                ToCommand(caseId, request),
+                cancellationToken);
+            return Ok(ToResponse(result));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
+        }
+    }
+
+    [HttpPost("{caseId:long}/confirm")]
+    public async Task<ActionResult<InitialRfqResponse>> ConfirmDraft(
+        long caseId,
+        UpdateInitialDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await confirmInitialDraft.ExecuteAsync(
+                ToCommand(caseId, request),
+                cancellationToken);
+            return Ok(ToResponse(result));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
+        }
+    }
+
+    [HttpPost("{caseId:long}/discard")]
+    public async Task<IActionResult> DiscardDraft(
+        long caseId,
+        DiscardInitialDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await discardInitialDraft.ExecuteAsync(
+                caseId,
+                request.ExpectedVersion,
+                cancellationToken);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
         }
     }
 
     [HttpGet("active-sales")]
-    [ProducesResponseType<IReadOnlyList<SalesRfqResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<SalesRfqResponse>>> GetActiveSales(
         CancellationToken cancellationToken)
     {
@@ -63,31 +118,107 @@ public sealed class RfqsController(
             item.SecurityBbgDisplay,
             item.CategoryId,
             item.RfqStatus,
+            item.QuoteStatus,
+            item.QuoteRequestReason,
             item.CurrentRevisionId,
             item.RevisionStatus,
             item.ContactOwnerId,
             item.AssignedTraderId,
             item.SettlementDate,
             item.StandardSettlementDate,
+            item.Notional,
+            item.SalesAndTradingMessage,
+            item.Version,
             item.CreatedAt)));
+    }
+
+    private static CreateDraftCommand ToCommand(CreateDraftRequest request) => new(
+        request.ClientId,
+        request.SecurityId,
+        request.Notional,
+        request.SettlementDate,
+        request.SalesAndTradingMessage,
+        request.AssignedTraderId);
+
+    private static UpdateInitialDraftCommand ToCommand(
+        long caseId,
+        UpdateInitialDraftRequest request) => new(
+        caseId,
+        request.Notional,
+        request.SettlementDate,
+        request.SalesAndTradingMessage,
+        request.AssignedTraderId,
+        request.ExpectedVersion);
+
+    private static InitialRfqResponse ToResponse(InitialRfqResult result) => new(
+        result.CaseId,
+        result.RevisionId,
+        result.RfqStatus,
+        result.RevisionStatus,
+        result.QuoteStatus,
+        result.QuoteRequestReason,
+        result.CategoryId,
+        result.ContactOwnerId,
+        result.AssignedTraderId,
+        result.Notional,
+        result.SettlementDate,
+        result.StandardSettlementDate,
+        result.SalesAndTradingMessage,
+        result.Version,
+        result.CreatedAt);
+
+    private static bool IsExpected(Exception exception) =>
+        exception is ArgumentException
+            or KeyNotFoundException
+            or InvalidOperationException
+            or UnauthorizedAccessException;
+
+    private ObjectResult ToProblem(Exception exception)
+    {
+        var statusCode = exception switch
+        {
+            UnauthorizedAccessException => StatusCodes.Status403Forbidden,
+            KeyNotFoundException => StatusCodes.Status404NotFound,
+            InvalidOperationException => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status400BadRequest,
+        };
+        return Problem(statusCode: statusCode, detail: exception.Message);
     }
 }
 
 public sealed record CreateDraftRequest(
     [Required, MinLength(1)] string ClientId,
     [Required, MinLength(1)] string SecurityId,
-    DateOnly SettlementDate,
+    decimal? Notional,
+    DateOnly? SettlementDate,
+    string? SalesAndTradingMessage,
     string? AssignedTraderId);
 
-public sealed record CreateDraftResponse(
+public sealed record UpdateInitialDraftRequest(
+    decimal? Notional,
+    DateOnly? SettlementDate,
+    string? SalesAndTradingMessage,
+    string? AssignedTraderId,
+    [Range(1, long.MaxValue)] long ExpectedVersion);
+
+public sealed record DiscardInitialDraftRequest(
+    [Range(1, long.MaxValue)] long ExpectedVersion);
+
+public sealed record InitialRfqResponse(
     long CaseId,
     Guid RevisionId,
     string RfqStatus,
+    string RevisionStatus,
+    string? QuoteStatus,
+    string? QuoteRequestReason,
     string CategoryId,
     string ContactOwnerId,
     string AssignedTraderId,
-    DateOnly SettlementDate,
+    decimal? Notional,
+    DateOnly? SettlementDate,
     DateOnly StandardSettlementDate,
+    string SalesAndTradingMessage,
+    long Version,
     DateTimeOffset CreatedAt);
 
 public sealed record SalesRfqResponse(
@@ -99,10 +230,15 @@ public sealed record SalesRfqResponse(
     string SecurityBbgDisplay,
     string CategoryId,
     string RfqStatus,
+    string? QuoteStatus,
+    string? QuoteRequestReason,
     Guid CurrentRevisionId,
     string RevisionStatus,
     string ContactOwnerId,
     string AssignedTraderId,
-    DateOnly SettlementDate,
+    DateOnly? SettlementDate,
     DateOnly StandardSettlementDate,
+    decimal? Notional,
+    string SalesAndTradingMessage,
+    long Version,
     DateTimeOffset CreatedAt);

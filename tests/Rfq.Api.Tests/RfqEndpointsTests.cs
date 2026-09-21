@@ -8,63 +8,106 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     : IClassFixture<RfqApiFixture>
 {
     [Fact]
-    public async Task PostTwoDraftsReturnsIncrementingIdsAndListsBoth()
+    public async Task InitialDraftCanBeSavedEditedConfirmedOrDiscarded()
     {
         using var client = fixture.Factory.CreateClient();
 
-        var postResponse = await client.PostAsJsonAsync(
+        var saveResponse = await client.PostAsJsonAsync(
             "/api/rfqs",
+            new { ClientId = "client-001", SecurityId = "sec-jgb-375" });
+        var saved = await AssertCreatedAsync(saveResponse);
+        Assert.Equal("Draft", saved.RfqStatus);
+        Assert.Equal("Draft", saved.RevisionStatus);
+        Assert.Null(saved.Notional);
+        Assert.Null(saved.SettlementDate);
+        Assert.Null(saved.QuoteStatus);
+        Assert.Equal(1, saved.Version);
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/rfqs/{saved.CaseId}/draft",
             new
             {
-                ClientId = "client-001",
-                SecurityId = "sec-jgb-375",
+                Notional = 100_000_000m,
                 SettlementDate = "2026-09-24",
+                SalesAndTradingMessage = "Please quote",
                 AssignedTraderId = "trader-a",
+                ExpectedVersion = saved.Version,
             });
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updated = await updateResponse.Content.ReadFromJsonAsync<InitialRfqBody>();
+        Assert.NotNull(updated);
+        Assert.Equal(2, updated.Version);
+        Assert.Equal(100_000_000m, updated.Notional);
 
-        var postResponseBody = await postResponse.Content.ReadAsStringAsync();
-        Assert.True(
-            postResponse.StatusCode == HttpStatusCode.Created,
-            $"Expected 201 Created but received {(int)postResponse.StatusCode}: {postResponseBody}");
-        var created = await postResponse.Content.ReadFromJsonAsync<CreateDraftBody>();
-        Assert.NotNull(created);
-        Assert.True(created.CaseId > 0);
-        Assert.NotEqual(Guid.Empty, created.RevisionId);
-        Assert.Equal("Draft", created.RfqStatus);
-        Assert.Equal("JGB", created.CategoryId);
-        Assert.Equal("sales-dev", created.ContactOwnerId);
-        Assert.Equal("trader-a", created.AssignedTraderId);
+        var confirmResponse = await client.PostAsJsonAsync(
+            $"/api/rfqs/{saved.CaseId}/confirm",
+            new
+            {
+                updated.Notional,
+                SettlementDate = "2026-09-24",
+                updated.SalesAndTradingMessage,
+                updated.AssignedTraderId,
+                ExpectedVersion = updated.Version,
+            });
+        Assert.Equal(HttpStatusCode.OK, confirmResponse.StatusCode);
+        var confirmed = await confirmResponse.Content.ReadFromJsonAsync<InitialRfqBody>();
+        Assert.NotNull(confirmed);
+        Assert.Equal("Active", confirmed.RfqStatus);
+        Assert.Equal("Confirmed", confirmed.RevisionStatus);
+        Assert.Equal("Requested", confirmed.QuoteStatus);
+        Assert.Equal("Initial", confirmed.QuoteRequestReason);
+        Assert.Equal(3, confirmed.Version);
 
-        var secondPostResponse = await client.PostAsJsonAsync(
-            "/api/rfqs",
+        var directResponse = await client.PostAsJsonAsync(
+            "/api/rfqs/confirm",
             new
             {
                 ClientId = "client-002",
                 SecurityId = "sec-toyota-1",
+                Notional = 50_000_000m,
                 SettlementDate = "2026-09-24",
+                SalesAndTradingMessage = "Direct confirmation",
                 AssignedTraderId = "trader-b",
             });
-        Assert.Equal(HttpStatusCode.Created, secondPostResponse.StatusCode);
-        var secondCreated = await secondPostResponse.Content.ReadFromJsonAsync<CreateDraftBody>();
-        Assert.NotNull(secondCreated);
-        Assert.Equal(created.CaseId + 1, secondCreated.CaseId);
+        var directlyConfirmed = await AssertCreatedAsync(directResponse);
+        Assert.Equal(saved.CaseId + 1, directlyConfirmed.CaseId);
+        Assert.Equal("Active", directlyConfirmed.RfqStatus);
+        Assert.Equal("Confirmed", directlyConfirmed.RevisionStatus);
+        Assert.Equal("Requested", directlyConfirmed.QuoteStatus);
+        Assert.Equal("Initial", directlyConfirmed.QuoteRequestReason);
+
+        var discardSaveResponse = await client.PostAsJsonAsync(
+            "/api/rfqs",
+            new { ClientId = "client-003", SecurityId = "sec-jgb-375" });
+        var toDiscard = await AssertCreatedAsync(discardSaveResponse);
+        var discardResponse = await client.PostAsJsonAsync(
+            $"/api/rfqs/{toDiscard.CaseId}/discard",
+            new { ExpectedVersion = toDiscard.Version });
+        Assert.Equal(HttpStatusCode.NoContent, discardResponse.StatusCode);
 
         var rows = await client.GetFromJsonAsync<List<SalesRfqBody>>(
             "/api/rfqs/active-sales");
-
         var list = Assert.IsType<List<SalesRfqBody>>(rows);
-        Assert.Equal(2, list.Count);
-        var row = Assert.Single(list, item => item.CaseId == created.CaseId);
-        Assert.Equal(created.CaseId, row.CaseId);
-        Assert.Equal("client-001", row.ClientId);
-        Assert.Equal("青空銀行", row.ClientName);
-        Assert.Equal("sec-jgb-375", row.SecurityId);
-        Assert.Equal("利付国債 第375回", row.SecurityJapaneseName);
-        Assert.Equal("JGB 0.5 03/20/2030 #375", row.SecurityBbgDisplay);
-        Assert.Equal("JGB", row.CategoryId);
-        Assert.Equal("Draft", row.RfqStatus);
-        Assert.Equal("Draft", row.RevisionStatus);
-        Assert.Contains(list, item => item.CaseId == secondCreated.CaseId);
+        var confirmedRow = Assert.Single(list, item => item.CaseId == saved.CaseId);
+        Assert.Equal("青空銀行", confirmedRow.ClientName);
+        Assert.Equal("利付国債 第375回", confirmedRow.SecurityJapaneseName);
+        Assert.Equal("JGB 0.5 03/20/2030 #375", confirmedRow.SecurityBbgDisplay);
+        Assert.Equal("Active", confirmedRow.RfqStatus);
+        Assert.Equal("Confirmed", confirmedRow.RevisionStatus);
+        Assert.Equal("Requested", confirmedRow.QuoteStatus);
+        Assert.Equal("Initial", confirmedRow.QuoteRequestReason);
+        Assert.DoesNotContain(list, item => item.CaseId == toDiscard.CaseId);
+    }
+
+    [Fact]
+    public async Task ConfirmRejectsIncompleteDraft()
+    {
+        using var client = fixture.Factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            "/api/rfqs/confirm",
+            new { ClientId = "client-004", SecurityId = "sec-jgb-375" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -93,45 +136,50 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(new DateOnly(2026, 9, 21), systemDate?.Date);
     }
 
-    private sealed record CreateDraftBody(
+    private static async Task<InitialRfqBody> AssertCreatedAsync(HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.Created,
+            $"Expected 201 Created but received {(int)response.StatusCode}: {responseBody}");
+        return Assert.IsType<InitialRfqBody>(
+            await response.Content.ReadFromJsonAsync<InitialRfqBody>());
+    }
+
+    private sealed record InitialRfqBody(
         long CaseId,
         Guid RevisionId,
         string RfqStatus,
+        string RevisionStatus,
+        string? QuoteStatus,
+        string? QuoteRequestReason,
         string CategoryId,
         string ContactOwnerId,
         string AssignedTraderId,
-        DateOnly SettlementDate,
+        decimal? Notional,
+        DateOnly? SettlementDate,
         DateOnly StandardSettlementDate,
+        string SalesAndTradingMessage,
+        long Version,
         DateTimeOffset CreatedAt);
 
     private sealed record SalesRfqBody(
         long CaseId,
-        string ClientId,
         string ClientName,
-        string SecurityId,
         string SecurityJapaneseName,
         string SecurityBbgDisplay,
-        string CategoryId,
         string RfqStatus,
-        Guid CurrentRevisionId,
         string RevisionStatus,
-        string ContactOwnerId,
-        string AssignedTraderId,
-        DateOnly SettlementDate,
-        DateOnly StandardSettlementDate,
-        DateTimeOffset CreatedAt);
+        string? QuoteStatus,
+        string? QuoteRequestReason);
 
     private sealed record SecurityBody(string SecurityId);
-
     private sealed record ClientBody(string ClientId);
-
     private sealed record UserBody(string UserId);
-
     private sealed record DefaultsBody(
         string CategoryId,
         string ContactOwnerId,
         string AssignedTraderId,
         DateOnly StandardSettlementDate);
-
     private sealed record SystemDateBody(DateOnly Date);
 }

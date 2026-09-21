@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -88,8 +89,10 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
                 SecurityId.Create("security-roundtrip"),
                 CategoryId.Create("JGB"),
                 UserId.Create("trader-roundtrip"),
+                100_000_000m,
                 new DateOnly(2026, 9, 24),
                 new DateOnly(2026, 9, 23),
+                "Roundtrip message",
                 salesUserId,
                 createdAt));
 
@@ -112,8 +115,165 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
             Assert.Equal("JGB", row.CategoryId);
             Assert.Equal("trader-roundtrip", row.AssignedTraderId);
             Assert.Equal(new DateOnly(2026, 9, 24), row.SettlementDate);
+            Assert.Equal(100_000_000m, row.Notional);
+            Assert.Equal("Roundtrip message", row.SalesAndTradingMessage);
             Assert.Equal(createdAt, row.CreatedAt);
         }
+    }
+
+    [Fact]
+    public async Task ConfirmedCurrentRevisionHasExactlyOneWorkingQuote()
+    {
+        await RecreateDatabaseAsync();
+        var salesUserId = UserId.Create("sales-confirm");
+        var confirmedAt = new DateTimeOffset(2026, 9, 21, 1, 0, 0, TimeSpan.Zero);
+        Guid revisionId;
+        long caseId;
+
+        await using (var createContext = fixture.CreateContext())
+        {
+            var repository = new RfqCaseRepository(createContext);
+            caseId = (await new PostgreSqlCaseIdGenerator(createContext).NextAsync()).Value;
+            var rfqCase = RfqCase.CreateDraft(
+                new CaseId(caseId),
+                ClientId.Create("client-confirm"),
+                SecurityId.Create("security-confirm"),
+                CategoryId.Create("JGB"),
+                UserId.Create("trader-confirm"),
+                100_000_000m,
+                new DateOnly(2026, 9, 24),
+                new DateOnly(2026, 9, 23),
+                "Confirm roundtrip",
+                salesUserId,
+                confirmedAt.AddMinutes(-1));
+            revisionId = rfqCase.InitialRevision.RevisionId.Value;
+            repository.Add(rfqCase);
+            await createContext.SaveChangesAsync();
+        }
+
+        await using (var confirmContext = fixture.CreateContext())
+        {
+            var repository = new RfqCaseRepository(confirmContext);
+            var rfqCase = Assert.IsType<RfqCase>(
+                await repository.GetAsync(new CaseId(caseId)));
+            rfqCase.ConfirmInitial(
+                new DateOnly(2026, 9, 21),
+                salesUserId,
+                confirmedAt,
+                rfqCase.InitialRevision.Version);
+            repository.Update(rfqCase);
+            var workingQuotes = new WorkingQuoteEnsurer(confirmContext);
+            await workingQuotes.EnsureAsync(
+                rfqCase.InitialRevision.RevisionId,
+                salesUserId,
+                confirmedAt);
+            await workingQuotes.EnsureAsync(
+                rfqCase.InitialRevision.RevisionId,
+                salesUserId,
+                confirmedAt);
+            await confirmContext.SaveChangesAsync();
+        }
+
+        await using var readContext = fixture.CreateContext();
+        var row = Assert.Single(
+            await new RfqCaseRepository(readContext)
+                .GetActiveSalesRfqsAsync(salesUserId));
+        Assert.Equal("Active", row.RfqStatus);
+        Assert.Equal("Confirmed", row.RevisionStatus);
+        Assert.Equal("Requested", row.QuoteStatus);
+        Assert.Equal("Initial", row.QuoteRequestReason);
+        Assert.Equal(revisionId, row.CurrentRevisionId);
+        var workingQuoteCount = await readContext.Database
+            .SqlQuery<int>($"""
+                SELECT COUNT(*)::int AS "Value"
+                FROM working_quotes
+                WHERE revision_id = {revisionId}
+                """)
+            .SingleAsync();
+        Assert.Equal(1, workingQuoteCount);
+    }
+
+    [Fact]
+    public async Task DirectlyConfirmedCaseRestoresAsOpenLifecycle()
+    {
+        await RecreateDatabaseAsync();
+        var salesUserId = UserId.Create("sales-direct-confirm");
+        var confirmedAt = new DateTimeOffset(2026, 9, 21, 1, 0, 0, TimeSpan.Zero);
+        long caseId;
+
+        await using (var writeContext = fixture.CreateContext())
+        {
+            var repository = new RfqCaseRepository(writeContext);
+            caseId = (await new PostgreSqlCaseIdGenerator(writeContext).NextAsync()).Value;
+            var rfqCase = RfqCase.CreateDraft(
+                new CaseId(caseId),
+                ClientId.Create("client-direct-confirm"),
+                SecurityId.Create("security-direct-confirm"),
+                CategoryId.Create("JGB"),
+                UserId.Create("trader-direct-confirm"),
+                100_000_000m,
+                new DateOnly(2026, 9, 24),
+                new DateOnly(2026, 9, 23),
+                null,
+                salesUserId,
+                confirmedAt.AddMinutes(-1));
+            rfqCase.ConfirmInitial(
+                new DateOnly(2026, 9, 21),
+                salesUserId,
+                confirmedAt,
+                rfqCase.InitialRevision.Version);
+            repository.Add(rfqCase);
+            await new WorkingQuoteEnsurer(writeContext).EnsureAsync(
+                rfqCase.InitialRevision.RevisionId,
+                salesUserId,
+                confirmedAt);
+            await writeContext.SaveChangesAsync();
+        }
+
+        await using var readContext = fixture.CreateContext();
+        var restored = Assert.IsType<RfqCase>(
+            await new RfqCaseRepository(readContext).GetAsync(new CaseId(caseId)));
+        var open = Assert.IsType<OpenRfq>(restored.Lifecycle);
+        Assert.Equal(RfqStatus.Active, restored.Status);
+        Assert.Equal(QuoteStatus.Requested, open.QuoteStatus);
+        Assert.Equal(QuoteRequestReason.Initial, open.QuoteRequestReason);
+    }
+
+    [Fact]
+    public async Task PartialUniqueIndexRejectsSecondDraftRevisionForCase()
+    {
+        await RecreateDatabaseAsync();
+        var createdAt = new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero);
+
+        await using var context = fixture.CreateContext();
+        var repository = new RfqCaseRepository(context);
+        var caseId = await new PostgreSqlCaseIdGenerator(context).NextAsync();
+        repository.Add(RfqCase.CreateDraft(
+            caseId,
+            ClientId.Create("client-unique"),
+            SecurityId.Create("security-unique"),
+            CategoryId.Create("JGB"),
+            UserId.Create("trader-unique"),
+            null,
+            null,
+            new DateOnly(2026, 9, 23),
+            null,
+            UserId.Create("sales-unique"),
+            createdAt));
+        await context.SaveChangesAsync();
+
+        var secondRevisionId = Guid.NewGuid();
+        var exception = await Assert.ThrowsAnyAsync<DbException>(() =>
+            context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO rfq_revisions
+                    (revision_id, case_id, status, version, created_at, created_by,
+                     standard_settlement_date, sales_and_trading_message)
+                VALUES
+                    ({secondRevisionId}, {caseId.Value}, 'Draft', 1,
+                     {createdAt.AddMinutes(1)}, 'sales-unique',
+                     {new DateOnly(2026, 9, 23)}, '')
+                """));
+        Assert.Contains("ux_rfq_revisions_one_draft_per_case", exception.Message);
     }
 
     [Theory]
