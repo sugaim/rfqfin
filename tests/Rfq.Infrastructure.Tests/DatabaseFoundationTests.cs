@@ -165,10 +165,12 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
             var workingQuotes = new WorkingQuoteEnsurer(confirmContext);
             await workingQuotes.EnsureAsync(
                 rfqCase.InitialRevision.RevisionId,
+                null,
                 salesUserId,
                 confirmedAt);
             await workingQuotes.EnsureAsync(
                 rfqCase.InitialRevision.RevisionId,
+                null,
                 salesUserId,
                 confirmedAt);
             await confirmContext.SaveChangesAsync();
@@ -191,6 +193,94 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
                 """)
             .SingleAsync();
         Assert.Equal(1, workingQuoteCount);
+    }
+
+    [Fact]
+    public async Task EnsureWorkingQuoteReturnsExistingAndClonesConfiguredSeed()
+    {
+        await RecreateDatabaseAsync();
+        var user = UserId.Create("sales-quote-seed");
+        var now = new DateTimeOffset(2026, 9, 21, 2, 0, 0, TimeSpan.Zero);
+        RevisionId seedRevisionId;
+        RevisionId targetRevisionId;
+
+        await using (var context = fixture.CreateContext())
+        {
+            var repository = new RfqCaseRepository(context);
+            var caseIds = new PostgreSqlCaseIdGenerator(context);
+            var seedCase = RfqCase.CreateDraft(
+                await caseIds.NextAsync(),
+                ClientId.Create("client-seed"),
+                SecurityId.Create("security-seed"),
+                CategoryId.Create("JGB"),
+                UserId.Create("trader-a"),
+                100_000_000m,
+                new DateOnly(2026, 9, 24),
+                new DateOnly(2026, 9, 23),
+                null,
+                user,
+                now);
+            seedCase.ConfirmInitial(
+                new DateOnly(2026, 9, 21), user, now, seedCase.InitialRevision.Version);
+            var targetCase = RfqCase.CreateDraft(
+                await caseIds.NextAsync(),
+                ClientId.Create("client-target"),
+                SecurityId.Create("security-target"),
+                CategoryId.Create("JGB"),
+                UserId.Create("trader-a"),
+                50_000_000m,
+                new DateOnly(2026, 9, 24),
+                new DateOnly(2026, 9, 23),
+                null,
+                user,
+                now);
+            targetCase.ConfirmInitial(
+                new DateOnly(2026, 9, 21), user, now, targetCase.InitialRevision.Version);
+            seedRevisionId = seedCase.InitialRevision.RevisionId;
+            targetRevisionId = targetCase.InitialRevision.RevisionId;
+            repository.Add(seedCase);
+            repository.Add(targetCase);
+            await context.SaveChangesAsync();
+
+            var ensurer = new WorkingQuoteEnsurer(context);
+            var seed = await ensurer.EnsureAsync(seedRevisionId, null, user, now);
+            await context.SaveChangesAsync();
+            var quoteRepository = new WorkingQuoteRepository(context);
+            var trackedSeed = Assert.IsType<WorkingQuote>(
+                await quoteRepository.GetAsync(seedRevisionId));
+            var calculated = new CalculatedQuotePayload(
+                CalculationDriver.Price,
+                99.5m,
+                99.5m,
+                0.8m,
+                0.81m,
+                0.03m,
+                0.84m,
+                0.83m,
+                5m,
+                8m);
+            trackedSeed.ApplyCalculated(calculated, seed.Version, user, now.AddMinutes(1));
+            quoteRepository.Update(trackedSeed);
+            await context.SaveChangesAsync();
+
+            var existing = await ensurer.EnsureAsync(seedRevisionId, null, user, now);
+            var clone = await ensurer.EnsureAsync(
+                targetRevisionId,
+                seedRevisionId,
+                user,
+                now.AddMinutes(2));
+            Assert.Equal(2, existing.Version);
+            Assert.Equal(1, clone.Version);
+            Assert.Equal(calculated, clone.Calculated);
+            await context.SaveChangesAsync();
+        }
+
+        await using var readContext = fixture.CreateContext();
+        var persistedClone = Assert.IsType<WorkingQuote>(
+            await new WorkingQuoteRepository(readContext).GetAsync(targetRevisionId));
+        Assert.Equal(WorkingQuoteMode.Calculated, persistedClone.Mode);
+        Assert.Equal(99.5m, persistedClone.Calculated?.Price);
+        Assert.Equal(1, persistedClone.Version);
     }
 
     [Fact]
@@ -225,6 +315,7 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
             repository.Add(rfqCase);
             await new WorkingQuoteEnsurer(writeContext).EnsureAsync(
                 rfqCase.InitialRevision.RevisionId,
+                null,
                 salesUserId,
                 confirmedAt);
             await writeContext.SaveChangesAsync();
@@ -306,6 +397,7 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
             new RfqCaseRepository(seedContext).Add(rfqCase);
             await new WorkingQuoteEnsurer(seedContext).EnsureAsync(
                 rfqCase.InitialRevision.RevisionId,
+                null,
                 sales,
                 DateTimeOffset.UtcNow);
             await seedContext.SaveChangesAsync();

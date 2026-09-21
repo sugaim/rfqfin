@@ -207,8 +207,9 @@ public sealed class CreateDraftTests
     {
         public List<RevisionId> Revisions { get; } = [];
 
-        public Task EnsureAsync(
+        public Task<WorkingQuote> EnsureAsync(
             RevisionId revisionId,
+            RevisionId? quoteSeedRevisionId,
             UserId createdBy,
             DateTimeOffset createdAt,
             CancellationToken cancellationToken = default)
@@ -218,7 +219,10 @@ public sealed class CreateDraftTests
                 Revisions.Add(revisionId);
             }
 
-            return Task.CompletedTask;
+            return Task.FromResult(WorkingQuote.CreateEmpty(
+                revisionId,
+                createdBy,
+                createdAt));
         }
     }
 

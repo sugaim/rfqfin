@@ -21,6 +21,9 @@ public static class DependencyInjection
         services.AddScoped<ReleaseRfq>();
         services.AddScoped<AssignTrader>();
         services.AddScoped<TakeOverRfq>();
+        services.AddScoped<CalculateWorkingQuote>();
+        services.AddScoped<ChangeWorkingQuoteMode>();
+        services.AddScoped<UpdateManualWorkingQuote>();
 
         return services;
     }

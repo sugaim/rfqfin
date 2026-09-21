@@ -21,8 +21,9 @@ public interface IRfqCaseRepository
 
 public interface IWorkingQuoteEnsurer
 {
-    Task EnsureAsync(
+    Task<WorkingQuote> EnsureAsync(
         RevisionId revisionId,
+        RevisionId? quoteSeedRevisionId,
         UserId createdBy,
         DateTimeOffset createdAt,
         CancellationToken cancellationToken = default);

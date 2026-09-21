@@ -1,10 +1,13 @@
+using System.Text.Json.Serialization;
 using Rfq.Application;
 using Rfq.Api;
 using Rfq.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
 builder.Services.AddRfqApplication();
 builder.Services.AddRfqInfrastructure(builder.Configuration);

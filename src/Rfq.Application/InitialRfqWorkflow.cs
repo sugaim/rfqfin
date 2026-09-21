@@ -91,6 +91,7 @@ public sealed class ConfirmInitialDraft(
         rfqCases.Update(rfqCase);
         await workingQuoteEnsurer.EnsureAsync(
             rfqCase.InitialRevision.RevisionId,
+            rfqCase.InitialRevision.QuoteSeedRevisionId,
             currentUser.User.UserId,
             now,
             cancellationToken);
@@ -126,6 +127,7 @@ public sealed class ConfirmNewRfq(
         rfqCases.Add(rfqCase);
         await workingQuoteEnsurer.EnsureAsync(
             rfqCase.InitialRevision.RevisionId,
+            rfqCase.InitialRevision.QuoteSeedRevisionId,
             currentUser.User.UserId,
             now,
             cancellationToken);

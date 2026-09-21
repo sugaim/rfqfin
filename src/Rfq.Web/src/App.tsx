@@ -1,21 +1,27 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Alert, AutoComplete, Button, Card, Form, Input, InputNumber, Layout, Menu, Popconfirm, Select, Space, Spin, Tag, Typography } from 'antd'
-import type { ColDef, RowClickedEvent } from 'ag-grid-community'
+import { Alert, AutoComplete, Button, Card, Form, Input, InputNumber, Layout, Menu, Popconfirm, Select, Space, Spin, Tag, Typography, message } from 'antd'
+import type { CellEditRequestEvent, ColDef, RowClickedEvent } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
 import {
   useAssignTraderMutation,
+  useCalculateWorkingQuoteMutation, useChangeWorkingQuoteModeMutation,
   useConfirmDraftMutation, useConfirmNewRfqMutation, useCreateDraftMutation,
   useDiscardDraftMutation, useGetActiveSalesRfqsQuery, useGetActiveTraderRfqsQuery,
   useGetCurrentUserQuery, useGetHealthQuery,
   useGetSystemDateQuery, useGetUsersQuery, useLazyResolveRfqDefaultsQuery,
   useLazySearchClientsQuery, useLazySearchSecuritiesQuery, usePickUpRfqMutation,
   useReleaseRfqMutation, useTakeOverRfqMutation, useUpdateDraftMutation,
+  useUpdateManualWorkingQuoteMutation,
   type ClientSearchResult, type CreateDraftRequest, type RfqDefaults,
   type SalesRfq, type SecuritySearchResult, type TraderRfq, type UpdateDraftRequest,
 } from './services/api'
 
 const navigationItems = ['Sales', 'Trader', 'EOD'].map((label) => ({ key: label.toLowerCase(), label }))
 const million = 1_000_000
+const formatPercent = (value: unknown) =>
+  value == null ? '' : `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 8 })}%`
+const formatBasisPoints = (value: unknown) =>
+  value == null ? '' : `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 8 })} bp`
 
 const toAbsoluteNotional = (notionalInMillions?: number) =>
   notionalInMillions === undefined
@@ -304,6 +310,18 @@ export interface TraderScreenProps {
   onRelease: (caseId: number, expectedVersion: number) => Promise<void>
   onAssign: (caseId: number, targetTraderId: string, expectedVersion: number) => Promise<void>
   onTakeOver: (caseId: number, expectedVersion: number, confirmed: boolean) => Promise<void>
+  onCalculate: (
+    row: TraderRfq,
+    driver: string,
+    value: number,
+    simpleYieldSlide: number,
+  ) => Promise<void>
+  onChangeMode: (row: TraderRfq, mode: 'Calculated' | 'Manual') => Promise<void>
+  onUpdateManual: (
+    row: TraderRfq,
+    price: number | null,
+    finalSimpleYield: number | null,
+  ) => Promise<void>
   onReload: () => void | Promise<unknown>
 }
 
@@ -318,12 +336,22 @@ export function TraderScreen({
   onRelease,
   onAssign,
   onTakeOver,
+  onCalculate,
+  onChangeMode,
+  onUpdateManual,
   onReload,
 }: TraderScreenProps) {
   const [selected, setSelected] = useState<TraderRfq | null>(null)
   const [selectedRows, setSelectedRows] = useState<TraderRfq[]>([])
   const [targetTraderId, setTargetTraderId] = useState<string>()
   const [actionError, setActionError] = useState(false)
+  const [calculationStatus, setCalculationStatus] = useState<Record<number, string>>({})
+  const canEditQuote = (row?: TraderRfq) => Boolean(
+    row
+    && row.owned
+    && row.assignedTraderId === currentUserId
+    && row.quoteStatus === 'Requested',
+  )
   const columns = useMemo<ColDef<TraderRfq>[]>(() => [
     { field: 'caseId', headerName: 'Case ID', minWidth: 110 },
     { field: 'clientName', headerName: 'Client', minWidth: 180 },
@@ -341,7 +369,78 @@ export function TraderScreen({
     { field: 'quoteStatus', headerName: 'Quote Status', minWidth: 130 },
     { field: 'quoteRequestReason', headerName: 'Reason', minWidth: 120 },
     { field: 'settlementDate', headerName: 'Settlement', minWidth: 130 },
-  ], [])
+    { field: 'workingQuoteMode', headerName: 'Mode', minWidth: 110 },
+    {
+      colId: 'price',
+      headerName: 'Price',
+      minWidth: 110,
+      valueGetter: ({ data }) => data?.workingQuoteMode === 'Manual'
+        ? data.manual?.price
+        : data?.calculated?.price,
+      editable: ({ data }) => canEditQuote(data),
+      cellEditor: 'agNumberCellEditor',
+    },
+    {
+      colId: 'bbgYield',
+      headerName: 'BBG Yield (%)',
+      minWidth: 120,
+      valueGetter: ({ data }) => data?.workingQuoteMode === 'Calculated'
+        ? data.calculated?.bbgYield
+        : undefined,
+      valueFormatter: ({ value }) => formatPercent(value),
+      editable: ({ data }) => canEditQuote(data) && data?.workingQuoteMode === 'Calculated',
+      cellEditor: 'agNumberCellEditor',
+    },
+    {
+      colId: 'baseSimpleYield',
+      headerName: 'Simple Yield (%)',
+      minWidth: 130,
+      valueGetter: ({ data }) => data?.workingQuoteMode === 'Calculated'
+        ? data.calculated?.baseSimpleYield
+        : undefined,
+      valueFormatter: ({ value }) => formatPercent(value),
+      editable: ({ data }) => canEditQuote(data) && data?.workingQuoteMode === 'Calculated',
+      cellEditor: 'agNumberCellEditor',
+    },
+    {
+      colId: 'gSpread',
+      headerName: 'G-Spread (bp)',
+      minWidth: 120,
+      valueGetter: ({ data }) => data?.workingQuoteMode === 'Calculated'
+        ? data.calculated?.gSpread
+        : undefined,
+      valueFormatter: ({ value }) => formatBasisPoints(value),
+      editable: ({ data }) => canEditQuote(data) && data?.workingQuoteMode === 'Calculated',
+      cellEditor: 'agNumberCellEditor',
+    },
+    {
+      colId: 'simpleYieldSlide',
+      headerName: 'SY Slide (%)',
+      minWidth: 110,
+      valueGetter: ({ data }) => data?.workingQuoteMode === 'Calculated'
+        ? data.calculated?.simpleYieldSlide ?? 0
+        : undefined,
+      valueFormatter: ({ value }) => formatPercent(value),
+      editable: ({ data }) => canEditQuote(data) && data?.workingQuoteMode === 'Calculated' && data?.calculated != null,
+      cellEditor: 'agNumberCellEditor',
+    },
+    {
+      colId: 'finalSimpleYield',
+      headerName: 'Final Simple Yield (%)',
+      minWidth: 150,
+      valueGetter: ({ data }) => data?.workingQuoteMode === 'Manual'
+        ? data.manual?.finalSimpleYield
+        : data?.calculated?.finalSimpleYield,
+      valueFormatter: ({ value }) => formatPercent(value),
+      editable: ({ data }) => canEditQuote(data) && data?.workingQuoteMode === 'Manual',
+      cellEditor: 'agNumberCellEditor',
+    },
+    {
+      headerName: 'Calc Status',
+      minWidth: 120,
+      valueGetter: ({ data }) => data ? calculationStatus[data.caseId] ?? 'Idle' : '',
+    },
+  ], [calculationStatus, currentUserId])
 
   const runAction = async (action: () => Promise<void>) => {
     setActionError(false)
@@ -373,6 +472,57 @@ export function TraderScreen({
     onAssign(selected.caseId, targetTraderId, selected.currentVersion))
   const takeOver = () => selected && runAction(() =>
     onTakeOver(selected.caseId, selected.currentVersion, true))
+
+  const editQuote = async (event: CellEditRequestEvent<TraderRfq>) => {
+    const row = event.data
+    const value = Number(event.newValue)
+    if (!Number.isFinite(value)) {
+      event.api.refreshCells({ rowNodes: [event.node], force: true })
+      return
+    }
+
+    setCalculationStatus((current) => ({ ...current, [row.caseId]: 'Calculating' }))
+    try {
+      if (row.workingQuoteMode === 'Manual') {
+        await onUpdateManual(
+          row,
+          event.column.getColId() === 'price' ? value : row.manual?.price ?? null,
+          event.column.getColId() === 'finalSimpleYield'
+            ? value
+            : row.manual?.finalSimpleYield ?? null,
+        )
+      } else {
+        const drivers: Record<string, string> = {
+          price: 'Price',
+          bbgYield: 'BbgYield',
+          baseSimpleYield: 'SimpleYield',
+          gSpread: 'GSpread',
+        }
+        const column = event.column.getColId()
+        const driver = column === 'simpleYieldSlide'
+          ? row.calculated?.driver
+          : drivers[column]
+        const driverValue = column === 'simpleYieldSlide'
+          ? row.calculated?.driverValue
+          : value
+        if (!driver || driverValue === undefined) return
+        await onCalculate(
+          row,
+          driver,
+          driverValue,
+          column === 'simpleYieldSlide'
+            ? value
+            : row.calculated?.simpleYieldSlide ?? 0,
+        )
+      }
+      setCalculationStatus((current) => ({ ...current, [row.caseId]: 'Success' }))
+      await onReload()
+    } catch {
+      setCalculationStatus((current) => ({ ...current, [row.caseId]: 'Error' }))
+      event.api.refreshCells({ rowNodes: [event.node], force: true })
+      void message.error('Calculation failed. The edited value was reverted.')
+    }
+  }
 
   const pickUpNeedsConfirmation = pickUpTargets.length > 1
     || pickUpTargets.some((row) => row.assignedTraderId !== currentUserId)
@@ -436,6 +586,20 @@ export function TraderScreen({
             Take Over
           </Button>
         </Popconfirm>
+        <Select
+          aria-label="Quote mode"
+          value={selected?.workingQuoteMode}
+          placeholder="Quote mode"
+          disabled={!selected || !canEditQuote(selected) || isMutating}
+          options={[
+            { value: 'Calculated', label: 'Calculated' },
+            { value: 'Manual', label: 'Manual' },
+          ]}
+          onChange={(mode: 'Calculated' | 'Manual') => {
+            if (selected) void runAction(() => onChangeMode(selected, mode))
+          }}
+          style={{ width: 140 }}
+        />
       </Space>
       <Spin spinning={isLoading}>
         <div className="rfq-grid" data-testid="trader-rfq-grid">
@@ -450,6 +614,8 @@ export function TraderScreen({
             }}
             onSelectionChanged={({ api: gridApi }) =>
               setSelectedRows(gridApi.getSelectedRows())}
+            readOnlyEdit
+            onCellEditRequest={(event) => void editQuote(event)}
             rowSelection={{ mode: 'multiRow' }}
             defaultColDef={{ sortable: true, filter: true, resizable: true }}
           />
@@ -479,6 +645,9 @@ export function App() {
   const [releaseRfq, releaseState] = useReleaseRfqMutation()
   const [assignTrader, assignState] = useAssignTraderMutation()
   const [takeOverRfq, takeOverState] = useTakeOverRfqMutation()
+  const [calculateWorkingQuote, calculateState] = useCalculateWorkingQuoteMutation()
+  const [changeWorkingQuoteMode, changeModeState] = useChangeWorkingQuoteModeMutation()
+  const [updateManualWorkingQuote, updateManualState] = useUpdateManualWorkingQuoteMutation()
   const [searchClients] = useLazySearchClientsQuery()
   const [searchSecurities] = useLazySearchSecuritiesQuery()
   const [resolveDefaults] = useLazyResolveRfqDefaultsQuery()
@@ -489,7 +658,15 @@ export function App() {
   const handleClientSearch = async (query: string) => setClients(query.trim() ? await searchClients(query).unwrap() : [])
   const handleSecuritySearch = async (query: string) => setSecurities(query.trim() ? await searchSecurities(query).unwrap() : [])
   const isMutating = [createState, updateState, confirmNewState, confirmState, discardState].some((state) => state.isLoading)
-  const isOwnershipMutating = [pickUpState, releaseState, assignState, takeOverState].some((state) => state.isLoading)
+  const isOwnershipMutating = [
+    pickUpState,
+    releaseState,
+    assignState,
+    takeOverState,
+    calculateState,
+    changeModeState,
+    updateManualState,
+  ].some((state) => state.isLoading)
   const traders = (tradersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))
 
   const changeIdentity = (userId: string) => {
@@ -542,6 +719,30 @@ export function App() {
             assignTrader({ caseId, targetTraderId, expectedVersion }).unwrap().then(() => undefined)}
           onTakeOver={(caseId, expectedVersion, confirmed) =>
             takeOverRfq({ caseId, expectedVersion, confirmed }).unwrap().then(() => undefined)}
+          onCalculate={(row, driver, value, simpleYieldSlide) =>
+            calculateWorkingQuote({
+              caseId: row.caseId,
+              driver,
+              value,
+              simpleYieldSlide,
+              expectedCurrentVersion: row.currentVersion,
+              expectedWorkingQuoteVersion: row.workingQuoteVersion,
+            }).unwrap().then(() => undefined)}
+          onChangeMode={(row, mode) =>
+            changeWorkingQuoteMode({
+              caseId: row.caseId,
+              mode,
+              expectedCurrentVersion: row.currentVersion,
+              expectedWorkingQuoteVersion: row.workingQuoteVersion,
+            }).unwrap().then(() => undefined)}
+          onUpdateManual={(row, price, finalSimpleYield) =>
+            updateManualWorkingQuote({
+              caseId: row.caseId,
+              price,
+              finalSimpleYield,
+              expectedCurrentVersion: row.currentVersion,
+              expectedWorkingQuoteVersion: row.workingQuoteVersion,
+            }).unwrap().then(() => undefined)}
           onReload={traderRfqsQuery.refetch}
         />
       )}

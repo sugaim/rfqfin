@@ -2,6 +2,12 @@ using Rfq.Domain;
 
 namespace Rfq.Application;
 
+public sealed record QuoteAuthorizationState(
+    bool IsOpen,
+    UserId AssignedTraderId,
+    bool Owned,
+    string? QuoteStatus);
+
 public interface IRfqAuthorization
 {
     void EnsureCanViewTraderScreen(CurrentUser user);
@@ -21,6 +27,8 @@ public interface IRfqAuthorization
     void EnsureCanAssignTrader(CurrentUser user, RfqCase rfqCase);
 
     void EnsureCanTakeOver(CurrentUser user, RfqCase rfqCase, bool confirmed);
+
+    void EnsureCanQuote(CurrentUser user, QuoteAuthorizationState state);
 }
 
 public sealed class RfqAuthorization : IRfqAuthorization
@@ -100,6 +108,27 @@ public sealed class RfqAuthorization : IRfqAuthorization
             throw new ArgumentException(
                 "Strong confirmation is required to take over an owned RFQ.",
                 nameof(confirmed));
+        }
+    }
+
+    public void EnsureCanQuote(CurrentUser user, QuoteAuthorizationState state)
+    {
+        EnsureRole(user, UserRole.Trader);
+        if (!state.IsOpen)
+        {
+            throw new InvalidOperationException("Quotes can only be edited for an Open RFQ.");
+        }
+
+        if (!state.Owned || state.AssignedTraderId != user.UserId)
+        {
+            throw new UnauthorizedAccessException(
+                "Only the owning Trader can edit the WorkingQuote.");
+        }
+
+        if (!string.Equals(state.QuoteStatus, "Requested", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "WorkingQuote editing requires QuoteStatus Requested.");
         }
     }
 

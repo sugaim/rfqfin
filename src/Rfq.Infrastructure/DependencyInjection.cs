@@ -20,6 +20,8 @@ public static class DependencyInjection
         services.AddScoped<ICaseIdGenerator, PostgreSqlCaseIdGenerator>();
         services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
         services.AddScoped<IWorkingQuoteEnsurer, WorkingQuoteEnsurer>();
+        services.AddScoped<IWorkingQuoteRepository, WorkingQuoteRepository>();
+        services.AddSingleton<ICalculationClient, MockCalculationClient>();
         services.AddScoped<ISecuritySearch, PostgreSqlSecuritySearch>();
         services.AddScoped<IClientSearch, PostgreSqlClientSearch>();
         services.AddScoped<IUserDirectory, PostgreSqlUserDirectory>();

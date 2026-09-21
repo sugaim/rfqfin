@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Rfq.Application;
+using Rfq.Domain;
 
 namespace Rfq.Api.Controllers;
 
@@ -11,7 +12,10 @@ public sealed class TraderRfqsController(
     PickUpRfq pickUpRfq,
     ReleaseRfq releaseRfq,
     AssignTrader assignTrader,
-    TakeOverRfq takeOverRfq) : ControllerBase
+    TakeOverRfq takeOverRfq,
+    CalculateWorkingQuote calculateWorkingQuote,
+    ChangeWorkingQuoteMode changeWorkingQuoteMode,
+    UpdateManualWorkingQuote updateManualWorkingQuote) : ControllerBase
 {
     [HttpGet("active")]
     public async Task<ActionResult<IReadOnlyList<TraderRfqListItem>>> GetActive(
@@ -67,12 +71,90 @@ public sealed class TraderRfqsController(
                 request.Confirmed,
                 cancellationToken));
 
+    [HttpPut("{caseId:long}/working-quote/calculate")]
+    public Task<ActionResult<WorkingQuoteResult>> Calculate(
+        long caseId,
+        CalculateWorkingQuoteRequest request,
+        CancellationToken cancellationToken) => ExecuteQuoteAsync(async () =>
+    {
+        if (!Enum.TryParse<CalculationDriver>(request.Driver, false, out var driver))
+        {
+            throw new ArgumentException($"Unknown calculation driver '{request.Driver}'.");
+        }
+
+        return await calculateWorkingQuote.ExecuteAsync(
+            caseId,
+            driver,
+            request.Value,
+            request.SimpleYieldSlide,
+            request.ExpectedCurrentVersion,
+            request.ExpectedWorkingQuoteVersion,
+            cancellationToken);
+    });
+
+    [HttpPut("{caseId:long}/working-quote/mode")]
+    public Task<ActionResult<WorkingQuoteResult>> ChangeMode(
+        long caseId,
+        ChangeWorkingQuoteModeRequest request,
+        CancellationToken cancellationToken) => ExecuteQuoteAsync(async () =>
+    {
+        if (!Enum.TryParse<WorkingQuoteMode>(request.Mode, false, out var mode))
+        {
+            throw new ArgumentException($"Unknown WorkingQuote mode '{request.Mode}'.");
+        }
+
+        return await changeWorkingQuoteMode.ExecuteAsync(
+            caseId,
+            mode,
+            request.ExpectedCurrentVersion,
+            request.ExpectedWorkingQuoteVersion,
+            cancellationToken);
+    });
+
+    [HttpPut("{caseId:long}/working-quote/manual")]
+    public Task<ActionResult<WorkingQuoteResult>> UpdateManual(
+        long caseId,
+        UpdateManualWorkingQuoteRequest request,
+        CancellationToken cancellationToken) => ExecuteQuoteAsync(() =>
+            updateManualWorkingQuote.ExecuteAsync(
+                caseId,
+                request.Price,
+                request.FinalSimpleYield,
+                request.ExpectedCurrentVersion,
+                request.ExpectedWorkingQuoteVersion,
+                cancellationToken));
+
     private async Task<ActionResult<OwnershipResult>> ExecuteAsync(
         Func<Task<OwnershipResult>> action)
     {
         try
         {
             return Ok(await action());
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
+        }
+    }
+
+    private async Task<ActionResult<WorkingQuoteResult>> ExecuteQuoteAsync(
+        Func<Task<WorkingQuoteResult>> action)
+    {
+        try
+        {
+            return Ok(await action());
+        }
+        catch (CalculationFailureException exception)
+        {
+            var problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status422UnprocessableEntity,
+                Title = "Calculation failed",
+                Detail = exception.Message,
+            };
+            problem.Extensions["code"] = exception.Code;
+            problem.Extensions["failureLogId"] = exception.FailureLogId;
+            return UnprocessableEntity(problem);
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -109,3 +191,21 @@ public sealed record ConfirmedOwnershipRequest(
 public sealed record AssignTraderRequest(
     [Required, MinLength(1)] string TargetTraderId,
     [Range(1, long.MaxValue)] long ExpectedVersion);
+
+public sealed record CalculateWorkingQuoteRequest(
+    [Required, MinLength(1)] string Driver,
+    decimal Value,
+    decimal SimpleYieldSlide,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    [Range(1, long.MaxValue)] long ExpectedWorkingQuoteVersion);
+
+public sealed record ChangeWorkingQuoteModeRequest(
+    [Required, MinLength(1)] string Mode,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    [Range(1, long.MaxValue)] long ExpectedWorkingQuoteVersion);
+
+public sealed record UpdateManualWorkingQuoteRequest(
+    decimal? Price,
+    decimal? FinalSimpleYield,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    [Range(1, long.MaxValue)] long ExpectedWorkingQuoteVersion);

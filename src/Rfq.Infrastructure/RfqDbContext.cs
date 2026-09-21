@@ -29,6 +29,9 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
 
     internal DbSet<WorkingQuoteEntity> WorkingQuotes => Set<WorkingQuoteEntity>();
 
+    internal DbSet<CalculationFailureLogEntity> CalculationFailureLogs =>
+        Set<CalculationFailureLogEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasSequence<long>(PostgreSqlCaseIdGenerator.SequenceName);
@@ -102,6 +105,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .HasPrecision(20, 2);
         revision.Property(entity => entity.SalesAndTradingMessage)
             .HasColumnName("sales_and_trading_message");
+        revision.Property(entity => entity.QuoteSeedRevisionId)
+            .HasColumnName("quote_seed_revision_id");
         revision.Property(entity => entity.ConfirmedAt)
             .HasColumnName("confirmed_at")
             .HasColumnType("timestamp with time zone");
@@ -116,6 +121,10 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .IsUnique()
             .HasFilter("status = 'Draft'")
             .HasDatabaseName("ux_rfq_revisions_one_draft_per_case");
+        revision.HasOne<RfqRevisionEntity>()
+            .WithMany()
+            .HasForeignKey(entity => entity.QuoteSeedRevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         var current = modelBuilder.Entity<CaseCurrentEntity>();
         current.ToTable("case_currents");
@@ -292,16 +301,82 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
         workingQuote.Property(entity => entity.Version)
             .HasColumnName("version")
             .IsConcurrencyToken();
+        workingQuote.Property(entity => entity.Mode)
+            .HasColumnName("mode")
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        workingQuote.Property(entity => entity.CalculatedPayloadJson)
+            .HasColumnName("calculated_payload")
+            .HasColumnType("jsonb");
+        workingQuote.Property(entity => entity.ManualPayloadJson)
+            .HasColumnName("manual_payload")
+            .HasColumnType("jsonb");
         workingQuote.Property(entity => entity.CreatedAt)
             .HasColumnName("created_at")
             .HasColumnType("timestamp with time zone");
         workingQuote.Property(entity => entity.CreatedBy)
             .HasColumnName("created_by")
             .HasMaxLength(100);
+        workingQuote.Property(entity => entity.UpdatedAt)
+            .HasColumnName("updated_at")
+            .HasColumnType("timestamp with time zone");
+        workingQuote.Property(entity => entity.UpdatedBy)
+            .HasColumnName("updated_by")
+            .HasMaxLength(100);
         workingQuote.HasOne(entity => entity.Revision)
             .WithOne()
             .HasForeignKey<WorkingQuoteEntity>(entity => entity.RevisionId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        var calculationFailure = modelBuilder.Entity<CalculationFailureLogEntity>();
+        calculationFailure.ToTable("calculation_failure_logs");
+        calculationFailure.HasKey(entity => entity.FailureLogId);
+        calculationFailure.Property(entity => entity.FailureLogId)
+            .HasColumnName("failure_log_id")
+            .ValueGeneratedNever();
+        calculationFailure.Property(entity => entity.CaseId)
+            .HasColumnName("case_id");
+        calculationFailure.Property(entity => entity.RevisionId)
+            .HasColumnName("revision_id");
+        calculationFailure.Property(entity => entity.TraderId)
+            .HasColumnName("trader_id")
+            .HasMaxLength(100);
+        calculationFailure.Property(entity => entity.RequestId)
+            .HasColumnName("request_id");
+        calculationFailure.Property(entity => entity.Driver)
+            .HasColumnName("driver")
+            .HasConversion<string>()
+            .HasMaxLength(50);
+        calculationFailure.Property(entity => entity.AttemptedValue)
+            .HasColumnName("attempted_value")
+            .HasPrecision(20, 8);
+        calculationFailure.Property(entity => entity.SimpleYieldSlide)
+            .HasColumnName("simple_yield_slide")
+            .HasPrecision(20, 8);
+        calculationFailure.Property(entity => entity.PriorWorkingQuoteJson)
+            .HasColumnName("prior_working_quote")
+            .HasColumnType("jsonb");
+        calculationFailure.Property(entity => entity.RequestJson)
+            .HasColumnName("request_payload")
+            .HasColumnType("jsonb");
+        calculationFailure.Property(entity => entity.ErrorCode)
+            .HasColumnName("error_code")
+            .HasMaxLength(100);
+        calculationFailure.Property(entity => entity.ErrorMessage)
+            .HasColumnName("error_message");
+        calculationFailure.Property(entity => entity.OccurredAt)
+            .HasColumnName("occurred_at")
+            .HasColumnType("timestamp with time zone");
+        calculationFailure.HasOne<RfqCaseEntity>()
+            .WithMany()
+            .HasForeignKey(entity => entity.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
+        calculationFailure.HasOne<RfqRevisionEntity>()
+            .WithMany()
+            .HasForeignKey(entity => entity.RevisionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        calculationFailure.HasIndex(entity => new { entity.CaseId, entity.OccurredAt })
+            .HasDatabaseName("ix_calculation_failure_logs_case_id_occurred_at");
     }
 }
 
@@ -375,6 +450,8 @@ internal sealed class RfqRevisionEntity
 
     public string SalesAndTradingMessage { get; set; } = string.Empty;
 
+    public Guid? QuoteSeedRevisionId { get; set; }
+
     public DateTimeOffset? ConfirmedAt { get; set; }
 
     public string? ConfirmedBy { get; set; }
@@ -388,9 +465,48 @@ internal sealed class WorkingQuoteEntity
 
     public long Version { get; set; }
 
+    public WorkingQuoteMode Mode { get; set; }
+
+    public string? CalculatedPayloadJson { get; set; }
+
+    public string? ManualPayloadJson { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public string CreatedBy { get; set; } = string.Empty;
 
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public string UpdatedBy { get; set; } = string.Empty;
+
     public RfqRevisionEntity Revision { get; set; } = null!;
+}
+
+internal sealed class CalculationFailureLogEntity
+{
+    public Guid FailureLogId { get; set; }
+
+    public long CaseId { get; set; }
+
+    public Guid RevisionId { get; set; }
+
+    public string TraderId { get; set; } = string.Empty;
+
+    public Guid RequestId { get; set; }
+
+    public CalculationDriver Driver { get; set; }
+
+    public decimal AttemptedValue { get; set; }
+
+    public decimal SimpleYieldSlide { get; set; }
+
+    public string PriorWorkingQuoteJson { get; set; } = "{}";
+
+    public string RequestJson { get; set; } = "{}";
+
+    public string ErrorCode { get; set; } = string.Empty;
+
+    public string ErrorMessage { get; set; } = string.Empty;
+
+    public DateTimeOffset OccurredAt { get; set; }
 }

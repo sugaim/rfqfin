@@ -10,6 +10,7 @@ public sealed class RfqRevision
         DateOnly? settlementDate,
         DateOnly standardSettlementDate,
         string salesAndTradingMessage,
+        RevisionId? quoteSeedRevisionId,
         long version,
         DateTimeOffset createdAt,
         UserId createdBy,
@@ -23,6 +24,7 @@ public sealed class RfqRevision
         SettlementDate = settlementDate;
         StandardSettlementDate = standardSettlementDate;
         SalesAndTradingMessage = salesAndTradingMessage;
+        QuoteSeedRevisionId = quoteSeedRevisionId;
         Version = version;
         CreatedAt = createdAt;
         CreatedBy = createdBy;
@@ -43,6 +45,8 @@ public sealed class RfqRevision
     public DateOnly StandardSettlementDate { get; }
 
     public string SalesAndTradingMessage { get; private set; }
+
+    public RevisionId? QuoteSeedRevisionId { get; }
 
     public long Version { get; private set; }
 
@@ -71,6 +75,7 @@ public sealed class RfqRevision
             settlementDate,
             standardSettlementDate,
             NormalizeMessage(salesAndTradingMessage),
+            null,
             1,
             createdAt,
             createdBy,
@@ -86,6 +91,7 @@ public sealed class RfqRevision
         DateOnly? settlementDate,
         DateOnly standardSettlementDate,
         string salesAndTradingMessage,
+        RevisionId? quoteSeedRevisionId,
         long version,
         DateTimeOffset createdAt,
         UserId createdBy,
@@ -100,6 +106,7 @@ public sealed class RfqRevision
             settlementDate,
             standardSettlementDate,
             salesAndTradingMessage,
+            quoteSeedRevisionId,
             version,
             createdAt,
             createdBy,

@@ -4,20 +4,63 @@ import { AppShell, SalesScreen, TraderScreen, type SalesScreenProps, type Trader
 import type { ClientSearchResult, RfqDefaults, SalesRfq, SecuritySearchResult, TraderRfq } from './services/api'
 
 type GridRow = SalesRfq | TraderRfq
+type GridColumn = {
+  colId?: string
+  valueGetter?: (params: { data: GridRow }) => unknown
+  valueFormatter?: (params: { value: unknown }) => unknown
+  cellEditor?: string
+}
 
 vi.mock('ag-grid-react', () => ({
-  AgGridReact: ({ rowData, onRowClicked }: {
+  AgGridReact: ({ rowData, columnDefs, onRowClicked, onCellEditRequest, readOnlyEdit }: {
     rowData: GridRow[]
+    columnDefs?: GridColumn[]
     onRowClicked?: (event: { data: GridRow }) => void
+    onCellEditRequest?: (event: {
+      data: GridRow
+      newValue: string
+      column: { getColId: () => string }
+      api: { refreshCells: ReturnType<typeof vi.fn> }
+      node: object
+    }) => void
+    readOnlyEdit?: boolean
   }) => (
     <div>
       {rowData.map((row) => (
-        <button key={row.caseId} onClick={() => onRowClicked?.({ data: row })}>
-          {row.clientId} {row.clientName} {row.securityId} {row.securityJapaneseName}{' '}
-          {row.securityBbgDisplay} {row.rfqStatus}{' '}
-          {'revisionStatus' in row ? row.revisionStatus : ''}{' '}
-          {row.quoteStatus} {row.quoteRequestReason}
-        </button>
+        <div key={row.caseId}>
+          <button onClick={() => onRowClicked?.({ data: row })}>
+            {row.clientId} {row.clientName} {row.securityId} {row.securityJapaneseName}{' '}
+            {row.securityBbgDisplay} {row.rfqStatus}{' '}
+            {'revisionStatus' in row ? row.revisionStatus : ''}{' '}
+            {row.quoteStatus} {row.quoteRequestReason}
+          </button>
+          {readOnlyEdit && onCellEditRequest && (
+            <button
+              onClick={() => onCellEditRequest({
+                data: row,
+                newValue: '99.5',
+                column: { getColId: () => 'price' },
+                api: { refreshCells: vi.fn() },
+                node: {},
+              })}
+            >
+              Edit Price {row.caseId}
+            </button>
+          )}
+          {columnDefs?.filter((column) => column.colId).map((column) => {
+            const value = column.valueGetter?.({ data: row })
+            const display = column.valueFormatter?.({ value }) ?? value ?? ''
+            return (
+              <output
+                key={column.colId}
+                data-testid={`grid-${row.caseId}-${column.colId}`}
+                data-cell-editor={column.cellEditor ?? ''}
+              >
+                {String(display)}
+              </output>
+            )
+          })}
+        </div>
       ))}
     </div>
   ),
@@ -189,12 +232,18 @@ const traderRow: TraderRfq = {
   rfqStatus: 'Active',
   quoteStatus: 'Requested',
   quoteRequestReason: 'Initial',
+  currentRevisionId: '00000000-0000-0000-0000-000000000201',
+  quoteSeedRevisionId: null,
   contactOwnerId: 'sales-dev',
   assignedTraderId: 'trader-a',
   owned: false,
   currentVersion: 4,
   settlementDate: '2026-09-23',
   notional: 100000000,
+  workingQuoteMode: 'Calculated',
+  calculated: null,
+  manual: null,
+  workingQuoteVersion: 1,
   createdAt: '2026-09-21T00:00:00Z',
 }
 
@@ -212,6 +261,9 @@ const traderProps: TraderScreenProps = {
   onRelease: vi.fn().mockResolvedValue(undefined),
   onAssign: vi.fn().mockResolvedValue(undefined),
   onTakeOver: vi.fn().mockResolvedValue(undefined),
+  onCalculate: vi.fn().mockResolvedValue(undefined),
+  onChangeMode: vi.fn().mockResolvedValue(undefined),
+  onUpdateManual: vi.fn().mockResolvedValue(undefined),
   onReload: vi.fn(),
 }
 
@@ -239,5 +291,119 @@ describe('TraderScreen', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
 
     await waitFor(() => expect(onTakeOver).toHaveBeenCalledWith(201, 4, true))
+  })
+
+  it('lets the owner switch the working quote to manual mode', async () => {
+    const onChangeMode = vi.fn().mockResolvedValue(undefined)
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{ ...traderRow, owned: true }]}
+        onChangeMode={onChangeMode}
+      />,
+    )
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+    fireEvent.mouseDown(screen.getByLabelText('Quote mode'))
+    fireEvent.click((await screen.findAllByText('Manual')).at(-1)!)
+
+    await waitFor(() => expect(onChangeMode).toHaveBeenCalledWith(
+      expect.objectContaining({ caseId: 201, workingQuoteVersion: 1 }),
+      'Manual',
+    ))
+  })
+
+  it('sends an edited calculated Price as the calculation driver', async () => {
+    const onCalculate = vi.fn().mockResolvedValue(undefined)
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{ ...traderRow, owned: true }]}
+        onCalculate={onCalculate}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
+
+    await waitFor(() => expect(onCalculate).toHaveBeenCalledWith(
+      expect.objectContaining({ caseId: 201, workingQuoteVersion: 1 }),
+      'Price',
+      99.5,
+      0,
+    ))
+  })
+
+  it('shows yields as percent and spreads as basis points with numeric editors', () => {
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{
+          ...traderRow,
+          owned: true,
+          calculated: {
+            driver: 'Price',
+            driverValue: 99.5,
+            price: 99.5,
+            bbgYield: 0.8,
+            baseSimpleYield: 0.81,
+            simpleYieldSlide: 0.03,
+            finalSimpleYield: 0.84,
+            internalYield: 0.83,
+            gSpread: 5,
+            asw: 8,
+          },
+        }]}
+      />,
+    )
+
+    expect(screen.getByTestId('grid-201-bbgYield')).toHaveTextContent('0.8%')
+    expect(screen.getByTestId('grid-201-baseSimpleYield')).toHaveTextContent('0.81%')
+    expect(screen.getByTestId('grid-201-simpleYieldSlide')).toHaveTextContent('0.03%')
+    expect(screen.getByTestId('grid-201-finalSimpleYield')).toHaveTextContent('0.84%')
+    expect(screen.getByTestId('grid-201-gSpread')).toHaveTextContent('5 bp')
+    expect(screen.getByTestId('grid-201-bbgYield')).toHaveAttribute(
+      'data-cell-editor',
+      'agNumberCellEditor',
+    )
+    expect(screen.getByTestId('grid-201-gSpread')).toHaveAttribute(
+      'data-cell-editor',
+      'agNumberCellEditor',
+    )
+  })
+
+  it('hides every calculated numeric result when switched to empty Manual mode', () => {
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{
+          ...traderRow,
+          owned: true,
+          workingQuoteMode: 'Manual',
+          manual: { price: null, finalSimpleYield: null },
+          calculated: {
+            driver: 'Price',
+            driverValue: 99.5,
+            price: 99.5,
+            bbgYield: 0.8,
+            baseSimpleYield: 0.81,
+            simpleYieldSlide: 0.03,
+            finalSimpleYield: 0.84,
+            internalYield: 0.83,
+            gSpread: 5,
+            asw: 8,
+          },
+        }]}
+      />,
+    )
+
+    for (const column of [
+      'price',
+      'bbgYield',
+      'baseSimpleYield',
+      'gSpread',
+      'simpleYieldSlide',
+      'finalSimpleYield',
+    ]) {
+      expect(screen.getByTestId(`grid-201-${column}`)).toBeEmptyDOMElement()
+    }
   })
 })

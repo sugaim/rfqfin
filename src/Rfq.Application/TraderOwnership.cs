@@ -13,12 +13,18 @@ public sealed record TraderRfqListItem(
     string RfqStatus,
     string? QuoteStatus,
     string? QuoteRequestReason,
+    Guid CurrentRevisionId,
+    Guid? QuoteSeedRevisionId,
     string ContactOwnerId,
     string AssignedTraderId,
     bool Owned,
     long CurrentVersion,
     DateOnly? SettlementDate,
     decimal? Notional,
+    string WorkingQuoteMode,
+    CalculatedQuotePayload? Calculated,
+    ManualQuotePayload? Manual,
+    long WorkingQuoteVersion,
     DateTimeOffset CreatedAt);
 
 public sealed record OwnershipResult(
@@ -29,14 +35,39 @@ public sealed record OwnershipResult(
 
 public sealed class GetActiveTraderRfqs(
     IRfqCaseRepository rfqCases,
+    IWorkingQuoteEnsurer workingQuoteEnsurer,
     IRfqAuthorization authorization,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
 {
-    public Task<IReadOnlyList<TraderRfqListItem>> ExecuteAsync(
+    public async Task<IReadOnlyList<TraderRfqListItem>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanViewTraderScreen(currentUser.User);
-        return rfqCases.GetActiveTraderRfqsAsync(
+        var items = await rfqCases.GetActiveTraderRfqsAsync(
+            currentUser.User.DeskId,
+            cancellationToken);
+        var missing = items.Where(item => item.WorkingQuoteVersion == 0).ToArray();
+        if (missing.Length == 0)
+        {
+            return items;
+        }
+
+        foreach (var item in missing)
+        {
+            await workingQuoteEnsurer.EnsureAsync(
+                new RevisionId(item.CurrentRevisionId),
+                item.QuoteSeedRevisionId is null
+                    ? null
+                    : new RevisionId(item.QuoteSeedRevisionId.Value),
+                currentUser.User.UserId,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await rfqCases.GetActiveTraderRfqsAsync(
             currentUser.User.DeskId,
             cancellationToken);
     }

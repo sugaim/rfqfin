@@ -22,6 +22,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             StandardSettlementDate = rfqCase.InitialRevision.StandardSettlementDate,
             Notional = rfqCase.InitialRevision.Notional,
             SalesAndTradingMessage = rfqCase.InitialRevision.SalesAndTradingMessage,
+            QuoteSeedRevisionId = rfqCase.InitialRevision.QuoteSeedRevisionId?.Value,
             ConfirmedAt = rfqCase.InitialRevision.ConfirmedAt,
             ConfirmedBy = rfqCase.InitialRevision.ConfirmedBy?.Value,
         };
@@ -80,6 +81,9 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             revisionEntity.SettlementDate,
             revisionEntity.StandardSettlementDate,
             revisionEntity.SalesAndTradingMessage,
+            revisionEntity.QuoteSeedRevisionId is null
+                ? null
+                : new RevisionId(revisionEntity.QuoteSeedRevisionId.Value),
             revisionEntity.Version,
             revisionEntity.CreatedAt,
             UserId.Create(revisionEntity.CreatedBy),
@@ -205,8 +209,10 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(deskId);
 
-        return await dbContext.RfqCases
+        var cases = await dbContext.RfqCases
             .AsNoTracking()
+            .Include(entity => entity.Current)
+            .ThenInclude(current => current.CurrentRevision)
             .Where(entity =>
                 entity.Current.Lifecycle == RfqLifecycleKind.Open
                 && dbContext.MasterUsers.Any(user =>
@@ -214,22 +220,36 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                     && user.DeskId == deskId))
             .OrderByDescending(entity => entity.CreatedAt)
             .ThenBy(entity => entity.CaseId)
-            .Select(entity => new TraderRfqListItem(
+            .ToListAsync(cancellationToken);
+        var clientIds = cases.Select(item => item.ClientId).Distinct().ToArray();
+        var securityIds = cases.Select(item => item.SecurityId).Distinct().ToArray();
+        var revisionIds = cases.Select(item => item.Current.CurrentRevisionId).ToArray();
+        var clients = await dbContext.Clients
+            .AsNoTracking()
+            .Where(item => clientIds.Contains(item.ClientId))
+            .ToDictionaryAsync(item => item.ClientId, item => item.Name, cancellationToken);
+        var securities = await dbContext.Securities
+            .AsNoTracking()
+            .Where(item => securityIds.Contains(item.SecurityId))
+            .ToDictionaryAsync(item => item.SecurityId, cancellationToken);
+        var quotes = await dbContext.WorkingQuotes
+            .AsNoTracking()
+            .Where(item => revisionIds.Contains(item.RevisionId))
+            .ToDictionaryAsync(item => item.RevisionId, cancellationToken);
+
+        return cases.Select(entity =>
+        {
+            clients.TryGetValue(entity.ClientId, out var clientName);
+            securities.TryGetValue(entity.SecurityId, out var security);
+            quotes.TryGetValue(entity.Current.CurrentRevisionId, out var quoteEntity);
+            var quote = quoteEntity is null ? null : WorkingQuoteMapper.ToDomain(quoteEntity);
+            return new TraderRfqListItem(
                 entity.CaseId,
                 entity.ClientId,
-                dbContext.Clients
-                    .Where(client => client.ClientId == entity.ClientId)
-                    .Select(client => client.Name)
-                    .FirstOrDefault() ?? entity.ClientId,
+                clientName ?? entity.ClientId,
                 entity.SecurityId,
-                dbContext.Securities
-                    .Where(security => security.SecurityId == entity.SecurityId)
-                    .Select(security => security.JapaneseName)
-                    .FirstOrDefault() ?? entity.SecurityId,
-                dbContext.Securities
-                    .Where(security => security.SecurityId == entity.SecurityId)
-                    .Select(security => security.BbgDisplay)
-                    .FirstOrDefault() ?? entity.SecurityId,
+                security?.JapaneseName ?? entity.SecurityId,
+                security?.BbgDisplay ?? entity.SecurityId,
                 entity.CategorySnapshot,
                 entity.Current.RfqStatus.ToString(),
                 entity.Current.QuoteStatus == null
@@ -238,13 +258,19 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                 entity.Current.QuoteRequestReason == null
                     ? null
                     : entity.Current.QuoteRequestReason.Value.ToString(),
+                entity.Current.CurrentRevisionId,
+                entity.Current.CurrentRevision.QuoteSeedRevisionId,
                 entity.Current.ContactOwnerId,
                 entity.Current.AssignedTraderId,
                 entity.Current.Owned,
                 entity.Current.Version,
                 entity.Current.CurrentRevision.SettlementDate,
                 entity.Current.CurrentRevision.Notional,
-                entity.CreatedAt))
-            .ToListAsync(cancellationToken);
+                quote?.Mode.ToString() ?? WorkingQuoteMode.Calculated.ToString(),
+                quote?.Calculated,
+                quote?.Manual,
+                quote?.Version ?? 0,
+                entity.CreatedAt);
+        }).ToArray();
     }
 }

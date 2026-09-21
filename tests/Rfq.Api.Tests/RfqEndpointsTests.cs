@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Rfq.Infrastructure;
 using Xunit;
 
 namespace Rfq.Api.Tests;
@@ -140,6 +143,82 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.True(pickedUp.Owned);
         Assert.Equal("trader-a", pickedUp.AssignedTraderId);
 
+        var calculateResponse = await traderA.PutAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/working-quote/calculate",
+            new
+            {
+                Driver = "Price",
+                Value = 99.5m,
+                SimpleYieldSlide = 0.03m,
+                ExpectedCurrentVersion = pickedUp.CurrentVersion,
+                ExpectedWorkingQuoteVersion = row.WorkingQuoteVersion,
+            });
+        var calculated = await AssertWorkingQuoteOkAsync(calculateResponse);
+        Assert.Equal("Calculated", calculated.Mode);
+        Assert.Equal(99.5m, calculated.Calculated?.Price);
+        Assert.Equal(
+            calculated.Calculated?.BaseSimpleYield + 0.03m,
+            calculated.Calculated?.FinalSimpleYield);
+
+        var failedCalculation = await traderA.PutAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/working-quote/calculate",
+            new
+            {
+                Driver = "Price",
+                Value = -999m,
+                SimpleYieldSlide = 0m,
+                ExpectedCurrentVersion = pickedUp.CurrentVersion,
+                ExpectedWorkingQuoteVersion = calculated.Version,
+            });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, failedCalculation.StatusCode);
+        await using (var failureScope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var dbContext = failureScope.ServiceProvider.GetRequiredService<RfqDbContext>();
+            var failureCount = await dbContext.Database.SqlQuery<int>($"""
+                SELECT COUNT(*)::int AS "Value"
+                FROM calculation_failure_logs
+                WHERE case_id = {created.CaseId}
+                """).SingleAsync();
+            Assert.Equal(1, failureCount);
+        }
+
+        var manualModeResponse = await traderA.PutAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/working-quote/mode",
+            new
+            {
+                Mode = "Manual",
+                ExpectedCurrentVersion = pickedUp.CurrentVersion,
+                ExpectedWorkingQuoteVersion = calculated.Version,
+            });
+        var manualMode = await AssertWorkingQuoteOkAsync(manualModeResponse);
+        Assert.Equal("Manual", manualMode.Mode);
+        Assert.Null(manualMode.Manual?.Price);
+        Assert.Equal(calculated.Calculated, manualMode.Calculated);
+
+        var manualUpdateResponse = await traderA.PutAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/working-quote/manual",
+            new
+            {
+                Price = 98.75m,
+                FinalSimpleYield = 1.25m,
+                ExpectedCurrentVersion = pickedUp.CurrentVersion,
+                ExpectedWorkingQuoteVersion = manualMode.Version,
+            });
+        var manualUpdate = await AssertWorkingQuoteOkAsync(manualUpdateResponse);
+        Assert.Equal(98.75m, manualUpdate.Manual?.Price);
+        Assert.Equal(1.25m, manualUpdate.Manual?.FinalSimpleYield);
+
+        var calculatedModeResponse = await traderA.PutAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/working-quote/mode",
+            new
+            {
+                Mode = "Calculated",
+                ExpectedCurrentVersion = pickedUp.CurrentVersion,
+                ExpectedWorkingQuoteVersion = manualUpdate.Version,
+            });
+        var restoredCalculated = await AssertWorkingQuoteOkAsync(calculatedModeResponse);
+        Assert.Equal(calculated.Calculated, restoredCalculated.Calculated);
+
         var release = await traderA.PostAsJsonAsync(
             $"/api/trader/rfqs/{created.CaseId}/release",
             new { ExpectedVersion = pickedUp.CurrentVersion });
@@ -264,6 +343,17 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             await response.Content.ReadFromJsonAsync<OwnershipBody>());
     }
 
+    private static async Task<WorkingQuoteBody> AssertWorkingQuoteOkAsync(
+        HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.OK,
+            $"Expected 200 OK but received {(int)response.StatusCode}: {responseBody}");
+        return Assert.IsType<WorkingQuoteBody>(
+            await response.Content.ReadFromJsonAsync<WorkingQuoteBody>());
+    }
+
     private sealed record InitialRfqBody(
         long CaseId,
         Guid RevisionId,
@@ -295,7 +385,8 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         long CaseId,
         string AssignedTraderId,
         bool Owned,
-        long CurrentVersion)
+        long CurrentVersion,
+        long WorkingQuoteVersion)
     {
         public long ExpectedVersion => CurrentVersion;
     }
@@ -305,6 +396,31 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         string AssignedTraderId,
         bool Owned,
         long CurrentVersion);
+
+    private sealed record WorkingQuoteBody(
+        long CaseId,
+        Guid RevisionId,
+        string Mode,
+        CalculatedQuoteBody? Calculated,
+        ManualQuoteBody? Manual,
+        long Version,
+        long CurrentVersion);
+
+    private sealed record CalculatedQuoteBody(
+        string Driver,
+        decimal DriverValue,
+        decimal Price,
+        decimal BbgYield,
+        decimal BaseSimpleYield,
+        decimal SimpleYieldSlide,
+        decimal FinalSimpleYield,
+        decimal InternalYield,
+        decimal GSpread,
+        decimal Asw);
+
+    private sealed record ManualQuoteBody(
+        decimal? Price,
+        decimal? FinalSimpleYield);
 
     private sealed record SecurityBody(string SecurityId);
     private sealed record ClientBody(string ClientId);

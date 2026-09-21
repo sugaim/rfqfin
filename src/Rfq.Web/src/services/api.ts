@@ -118,13 +118,47 @@ export interface TraderRfq {
   rfqStatus: string
   quoteStatus: string | null
   quoteRequestReason: string | null
+  currentRevisionId: string
+  quoteSeedRevisionId: string | null
   contactOwnerId: string
   assignedTraderId: string
   owned: boolean
   currentVersion: number
   settlementDate: string | null
   notional: number | null
+  workingQuoteMode: 'Calculated' | 'Manual'
+  calculated: CalculatedQuotePayload | null
+  manual: ManualQuotePayload | null
+  workingQuoteVersion: number
   createdAt: string
+}
+
+export interface CalculatedQuotePayload {
+  driver: 'Price' | 'BbgYield' | 'SimpleYield' | 'GSpread'
+  driverValue: number
+  price: number
+  bbgYield: number
+  baseSimpleYield: number
+  simpleYieldSlide: number
+  finalSimpleYield: number
+  internalYield: number
+  gSpread: number
+  asw: number
+}
+
+export interface ManualQuotePayload {
+  price: number | null
+  finalSimpleYield: number | null
+}
+
+export interface WorkingQuoteResult {
+  caseId: number
+  revisionId: string
+  mode: 'Calculated' | 'Manual'
+  calculated: CalculatedQuotePayload | null
+  manual: ManualQuotePayload | null
+  version: number
+  currentVersion: number
 }
 
 export interface OwnershipResult {
@@ -241,6 +275,54 @@ export const api = createApi({
         body,
       }),
     }),
+    calculateWorkingQuote: builder.mutation<
+      WorkingQuoteResult,
+      {
+        caseId: number
+        driver: string
+        value: number
+        simpleYieldSlide: number
+        expectedCurrentVersion: number
+        expectedWorkingQuoteVersion: number
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/trader/rfqs/${caseId}/working-quote/calculate`,
+        method: 'PUT',
+        body,
+      }),
+    }),
+    changeWorkingQuoteMode: builder.mutation<
+      WorkingQuoteResult,
+      {
+        caseId: number
+        mode: 'Calculated' | 'Manual'
+        expectedCurrentVersion: number
+        expectedWorkingQuoteVersion: number
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/trader/rfqs/${caseId}/working-quote/mode`,
+        method: 'PUT',
+        body,
+      }),
+    }),
+    updateManualWorkingQuote: builder.mutation<
+      WorkingQuoteResult,
+      {
+        caseId: number
+        price: number | null
+        finalSimpleYield: number | null
+        expectedCurrentVersion: number
+        expectedWorkingQuoteVersion: number
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/trader/rfqs/${caseId}/working-quote/manual`,
+        method: 'PUT',
+        body,
+      }),
+    }),
     searchClients: builder.query<ClientSearchResult[], string>({
       query: (q) => ({ url: '/masters/clients/search', params: { q } }),
       keepUnusedDataFor: 0,
@@ -264,6 +346,8 @@ export const api = createApi({
 
 export const {
   useAssignTraderMutation,
+  useCalculateWorkingQuoteMutation,
+  useChangeWorkingQuoteModeMutation,
   useConfirmDraftMutation,
   useConfirmNewRfqMutation,
   useCreateDraftMutation,
@@ -280,5 +364,6 @@ export const {
   usePickUpRfqMutation,
   useReleaseRfqMutation,
   useTakeOverRfqMutation,
+  useUpdateManualWorkingQuoteMutation,
   useUpdateDraftMutation,
 } = api
