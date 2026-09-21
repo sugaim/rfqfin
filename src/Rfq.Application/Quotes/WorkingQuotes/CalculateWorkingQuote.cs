@@ -12,12 +12,12 @@ public sealed class CalculateWorkingQuote(
     TimeProvider timeProvider)
 {
     public async Task<WorkingQuoteResult> ExecuteAsync(
-        long caseId,
+        CaseId caseId,
         CalculationDriver driver,
         decimal value,
         decimal simpleYieldSlide,
-        long expectedCurrentVersion,
-        long expectedWorkingQuoteVersion,
+        StateVersion expectedCurrentVersion,
+        StateVersion expectedWorkingQuoteVersion,
         CancellationToken cancellationToken = default)
     {
         var before = await GetContextAsync(caseId, cancellationToken);
@@ -26,7 +26,7 @@ public sealed class CalculateWorkingQuote(
 
         var request = new CalculationRequest(
             Guid.NewGuid(),
-            before.SecurityId.Value,
+            before.SecurityId,
             before.SettlementDate,
             driver,
             ToParameter(driver, value),
@@ -38,8 +38,8 @@ public sealed class CalculateWorkingQuote(
             var failure = new CalculationFailureRecord(
                 Guid.NewGuid(),
                 caseId,
-                before.RevisionId.Value,
-                currentUser.User.UserId.Value,
+                before.RevisionId,
+                currentUser.User.UserId,
                 request.RequestId,
                 driver,
                 value,
@@ -59,7 +59,7 @@ public sealed class CalculateWorkingQuote(
         var success = (CalculationSuccess)result;
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         if (rfqCase.CurrentRevision.RevisionId != before.RevisionId
-            || rfqCase.Version != new StateVersion(expectedCurrentVersion))
+            || rfqCase.Version != expectedCurrentVersion)
         {
             throw new InvalidOperationException(
                 "The RFQ state changed while calculation was in progress.");
@@ -73,31 +73,31 @@ public sealed class CalculateWorkingQuote(
         quote = WorkingQuoteTransitions.ApplyCalculated(
             quote,
             success.Payload,
-            new StateVersion(expectedWorkingQuoteVersion),
+            expectedWorkingQuoteVersion,
             currentUser.User.UserId,
             timeProvider.GetUtcNow());
         workingQuotes.Update(quote);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return WorkingQuoteResult.From(caseId, quote, rfqCase.Version.Value);
+        return WorkingQuoteResult.From(caseId, quote, rfqCase.Version);
     }
 
     private async Task<QuoteEditContext> GetContextAsync(
-        long caseId,
+        CaseId caseId,
         CancellationToken cancellationToken) =>
-        await workingQuotes.GetEditContextAsync(new CaseId(caseId), cancellationToken)
+        await workingQuotes.GetEditContextAsync(caseId, cancellationToken)
             ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
 
     private static void ValidateExpected(
         QuoteEditContext context,
-        long expectedCurrentVersion,
-        long expectedWorkingQuoteVersion)
+        StateVersion expectedCurrentVersion,
+        StateVersion expectedWorkingQuoteVersion)
     {
-        if (context.Version != new StateVersion(expectedCurrentVersion))
+        if (context.Version != expectedCurrentVersion)
         {
             throw new InvalidOperationException("The RFQ was changed by another user.");
         }
 
-        if (context.WorkingQuote.Version != new StateVersion(expectedWorkingQuoteVersion))
+        if (context.WorkingQuote.Version != expectedWorkingQuoteVersion)
         {
             throw new InvalidOperationException("The WorkingQuote was changed by another user.");
         }

@@ -20,7 +20,7 @@ public sealed class UpdateInitialDraft(
         authorization.EnsureCanEditRevision(currentUser.User, rfqCase);
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
-            rfqCase.AssignedTraderId.Value,
+            rfqCase.AssignedTraderId,
             cancellationToken);
         rfqCase = InitialDraftTransitions.Update(
             rfqCase,
@@ -28,7 +28,7 @@ public sealed class UpdateInitialDraft(
                 rfqCase.CurrentRevision.StandardSettlementDate,
                 command.SalesAndTradingMessage),
             assignedTraderId,
-            new StateVersion(command.ExpectedVersion));
+            command.ExpectedVersion);
 
         rfqCases.Update(rfqCase);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -37,10 +37,10 @@ public sealed class UpdateInitialDraft(
 
     internal static async Task<RfqCase> GetCaseAsync(
         IRfqCaseRepository rfqCases,
-        long caseId,
+        CaseId caseId,
         CancellationToken cancellationToken)
     {
-        var rfqCase = await rfqCases.GetAsync(new CaseId(caseId), cancellationToken)
+        var rfqCase = await rfqCases.GetAsync(caseId, cancellationToken)
             ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
         return rfqCase;
     }

@@ -14,3 +14,10 @@ public interface IUserDirectory
         UserId userId,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record UserSummary(
+    UserId UserId,
+    string Name,
+    IReadOnlySet<UserRole> Roles,
+    string DeskId,
+    int? DefaultQuoteExpiryMinutes = null);

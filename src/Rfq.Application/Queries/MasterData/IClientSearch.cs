@@ -14,3 +14,8 @@ public interface IClientSearch
         ClientId clientId,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record ClientSearchResult(
+    ClientId ClientId,
+    string Code,
+    string Name);

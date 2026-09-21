@@ -4,40 +4,46 @@ namespace Rfq.Application;
 
 public sealed class GetActiveTraderRfqs(
     IRfqCaseRepository rfqCases,
-    IWorkingQuoteEnsurer workingQuoteEnsurer,
     IRfqAuthorization authorization,
-    ICurrentUser currentUser,
-    IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    ICurrentUser currentUser)
 {
     public async Task<IReadOnlyList<TraderRfqListItem>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanViewTraderScreen(currentUser.User);
-        var items = await rfqCases.GetActiveTraderRfqsAsync(
-            currentUser.User.DeskId,
-            cancellationToken);
-        var missing = items.Where(item => item.WorkingQuoteVersion == 0).ToArray();
-        if (missing.Length == 0)
-        {
-            return items;
-        }
-
-        foreach (var item in missing)
-        {
-            await workingQuoteEnsurer.EnsureAsync(
-                new RevisionId(item.CurrentRevisionId),
-                item.QuoteSeedRevisionId is null
-                    ? null
-                    : new RevisionId(item.QuoteSeedRevisionId.Value),
-                currentUser.User.UserId,
-                timeProvider.GetUtcNow(),
-                cancellationToken);
-        }
-
-        await unitOfWork.SaveChangesAsync(cancellationToken);
         return await rfqCases.GetActiveTraderRfqsAsync(
             currentUser.User.DeskId,
             cancellationToken);
     }
 }
+
+public sealed record TraderRfqListItem(
+    CaseId CaseId,
+    ClientId ClientId,
+    string ClientName,
+    SecurityId SecurityId,
+    string SecurityJapaneseName,
+    string SecurityBbgDisplay,
+    CategoryId CategoryId,
+    RfqStatus RfqStatus,
+    QuoteStatus? QuoteStatus,
+    QuoteRequestReason? QuoteRequestReason,
+    RevisionId CurrentRevisionId,
+    QuoteId? CurrentQuoteId,
+    QuoteId? ClosedQuoteId,
+    DateTimeOffset? ConfirmedAt,
+    DateTimeOffset? ExpiresAt,
+    RevisionId? QuoteSeedRevisionId,
+    UserId ContactOwnerId,
+    UserId AssignedTraderId,
+    bool Owned,
+    StateVersion CurrentVersion,
+    DateOnly? SettlementDate,
+    decimal? Notional,
+    WorkingQuoteMode WorkingQuoteMode,
+    CalculatedQuotePayload? Calculated,
+    ManualQuotePayload? Manual,
+    StateVersion WorkingQuoteVersion,
+    string TraderMemo,
+    StateVersion MemoVersion,
+    DateTimeOffset CreatedAt);

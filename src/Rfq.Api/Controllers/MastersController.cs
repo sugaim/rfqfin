@@ -12,19 +12,24 @@ public sealed class MastersController(
     ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet("securities/search")]
-    public async Task<ActionResult<IReadOnlyList<SecuritySearchResult>>> SearchSecurities(
+    public async Task<ActionResult<IReadOnlyList<SecuritySearchResponse>>> SearchSecurities(
         [FromQuery] string q,
         CancellationToken cancellationToken)
     {
-        return Ok(await securitySearch.SearchAsync(q, cancellationToken));
+        var results = await securitySearch.SearchAsync(q, cancellationToken);
+        return Ok(results.Select(item => new SecuritySearchResponse(
+            item.SecurityId.Value, item.JapaneseName, item.BbgDisplay,
+            item.InternalCode, item.Isin, item.CategoryId.Value, item.CategoryName)));
     }
 
     [HttpGet("clients/search")]
-    public async Task<ActionResult<IReadOnlyList<ClientSearchResult>>> SearchClients(
+    public async Task<ActionResult<IReadOnlyList<ClientSearchResponse>>> SearchClients(
         [FromQuery] string q,
         CancellationToken cancellationToken)
     {
-        return Ok(await clientSearch.SearchAsync(q, cancellationToken));
+        var results = await clientSearch.SearchAsync(q, cancellationToken);
+        return Ok(results.Select(item => new ClientSearchResponse(
+            item.ClientId.Value, item.Code, item.Name)));
     }
 
     [HttpGet("users")]
@@ -36,7 +41,7 @@ public sealed class MastersController(
         return Ok(users
             .Where(user => user.DeskId == currentUser.User.DeskId)
             .Select(user => new UserSummaryResponse(
-                user.UserId,
+                user.UserId.Value,
                 user.Name,
                 user.Roles.Select(item => item.ToString()).Order().ToArray(),
                 user.DeskId,
@@ -50,3 +55,14 @@ public sealed record UserSummaryResponse(
     IReadOnlyList<string> Roles,
     string DeskId,
     int? DefaultQuoteExpiryMinutes);
+
+public sealed record SecuritySearchResponse(
+    string SecurityId,
+    string JapaneseName,
+    string BbgDisplay,
+    string InternalCode,
+    string Isin,
+    string CategoryId,
+    string CategoryName);
+
+public sealed record ClientSearchResponse(string ClientId, string Code, string Name);

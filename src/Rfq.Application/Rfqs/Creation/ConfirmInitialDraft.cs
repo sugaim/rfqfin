@@ -11,7 +11,7 @@ public sealed class ConfirmInitialDraft(
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
-    IRfqEventSink? eventSink = null)
+    IRfqEventSink eventSink)
 {
     public async Task<InitialRfqResult> ExecuteAsync(
         UpdateInitialDraftCommand command,
@@ -24,7 +24,7 @@ public sealed class ConfirmInitialDraft(
         authorization.EnsureCanConfirmRevision(currentUser.User, rfqCase);
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
-            rfqCase.AssignedTraderId.Value,
+            rfqCase.AssignedTraderId,
             cancellationToken);
         var systemDate = await systemDateProvider.GetTodayAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
@@ -37,15 +37,15 @@ public sealed class ConfirmInitialDraft(
             systemDate,
             currentUser.User.UserId,
             now,
-            new StateVersion(command.ExpectedVersion));
+            command.ExpectedVersion);
 
         rfqCases.Update(rfqCase);
         workingQuotes.Add(WorkingQuoteFactory.CreateInitialFor(
             rfqCase, currentUser.User.UserId, now));
-        eventSink?.Record(new RfqTransition(
+        eventSink.Record(new RfqTransition(
             RfqTransitionKind.RevisionConfirmed,
-            rfqCase.CaseId.Value,
-            currentUser.User.UserId.Value,
+            rfqCase.CaseId,
+            currentUser.User.UserId,
             now,
             To: rfqCase.CurrentRevision.RevisionId.Value.ToString()));
         await unitOfWork.SaveChangesAsync(cancellationToken);

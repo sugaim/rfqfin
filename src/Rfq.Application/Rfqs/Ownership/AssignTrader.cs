@@ -8,24 +8,24 @@ public sealed class AssignTrader(
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
-    IRfqEventSink? events = null,
-    TimeProvider? timeProvider = null)
+    IRfqEventSink events,
+    TimeProvider timeProvider)
 {
     public async Task<OwnershipResult> ExecuteAsync(
-        long caseId,
-        string targetTraderId,
-        long expectedVersion,
+        CaseId caseId,
+        UserId targetTraderId,
+        StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanAssignTrader(currentUser.User, rfqCase);
         var target = await assignedTraderValidator.ResolveAsync(
             targetTraderId,
-            rfqCase.AssignedTraderId.Value,
+            rfqCase.AssignedTraderId,
             cancellationToken);
         var previous = rfqCase.AssignedTraderId.Value;
         rfqCase = RfqOwnershipTransitions.Assign(
-            rfqCase, target, new StateVersion(expectedVersion));
+            rfqCase, target, expectedVersion);
         PickUpRfq.Record(events, timeProvider, RfqTransitionKind.AssignedTraderChanged,
             rfqCase, currentUser.User.UserId, previous);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);

@@ -11,14 +11,13 @@ public sealed class ResolveRfqDefaults(
     ICurrentUser currentUser)
 {
     public async Task<RfqDefaultsResult> ExecuteAsync(
-        string securityId,
+        SecurityId securityId,
         CancellationToken cancellationToken = default)
     {
-        var resolvedSecurityId = SecurityId.Create(securityId);
         var systemDate = await systemDateProvider.GetTodayAsync(cancellationToken);
-        var security = await securitySearch.ResolveAsync(resolvedSecurityId, cancellationToken)
+        var security = await securitySearch.ResolveAsync(securityId, cancellationToken)
             ?? throw new KeyNotFoundException($"Security '{securityId}' was not found.");
-        var categoryId = CategoryId.Create(security.CategoryId);
+        var categoryId = security.CategoryId;
         var assignedTraderId = await categoryRouting.GetDefaultAssignedTraderAsync(
                 categoryId,
                 cancellationToken)
@@ -48,6 +47,6 @@ public sealed class ResolveRfqDefaults(
             assignedTrader.UserId,
             assignedTrader.Name,
             systemDate,
-            settlementResolver.Resolve(resolvedSecurityId, systemDate));
+            settlementResolver.Resolve(securityId, systemDate));
     }
 }

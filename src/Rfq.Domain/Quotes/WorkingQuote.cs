@@ -37,3 +37,14 @@ public sealed class WorkingQuote
             revisionId, mode, calculated, manual, version,
             createdAt, createdBy, updatedAt, updatedBy);
 }
+
+public enum WorkingQuoteMode { Calculated, Manual }
+
+public sealed record CalculatedQuotePayload(
+    CalculationDriver Driver, decimal DriverValue, decimal Price,
+    decimal BbgYield, decimal BaseSimpleYield, decimal SimpleYieldSlide,
+    decimal FinalSimpleYield, decimal InternalYield, decimal GSpread, decimal Asw);
+
+public sealed record ManualQuotePayload(decimal? Price, decimal? FinalSimpleYield);
+
+public enum CalculationDriver { Price, BbgYield, SimpleYield, GSpread }

@@ -11,11 +11,11 @@ public sealed class UpdateManualWorkingQuote(
     TimeProvider timeProvider)
 {
     public async Task<WorkingQuoteResult> ExecuteAsync(
-        long caseId,
+        CaseId caseId,
         decimal? price,
         decimal? finalSimpleYield,
-        long expectedCurrentVersion,
-        long expectedWorkingQuoteVersion,
+        StateVersion expectedCurrentVersion,
+        StateVersion expectedWorkingQuoteVersion,
         CancellationToken cancellationToken = default)
     {
         var (rfqCase, quote) = await WorkingQuoteMutation.LoadAsync(
@@ -31,11 +31,11 @@ public sealed class UpdateManualWorkingQuote(
             quote,
             price,
             finalSimpleYield,
-            new StateVersion(expectedWorkingQuoteVersion),
+            expectedWorkingQuoteVersion,
             currentUser.User.UserId,
             timeProvider.GetUtcNow());
         workingQuotes.Update(quote);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return WorkingQuoteResult.From(caseId, quote, rfqCase.Version.Value);
+        return WorkingQuoteResult.From(caseId, quote, rfqCase.Version);
     }
 }

@@ -5,10 +5,18 @@ public static class WorkingQuoteFactory
     public static WorkingQuote CreateInitialFor(
         RfqCase rfq, UserId createdBy, DateTimeOffset createdAt)
     {
-        if (rfq.Lifecycle is not OpenRfq
-            || rfq.CurrentRevision.Status != RevisionStatus.Confirmed)
+        if (rfq.Lifecycle is not ActiveRfq
+            {
+                QuoteState: QuoteRequested
+                {
+                    Reason: QuoteRequestReason.Initial
+                }
+            })
             throw new DomainRuleViolationException(
-                "A WorkingQuote requires an Open RFQ with a confirmed current Revision.");
+                "An initial WorkingQuote requires an Active initial quote request.");
+        if (rfq.CurrentRevision.Status != RevisionStatus.Confirmed)
+            throw new DomainRuleViolationException(
+                "An initial WorkingQuote requires a confirmed current Revision.");
         return Empty(rfq.CurrentRevision.RevisionId, createdBy, createdAt);
     }
 

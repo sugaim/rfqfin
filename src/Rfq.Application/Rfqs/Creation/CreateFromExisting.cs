@@ -12,7 +12,7 @@ public sealed class CreateFromExisting(
     IUnitOfWork unitOfWork)
 {
     public async Task<InitialRfqResult> ExecuteAsync(
-        long sourceCaseId,
+        CaseId sourceCaseId,
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanCreateRevision(currentUser.User);
@@ -24,8 +24,8 @@ public sealed class CreateFromExisting(
             ? source.CurrentRevision.SettlementDate
             : null;
         var copy = await factory.CreateAsync(new CreateDraftCommand(
-            source.ClientId.Value,
-            source.SecurityId.Value,
+            source.ClientId,
+            source.SecurityId,
             source.CurrentRevision.Notional,
             settlement,
             source.CurrentRevision.SalesAndTradingMessage,

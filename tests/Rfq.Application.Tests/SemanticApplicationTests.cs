@@ -20,15 +20,70 @@ public sealed class SemanticApplicationTests
         var useCase = new ConfirmInitialDraft(
             cases, new AssignedTraderValidator(new Users(), Current(Sales, UserRole.Sales)),
             working, new SystemDate(), new RfqAuthorization(),
-            Current(Sales, UserRole.Sales), uow, TimeProvider.System);
+            Current(Sales, UserRole.Sales), uow, TimeProvider.System, new RfqEvents());
 
         await useCase.ExecuteAsync(new UpdateInitialDraftCommand(
-            draft.CaseId.Value, 1_000_000, Today.AddDays(2), "confirmed",
-            Trader.Value, draft.CurrentRevision.Version.Value));
+            draft.CaseId, 1_000_000, Today.AddDays(2), "confirmed",
+            Trader, draft.CurrentRevision.Version));
 
         Assert.Single(working.Added);
         Assert.Equal(cases.Case!.CurrentRevision.RevisionId, working.Added[0].RevisionId);
         Assert.Equal(1, uow.Saves);
+    }
+
+    [Fact]
+    public async Task Confirm_new_creates_working_quote_in_the_same_commit()
+    {
+        var current = Current(Sales, UserRole.Sales);
+        var cases = new CaseRepository(null);
+        var working = new WorkingRepository();
+        var uow = new UnitOfWork();
+        var useCase = new ConfirmNewRfq(
+            Factory(current), cases, working, new SystemDate(), new RfqAuthorization(),
+            current, uow, TimeProvider.System, new RfqEvents());
+
+        var result = await useCase.ExecuteAsync(Command());
+
+        Assert.Single(working.Added);
+        Assert.Equal(result.RevisionId, working.Added[0].RevisionId);
+        Assert.Equal(result.RevisionId, cases.Added!.CurrentRevision.RevisionId);
+        Assert.Equal(1, uow.Saves);
+    }
+
+    [Fact]
+    public async Task Sales_created_rfq_records_sales_id()
+    {
+        var current = Current(Sales, UserRole.Sales);
+
+        var rfq = await Factory(current).CreateAsync(Command());
+
+        Assert.Equal(Sales, rfq.SalesId);
+        Assert.Equal(Sales, rfq.ContactOwnerId);
+    }
+
+    [Fact]
+    public async Task Trader_created_rfq_has_no_sales_id()
+    {
+        var current = Current(Trader, UserRole.Trader);
+
+        var rfq = await Factory(current).CreateAsync(Command());
+
+        Assert.Null(rfq.SalesId);
+        Assert.Equal(Trader, rfq.ContactOwnerId);
+    }
+
+    [Fact]
+    public async Task Trader_screen_query_does_not_write()
+    {
+        var cases = new CaseRepository(null, []);
+        var useCase = new GetActiveTraderRfqs(
+            cases, new RfqAuthorization(), Current(Trader, UserRole.Trader));
+
+        var result = await useCase.ExecuteAsync();
+
+        Assert.Empty(result);
+        Assert.Equal(1, cases.TraderQueries);
+        Assert.Equal(0, cases.Updates);
     }
 
     [Fact]
@@ -47,11 +102,11 @@ public sealed class SemanticApplicationTests
             Current(Trader, UserRole.Trader), new QuoteEvents(), uow, TimeProvider.System);
 
         var result = await useCase.ExecuteAsync(
-            rfq.CaseId.Value, 5, rfq.Version.Value, quote.Version.Value);
+            rfq.CaseId, 5, rfq.Version, quote.Version);
 
-        Assert.NotEqual(Guid.Empty, result.QuoteId);
-        Assert.Equal(result.QuoteId, Assert.Single(confirmed.Added).QuoteId.Value);
-        Assert.Equal(result.QuoteId, cases.Case!.CurrentQuoteId!.Value.Value);
+        Assert.NotEqual(Guid.Empty, result.QuoteId.Value);
+        Assert.Equal(result.QuoteId, Assert.Single(confirmed.Added).QuoteId);
+        Assert.Equal(result.QuoteId, cases.Case!.CurrentQuoteId!.Value);
         Assert.Equal(1, uow.Saves);
     }
 
@@ -72,8 +127,8 @@ public sealed class SemanticApplicationTests
             Current(Sales, UserRole.Sales), new RfqEvents(), uow, TimeProvider.System);
 
         await useCase.ExecuteAsync(new AmendmentItem(
-            saved.Rfq.CaseId.Value, saved.Rfq.Version.Value,
-            saved.DraftRevision.Version.Value));
+            saved.Rfq.CaseId, saved.Rfq.Version,
+            saved.DraftRevision.Version));
 
         var added = Assert.Single(working.Added);
         Assert.Equal(cases.Case!.CurrentRevision.RevisionId, added.RevisionId);
@@ -100,8 +155,8 @@ public sealed class SemanticApplicationTests
             Current(Trader, UserRole.Trader), new UnitOfWork(), TimeProvider.System);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => useCase.ExecuteAsync(
-            rfq.CaseId.Value, CalculationDriver.Price, 100m, 0m,
-            rfq.Version.Value, quote.Version.Value));
+            rfq.CaseId, CalculationDriver.Price, 100m, 0m,
+            rfq.Version, quote.Version));
         Assert.Equal(0, working.Updates);
     }
 
@@ -118,8 +173,8 @@ public sealed class SemanticApplicationTests
             new UnitOfWork(), TimeProvider.System);
 
         await Assert.ThrowsAsync<CalculationFailureException>(() => useCase.ExecuteAsync(
-            rfq.CaseId.Value, CalculationDriver.Price, 100m, 0m,
-            rfq.Version.Value, quote.Version.Value));
+            rfq.CaseId, CalculationDriver.Price, 100m, 0m,
+            rfq.Version, quote.Version));
         Assert.Equal(0, working.Updates);
         Assert.Single(working.Failures);
     }
@@ -137,7 +192,7 @@ public sealed class SemanticApplicationTests
             cases, factory, new SystemDate(), businessDates,
             new RfqAuthorization(), current, new UnitOfWork());
 
-        await useCase.ExecuteAsync(source.CaseId.Value);
+        await useCase.ExecuteAsync(source.CaseId);
 
         Assert.Equal(createdAt, businessDates.ReceivedInstant);
         Assert.Equal(source.CurrentRevision.SettlementDate, cases.Added!.CurrentRevision.SettlementDate);
@@ -148,6 +203,10 @@ public sealed class SemanticApplicationTests
         new ResolveRfqDefaults(new Securities(), new Routing(), new Users(),
             new SystemDate(), new Settlement(), current),
         new AssignedTraderValidator(new Users(), current), current, TimeProvider.System);
+
+    private static CreateDraftCommand Command() => new(
+        ClientId.Create("client"), SecurityId.Create("security"), 1_000_000,
+        Today.AddDays(2), "message", Trader);
 
     private static RfqCase Draft(DateTimeOffset? createdAt = null) => RfqCase.CreateDraft(
         new CaseId(10), RevisionId.New(), ClientId.Create("client"), SecurityId.Create("security"),
@@ -171,18 +230,26 @@ public sealed class SemanticApplicationTests
 
     private sealed record CurrentUserService(CurrentUser User) : ICurrentUser;
 
-    private sealed class CaseRepository(RfqCase? value) : IRfqCaseRepository
+    private sealed class CaseRepository(
+        RfqCase? value,
+        IReadOnlyList<TraderRfqListItem>? traderRows = null) : IRfqCaseRepository
     {
         public RfqCase? Case { get; set; } = value;
         public RfqCase? Added { get; private set; }
         public List<RfqRevision> ChangedRevisions { get; } = [];
+        public int Updates { get; private set; }
+        public int TraderQueries { get; private set; }
         public void Add(RfqCase rfq) { Added = rfq; Case = rfq; }
         public Task<RfqCase?> GetAsync(CaseId id, CancellationToken token = default) =>
             Task.FromResult(Case?.CaseId == id ? Case : null);
-        public void Update(RfqCase rfq) => Case = rfq;
+        public void Update(RfqCase rfq) { Updates++; Case = rfq; }
         public void UpdateRevision(RfqRevision revision) => ChangedRevisions.Add(revision);
         public Task<IReadOnlyList<SalesRfqListItem>> GetActiveSalesRfqsAsync(UserId id, CancellationToken token = default) => throw new NotSupportedException();
-        public Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(string desk, CancellationToken token = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(string desk, CancellationToken token = default)
+        {
+            TraderQueries++;
+            return Task.FromResult(traderRows ?? (IReadOnlyList<TraderRfqListItem>)[]);
+        }
     }
 
     private sealed class WorkingRepository : IWorkingQuoteRepository
@@ -257,12 +324,12 @@ public sealed class SemanticApplicationTests
     private sealed class Clients : IClientSearch
     {
         public Task<IReadOnlyList<ClientSearchResult>> SearchAsync(string q, CancellationToken token = default) => throw new NotSupportedException();
-        public Task<ClientSearchResult?> ResolveAsync(ClientId id, CancellationToken token = default) => Task.FromResult<ClientSearchResult?>(new(id.Value, id.Value, "Client"));
+        public Task<ClientSearchResult?> ResolveAsync(ClientId id, CancellationToken token = default) => Task.FromResult<ClientSearchResult?>(new(id, id.Value, "Client"));
     }
     private sealed class Securities : ISecuritySearch
     {
         public Task<IReadOnlyList<SecuritySearchResult>> SearchAsync(string q, CancellationToken token = default) => throw new NotSupportedException();
-        public Task<SecuritySearchResult?> ResolveAsync(SecurityId id, CancellationToken token = default) => Task.FromResult<SecuritySearchResult?>(new(id.Value, "Security", "SEC", "1-01-0001-00001", "ISIN", "category", "Category"));
+        public Task<SecuritySearchResult?> ResolveAsync(SecurityId id, CancellationToken token = default) => Task.FromResult<SecuritySearchResult?>(new(id, "Security", "SEC", "1-01-0001-00001", "ISIN", CategoryId.Create("category"), "Category"));
     }
     private sealed class Routing : ICategoryRouting { public Task<UserId?> GetDefaultAssignedTraderAsync(CategoryId id, CancellationToken token = default) => Task.FromResult<UserId?>(Trader); }
     private sealed class Settlement : IStandardSettlementResolver { public DateOnly Resolve(SecurityId id, DateOnly date) => date.AddDays(2); }
@@ -270,6 +337,6 @@ public sealed class SemanticApplicationTests
     {
         public Task<IReadOnlyList<UserSummary>> GetUsersAsync(UserRole? role = null, CancellationToken token = default) => throw new NotSupportedException();
         public Task<UserSummary?> ResolveAsync(UserId id, CancellationToken token = default) => Task.FromResult<UserSummary?>(
-            new(id.Value, id.Value, new HashSet<UserRole> { id == Trader ? UserRole.Trader : UserRole.Sales }, "desk"));
+            new(id, id.Value, new HashSet<UserRole> { id == Trader ? UserRole.Trader : UserRole.Sales }, "desk"));
     }
 }

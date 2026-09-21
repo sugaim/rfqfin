@@ -15,8 +15,8 @@ public sealed class DiscardAmendment(
         var rfq = await CloseRfq.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanDiscardRevision(currentUser.User, rfq);
         var transition = AmendmentTransitions.Discard(
-            rfq, new StateVersion(command.ExpectedCurrentVersion),
-            new StateVersion(command.ExpectedDraftVersion));
+            rfq, command.ExpectedCurrentVersion,
+            command.ExpectedDraftVersion);
         rfq = transition.Rfq;
         cases.Update(rfq);
         cases.UpdateRevision(transition.DiscardedRevision);

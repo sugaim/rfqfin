@@ -95,6 +95,9 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 7 => RfqStatus.Away,
                 _ => RfqStatus.Active,
             };
+            var createdBy = index == 1
+                ? security.Item3
+                : index % 3 == 0 ? "sales-a" : "sales-dev";
             var revision = new RfqRevisionEntity
             {
                 RevisionId = revisionId,
@@ -102,13 +105,13 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 Status = isDraft ? RevisionStatus.Draft : RevisionStatus.Confirmed,
                 Version = isDraft ? 1 : 2,
                 CreatedAt = created,
-                CreatedBy = index % 3 == 0 ? "sales-a" : "sales-dev",
+                CreatedBy = createdBy,
                 SettlementDate = new DateOnly(2026, 9, 23).AddDays(index % 20),
                 StandardSettlementDate = new DateOnly(2026, 9, 23),
                 Notional = (10 + index % 190) * 1_000_000m,
                 SalesAndTradingMessage = $"Demo RFQ {caseId}",
                 ConfirmedAt = isDraft ? null : created.AddMinutes(2),
-                ConfirmedBy = isDraft ? null : index % 3 == 0 ? "sales-a" : "sales-dev",
+                ConfirmedBy = isDraft ? null : createdBy,
             };
             var entity = new RfqCaseEntity
             {
@@ -118,7 +121,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 CategorySnapshot = security.Item2,
                 CreatedAt = created,
                 CreatedBy = revision.CreatedBy,
-                SalesId = revision.CreatedBy,
+                SalesId = index == 1 ? null : revision.CreatedBy,
                 Revisions = [revision],
                 Memo = new CaseMemoEntity
                 {

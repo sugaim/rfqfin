@@ -27,3 +27,6 @@ public sealed class ScratchPricer(ICalculationClient calculationClient)
         };
     }
 }
+
+public sealed record ScratchPriceRequest(SecurityId SecurityId, DateOnly SettlementDate,
+    CalculationDriver Driver, decimal Value, decimal SimpleYieldSlide);

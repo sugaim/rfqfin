@@ -11,24 +11,25 @@ public sealed class CorrectRfqOutcome(
     TimeProvider timeProvider)
 {
     public async Task<CloseRfqResult> ExecuteAsync(
-        long caseId,
+        CaseId caseId,
         RfqStatus outcome,
         string? reason,
-        long expectedCurrentVersion,
+        StateVersion expectedCurrentVersion,
         CancellationToken cancellationToken = default)
     {
         var rfqCase = await CloseRfq.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanCorrectOutcome(currentUser.User, rfqCase);
         var previous = rfqCase.Status;
         rfqCase = RfqLifecycleTransitions.CorrectOutcome(
-            rfqCase, outcome, new StateVersion(expectedCurrentVersion));
+            rfqCase, outcome, expectedCurrentVersion);
         rfqCases.Update(rfqCase);
         eventSink.Record(new RfqTransition(
             RfqTransitionKind.OutcomeCorrected,
             caseId,
-            currentUser.User.UserId.Value,
+            currentUser.User.UserId,
             timeProvider.GetUtcNow(),
-            rfqCase.ClosedQuoteId!.Value.Value,
+            (rfqCase.Lifecycle as ClosedRfq)?.ClosedQuoteId
+                ?? throw new DomainInvariantException("Corrected RFQ is not Closed."),
             previous.ToString(),
             outcome.ToString(),
             string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()));

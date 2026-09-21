@@ -5,7 +5,7 @@ public sealed class RfqCase
     private RfqCase(
         CaseId caseId, ClientId clientId, SecurityId securityId,
         CategoryId categorySnapshot, DateTimeOffset createdAt, UserId createdBy,
-        UserId salesId, UserId contactOwnerId, UserId assignedTraderId,
+        UserId? salesId, UserId contactOwnerId, UserId assignedTraderId,
         StateVersion version, RfqRevision currentRevision, RfqLifecycle lifecycle,
         RfqRevision? pendingDraftRevision, CaseId? copiedFromCaseId)
     {
@@ -32,7 +32,7 @@ public sealed class RfqCase
     public CategoryId CategorySnapshot { get; }
     public DateTimeOffset CreatedAt { get; }
     public UserId CreatedBy { get; }
-    public UserId SalesId { get; }
+    public UserId? SalesId { get; }
     public UserId ContactOwnerId { get; }
     public UserId AssignedTraderId { get; }
     public StateVersion Version { get; }
@@ -73,13 +73,14 @@ public sealed class RfqCase
         CaseId caseId, RevisionId revisionId, ClientId clientId,
         SecurityId securityId, CategoryId categorySnapshot, UserId assignedTraderId,
         RevisionTerms terms, UserId createdBy, DateTimeOffset createdAt,
+        UserId? salesId = null,
         CaseId? copiedFromCaseId = null, RevisionId? copiedFromRevisionId = null)
     {
         var revision = RfqRevision.CreateDraft(
             revisionId, caseId, terms, createdAt, createdBy, copiedFromRevisionId);
         return new RfqCase(
             caseId, clientId, securityId, categorySnapshot, createdAt, createdBy,
-            createdBy, createdBy, assignedTraderId, new StateVersion(1), revision,
+            salesId, createdBy, assignedTraderId, new StateVersion(1), revision,
             new DraftRfq(revisionId), null, copiedFromCaseId);
     }
 
@@ -100,7 +101,7 @@ public sealed class RfqCase
     internal static RfqCase Restore(
         CaseId caseId, ClientId clientId, SecurityId securityId,
         CategoryId categorySnapshot, DateTimeOffset createdAt, UserId createdBy,
-        UserId salesId, UserId contactOwnerId, UserId assignedTraderId,
+        UserId? salesId, UserId contactOwnerId, UserId assignedTraderId,
         StateVersion version, RfqRevision currentRevision, RfqLifecycle lifecycle,
         RfqRevision? pendingDraftRevision = null, CaseId? copiedFromCaseId = null) => new(
             caseId, clientId, securityId, categorySnapshot, createdAt, createdBy,

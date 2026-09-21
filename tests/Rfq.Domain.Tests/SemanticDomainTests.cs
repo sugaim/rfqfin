@@ -64,20 +64,55 @@ public sealed class SemanticDomainTests
     }
 
     [Fact]
-    public void Ownership_transitions_are_typed_and_immutable()
+    public void Release_changes_owned_to_unowned_and_preserves_assigned_trader()
     {
         var original = Open();
         var picked = RfqOwnershipTransitions.PickUp(original, Trader, original.Version);
         Assert.IsType<Unowned>(original.Ownership);
         Assert.IsType<Owned>(picked.Ownership);
-        var released = RfqOwnershipTransitions.Release(picked, Trader, picked.Version);
-        var assigned = RfqOwnershipTransitions.Assign(
-            released, UserId.Create("other"), released.Version);
-        var taken = RfqOwnershipTransitions.PickUp(
-            assigned, UserId.Create("other"), assigned.Version);
-        var over = RfqOwnershipTransitions.TakeOver(taken, Trader, taken.Version);
-        Assert.Equal(Trader, over.AssignedTraderId);
-        Assert.IsType<Owned>(over.Ownership);
+        var released = RfqOwnershipTransitions.Release(picked, picked.Version);
+        Assert.IsType<Unowned>(released.Ownership);
+        Assert.Equal(Trader, released.AssignedTraderId);
+    }
+
+    [Fact]
+    public void Release_rejects_an_unowned_rfq()
+    {
+        var rfq = Open();
+        Assert.Throws<DomainRuleViolationException>(
+            () => RfqOwnershipTransitions.Release(rfq, rfq.Version));
+    }
+
+    [Fact]
+    public void Take_over_changes_the_target_trader_and_keeps_owned_state()
+    {
+        var currentOwner = UserId.Create("current");
+        var target = UserId.Create("target");
+        var open = Open();
+        var assigned = RfqOwnershipTransitions.Assign(open, currentOwner, open.Version);
+        var owned = RfqOwnershipTransitions.PickUp(assigned, currentOwner, assigned.Version);
+        var takenOver = RfqOwnershipTransitions.TakeOver(owned, target, owned.Version);
+        Assert.Equal(target, takenOver.AssignedTraderId);
+        Assert.IsType<Owned>(takenOver.Ownership);
+    }
+
+    [Fact]
+    public void Take_over_requires_a_target_trader()
+    {
+        var open = Open();
+        var owned = RfqOwnershipTransitions.PickUp(open, Trader, open.Version);
+        Assert.Throws<DomainValidationException>(
+            () => RfqOwnershipTransitions.TakeOver(owned, null!, owned.Version));
+    }
+
+    [Fact]
+    public void Assign_changes_the_target_trader_and_keeps_unowned_state()
+    {
+        var target = UserId.Create("target");
+        var open = Open();
+        var assigned = RfqOwnershipTransitions.Assign(open, target, open.Version);
+        Assert.Equal(target, assigned.AssignedTraderId);
+        Assert.IsType<Unowned>(assigned.Ownership);
     }
 
     [Fact]
@@ -115,6 +150,48 @@ public sealed class SemanticDomainTests
             manual, 99m, 1.2m, manual.Version, Trader, Now);
         Assert.Equal(99m, edited.Manual!.Price);
         Assert.Null(initial.Calculated);
+    }
+
+    [Theory]
+    [InlineData(QuoteRequestReason.Revised)]
+    [InlineData(QuoteRequestReason.Reopened)]
+    [InlineData(QuoteRequestReason.Expired)]
+    [InlineData(QuoteRequestReason.Withdrawn)]
+    public void Initial_working_quote_rejects_non_initial_quote_requests(
+        QuoteRequestReason reason)
+    {
+        var rfq = Requested(reason);
+        Assert.Throws<DomainRuleViolationException>(
+            () => WorkingQuoteFactory.CreateInitialFor(rfq, Trader, Now));
+    }
+
+    [Fact]
+    public void Initial_working_quote_rejects_confirmed_and_presented_quotes()
+    {
+        var (confirmed, _) = ConfirmQuote();
+        Assert.Throws<DomainRuleViolationException>(
+            () => WorkingQuoteFactory.CreateInitialFor(confirmed, Trader, Now));
+
+        var presented = RfqLifecycleTransitions.Present(confirmed, confirmed.Version);
+        Assert.Throws<DomainRuleViolationException>(
+            () => WorkingQuoteFactory.CreateInitialFor(presented, Trader, Now));
+    }
+
+    [Fact]
+    public void Initial_working_quote_rejects_non_open_lifecycle_states()
+    {
+        var draft = Draft();
+        var open = Open();
+        var cancelled = RfqLifecycleTransitions.Cancel(open, open.Version);
+        var (quoted, _) = ConfirmQuote();
+        var closed = RfqLifecycleTransitions.Close(
+            quoted, RfqStatus.Hit, quoted.Version).Rfq;
+
+        foreach (var rfq in new[] { draft, cancelled, closed })
+        {
+            Assert.Throws<DomainRuleViolationException>(
+                () => WorkingQuoteFactory.CreateInitialFor(rfq, Trader, Now));
+        }
     }
 
     [Fact]
@@ -173,14 +250,48 @@ public sealed class SemanticDomainTests
 
     private static RfqCase Open()
     {
-        var draft = RfqCase.CreateDraft(
+        var draft = Draft();
+        return RfqLifecycleTransitions.ConfirmInitial(
+            draft, draft.CurrentRevision.Terms, Trader, Today, Sales, Now,
+            draft.CurrentRevision.Version);
+    }
+
+    private static RfqCase Draft() =>
+        RfqCase.CreateDraft(
             new CaseId(1), RevisionId.New(), ClientId.Create("c"), SecurityId.Create("s"),
             CategoryId.Create("cat"), Trader,
             new RevisionTerms(1_000_000, Today.AddDays(2), Today.AddDays(2), ""),
             Sales, Now);
-        return RfqLifecycleTransitions.ConfirmInitial(
-            draft, draft.CurrentRevision.Terms, Trader, Today, Sales, Now,
-            draft.CurrentRevision.Version);
+
+    private static RfqCase Requested(QuoteRequestReason reason)
+    {
+        if (reason == QuoteRequestReason.Reopened)
+        {
+            var open = Open();
+            var cancelled = RfqLifecycleTransitions.Cancel(open, open.Version);
+            return RfqLifecycleTransitions.Reopen(cancelled, cancelled.Version);
+        }
+
+        if (reason == QuoteRequestReason.Revised)
+        {
+            var open = Open();
+            var saved = AmendmentTransitions.SaveDraft(
+                open, RevisionId.New(), open.CurrentRevision.Terms,
+                Sales, Now, open.Version);
+            return AmendmentTransitions.Confirm(
+                saved.Rfq, Today, Sales, Now, saved.Rfq.Version,
+                saved.DraftRevision.Version).Rfq;
+        }
+
+        var (confirmed, quote) = ConfirmQuote();
+        return reason switch
+        {
+            QuoteRequestReason.Expired => QuoteTransitions.Expire(
+                confirmed, quote.QuoteId, confirmed.Version),
+            QuoteRequestReason.Withdrawn => QuoteTransitions.Withdraw(
+                confirmed, confirmed.Version),
+            _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null)
+        };
     }
 
     private static (RfqCase Rfq, ConfirmedQuote Quote) ConfirmQuote()

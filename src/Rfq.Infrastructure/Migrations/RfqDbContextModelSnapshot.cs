@@ -492,7 +492,6 @@ namespace Rfq.Infrastructure.Migrations
                         .HasColumnName("created_by");
 
                     b.Property<string>("SalesId")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("sales_id");

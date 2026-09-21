@@ -36,7 +36,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             CategorySnapshot = rfqCase.CategorySnapshot.Value,
             CreatedAt = rfqCase.CreatedAt,
             CreatedBy = rfqCase.CreatedBy.Value,
-            SalesId = rfqCase.SalesId.Value,
+            SalesId = rfqCase.SalesId?.Value,
             CopiedFromCaseId = rfqCase.CopiedFromCaseId?.Value,
             Revisions = [revision],
             Memo = new CaseMemoEntity
@@ -106,7 +106,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             CategoryId.Create(entity.CategorySnapshot),
             entity.CreatedAt,
             UserId.Create(entity.CreatedBy),
-            UserId.Create(entity.SalesId),
+            entity.SalesId is null ? null : UserId.Create(entity.SalesId),
             UserId.Create(entity.Current.ContactOwnerId),
             UserId.Create(entity.Current.AssignedTraderId),
             new StateVersion(entity.Current.Version),
@@ -191,13 +191,13 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             .OrderByDescending(entity => entity.CreatedAt)
             .ThenBy(entity => entity.CaseId)
             .Select(entity => new SalesRfqListItem(
-                entity.CaseId,
-                entity.ClientId,
+                new CaseId(entity.CaseId),
+                ClientId.Create(entity.ClientId),
                 dbContext.Clients
                     .Where(client => client.ClientId == entity.ClientId)
                     .Select(client => client.Name)
                     .FirstOrDefault() ?? entity.ClientId,
-                entity.SecurityId,
+                SecurityId.Create(entity.SecurityId),
                 dbContext.Securities
                     .Where(security => security.SecurityId == entity.SecurityId)
                     .Select(security => security.JapaneseName)
@@ -206,39 +206,35 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                     .Where(security => security.SecurityId == entity.SecurityId)
                     .Select(security => security.BbgDisplay)
                     .FirstOrDefault() ?? entity.SecurityId,
-                entity.CategorySnapshot,
-                entity.Current.RfqStatus.ToString(),
-                entity.Current.QuoteStatus == null
-                    ? null
-                    : entity.Current.QuoteStatus.Value.ToString(),
-                entity.Current.QuoteRequestReason == null
-                    ? null
-                    : entity.Current.QuoteRequestReason.Value.ToString(),
-                entity.Current.CurrentRevisionId,
-                entity.Current.CurrentQuoteId,
-                entity.Current.ClosedQuoteId,
-                entity.Current.Version,
-                entity.Current.CurrentRevision.Status.ToString(),
-                entity.Current.ContactOwnerId,
-                entity.Current.AssignedTraderId,
+                CategoryId.Create(entity.CategorySnapshot),
+                entity.Current.RfqStatus,
+                entity.Current.QuoteStatus,
+                entity.Current.QuoteRequestReason,
+                new RevisionId(entity.Current.CurrentRevisionId),
+                entity.Current.CurrentQuoteId == null ? null : new QuoteId(entity.Current.CurrentQuoteId.Value),
+                entity.Current.ClosedQuoteId == null ? null : new QuoteId(entity.Current.ClosedQuoteId.Value),
+                new StateVersion(entity.Current.Version),
+                entity.Current.CurrentRevision.Status,
+                UserId.Create(entity.Current.ContactOwnerId),
+                UserId.Create(entity.Current.AssignedTraderId),
                 entity.Current.CurrentRevision.SettlementDate,
                 entity.Current.CurrentRevision.StandardSettlementDate,
                 entity.Current.CurrentRevision.Notional,
                 entity.Current.CurrentRevision.SalesAndTradingMessage,
                 entity.Memo.SalesMemo,
-                entity.Memo.Version,
-                entity.Current.CurrentRevision.Version,
+                new StateVersion(entity.Memo.Version),
+                new StateVersion(entity.Current.CurrentRevision.Version),
                 entity.CreatedAt,
-                entity.Revisions
+                ToRevisionId(entity.Revisions
                     .Where(revision => revision.Status == RevisionStatus.Draft
                         && revision.RevisionId != entity.Current.CurrentRevisionId)
                     .Select(revision => (Guid?)revision.RevisionId)
-                    .SingleOrDefault(),
-                entity.Revisions
+                    .SingleOrDefault()),
+                ToStateVersion(entity.Revisions
                     .Where(revision => revision.Status == RevisionStatus.Draft
                         && revision.RevisionId != entity.Current.CurrentRevisionId)
                     .Select(revision => (long?)revision.Version)
-                    .SingleOrDefault(),
+                    .SingleOrDefault()),
                 entity.Revisions
                     .Where(revision => revision.Status == RevisionStatus.Draft
                         && revision.RevisionId != entity.Current.CurrentRevisionId)
@@ -307,7 +303,10 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             clients.TryGetValue(entity.ClientId, out var clientName);
             securities.TryGetValue(entity.SecurityId, out var security);
             quotes.TryGetValue(entity.Current.CurrentRevisionId, out var quoteEntity);
-            var quote = quoteEntity is null ? null : WorkingQuoteMapper.ToDomain(quoteEntity);
+            var quote = quoteEntity is null
+                ? throw new DomainInvariantException(
+                    $"WorkingQuote for Revision '{entity.Current.CurrentRevisionId}' was not found.")
+                : WorkingQuoteMapper.ToDomain(quoteEntity);
             ConfirmedQuoteEntity? confirmedQuote = null;
             var displayQuoteId = entity.Current.CurrentQuoteId ?? entity.Current.ClosedQuoteId;
             if (displayQuoteId is not null)
@@ -315,38 +314,35 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                 confirmedQuotes.TryGetValue(displayQuoteId.Value, out confirmedQuote);
             }
             return new TraderRfqListItem(
-                entity.CaseId,
-                entity.ClientId,
+                new CaseId(entity.CaseId),
+                ClientId.Create(entity.ClientId),
                 clientName ?? entity.ClientId,
-                entity.SecurityId,
+                SecurityId.Create(entity.SecurityId),
                 security?.JapaneseName ?? entity.SecurityId,
                 security?.BbgDisplay ?? entity.SecurityId,
-                entity.CategorySnapshot,
-                entity.Current.RfqStatus.ToString(),
-                entity.Current.QuoteStatus == null
-                    ? null
-                    : entity.Current.QuoteStatus.Value.ToString(),
-                entity.Current.QuoteRequestReason == null
-                    ? null
-                    : entity.Current.QuoteRequestReason.Value.ToString(),
-                entity.Current.CurrentRevisionId,
-                entity.Current.CurrentQuoteId,
-                entity.Current.ClosedQuoteId,
+                CategoryId.Create(entity.CategorySnapshot),
+                entity.Current.RfqStatus,
+                entity.Current.QuoteStatus,
+                entity.Current.QuoteRequestReason,
+                new RevisionId(entity.Current.CurrentRevisionId),
+                entity.Current.CurrentQuoteId == null ? null : new QuoteId(entity.Current.CurrentQuoteId.Value),
+                entity.Current.ClosedQuoteId == null ? null : new QuoteId(entity.Current.ClosedQuoteId.Value),
                 confirmedQuote?.ConfirmedAt,
                 confirmedQuote?.ExpiresAt,
-                entity.Current.CurrentRevision.QuoteSeedRevisionId,
-                entity.Current.ContactOwnerId,
-                entity.Current.AssignedTraderId,
+                entity.Current.CurrentRevision.QuoteSeedRevisionId == null
+                    ? null : new RevisionId(entity.Current.CurrentRevision.QuoteSeedRevisionId.Value),
+                UserId.Create(entity.Current.ContactOwnerId),
+                UserId.Create(entity.Current.AssignedTraderId),
                 entity.Current.Owned,
-                entity.Current.Version,
+                new StateVersion(entity.Current.Version),
                 entity.Current.CurrentRevision.SettlementDate,
                 entity.Current.CurrentRevision.Notional,
-                quote?.Mode.ToString() ?? WorkingQuoteMode.Calculated.ToString(),
-                quote?.Calculated,
-                quote?.Manual,
-                quote?.Version.Value ?? 0,
+                quote.Mode,
+                quote.Calculated,
+                quote.Manual,
+                quote.Version,
                 entity.Memo.TraderMemo,
-                entity.Memo.Version,
+                new StateVersion(entity.Memo.Version),
                 entity.CreatedAt);
         }).ToArray();
     }
@@ -363,8 +359,15 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                     && quote.ExpiresAt != null
                     && quote.ExpiresAt <= now))
             .Select(item => new ExpiredQuoteCandidate(
-                item.CaseId, item.Current.CurrentQuoteId!.Value, item.Current.Version))
+                new CaseId(item.CaseId), new QuoteId(item.Current.CurrentQuoteId.GetValueOrDefault()),
+                new StateVersion(item.Current.Version)))
             .ToListAsync(cancellationToken);
+
+    private static RevisionId? ToRevisionId(Guid? value) =>
+        value is null ? null : new RevisionId(value.Value);
+
+    private static StateVersion? ToStateVersion(long? value) =>
+        value is null ? null : new StateVersion(value.Value);
 
     private static RfqLifecycleKind ToLifecycleKind(RfqLifecycle lifecycle) => lifecycle switch
     {

@@ -18,22 +18,24 @@ public sealed class InitialRfqFactory(
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var clientId = ClientId.Create(command.ClientId);
-        _ = await clientSearch.ResolveAsync(clientId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Client '{clientId.Value}' was not found.");
+        _ = await clientSearch.ResolveAsync(command.ClientId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Client '{command.ClientId.Value}' was not found.");
         var defaults = await resolveDefaults.ExecuteAsync(command.SecurityId, cancellationToken);
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
             defaults.AssignedTraderId,
             cancellationToken);
         var caseId = await caseIdGenerator.NextAsync(cancellationToken);
+        var salesId = currentUser.User.Roles.Contains(UserRole.Sales)
+            ? currentUser.User.UserId
+            : null;
 
         return RfqCase.CreateDraft(
             caseId,
             RevisionId.New(),
-            clientId,
-            SecurityId.Create(defaults.SecurityId),
-            CategoryId.Create(defaults.CategoryId),
+            command.ClientId,
+            defaults.SecurityId,
+            defaults.CategoryId,
             assignedTraderId,
             new RevisionTerms(
                 command.Notional,
@@ -42,6 +44,7 @@ public sealed class InitialRfqFactory(
                 command.SalesAndTradingMessage),
             currentUser.User.UserId,
             timeProvider.GetUtcNow(),
+            salesId,
             copiedFromCaseId,
             copiedFromRevisionId);
     }

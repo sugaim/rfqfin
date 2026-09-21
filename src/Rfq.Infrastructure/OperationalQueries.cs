@@ -29,50 +29,53 @@ public sealed class PostgreSqlOperationalQueries(
             var to = new DateTimeOffset(search.To.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
             query = query.Where(item => item.CreatedAt < to);
         }
-        if (!string.IsNullOrWhiteSpace(search.ClientId)) query = query.Where(item => item.ClientId == search.ClientId);
-        if (!string.IsNullOrWhiteSpace(search.SecurityId)) query = query.Where(item => item.SecurityId == search.SecurityId);
-        if (!string.IsNullOrWhiteSpace(search.CategoryId)) query = query.Where(item => item.CategorySnapshot == search.CategoryId);
-        if (!string.IsNullOrWhiteSpace(search.ContactOwnerId)) query = query.Where(item => item.Current.ContactOwnerId == search.ContactOwnerId);
-        if (!string.IsNullOrWhiteSpace(search.SalesId)) query = query.Where(item => item.SalesId == search.SalesId);
-        if (!string.IsNullOrWhiteSpace(search.AssignedTraderId)) query = query.Where(item => item.Current.AssignedTraderId == search.AssignedTraderId);
-        if (!string.IsNullOrWhiteSpace(search.Status)
-            && Enum.TryParse<RfqStatus>(search.Status, true, out var status)) query = query.Where(item => item.Current.RfqStatus == status);
-        if (search.CaseId is not null) query = query.Where(item => item.CaseId == search.CaseId);
+        if (search.ClientId is not null) query = query.Where(item => item.ClientId == search.ClientId.Value);
+        if (search.SecurityId is not null) query = query.Where(item => item.SecurityId == search.SecurityId.Value);
+        if (search.CategoryId is not null) query = query.Where(item => item.CategorySnapshot == search.CategoryId.Value);
+        if (search.ContactOwnerId is not null) query = query.Where(item => item.Current.ContactOwnerId == search.ContactOwnerId.Value);
+        if (search.SalesId is not null) query = query.Where(item => item.SalesId == search.SalesId.Value);
+        if (search.AssignedTraderId is not null) query = query.Where(item => item.Current.AssignedTraderId == search.AssignedTraderId.Value);
+        if (search.Status is not null) query = query.Where(item => item.Current.RfqStatus == search.Status.Value);
+        if (search.CaseId is not null) query = query.Where(item => item.CaseId == search.CaseId.Value.Value);
 
         var rows = await query.OrderByDescending(item => item.CreatedAt).Take(ResultCap + 1)
             .Select(item => new PastRfqItem(
-                item.CaseId, item.CreatedAt, item.ClientId,
+                new CaseId(item.CaseId), item.CreatedAt, ClientId.Create(item.ClientId),
                 dbContext.Clients.Where(client => client.ClientId == item.ClientId)
                     .Select(client => client.Name).FirstOrDefault() ?? item.ClientId,
-                item.SecurityId,
+                SecurityId.Create(item.SecurityId),
                 dbContext.Securities.Where(security => security.SecurityId == item.SecurityId)
                     .Select(security => security.JapaneseName).FirstOrDefault() ?? item.SecurityId,
-                item.CategorySnapshot, item.Current.RfqStatus.ToString(),
-                item.Current.QuoteStatus == null ? null : item.Current.QuoteStatus.Value.ToString(),
-                item.Current.ContactOwnerId, item.SalesId, item.Current.AssignedTraderId,
+                CategoryId.Create(item.CategorySnapshot), item.Current.RfqStatus,
+                item.Current.QuoteStatus,
+                UserId.Create(item.Current.ContactOwnerId),
+                item.SalesId == null ? null : UserId.Create(item.SalesId),
+                UserId.Create(item.Current.AssignedTraderId),
                 item.Current.CurrentRevision.Notional, item.Current.CurrentRevision.SettlementDate))
             .ToListAsync(cancellationToken);
         return new(rows.Take(ResultCap).ToArray(), rows.Count > ResultCap);
     }
 
     public async Task<IReadOnlyList<RevisionHistoryItem>> GetRevisionHistoryAsync(
-        long caseId, CancellationToken cancellationToken = default) =>
-        await dbContext.RfqRevisions.AsNoTracking().Where(item => item.CaseId == caseId)
+        CaseId caseId, CancellationToken cancellationToken = default) =>
+        await dbContext.RfqRevisions.AsNoTracking().Where(item => item.CaseId == caseId.Value)
             .OrderByDescending(item => item.CreatedAt)
-            .Select(item => new RevisionHistoryItem(item.RevisionId, item.Status.ToString(),
-                item.Notional, item.SettlementDate, item.SalesAndTradingMessage, item.Version,
-                item.CreatedAt, item.ConfirmedAt, item.CopiedFromRevisionId, item.QuoteSeedRevisionId))
+            .Select(item => new RevisionHistoryItem(new RevisionId(item.RevisionId), item.Status,
+                item.Notional, item.SettlementDate, item.SalesAndTradingMessage, new StateVersion(item.Version),
+                item.CreatedAt, item.ConfirmedAt,
+                item.CopiedFromRevisionId == null ? null : new RevisionId(item.CopiedFromRevisionId.Value),
+                item.QuoteSeedRevisionId == null ? null : new RevisionId(item.QuoteSeedRevisionId.Value)))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<QuoteHistoryItem>> GetQuoteHistoryAsync(
-        long caseId, CancellationToken cancellationToken = default) =>
+        CaseId caseId, CancellationToken cancellationToken = default) =>
         await (from quote in dbContext.ConfirmedQuotes.AsNoTracking()
                join revision in dbContext.RfqRevisions.AsNoTracking()
                    on quote.RevisionId equals revision.RevisionId
-               where revision.CaseId == caseId
+               where revision.CaseId == caseId.Value
                orderby quote.ConfirmedAt descending
-               select new QuoteHistoryItem(quote.QuoteId, quote.RevisionId, quote.Mode.ToString(),
-                   quote.ConfirmedAt, quote.ExpiresAt, quote.RequestReasonAnswered.ToString()))
+               select new QuoteHistoryItem(new QuoteId(quote.QuoteId), new RevisionId(quote.RevisionId), quote.Mode,
+                   quote.ConfirmedAt, quote.ExpiresAt, quote.RequestReasonAnswered))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<EodSummaryItem>> GetEodAsync(
@@ -85,7 +88,7 @@ public sealed class PostgreSqlOperationalQueries(
             .Select(item => new { item.Current.ContactOwnerId, item.Current.RfqStatus })
             .ToListAsync(cancellationToken);
         return rows.GroupBy(item => item.ContactOwnerId)
-            .Select(group => new EodSummaryItem(group.Key,
+            .Select(group => new EodSummaryItem(UserId.Create(group.Key),
                 group.Count(item => item.RfqStatus is RfqStatus.Active or RfqStatus.Presented),
                 group.Count(item => item.RfqStatus == RfqStatus.Hit),
                 group.Count(item => item.RfqStatus == RfqStatus.Away)))

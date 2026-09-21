@@ -31,14 +31,14 @@ public sealed class BulkCloseRfqs(
                     results.Add(new BulkCloseItemResult(
                         item.CaseId,
                         "Skipped",
-                        rfqCase.Status.ToString(),
+                        rfqCase.Status,
                         null));
                     continue;
                 }
 
                 authorization.EnsureCanClose(currentUser.User, rfqCase);
                 var transition = RfqLifecycleTransitions.Close(
-                    rfqCase, outcome, new StateVersion(item.ExpectedCurrentVersion));
+                    rfqCase, outcome, item.ExpectedCurrentVersion);
                 rfqCase = transition.Rfq;
                 rfqCases.Update(rfqCase);
                 if (transition.DiscardedRevision is not null)
@@ -53,7 +53,7 @@ public sealed class BulkCloseRfqs(
                 results.Add(new BulkCloseItemResult(
                     item.CaseId,
                     "Closed",
-                    outcome.ToString(),
+                    outcome,
                     null));
             }
             catch (Exception exception) when (IsExpected(exception))

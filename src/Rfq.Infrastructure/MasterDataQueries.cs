@@ -127,21 +127,21 @@ public sealed class PostgreSqlSecuritySearch(RfqDbContext dbContext) : ISecurity
         foreach (var row in rows)
         {
             var result = ToResult(row);
-            if (!candidates.TryGetValue(result.SecurityId, out var existing)
+            if (!candidates.TryGetValue(result.SecurityId.Value, out var existing)
                 || rank < existing.Rank)
             {
-                candidates[result.SecurityId] = new RankedSecurity(result, rank);
+                candidates[result.SecurityId.Value] = new RankedSecurity(result, rank);
             }
         }
     }
 
     private static SecuritySearchResult ToResult(SecurityRow row) => new(
-        row.SecurityId,
+        SecurityId.Create(row.SecurityId),
         row.JapaneseName,
         row.BbgDisplay,
         row.InternalCode,
         row.Isin,
-        row.CategoryId,
+        CategoryId.Create(row.CategoryId),
         row.CategoryName);
 
     private sealed record SecurityRow(
@@ -177,7 +177,7 @@ public sealed class PostgreSqlClientSearch(RfqDbContext dbContext) : IClientSear
             .OrderBy(client => client.Code == input ? 0 : client.Code.StartsWith(input) ? 1 : 2)
             .ThenBy(client => client.Code)
             .Take(20)
-            .Select(client => new ClientSearchResult(client.ClientId, client.Code, client.Name))
+            .Select(client => new ClientSearchResult(ClientId.Create(client.ClientId), client.Code, client.Name))
             .ToListAsync(cancellationToken);
     }
 
@@ -190,7 +190,7 @@ public sealed class PostgreSqlClientSearch(RfqDbContext dbContext) : IClientSear
         return await dbContext.Clients
             .AsNoTracking()
             .Where(client => client.ClientId == clientId.Value)
-            .Select(client => new ClientSearchResult(client.ClientId, client.Code, client.Name))
+            .Select(client => new ClientSearchResult(ClientId.Create(client.ClientId), client.Code, client.Name))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }
@@ -227,7 +227,7 @@ public sealed class PostgreSqlUserDirectory(RfqDbContext dbContext) : IUserDirec
     }
 
     private static UserSummary ToSummary(MasterUserEntity user) => new(
-        user.UserId,
+        UserId.Create(user.UserId),
         user.Name,
         user.Roles
             .Select(role => Enum.Parse<UserRole>(role, ignoreCase: false))

@@ -21,12 +21,13 @@ public sealed class TraderRfqsController(
     BulkWithdrawQuotes bulkWithdrawQuotes) : ControllerBase
 {
     [HttpGet("active")]
-    public async Task<ActionResult<IReadOnlyList<TraderRfqListItem>>> GetActive(
+    public async Task<ActionResult<IReadOnlyList<TraderRfqResponse>>> GetActive(
         CancellationToken cancellationToken)
     {
         try
         {
-            return Ok(await getActiveTraderRfqs.ExecuteAsync(cancellationToken));
+            var items = await getActiveTraderRfqs.ExecuteAsync(cancellationToken);
+            return Ok(items.Select(TraderRfqResponse.From).ToArray());
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -35,47 +36,47 @@ public sealed class TraderRfqsController(
     }
 
     [HttpPost("{caseId:long}/pick-up")]
-    public Task<ActionResult<OwnershipResult>> PickUp(
+    public Task<ActionResult<OwnershipResponse>> PickUp(
         long caseId,
         ConfirmedOwnershipRequest request,
         CancellationToken cancellationToken) => ExecuteAsync(() =>
             pickUpRfq.ExecuteAsync(
-                caseId,
-                request.ExpectedVersion,
+                new CaseId(caseId),
+                new StateVersion(request.ExpectedVersion),
                 request.Confirmed,
                 cancellationToken));
 
     [HttpPost("{caseId:long}/release")]
-    public Task<ActionResult<OwnershipResult>> Release(
+    public Task<ActionResult<OwnershipResponse>> Release(
         long caseId,
         OwnershipRequest request,
         CancellationToken cancellationToken) => ExecuteAsync(() =>
-            releaseRfq.ExecuteAsync(caseId, request.ExpectedVersion, cancellationToken));
+            releaseRfq.ExecuteAsync(new CaseId(caseId), new StateVersion(request.ExpectedVersion), cancellationToken));
 
     [HttpPost("{caseId:long}/assign")]
-    public Task<ActionResult<OwnershipResult>> Assign(
+    public Task<ActionResult<OwnershipResponse>> Assign(
         long caseId,
         AssignTraderRequest request,
         CancellationToken cancellationToken) => ExecuteAsync(() =>
             assignTrader.ExecuteAsync(
-                caseId,
-                request.TargetTraderId,
-                request.ExpectedVersion,
+                new CaseId(caseId),
+                UserId.Create(request.TargetTraderId),
+                new StateVersion(request.ExpectedVersion),
                 cancellationToken));
 
     [HttpPost("{caseId:long}/take-over")]
-    public Task<ActionResult<OwnershipResult>> TakeOver(
+    public Task<ActionResult<OwnershipResponse>> TakeOver(
         long caseId,
         ConfirmedOwnershipRequest request,
         CancellationToken cancellationToken) => ExecuteAsync(() =>
             takeOverRfq.ExecuteAsync(
-                caseId,
-                request.ExpectedVersion,
+                new CaseId(caseId),
+                new StateVersion(request.ExpectedVersion),
                 request.Confirmed,
                 cancellationToken));
 
     [HttpPut("{caseId:long}/working-quote/calculate")]
-    public Task<ActionResult<WorkingQuoteResult>> Calculate(
+    public Task<ActionResult<WorkingQuoteResponse>> Calculate(
         long caseId,
         CalculateWorkingQuoteRequest request,
         CancellationToken cancellationToken) => ExecuteQuoteAsync(async () =>
@@ -86,17 +87,17 @@ public sealed class TraderRfqsController(
         }
 
         return await calculateWorkingQuote.ExecuteAsync(
-            caseId,
+            new CaseId(caseId),
             driver,
             request.Value,
             request.SimpleYieldSlide,
-            request.ExpectedCurrentVersion,
-            request.ExpectedWorkingQuoteVersion,
+            new StateVersion(request.ExpectedCurrentVersion),
+            new StateVersion(request.ExpectedWorkingQuoteVersion),
             cancellationToken);
     });
 
     [HttpPut("{caseId:long}/working-quote/mode")]
-    public Task<ActionResult<WorkingQuoteResult>> ChangeMode(
+    public Task<ActionResult<WorkingQuoteResponse>> ChangeMode(
         long caseId,
         ChangeWorkingQuoteModeRequest request,
         CancellationToken cancellationToken) => ExecuteQuoteAsync(async () =>
@@ -107,63 +108,75 @@ public sealed class TraderRfqsController(
         }
 
         return await changeWorkingQuoteMode.ExecuteAsync(
-            caseId,
+            new CaseId(caseId),
             mode,
-            request.ExpectedCurrentVersion,
-            request.ExpectedWorkingQuoteVersion,
+            new StateVersion(request.ExpectedCurrentVersion),
+            new StateVersion(request.ExpectedWorkingQuoteVersion),
             cancellationToken);
     });
 
     [HttpPut("{caseId:long}/working-quote/manual")]
-    public Task<ActionResult<WorkingQuoteResult>> UpdateManual(
+    public Task<ActionResult<WorkingQuoteResponse>> UpdateManual(
         long caseId,
         UpdateManualWorkingQuoteRequest request,
         CancellationToken cancellationToken) => ExecuteQuoteAsync(() =>
             updateManualWorkingQuote.ExecuteAsync(
-                caseId,
+                new CaseId(caseId),
                 request.Price,
                 request.FinalSimpleYield,
-                request.ExpectedCurrentVersion,
-                request.ExpectedWorkingQuoteVersion,
+                new StateVersion(request.ExpectedCurrentVersion),
+                new StateVersion(request.ExpectedWorkingQuoteVersion),
                 cancellationToken));
 
     [HttpPost("{caseId:long}/confirm-quote")]
-    public Task<ActionResult<ConfirmQuoteResult>> ConfirmQuote(
+    public Task<ActionResult<ConfirmQuoteResponse>> ConfirmQuote(
         long caseId,
         ConfirmQuoteRequest request,
         CancellationToken cancellationToken) => ExecuteConfirmAsync(() =>
             confirmQuote.ExecuteAsync(
-                caseId,
+                new CaseId(caseId),
                 request.ExpiryMinutes,
-                request.ExpectedCurrentVersion,
-                request.ExpectedWorkingQuoteVersion,
+                new StateVersion(request.ExpectedCurrentVersion),
+                new StateVersion(request.ExpectedWorkingQuoteVersion),
             cancellationToken));
 
     [HttpPost("{caseId:long}/withdraw")]
-    public Task<ActionResult<LifecycleResult>> Withdraw(
+    public Task<ActionResult<LifecycleResponse>> Withdraw(
         long caseId, OwnershipRequest request, CancellationToken cancellationToken) =>
         ExecuteLifecycleAsync(() => withdrawQuote.ExecuteAsync(
-            caseId, request.ExpectedVersion, cancellationToken));
+            new CaseId(caseId), new StateVersion(request.ExpectedVersion), cancellationToken));
 
     [HttpPost("bulk-withdraw")]
-    public Task<ActionResult<IReadOnlyList<LifecycleItemResult>>> BulkWithdraw(
+    public Task<ActionResult<IReadOnlyList<LifecycleItemResponse>>> BulkWithdraw(
         BulkLifecycleRequest request, CancellationToken cancellationToken) =>
-        ExecuteLifecycleAsync(() => bulkWithdrawQuotes.ExecuteAsync(
+        ExecuteLifecycleItemsAsync(() => bulkWithdrawQuotes.ExecuteAsync(
             request.Items.Select(item => new LifecycleItem(
-                item.CaseId, item.ExpectedCurrentVersion)).ToArray(), cancellationToken));
+                new CaseId(item.CaseId), new StateVersion(item.ExpectedCurrentVersion))).ToArray(), cancellationToken));
 
-    private async Task<ActionResult<T>> ExecuteLifecycleAsync<T>(Func<Task<T>> action)
+    private async Task<ActionResult<LifecycleResponse>> ExecuteLifecycleAsync(
+        Func<Task<LifecycleResult>> action)
     {
-        try { return Ok(await action()); }
+        try { return Ok(LifecycleResponse.From(await action())); }
         catch (Exception exception) when (IsExpected(exception)) { return ToProblem(exception); }
     }
 
-    private async Task<ActionResult<OwnershipResult>> ExecuteAsync(
+    private async Task<ActionResult<IReadOnlyList<LifecycleItemResponse>>> ExecuteLifecycleItemsAsync(
+        Func<Task<IReadOnlyList<LifecycleItemResult>>> action)
+    {
+        try
+        {
+            var items = await action();
+            return Ok(items.Select(LifecycleItemResponse.From).ToArray());
+        }
+        catch (Exception exception) when (IsExpected(exception)) { return ToProblem(exception); }
+    }
+
+    private async Task<ActionResult<OwnershipResponse>> ExecuteAsync(
         Func<Task<OwnershipResult>> action)
     {
         try
         {
-            return Ok(await action());
+            return Ok(OwnershipResponse.From(await action()));
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -171,12 +184,12 @@ public sealed class TraderRfqsController(
         }
     }
 
-    private async Task<ActionResult<WorkingQuoteResult>> ExecuteQuoteAsync(
+    private async Task<ActionResult<WorkingQuoteResponse>> ExecuteQuoteAsync(
         Func<Task<WorkingQuoteResult>> action)
     {
         try
         {
-            return Ok(await action());
+            return Ok(WorkingQuoteResponse.From(await action()));
         }
         catch (CalculationFailureException exception)
         {
@@ -197,12 +210,12 @@ public sealed class TraderRfqsController(
         }
     }
 
-    private async Task<ActionResult<ConfirmQuoteResult>> ExecuteConfirmAsync(
+    private async Task<ActionResult<ConfirmQuoteResponse>> ExecuteConfirmAsync(
         Func<Task<ConfirmQuoteResult>> action)
     {
         try
         {
-            return Ok(await action());
+            return Ok(ConfirmQuoteResponse.From(await action()));
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -286,3 +299,99 @@ public sealed record LifecycleItemRequest(
 
 public sealed record BulkLifecycleRequest(
     [Required, MinLength(1)] IReadOnlyList<LifecycleItemRequest> Items);
+
+public sealed record TraderRfqResponse(
+    long CaseId,
+    string ClientId,
+    string ClientName,
+    string SecurityId,
+    string SecurityJapaneseName,
+    string SecurityBbgDisplay,
+    string CategoryId,
+    string RfqStatus,
+    string? QuoteStatus,
+    string? QuoteRequestReason,
+    Guid CurrentRevisionId,
+    Guid? CurrentQuoteId,
+    Guid? ClosedQuoteId,
+    DateTimeOffset? ConfirmedAt,
+    DateTimeOffset? ExpiresAt,
+    Guid? QuoteSeedRevisionId,
+    string ContactOwnerId,
+    string AssignedTraderId,
+    bool Owned,
+    long CurrentVersion,
+    DateOnly? SettlementDate,
+    decimal? Notional,
+    string WorkingQuoteMode,
+    CalculatedQuotePayload? Calculated,
+    ManualQuotePayload? Manual,
+    long WorkingQuoteVersion,
+    string TraderMemo,
+    long MemoVersion,
+    DateTimeOffset CreatedAt)
+{
+    public static TraderRfqResponse From(TraderRfqListItem item) => new(
+        item.CaseId.Value, item.ClientId.Value, item.ClientName, item.SecurityId.Value,
+        item.SecurityJapaneseName, item.SecurityBbgDisplay, item.CategoryId.Value,
+        item.RfqStatus.ToString(), item.QuoteStatus?.ToString(),
+        item.QuoteRequestReason?.ToString(), item.CurrentRevisionId.Value,
+        item.CurrentQuoteId?.Value, item.ClosedQuoteId?.Value, item.ConfirmedAt,
+        item.ExpiresAt, item.QuoteSeedRevisionId?.Value, item.ContactOwnerId.Value,
+        item.AssignedTraderId.Value, item.Owned, item.CurrentVersion.Value,
+        item.SettlementDate, item.Notional, item.WorkingQuoteMode.ToString(),
+        item.Calculated, item.Manual, item.WorkingQuoteVersion.Value,
+        item.TraderMemo, item.MemoVersion.Value, item.CreatedAt);
+}
+
+public sealed record OwnershipResponse(
+    long CaseId,
+    string AssignedTraderId,
+    bool Owned,
+    long CurrentVersion)
+{
+    public static OwnershipResponse From(OwnershipResult result) => new(
+        result.CaseId.Value, result.AssignedTraderId.Value, result.Owned,
+        result.CurrentVersion.Value);
+}
+
+public sealed record WorkingQuoteResponse(
+    long CaseId,
+    Guid RevisionId,
+    string Mode,
+    CalculatedQuotePayload? Calculated,
+    ManualQuotePayload? Manual,
+    long Version,
+    long CurrentVersion)
+{
+    public static WorkingQuoteResponse From(WorkingQuoteResult result) => new(
+        result.CaseId.Value, result.RevisionId.Value, result.Mode.ToString(),
+        result.Calculated, result.Manual, result.Version.Value, result.CurrentVersion.Value);
+}
+
+public sealed record ConfirmQuoteResponse(
+    long CaseId,
+    Guid QuoteId,
+    Guid RevisionId,
+    string RfqStatus,
+    string QuoteStatus,
+    string Mode,
+    CalculatedQuotePayload? Calculated,
+    ManualQuotePayload? Manual,
+    DateTimeOffset ConfirmedAt,
+    int? ExpiryMinutes,
+    DateTimeOffset? ExpiresAt,
+    long CurrentVersion)
+{
+    public static ConfirmQuoteResponse From(ConfirmQuoteResult result) => new(
+        result.CaseId.Value, result.QuoteId.Value, result.RevisionId.Value,
+        result.RfqStatus.ToString(), result.QuoteStatus.ToString(), result.Mode.ToString(),
+        result.Calculated, result.Manual, result.ConfirmedAt, result.ExpiryMinutes,
+        result.ExpiresAt, result.CurrentVersion.Value);
+}
+
+public sealed record LifecycleItemResponse(long CaseId, string Result, string? Error)
+{
+    public static LifecycleItemResponse From(LifecycleItemResult result) =>
+        new(result.CaseId.Value, result.Result, result.Error);
+}

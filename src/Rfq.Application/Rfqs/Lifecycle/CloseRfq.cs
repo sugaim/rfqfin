@@ -11,15 +11,15 @@ public sealed class CloseRfq(
     TimeProvider timeProvider)
 {
     public async Task<CloseRfqResult> ExecuteAsync(
-        long caseId,
+        CaseId caseId,
         RfqStatus outcome,
-        long expectedCurrentVersion,
+        StateVersion expectedCurrentVersion,
         CancellationToken cancellationToken = default)
     {
         var rfqCase = await LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanClose(currentUser.User, rfqCase);
         var transition = RfqLifecycleTransitions.Close(
-            rfqCase, outcome, new StateVersion(expectedCurrentVersion));
+            rfqCase, outcome, expectedCurrentVersion);
         rfqCase = transition.Rfq;
         rfqCases.Update(rfqCase);
         if (transition.DiscardedRevision is not null)
@@ -31,29 +31,39 @@ public sealed class CloseRfq(
 
     internal static async Task<RfqCase> LoadAsync(
         IRfqCaseRepository rfqCases,
-        long caseId,
+        CaseId caseId,
         CancellationToken cancellationToken) =>
-        await rfqCases.GetAsync(new CaseId(caseId), cancellationToken)
+        await rfqCases.GetAsync(caseId, cancellationToken)
             ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
 
-    internal static CloseRfqResult ToResult(RfqCase rfqCase) => new(
-        rfqCase.CaseId.Value,
-        rfqCase.Status.ToString(),
-        rfqCase.ClosedQuoteId!.Value.Value,
-        rfqCase.Ownership is Owned,
-        rfqCase.Version.Value);
+    internal static CloseRfqResult ToResult(RfqCase rfqCase)
+    {
+        var closed = rfqCase.Lifecycle as ClosedRfq
+            ?? throw new DomainInvariantException("Close result requires a Closed RFQ.");
+        return new CloseRfqResult(
+            rfqCase.CaseId,
+            closed.Outcome,
+            closed.ClosedQuoteId,
+            false,
+            rfqCase.Version);
+    }
 
     internal static void RecordClosed(
         IRfqEventSink eventSink,
         CurrentUser user,
         TimeProvider timeProvider,
         RfqCase rfqCase,
-        RfqStatus outcome) => eventSink.Record(new RfqTransition(
+        RfqStatus outcome)
+    {
+        var closed = rfqCase.Lifecycle as ClosedRfq
+            ?? throw new DomainInvariantException("Close event requires a Closed RFQ.");
+        eventSink.Record(new RfqTransition(
             outcome == RfqStatus.Hit
                 ? RfqTransitionKind.ClosedHit
                 : RfqTransitionKind.ClosedAway,
-            rfqCase.CaseId.Value,
-            user.UserId.Value,
+            rfqCase.CaseId,
+            user.UserId,
             timeProvider.GetUtcNow(),
-            rfqCase.ClosedQuoteId!.Value.Value));
+            closed.ClosedQuoteId));
+    }
 }

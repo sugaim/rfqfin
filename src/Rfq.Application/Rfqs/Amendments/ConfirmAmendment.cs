@@ -24,8 +24,8 @@ public sealed class ConfirmAmendment(
             await systemDate.GetTodayAsync(cancellationToken),
             currentUser.User.UserId,
             now,
-            new StateVersion(command.ExpectedCurrentVersion),
-            new StateVersion(command.ExpectedDraftVersion));
+            command.ExpectedCurrentVersion,
+            command.ExpectedDraftVersion);
         rfq = transition.Rfq;
         cases.Update(rfq);
         cases.UpdateRevision(transition.SupersededRevision);
@@ -37,8 +37,8 @@ public sealed class ConfirmAmendment(
             rfq, seed, currentUser.User.UserId, now));
         events.Record(new RfqTransition(
             RfqTransitionKind.RevisionConfirmed,
-            rfq.CaseId.Value,
-            currentUser.User.UserId.Value,
+            rfq.CaseId,
+            currentUser.User.UserId,
             now,
             From: transition.SupersededRevision.RevisionId.Value.ToString(),
             To: rfq.CurrentRevision.RevisionId.Value.ToString()));

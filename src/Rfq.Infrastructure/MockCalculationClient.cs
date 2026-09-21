@@ -25,7 +25,7 @@ public sealed class MockCalculationClient : ICalculationClient
                 "Mock calculation failure was requested.");
         }
 
-        var securityBasis = request.SecurityId.Sum(character => character) % 50 / 100m;
+        var securityBasis = request.SecurityId.Value.Sum(character => character) % 50 / 100m;
         var referenceYield = 0.7m + securityBasis;
         var (price, baseSimpleYield, gSpread) = request.Driver switch
         {

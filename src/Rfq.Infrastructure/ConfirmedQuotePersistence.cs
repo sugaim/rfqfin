@@ -64,16 +64,32 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
 
     public void Record(QuoteTransition transition)
     {
-        pending.Add(new("Quote", null, transition.QuoteId,
-            transition.Kind.ToString(), transition.PerformedBy, transition.OccurredAt,
-            JsonSerializer.Serialize(transition)));
+        pending.Add(new("Quote", null, transition.QuoteId.Value,
+            transition.Kind.ToString(), transition.PerformedBy.Value, transition.OccurredAt,
+            JsonSerializer.Serialize(new
+            {
+                transition.Kind,
+                QuoteId = transition.QuoteId.Value,
+                PerformedBy = transition.PerformedBy.Value,
+                transition.OccurredAt,
+            })));
     }
 
     public void Record(RfqTransition transition)
     {
-        pending.Add(new("Rfq", transition.CaseId, transition.QuoteId,
-            transition.Kind.ToString(), transition.PerformedBy, transition.OccurredAt,
-            JsonSerializer.Serialize(transition)));
+        pending.Add(new("Rfq", transition.CaseId.Value, transition.QuoteId?.Value,
+            transition.Kind.ToString(), transition.PerformedBy.Value, transition.OccurredAt,
+            JsonSerializer.Serialize(new
+            {
+                transition.Kind,
+                CaseId = transition.CaseId.Value,
+                PerformedBy = transition.PerformedBy.Value,
+                transition.OccurredAt,
+                QuoteId = transition.QuoteId?.Value,
+                transition.From,
+                transition.To,
+                transition.Reason,
+            })));
     }
 
     internal void Clear() => pending.Clear();

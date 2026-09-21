@@ -11,7 +11,7 @@ public sealed class ConfirmNewRfq(
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
-    IRfqEventSink? eventSink = null)
+    IRfqEventSink eventSink)
 {
     public async Task<InitialRfqResult> ExecuteAsync(
         CreateDraftCommand command,
@@ -28,10 +28,10 @@ public sealed class ConfirmNewRfq(
         rfqCases.Add(rfqCase);
         workingQuotes.Add(WorkingQuoteFactory.CreateInitialFor(
             rfqCase, currentUser.User.UserId, now));
-        eventSink?.Record(new RfqTransition(
+        eventSink.Record(new RfqTransition(
             RfqTransitionKind.RevisionConfirmed,
-            rfqCase.CaseId.Value,
-            currentUser.User.UserId.Value,
+            rfqCase.CaseId,
+            currentUser.User.UserId,
             now,
             To: rfqCase.CurrentRevision.RevisionId.Value.ToString()));
         await unitOfWork.SaveChangesAsync(cancellationToken);

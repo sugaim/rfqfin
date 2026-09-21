@@ -34,7 +34,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         await RecreateAndSeed();
         Guid quoteId;
         long caseId;
-        string salesId;
+        string? salesId;
         await using (var context = fixture.CreateContext())
         {
             var row = await (
@@ -47,7 +47,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
             salesId = row.SalesId;
             var sink = new PersistedEventSink();
             sink.Record(new QuoteTransition(
-                QuoteTransitionKind.Confirmed, quoteId, "trader-a", DateTimeOffset.UtcNow));
+                QuoteTransitionKind.Confirmed, new QuoteId(quoteId), UserId.Create("trader-a"), DateTimeOffset.UtcNow));
             await new EfUnitOfWork(context, sink).SaveChangesAsync();
         }
 
@@ -113,7 +113,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         await using var second = fixture.CreateContext();
         var sink = new PersistedEventSink();
         sink.Record(new RfqTransition(
-            RfqTransitionKind.ContactOwnerChanged, caseId, "sales-dev",
+            RfqTransitionKind.ContactOwnerChanged, new CaseId(caseId), UserId.Create("sales-dev"),
             DateTimeOffset.UtcNow));
         var secondSave = new EfUnitOfWork(second, sink).SaveChangesAsync();
         await Task.Delay(200);
@@ -136,6 +136,42 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
             .ToListAsync();
         Assert.Contains("ux_rfq_revisions_one_draft_per_case", indexes);
         Assert.Contains("PK_working_quotes", indexes);
+    }
+
+    [Fact]
+    public async Task Nullable_sales_id_round_trips_and_trader_query_does_not_repair_missing_quote()
+    {
+        await RecreateAndSeed();
+        var caseId = new CaseId(99_002);
+        await using (var write = fixture.CreateContext())
+        {
+            var trader = UserId.Create("trader-a");
+            var draft = RfqCase.CreateDraft(
+                caseId, RevisionId.New(), ClientId.Create("client-001"),
+                SecurityId.Create("sec-jgb-375"), CategoryId.Create("JGB"), trader,
+                new RevisionTerms(1_000_000, new DateOnly(2026, 9, 23),
+                    new DateOnly(2026, 9, 23), ""),
+                trader, DateTimeOffset.UtcNow, salesId: null);
+            var open = RfqLifecycleTransitions.ConfirmInitial(
+                draft, draft.CurrentRevision.Terms, trader,
+                new DateOnly(2026, 9, 21), trader, DateTimeOffset.UtcNow,
+                draft.CurrentRevision.Version);
+            new RfqCaseRepository(write).Add(open);
+            await new EfUnitOfWork(write).SaveChangesAsync();
+        }
+
+        await using var read = fixture.CreateContext();
+        var repository = new RfqCaseRepository(read);
+        var restored = await repository.GetAsync(caseId);
+        Assert.NotNull(restored);
+        Assert.Null(restored.SalesId);
+        var before = await read.WorkingQuotes.CountAsync();
+
+        await Assert.ThrowsAsync<DomainInvariantException>(
+            () => repository.GetActiveTraderRfqsAsync("jpy-credit"));
+
+        Assert.Equal(before, await read.WorkingQuotes.CountAsync());
+        Assert.False(read.ChangeTracker.HasChanges());
     }
 
     private async Task RecreateAndSeed()

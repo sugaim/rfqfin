@@ -40,3 +40,9 @@ public interface IRfqAuthorization
 
     void EnsureCanUpdateTraderMemo(CurrentUser user);
 }
+
+public sealed record QuoteAuthorizationState(
+    bool IsOpen,
+    UserId AssignedTraderId,
+    Ownership? Ownership,
+    ActiveQuoteState? QuoteState);

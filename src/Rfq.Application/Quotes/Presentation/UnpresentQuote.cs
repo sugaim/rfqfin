@@ -11,28 +11,29 @@ public sealed class UnpresentQuote(
     TimeProvider timeProvider)
 {
     public async Task<PresentationResult> ExecuteAsync(
-        long caseId,
-        long expectedCurrentVersion,
+        CaseId caseId,
+        StateVersion expectedCurrentVersion,
         CancellationToken cancellationToken = default)
     {
         var rfqCase = await UpdateInitialDraft.GetCaseAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanPresent(currentUser.User, rfqCase);
         rfqCase = RfqLifecycleTransitions.Unpresent(
-            rfqCase, new StateVersion(expectedCurrentVersion));
+            rfqCase, expectedCurrentVersion);
         var quoteId = rfqCase.CurrentQuoteId
             ?? throw new InvalidOperationException("Current ConfirmedQuote was not found.");
         rfqCases.Update(rfqCase);
         eventSink.Record(new QuoteTransition(
             QuoteTransitionKind.Unpresented,
-            quoteId.Value,
-            currentUser.User.UserId.Value,
+            quoteId,
+            currentUser.User.UserId,
             timeProvider.GetUtcNow()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new PresentationResult(
             caseId,
-            quoteId.Value,
-            rfqCase.Status.ToString(),
-            rfqCase.QuoteStatus!.Value.ToString(),
-            rfqCase.Version.Value);
+            quoteId,
+            rfqCase.Status,
+            rfqCase.QuoteStatus
+                ?? throw new DomainInvariantException("Active quoted RFQ is missing QuoteStatus."),
+            rfqCase.Version);
     }
 }

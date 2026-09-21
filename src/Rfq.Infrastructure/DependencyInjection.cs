@@ -19,7 +19,6 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICaseIdGenerator, PostgreSqlCaseIdGenerator>();
         services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
-        services.AddScoped<IWorkingQuoteEnsurer, WorkingQuoteEnsurer>();
         services.AddScoped<IWorkingQuoteRepository, WorkingQuoteRepository>();
         services.AddScoped<IConfirmedQuoteRepository, ConfirmedQuoteRepository>();
         services.AddScoped<ICaseMemoRepository, CaseMemoRepository>();

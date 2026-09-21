@@ -79,7 +79,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .HasMaxLength(100);
         rfqCase.Property(entity => entity.SalesId)
             .HasColumnName("sales_id")
-            .HasMaxLength(100);
+            .HasMaxLength(100)
+            .IsRequired(false);
         rfqCase.Property(entity => entity.CopiedFromCaseId)
             .HasColumnName("copied_from_case_id");
         rfqCase.HasOne<RfqCaseEntity>()
@@ -539,7 +540,7 @@ internal sealed class RfqCaseEntity
 
     public string CreatedBy { get; set; } = string.Empty;
 
-    public string SalesId { get; set; } = string.Empty;
+    public string? SalesId { get; set; }
 
     public long? CopiedFromCaseId { get; set; }
 

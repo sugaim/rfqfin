@@ -6,9 +6,9 @@ internal static class OwnershipUseCase
 {
     public static async Task<RfqCase> LoadAsync(
         IRfqCaseRepository rfqCases,
-        long caseId,
+        CaseId caseId,
         CancellationToken cancellationToken) =>
-        await rfqCases.GetAsync(new CaseId(caseId), cancellationToken)
+        await rfqCases.GetAsync(caseId, cancellationToken)
             ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
 
     public static async Task<OwnershipResult> SaveAsync(
@@ -20,9 +20,15 @@ internal static class OwnershipUseCase
         rfqCases.Update(rfqCase);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new OwnershipResult(
-            rfqCase.CaseId.Value,
-            rfqCase.AssignedTraderId.Value,
+            rfqCase.CaseId,
+            rfqCase.AssignedTraderId,
             rfqCase.Ownership is Owned,
-            rfqCase.Version.Value);
+            rfqCase.Version);
     }
 }
+
+public sealed record OwnershipResult(
+    CaseId CaseId,
+    UserId AssignedTraderId,
+    bool Owned,
+    StateVersion CurrentVersion);

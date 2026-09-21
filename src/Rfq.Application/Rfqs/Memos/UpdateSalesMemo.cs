@@ -11,9 +11,9 @@ public sealed class UpdateSalesMemo(
     IUnitOfWork unitOfWork)
 {
     public async Task<CaseMemoResult> ExecuteAsync(
-        long caseId,
+        CaseId caseId,
         string? memo,
-        long expectedVersion,
+        StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanUpdateSalesMemo(currentUser.User);
@@ -21,17 +21,17 @@ public sealed class UpdateSalesMemo(
         await EnsureDeskAccessAsync(users, currentUser.User, rfqCase, cancellationToken);
         var caseMemo = await GetMemoAsync(memos, caseId, cancellationToken);
         caseMemo = CaseMemoTransitions.UpdateSales(
-            caseMemo, memo, new StateVersion(expectedVersion));
+            caseMemo, memo, expectedVersion);
         memos.Update(caseMemo);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new CaseMemoResult(caseId, caseMemo.SalesMemo, caseMemo.Version.Value);
+        return new CaseMemoResult(caseId, caseMemo.SalesMemo, caseMemo.Version);
     }
 
     internal static async Task<CaseMemo> GetMemoAsync(
         ICaseMemoRepository memos,
-        long caseId,
+        CaseId caseId,
         CancellationToken cancellationToken) =>
-        await memos.GetAsync(new CaseId(caseId), cancellationToken)
+        await memos.GetAsync(caseId, cancellationToken)
             ?? throw new KeyNotFoundException($"Case Memo for RFQ Case '{caseId}' was not found.");
 
     internal static async Task EnsureDeskAccessAsync(

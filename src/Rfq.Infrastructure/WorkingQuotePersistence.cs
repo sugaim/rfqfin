@@ -5,53 +5,6 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-public sealed class WorkingQuoteEnsurer(RfqDbContext dbContext) : IWorkingQuoteEnsurer
-{
-    public async Task<WorkingQuote> EnsureAsync(
-        RevisionId revisionId,
-        RevisionId? quoteSeedRevisionId,
-        UserId createdBy,
-        DateTimeOffset createdAt,
-        CancellationToken cancellationToken = default)
-    {
-        var revisionValue = revisionId.Value;
-        var existing = dbContext.WorkingQuotes.Local
-            .SingleOrDefault(item => item.RevisionId == revisionValue)
-            ?? await dbContext.WorkingQuotes.SingleOrDefaultAsync(
-                item => item.RevisionId == revisionValue,
-                cancellationToken);
-        if (existing is not null)
-        {
-            return WorkingQuoteMapper.ToDomain(existing);
-        }
-
-        WorkingQuote quote;
-        if (quoteSeedRevisionId is not null)
-        {
-            var seed = await dbContext.WorkingQuotes
-                .AsNoTracking()
-                .SingleOrDefaultAsync(
-                    item => item.RevisionId == quoteSeedRevisionId.Value.Value,
-                    cancellationToken)
-                ?? throw new KeyNotFoundException(
-                    $"Quote seed Revision '{quoteSeedRevisionId.Value.Value}' was not found.");
-            var source = WorkingQuoteMapper.ToDomain(seed);
-            quote = WorkingQuote.Restore(
-                revisionId, source.Mode, source.Calculated, source.Manual,
-                new StateVersion(1), createdAt, createdBy, createdAt, createdBy);
-        }
-        else
-        {
-            quote = WorkingQuote.Restore(
-                revisionId, WorkingQuoteMode.Calculated, null, null,
-                new StateVersion(1), createdAt, createdBy, createdAt, createdBy);
-        }
-
-        dbContext.WorkingQuotes.Add(WorkingQuoteMapper.ToEntity(quote));
-        return quote;
-    }
-}
-
 public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuoteRepository
 {
     public void Add(WorkingQuote workingQuote) =>
@@ -129,9 +82,9 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
         dbContext.CalculationFailureLogs.Add(new CalculationFailureLogEntity
         {
             FailureLogId = failure.FailureLogId,
-            CaseId = failure.CaseId,
-            RevisionId = failure.RevisionId,
-            TraderId = failure.TraderId,
+            CaseId = failure.CaseId.Value,
+            RevisionId = failure.RevisionId.Value,
+            TraderId = failure.TraderId.Value,
             RequestId = failure.RequestId,
             Driver = failure.Driver,
             AttemptedValue = failure.AttemptedValue,

@@ -316,10 +316,18 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             new { ExpectedVersion = ownerB.CurrentVersion, Confirmed = true });
         Assert.Equal(HttpStatusCode.Conflict, staleTakeOver.StatusCode);
 
-        var forbiddenCreate = await traderA.PostAsJsonAsync(
+        var traderCreate = await traderA.PostAsJsonAsync(
             "/api/rfqs",
             new { ClientId = "client-001", SecurityId = "sec-jgb-375" });
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenCreate.StatusCode);
+        var traderCreated = await AssertCreatedAsync(traderCreate);
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var traderDbContext = scope.ServiceProvider.GetRequiredService<RfqDbContext>();
+        var nullSalesCount = await traderDbContext.Database.SqlQuery<int>($"""
+            SELECT COUNT(*)::int AS "Value"
+            FROM rfq_cases
+            WHERE case_id = {traderCreated.CaseId} AND sales_id IS NULL
+            """).SingleAsync();
+        Assert.Equal(1, nullSalesCount);
     }
 
     [Fact]

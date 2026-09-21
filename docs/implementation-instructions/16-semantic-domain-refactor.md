@@ -771,10 +771,12 @@ Calculation failure must still leave WorkingQuote unchanged and append the failu
 
 This is the target structure. New/materially rewritten Domain files in this commit should be placed here. Broad relocation of untouched Application/Infrastructure code is deferred to commit 2.
 
-Commit 2 applies this target organization to Domain and Application. Its mechanical
-completion rule is one top-level type per file, with the file name matching the type
-name. Existing `Rfq.Domain` and `Rfq.Application` namespaces remain stable; feature
-folders do not imply a namespace migration.
+Commit 2 applies this target organization to Domain and Application. A later Domain
+review supersedes the mechanical one-top-level-type-per-file rule for small closed
+type families: major concepts remain independently discoverable, while tightly coupled
+ADT-like supporting types stay with their owning concept. Application keeps its
+one-top-level-type-per-file organization. Existing `Rfq.Domain` and `Rfq.Application`
+namespaces remain stable; feature folders do not imply a namespace migration.
 
 ```text
 src/Rfq.Domain/
@@ -786,38 +788,44 @@ src/Rfq.Domain/
       RfqRevision.cs
       RevisionTerms.cs
       RevisionStatus.cs
+      DomainGuards.cs
     Lifecycle/
       RfqLifecycle.cs
-      DraftRfq.cs
       OpenRfq.cs
-      ActiveRfq.cs
-      PresentedRfq.cs
-      CancelledRfq.cs
-      ClosedRfq.cs
-      ActiveQuoteState.cs
-      QuoteRequested.cs
-      QuoteConfirmed.cs
+      QuoteState.cs
       Ownership.cs
-      Owned.cs
-      Unowned.cs
+      RfqStatus.cs
+      QuoteStatus.cs
+      RfqLifecycleKind.cs
 
   Quotes/
     WorkingQuote.cs
+    WorkingQuoteFactory.cs
     ConfirmedQuote.cs
     QuoteConfirmation.cs
-    QuoteExpiry.cs
-    WorkingQuoteFactory.cs
-    ...quote payload/value types...
 
   Transitions/
-    RfqLifecycleTransitions.cs
-    RfqOwnershipTransitions.cs
-    QuoteTransitions.cs
-    AmendmentTransitions.cs
-    WorkingQuoteTransitions.cs
-    CaseMemoTransitions.cs
-    InitialDraftTransitions.cs
-    RfqResponsibilityTransitions.cs
+    Amendments/
+      AmendmentTransitions.cs
+      AmendmentSaveResult.cs
+      AmendmentConfirmResult.cs
+      AmendmentDiscardResult.cs
+    Quotes/
+      QuoteTransitions.cs
+      QuoteConfirmationResult.cs
+    Lifecycle/
+      RfqLifecycleTransitions.cs
+      CloseTransitionResult.cs
+    Ownership/
+      RfqOwnershipTransitions.cs
+    Responsibility/
+      RfqResponsibilityTransitions.cs
+    WorkingQuotes/
+      WorkingQuoteTransitions.cs
+    CaseMemos/
+      CaseMemoTransitions.cs
+    InitialDrafts/
+      InitialDraftTransitions.cs
 
   Identities/
     CaseId.cs
@@ -843,6 +851,17 @@ src/Rfq.Domain/
 ```
 
 Do not introduce a `Common`, `Shared`, or generic `Primitives` dumping-ground.
+
+The Domain grouping rule is:
+
+- `RfqLifecycle.cs` owns `RfqLifecycle`, `DraftRfq`, `CancelledRfq`, and `ClosedRfq`.
+- `OpenRfq.cs` owns `OpenRfq`, `ActiveRfq`, and `PresentedRfq`.
+- `QuoteState.cs` owns the active quote-state family and its request reason.
+- `Ownership.cs` owns the closed `Ownership` family.
+- `WorkingQuote.cs` owns its mode, payload, and calculation-driver supporting types.
+- `QuoteConfirmation.cs` owns `QuoteExpiry`.
+- Transition results stay beside the business transition group that produces them;
+  do not create a shared `Transitions/Results` folder.
 
 For this commit, keeping namespace `Rfq.Domain` across these folders is acceptable and preferred if changing namespaces would add noise. Folder structure does not require namespace churn.
 
@@ -882,7 +901,9 @@ src/Rfq.Application/
 ```
 
 Do **not** perform a bulk Application file-move-only refactor in commit 1. Commit 2
-finishes the Application organization shown above and the one-type-per-file cleanup.
+finishes the Application organization shown above. Major use cases and concepts remain
+independently discoverable, while small closed request/result/value families are
+co-located with their owning feature instead of following a mechanical one-type-per-file rule.
 New commit-1 files may use the target location when it does not obscure the semantic
 diff.
 

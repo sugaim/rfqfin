@@ -11,20 +11,29 @@ public sealed class OperationsController(
     ScratchPricer pricer) : ControllerBase
 {
     [HttpGet("past-rfqs")]
-    public Task<PastRfqResult> Search([FromQuery] PastRfqSearch search,
-        CancellationToken cancellationToken) => queries.SearchAsync(search, cancellationToken);
+    public async Task<PastRfqResponse> Search([FromQuery] PastRfqSearchRequest search,
+        CancellationToken cancellationToken)
+    {
+        var result = await queries.SearchAsync(search.ToApplication(), cancellationToken);
+        return new PastRfqResponse(result.Items.Select(PastRfqItemResponse.From).ToArray(),
+            result.RequiresNarrowing);
+    }
 
     [HttpGet("rfqs/{caseId:long}/revisions")]
-    public Task<IReadOnlyList<RevisionHistoryItem>> Revisions(long caseId,
-        CancellationToken cancellationToken) => queries.GetRevisionHistoryAsync(caseId, cancellationToken);
+    public async Task<IReadOnlyList<RevisionHistoryResponse>> Revisions(long caseId,
+        CancellationToken cancellationToken) => (await queries.GetRevisionHistoryAsync(
+            new CaseId(caseId), cancellationToken)).Select(RevisionHistoryResponse.From).ToArray();
 
     [HttpGet("rfqs/{caseId:long}/quotes")]
-    public Task<IReadOnlyList<QuoteHistoryItem>> Quotes(long caseId,
-        CancellationToken cancellationToken) => queries.GetQuoteHistoryAsync(caseId, cancellationToken);
+    public async Task<IReadOnlyList<QuoteHistoryResponse>> Quotes(long caseId,
+        CancellationToken cancellationToken) => (await queries.GetQuoteHistoryAsync(
+            new CaseId(caseId), cancellationToken)).Select(QuoteHistoryResponse.From).ToArray();
 
     [HttpGet("eod")]
-    public Task<IReadOnlyList<EodSummaryItem>> Eod([FromQuery] DateOnly date,
-        CancellationToken cancellationToken) => queries.GetEodAsync(date, cancellationToken);
+    public async Task<IReadOnlyList<EodSummaryResponse>> Eod([FromQuery] DateOnly date,
+        CancellationToken cancellationToken) => (await queries.GetEodAsync(date, cancellationToken))
+            .Select(item => new EodSummaryResponse(
+                item.ContactOwnerId.Value, item.Open, item.Hit, item.Away)).ToArray();
 
     [HttpGet("grid-config/{screenId}/{configKey}")]
     public async Task<ActionResult<GridConfig>> GetGridConfig(string screenId, string configKey,
@@ -41,8 +50,110 @@ public sealed class OperationsController(
             request.ConfigJson, cancellationToken);
 
     [HttpPost("pricer")]
-    public Task<CalculatedQuotePayload> Price(ScratchPriceRequest request,
-        CancellationToken cancellationToken) => pricer.ExecuteAsync(request, cancellationToken);
+    public Task<CalculatedQuotePayload> Price(ScratchPriceApiRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Enum.TryParse<CalculationDriver>(request.Driver, false, out var driver))
+        {
+            throw new ArgumentException($"Unknown calculation driver '{request.Driver}'.");
+        }
+
+        return pricer.ExecuteAsync(
+            new ScratchPriceRequest(SecurityId.Create(request.SecurityId), request.SettlementDate,
+                driver, request.Value, request.SimpleYieldSlide), cancellationToken);
+    }
 }
 
 public sealed record GridConfigRequest(int Version, string ConfigJson);
+
+public sealed record ScratchPriceApiRequest(
+    string SecurityId,
+    DateOnly SettlementDate,
+    string Driver,
+    decimal Value,
+    decimal SimpleYieldSlide);
+
+public sealed record PastRfqSearchRequest(
+    DateOnly? From = null,
+    DateOnly? To = null,
+    string? ClientId = null,
+    string? SecurityId = null,
+    string? CategoryId = null,
+    string? ContactOwnerId = null,
+    string? SalesId = null,
+    string? AssignedTraderId = null,
+    RfqStatus? Status = null,
+    long? CaseId = null)
+{
+    public PastRfqSearch ToApplication() => new(
+        From,
+        To,
+        ClientId is null ? null : Rfq.Domain.ClientId.Create(ClientId),
+        SecurityId is null ? null : Rfq.Domain.SecurityId.Create(SecurityId),
+        CategoryId is null ? null : Rfq.Domain.CategoryId.Create(CategoryId),
+        ContactOwnerId is null ? null : UserId.Create(ContactOwnerId),
+        SalesId is null ? null : UserId.Create(SalesId),
+        AssignedTraderId is null ? null : UserId.Create(AssignedTraderId),
+        Status,
+        CaseId is null ? null : new Rfq.Domain.CaseId(CaseId.Value));
+}
+
+public sealed record PastRfqResponse(
+    IReadOnlyList<PastRfqItemResponse> Items,
+    bool RequiresNarrowing);
+
+public sealed record PastRfqItemResponse(
+    long CaseId,
+    DateTimeOffset CreatedAt,
+    string ClientId,
+    string ClientName,
+    string SecurityId,
+    string SecurityName,
+    string CategoryId,
+    string Status,
+    string? QuoteStatus,
+    string ContactOwnerId,
+    string? SalesId,
+    string AssignedTraderId,
+    decimal? Notional,
+    DateOnly? SettlementDate)
+{
+    public static PastRfqItemResponse From(PastRfqItem item) => new(
+        item.CaseId.Value, item.CreatedAt, item.ClientId.Value, item.ClientName,
+        item.SecurityId.Value, item.SecurityName, item.CategoryId.Value,
+        item.Status.ToString(), item.QuoteStatus?.ToString(), item.ContactOwnerId.Value,
+        item.SalesId?.Value, item.AssignedTraderId.Value, item.Notional, item.SettlementDate);
+}
+
+public sealed record RevisionHistoryResponse(
+    Guid RevisionId,
+    string Status,
+    decimal? Notional,
+    DateOnly? SettlementDate,
+    string Message,
+    long Version,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ConfirmedAt,
+    Guid? CopiedFromRevisionId,
+    Guid? QuoteSeedRevisionId)
+{
+    public static RevisionHistoryResponse From(RevisionHistoryItem item) => new(
+        item.RevisionId.Value, item.Status.ToString(), item.Notional, item.SettlementDate,
+        item.Message, item.Version.Value, item.CreatedAt, item.ConfirmedAt,
+        item.CopiedFromRevisionId?.Value, item.QuoteSeedRevisionId?.Value);
+}
+
+public sealed record QuoteHistoryResponse(
+    Guid QuoteId,
+    Guid RevisionId,
+    string Mode,
+    DateTimeOffset ConfirmedAt,
+    DateTimeOffset? ExpiresAt,
+    string RequestReason)
+{
+    public static QuoteHistoryResponse From(QuoteHistoryItem item) => new(
+        item.QuoteId.Value, item.RevisionId.Value, item.Mode.ToString(), item.ConfirmedAt,
+        item.ExpiresAt, item.RequestReason.ToString());
+}
+
+public sealed record EodSummaryResponse(string ContactOwnerId, int Open, int Hit, int Away);

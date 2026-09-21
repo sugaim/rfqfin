@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Rfq.Application;
+using Rfq.Domain;
 
 namespace Rfq.Api.Controllers;
 
@@ -8,17 +9,27 @@ namespace Rfq.Api.Controllers;
 public sealed class RfqDefaultsController(ResolveRfqDefaults resolveDefaults) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType<RfqDefaultsResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RfqDefaultsResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<RfqDefaultsResult>> Get(
+    public async Task<ActionResult<RfqDefaultsResponse>> Get(
         [FromQuery] string securityId,
         CancellationToken cancellationToken)
     {
         try
         {
-            return Ok(await resolveDefaults.ExecuteAsync(
-                securityId,
-                cancellationToken));
+            var result = await resolveDefaults.ExecuteAsync(
+                SecurityId.Create(securityId),
+                cancellationToken);
+            return Ok(new RfqDefaultsResponse(
+                result.SecurityId.Value,
+                result.CategoryId.Value,
+                result.CategoryName,
+                result.ContactOwnerId.Value,
+                result.ContactOwnerName,
+                result.AssignedTraderId.Value,
+                result.AssignedTraderName,
+                result.SystemDate,
+                result.StandardSettlementDate));
         }
         catch (Exception exception) when (
             exception is ArgumentException or KeyNotFoundException or InvalidOperationException)
@@ -28,3 +39,14 @@ public sealed class RfqDefaultsController(ResolveRfqDefaults resolveDefaults) : 
         }
     }
 }
+
+public sealed record RfqDefaultsResponse(
+    string SecurityId,
+    string CategoryId,
+    string CategoryName,
+    string ContactOwnerId,
+    string ContactOwnerName,
+    string AssignedTraderId,
+    string AssignedTraderName,
+    DateOnly SystemDate,
+    DateOnly StandardSettlementDate);

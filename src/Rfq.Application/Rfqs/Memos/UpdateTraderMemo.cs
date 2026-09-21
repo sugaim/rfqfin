@@ -11,9 +11,9 @@ public sealed class UpdateTraderMemo(
     IUnitOfWork unitOfWork)
 {
     public async Task<CaseMemoResult> ExecuteAsync(
-        long caseId,
+        CaseId caseId,
         string? memo,
-        long expectedVersion,
+        StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanUpdateTraderMemo(currentUser.User);
@@ -28,9 +28,9 @@ public sealed class UpdateTraderMemo(
             caseId,
             cancellationToken);
         caseMemo = CaseMemoTransitions.UpdateTrader(
-            caseMemo, memo, new StateVersion(expectedVersion));
+            caseMemo, memo, expectedVersion);
         memos.Update(caseMemo);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new CaseMemoResult(caseId, caseMemo.TraderMemo, caseMemo.Version.Value);
+        return new CaseMemoResult(caseId, caseMemo.TraderMemo, caseMemo.Version);
     }
 }

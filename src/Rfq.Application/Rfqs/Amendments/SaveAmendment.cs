@@ -23,9 +23,8 @@ public sealed class SaveAmendment(
                 command.SalesAndTradingMessage),
             currentUser.User.UserId,
             timeProvider.GetUtcNow(),
-            new StateVersion(command.ExpectedCurrentVersion),
-            command.ExpectedDraftVersion is null
-                ? null : new StateVersion(command.ExpectedDraftVersion.Value));
+            command.ExpectedCurrentVersion,
+            command.ExpectedDraftVersion);
         rfq = transition.Rfq;
         cases.Update(rfq);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -33,12 +32,12 @@ public sealed class SaveAmendment(
     }
 
     internal static AmendmentResult ToResult(RfqCase rfq) => new(
-        rfq.CaseId.Value,
-        rfq.CurrentRevision.RevisionId.Value,
-        rfq.PendingDraftRevision?.RevisionId.Value,
-        rfq.Version.Value,
-        rfq.PendingDraftRevision?.Version.Value,
-        rfq.Status.ToString(),
-        rfq.QuoteStatus?.ToString(),
-        rfq.QuoteRequestReason?.ToString());
+        rfq.CaseId,
+        rfq.CurrentRevision.RevisionId,
+        rfq.PendingDraftRevision?.RevisionId,
+        rfq.Version,
+        rfq.PendingDraftRevision?.Version,
+        rfq.Status,
+        rfq.QuoteStatus,
+        rfq.QuoteRequestReason);
 }

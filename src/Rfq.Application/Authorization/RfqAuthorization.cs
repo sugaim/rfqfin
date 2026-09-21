@@ -7,7 +7,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     public void EnsureCanViewTraderScreen(CurrentUser user) =>
         EnsureRole(user, UserRole.Trader);
 
-    public void EnsureCanCreateRevision(CurrentUser user) => EnsureRole(user, UserRole.Sales);
+    public void EnsureCanCreateRevision(CurrentUser user) => EnsureSalesOrTrader(user);
 
     public void EnsureCanEditRevision(CurrentUser user, RfqCase rfqCase) =>
         EnsureContactOwner(user, rfqCase);
@@ -170,7 +170,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
 
     private static void EnsureContactOwner(CurrentUser user, RfqCase rfqCase)
     {
-        EnsureRole(user, UserRole.Sales);
+        EnsureSalesOrTrader(user);
         if (rfqCase.ContactOwnerId != user.UserId)
         {
             throw new UnauthorizedAccessException(
@@ -195,6 +195,15 @@ public sealed class RfqAuthorization : IRfqAuthorization
         if (!user.Roles.Contains(role))
         {
             throw new UnauthorizedAccessException($"The {role} role is required.");
+        }
+    }
+
+    private static void EnsureSalesOrTrader(CurrentUser user)
+    {
+        if (!user.Roles.Contains(UserRole.Sales)
+            && !user.Roles.Contains(UserRole.Trader))
+        {
+            throw new UnauthorizedAccessException("The Sales or Trader role is required.");
         }
     }
 

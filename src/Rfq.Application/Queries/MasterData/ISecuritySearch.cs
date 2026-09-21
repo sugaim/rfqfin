@@ -14,3 +14,12 @@ public interface ISecuritySearch
         SecurityId securityId,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record SecuritySearchResult(
+    SecurityId SecurityId,
+    string JapaneseName,
+    string BbgDisplay,
+    string InternalCode,
+    string Isin,
+    CategoryId CategoryId,
+    string CategoryName);

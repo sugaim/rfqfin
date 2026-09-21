@@ -110,8 +110,8 @@ public sealed class RfqsController(
         try
         {
             await discardInitialDraft.ExecuteAsync(
-                caseId,
-                request.ExpectedVersion,
+                new CaseId(caseId),
+                new StateVersion(request.ExpectedVersion),
                 cancellationToken);
             return NoContent();
         }
@@ -127,80 +127,83 @@ public sealed class RfqsController(
     {
         var items = await getActiveSalesRfqs.ExecuteAsync(cancellationToken);
         return Ok(items.Select(item => new SalesRfqResponse(
-            item.CaseId,
-            item.ClientId,
+            item.CaseId.Value,
+            item.ClientId.Value,
             item.ClientName,
-            item.SecurityId,
+            item.SecurityId.Value,
             item.SecurityJapaneseName,
             item.SecurityBbgDisplay,
-            item.CategoryId,
-            item.RfqStatus,
-            item.QuoteStatus,
-            item.QuoteRequestReason,
-            item.CurrentRevisionId,
-            item.CurrentQuoteId,
-            item.ClosedQuoteId,
-            item.CurrentVersion,
-            item.RevisionStatus,
-            item.ContactOwnerId,
-            item.AssignedTraderId,
+            item.CategoryId.Value,
+            item.RfqStatus.ToString(),
+            item.QuoteStatus?.ToString(),
+            item.QuoteRequestReason?.ToString(),
+            item.CurrentRevisionId.Value,
+            item.CurrentQuoteId?.Value,
+            item.ClosedQuoteId?.Value,
+            item.CurrentVersion.Value,
+            item.RevisionStatus.ToString(),
+            item.ContactOwnerId.Value,
+            item.AssignedTraderId.Value,
             item.SettlementDate,
             item.StandardSettlementDate,
             item.Notional,
             item.SalesAndTradingMessage,
             item.SalesMemo,
-            item.MemoVersion,
-            item.Version,
+            item.MemoVersion.Value,
+            item.Version.Value,
             item.CreatedAt,
-            item.DraftRevisionId,
-            item.DraftVersion,
+            item.DraftRevisionId?.Value,
+            item.DraftVersion?.Value,
             item.DraftSettlementDate,
             item.DraftNotional,
             item.DraftSalesAndTradingMessage)));
     }
 
     [HttpPut("{caseId:long}/amendment")]
-    public Task<ActionResult<AmendmentResult>> SaveAmendment(
+    public Task<ActionResult<AmendmentResponse>> SaveAmendment(
         long caseId,
         SaveAmendmentRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             saveAmendment.ExecuteAsync(new SaveAmendmentCommand(
-                caseId,
+                new CaseId(caseId),
                 request.Notional,
                 request.SettlementDate,
                 request.SalesAndTradingMessage,
-                request.ExpectedCurrentVersion,
-                request.ExpectedDraftVersion), cancellationToken));
+                new StateVersion(request.ExpectedCurrentVersion),
+                request.ExpectedDraftVersion is null ? null : new StateVersion(request.ExpectedDraftVersion.Value)), cancellationToken),
+            AmendmentResponse.From);
 
     [HttpPost("{caseId:long}/amendment/confirm")]
-    public Task<ActionResult<AmendmentResult>> ConfirmAmendment(
+    public Task<ActionResult<AmendmentResponse>> ConfirmAmendment(
         long caseId,
         AmendmentActionRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             confirmAmendment.ExecuteAsync(new AmendmentItem(
-                caseId, request.ExpectedCurrentVersion, request.ExpectedDraftVersion),
-                cancellationToken));
+                new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), new StateVersion(request.ExpectedDraftVersion)),
+                cancellationToken), AmendmentResponse.From);
 
     [HttpPost("{caseId:long}/amendment/discard")]
-    public Task<ActionResult<AmendmentResult>> DiscardAmendment(
+    public Task<ActionResult<AmendmentResponse>> DiscardAmendment(
         long caseId,
         AmendmentActionRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             discardAmendment.ExecuteAsync(new AmendmentItem(
-                caseId, request.ExpectedCurrentVersion, request.ExpectedDraftVersion),
-                cancellationToken));
+                new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), new StateVersion(request.ExpectedDraftVersion)),
+                cancellationToken), AmendmentResponse.From);
 
     [HttpPost("amendment/bulk-confirm")]
-    public Task<ActionResult<IReadOnlyList<AmendmentItemResult>>> BulkConfirmAmendment(
+    public Task<ActionResult<IReadOnlyList<AmendmentItemResponse>>> BulkConfirmAmendment(
         BulkAmendmentRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
-            bulkConfirmAmendments.ExecuteAsync(request.Items.Select(ToItem).ToArray(), cancellationToken));
+            bulkConfirmAmendments.ExecuteAsync(request.Items.Select(ToItem).ToArray(), cancellationToken),
+            items => (IReadOnlyList<AmendmentItemResponse>)items.Select(AmendmentItemResponse.From).ToArray());
 
     [HttpPost("amendment/bulk-discard")]
-    public Task<ActionResult<IReadOnlyList<AmendmentItemResult>>> BulkDiscardAmendment(
+    public Task<ActionResult<IReadOnlyList<AmendmentItemResponse>>> BulkDiscardAmendment(
         BulkAmendmentRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
-            bulkDiscardAmendments.ExecuteAsync(request.Items.Select(ToItem).ToArray(), cancellationToken));
+            bulkDiscardAmendments.ExecuteAsync(request.Items.Select(ToItem).ToArray(), cancellationToken),
+            items => (IReadOnlyList<AmendmentItemResponse>)items.Select(AmendmentItemResponse.From).ToArray());
 
     [HttpPost("{caseId:long}/create-from-existing")]
     public async Task<ActionResult<InitialRfqResponse>> CreateFromExisting(
@@ -209,7 +212,7 @@ public sealed class RfqsController(
     {
         try
         {
-            var result = await createFromExisting.ExecuteAsync(caseId, cancellationToken);
+            var result = await createFromExisting.ExecuteAsync(new CaseId(caseId), cancellationToken);
             return Created("/api/rfqs/active-sales", ToResponse(result));
         }
         catch (Exception exception) when (IsExpected(exception))
@@ -219,108 +222,111 @@ public sealed class RfqsController(
     }
 
     [HttpPost("{caseId:long}/cancel")]
-    public Task<ActionResult<LifecycleResult>> Cancel(
+    public Task<ActionResult<LifecycleResponse>> Cancel(
         long caseId, LifecycleActionRequest request, CancellationToken cancellationToken) =>
         ExecuteCaseActionAsync(() => cancelRfq.ExecuteAsync(
-            caseId, request.ExpectedCurrentVersion, cancellationToken));
+            new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), cancellationToken),
+            LifecycleResponse.From);
 
     [HttpPost("{caseId:long}/reopen")]
-    public Task<ActionResult<LifecycleResult>> Reopen(
+    public Task<ActionResult<LifecycleResponse>> Reopen(
         long caseId, LifecycleActionRequest request, CancellationToken cancellationToken) =>
         ExecuteCaseActionAsync(() => reopenRfq.ExecuteAsync(
-            caseId, request.ExpectedCurrentVersion, cancellationToken));
+            new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), cancellationToken),
+            LifecycleResponse.From);
 
     private static AmendmentItem ToItem(AmendmentActionItemRequest item) =>
-        new(item.CaseId, item.ExpectedCurrentVersion, item.ExpectedDraftVersion);
+        new(new CaseId(item.CaseId), new StateVersion(item.ExpectedCurrentVersion), new StateVersion(item.ExpectedDraftVersion));
 
     [HttpPost("{caseId:long}/present")]
-    public Task<ActionResult<PresentationResult>> Present(
+    public Task<ActionResult<PresentationResponse>> Present(
         long caseId,
         PresentationRequest request,
         CancellationToken cancellationToken) => ExecutePresentationAsync(() =>
-            presentQuote.ExecuteAsync(caseId, request.ExpectedCurrentVersion, cancellationToken));
+            presentQuote.ExecuteAsync(new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), cancellationToken));
 
     [HttpPost("{caseId:long}/unpresent")]
-    public Task<ActionResult<PresentationResult>> Unpresent(
+    public Task<ActionResult<PresentationResponse>> Unpresent(
         long caseId,
         PresentationRequest request,
         CancellationToken cancellationToken) => ExecutePresentationAsync(() =>
-            unpresentQuote.ExecuteAsync(caseId, request.ExpectedCurrentVersion, cancellationToken));
+            unpresentQuote.ExecuteAsync(new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), cancellationToken));
 
     [HttpPost("{caseId:long}/close")]
-    public Task<ActionResult<CloseRfqResult>> Close(
+    public Task<ActionResult<CloseRfqResponse>> Close(
         long caseId,
         CloseRfqRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             closeRfq.ExecuteAsync(
-                caseId,
+                new CaseId(caseId),
                 ParseOutcome(request.Outcome),
-                request.ExpectedCurrentVersion,
-                cancellationToken));
+                new StateVersion(request.ExpectedCurrentVersion),
+                cancellationToken), CloseRfqResponse.From);
 
     [HttpPost("bulk-close")]
-    public Task<ActionResult<IReadOnlyList<BulkCloseItemResult>>> BulkClose(
+    public Task<ActionResult<IReadOnlyList<BulkCloseItemResponse>>> BulkClose(
         BulkCloseRfqRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             bulkCloseRfqs.ExecuteAsync(
                 request.Items.Select(item => new BulkCloseItem(
-                    item.CaseId,
-                    item.ExpectedCurrentVersion)).ToArray(),
+                    new CaseId(item.CaseId),
+                    new StateVersion(item.ExpectedCurrentVersion))).ToArray(),
                 ParseOutcome(request.Outcome),
-                cancellationToken));
+                cancellationToken),
+            items => (IReadOnlyList<BulkCloseItemResponse>)items.Select(BulkCloseItemResponse.From).ToArray());
 
     [HttpPost("{caseId:long}/correct-outcome")]
-    public Task<ActionResult<CloseRfqResult>> CorrectOutcome(
+    public Task<ActionResult<CloseRfqResponse>> CorrectOutcome(
         long caseId,
         CorrectOutcomeRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             correctRfqOutcome.ExecuteAsync(
-                caseId,
+                new CaseId(caseId),
                 ParseOutcome(request.Outcome),
                 request.Reason,
-                request.ExpectedCurrentVersion,
-                cancellationToken));
+                new StateVersion(request.ExpectedCurrentVersion),
+                cancellationToken), CloseRfqResponse.From);
 
     [HttpPost("{caseId:long}/contact-owner")]
-    public Task<ActionResult<ContactOwnerResult>> ChangeOwner(
+    public Task<ActionResult<ContactOwnerResponse>> ChangeOwner(
         long caseId,
         ChangeContactOwnerRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             changeContactOwner.ExecuteAsync(
-                caseId,
-                request.TargetUserId,
-                request.ExpectedCurrentVersion,
+                new CaseId(caseId),
+                UserId.Create(request.TargetUserId),
+                new StateVersion(request.ExpectedCurrentVersion),
                 request.Confirmed,
-                cancellationToken));
+                cancellationToken), ContactOwnerResponse.From);
 
     [HttpPut("{caseId:long}/sales-memo")]
-    public Task<ActionResult<CaseMemoResult>> UpdateSalesMemo(
+    public Task<ActionResult<CaseMemoResponse>> UpdateSalesMemo(
         long caseId,
         UpdateMemoRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             updateSalesMemo.ExecuteAsync(
-                caseId,
+                new CaseId(caseId),
                 request.Memo,
-                request.ExpectedVersion,
-                cancellationToken));
+                new StateVersion(request.ExpectedVersion),
+                cancellationToken), CaseMemoResponse.From);
 
     [HttpPut("{caseId:long}/trader-memo")]
-    public Task<ActionResult<CaseMemoResult>> UpdateTraderMemo(
+    public Task<ActionResult<CaseMemoResponse>> UpdateTraderMemo(
         long caseId,
         UpdateMemoRequest request,
         CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
             updateTraderMemo.ExecuteAsync(
-                caseId,
+                new CaseId(caseId),
                 request.Memo,
-                request.ExpectedVersion,
-                cancellationToken));
+                new StateVersion(request.ExpectedVersion),
+                cancellationToken), CaseMemoResponse.From);
 
-    private async Task<ActionResult<PresentationResult>> ExecutePresentationAsync(
+    private async Task<ActionResult<PresentationResponse>> ExecutePresentationAsync(
         Func<Task<PresentationResult>> action)
     {
         try
         {
-            return Ok(await action());
+            return Ok(PresentationResponse.From(await action()));
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -328,11 +334,13 @@ public sealed class RfqsController(
         }
     }
 
-    private async Task<ActionResult<T>> ExecuteCaseActionAsync<T>(Func<Task<T>> action)
+    private async Task<ActionResult<TResponse>> ExecuteCaseActionAsync<TApplication, TResponse>(
+        Func<Task<TApplication>> action,
+        Func<TApplication, TResponse> map)
     {
         try
         {
-            return Ok(await action());
+            return Ok(map(await action()));
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -352,38 +360,38 @@ public sealed class RfqsController(
     }
 
     private static CreateDraftCommand ToCommand(CreateDraftRequest request) => new(
-        request.ClientId,
-        request.SecurityId,
+        ClientId.Create(request.ClientId),
+        SecurityId.Create(request.SecurityId),
         request.Notional,
         request.SettlementDate,
         request.SalesAndTradingMessage,
-        request.AssignedTraderId);
+        request.AssignedTraderId is null ? null : UserId.Create(request.AssignedTraderId));
 
     private static UpdateInitialDraftCommand ToCommand(
         long caseId,
         UpdateInitialDraftRequest request) => new(
-        caseId,
+        new CaseId(caseId),
         request.Notional,
         request.SettlementDate,
         request.SalesAndTradingMessage,
-        request.AssignedTraderId,
-        request.ExpectedVersion);
+        request.AssignedTraderId is null ? null : UserId.Create(request.AssignedTraderId),
+        new StateVersion(request.ExpectedVersion));
 
     private static InitialRfqResponse ToResponse(InitialRfqResult result) => new(
-        result.CaseId,
-        result.RevisionId,
-        result.RfqStatus,
-        result.RevisionStatus,
-        result.QuoteStatus,
-        result.QuoteRequestReason,
-        result.CategoryId,
-        result.ContactOwnerId,
-        result.AssignedTraderId,
+        result.CaseId.Value,
+        result.RevisionId.Value,
+        result.RfqStatus.ToString(),
+        result.RevisionStatus.ToString(),
+        result.QuoteStatus?.ToString(),
+        result.QuoteRequestReason?.ToString(),
+        result.CategoryId.Value,
+        result.ContactOwnerId.Value,
+        result.AssignedTraderId.Value,
         result.Notional,
         result.SettlementDate,
         result.StandardSettlementDate,
         result.SalesAndTradingMessage,
-        result.Version,
+        result.Version.Value,
         result.CreatedAt);
 
     private static bool IsExpected(Exception exception) =>
@@ -545,3 +553,83 @@ public sealed record SalesRfqResponse(
     DateOnly? DraftSettlementDate,
     decimal? DraftNotional,
     string? DraftSalesAndTradingMessage);
+
+public sealed record AmendmentResponse(
+    long CaseId,
+    Guid CurrentRevisionId,
+    Guid? DraftRevisionId,
+    long CurrentVersion,
+    long? DraftVersion,
+    string RfqStatus,
+    string? QuoteStatus,
+    string? QuoteRequestReason)
+{
+    public static AmendmentResponse From(AmendmentResult result) => new(
+        result.CaseId.Value, result.CurrentRevisionId.Value, result.DraftRevisionId?.Value,
+        result.CurrentVersion.Value, result.DraftVersion?.Value, result.RfqStatus.ToString(),
+        result.QuoteStatus?.ToString(), result.QuoteRequestReason?.ToString());
+}
+
+public sealed record AmendmentItemResponse(long CaseId, string Result, string? Error)
+{
+    public static AmendmentItemResponse From(AmendmentItemResult result) =>
+        new(result.CaseId.Value, result.Result, result.Error);
+}
+
+public sealed record LifecycleResponse(
+    long CaseId,
+    string RfqStatus,
+    string? QuoteStatus,
+    string? QuoteRequestReason,
+    long CurrentVersion)
+{
+    public static LifecycleResponse From(LifecycleResult result) => new(
+        result.CaseId.Value, result.RfqStatus.ToString(), result.QuoteStatus?.ToString(),
+        result.QuoteRequestReason?.ToString(), result.CurrentVersion.Value);
+}
+
+public sealed record PresentationResponse(
+    long CaseId,
+    Guid QuoteId,
+    string RfqStatus,
+    string QuoteStatus,
+    long CurrentVersion)
+{
+    public static PresentationResponse From(PresentationResult result) => new(
+        result.CaseId.Value, result.QuoteId.Value, result.RfqStatus.ToString(),
+        result.QuoteStatus.ToString(), result.CurrentVersion.Value);
+}
+
+public sealed record CloseRfqResponse(
+    long CaseId,
+    string RfqStatus,
+    Guid ClosedQuoteId,
+    bool Owned,
+    long CurrentVersion)
+{
+    public static CloseRfqResponse From(CloseRfqResult result) => new(
+        result.CaseId.Value, result.RfqStatus.ToString(), result.ClosedQuoteId.Value,
+        result.Owned, result.CurrentVersion.Value);
+}
+
+public sealed record BulkCloseItemResponse(
+    long CaseId,
+    string Result,
+    string? RfqStatus,
+    string? Error)
+{
+    public static BulkCloseItemResponse From(BulkCloseItemResult result) => new(
+        result.CaseId.Value, result.Result, result.RfqStatus?.ToString(), result.Error);
+}
+
+public sealed record ContactOwnerResponse(long CaseId, string ContactOwnerId, long CurrentVersion)
+{
+    public static ContactOwnerResponse From(ContactOwnerResult result) => new(
+        result.CaseId.Value, result.ContactOwnerId.Value, result.CurrentVersion.Value);
+}
+
+public sealed record CaseMemoResponse(long CaseId, string Memo, long Version)
+{
+    public static CaseMemoResponse From(CaseMemoResult result) =>
+        new(result.CaseId.Value, result.Memo, result.Version.Value);
+}

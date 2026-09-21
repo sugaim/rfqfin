@@ -13,10 +13,10 @@ public sealed class ConfirmQuote(
     TimeProvider timeProvider)
 {
     public async Task<ConfirmQuoteResult> ExecuteAsync(
-        long caseId,
+        CaseId caseId,
         int? expiryMinutes,
-        long expectedCurrentVersion,
-        long expectedWorkingQuoteVersion,
+        StateVersion expectedCurrentVersion,
+        StateVersion expectedWorkingQuoteVersion,
         CancellationToken cancellationToken = default)
     {
         var rfqCase = await UpdateInitialDraft.GetCaseAsync(
@@ -24,7 +24,7 @@ public sealed class ConfirmQuote(
             caseId,
             cancellationToken);
         authorization.EnsureCanConfirmQuote(currentUser.User, rfqCase);
-        if (rfqCase.Version != new StateVersion(expectedCurrentVersion))
+        if (rfqCase.Version != expectedCurrentVersion)
         {
             throw new StateVersionMismatchException("The RFQ Case was changed by another user.");
         }
@@ -33,7 +33,7 @@ public sealed class ConfirmQuote(
             rfqCase.CurrentRevision.RevisionId,
             cancellationToken)
             ?? throw new KeyNotFoundException("WorkingQuote was not found.");
-        if (workingQuote.Version != new StateVersion(expectedWorkingQuoteVersion))
+        if (workingQuote.Version != expectedWorkingQuoteVersion)
         {
             throw new StateVersionMismatchException("The WorkingQuote was changed by another user.");
         }
@@ -49,23 +49,38 @@ public sealed class ConfirmQuote(
         rfqCases.Update(rfqCase);
         eventSink.Record(new QuoteTransition(
             QuoteTransitionKind.Confirmed,
-            confirmedQuote.QuoteId.Value,
-            currentUser.User.UserId.Value,
+            confirmedQuote.QuoteId,
+            currentUser.User.UserId,
             now));
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ConfirmQuoteResult(
             caseId,
-            confirmedQuote.QuoteId.Value,
-            confirmedQuote.RevisionId.Value,
-            rfqCase.Status.ToString(),
-            rfqCase.QuoteStatus!.Value.ToString(),
-            confirmedQuote.Mode.ToString(),
+            confirmedQuote.QuoteId,
+            confirmedQuote.RevisionId,
+            rfqCase.Status,
+            rfqCase.QuoteStatus
+                ?? throw new DomainInvariantException("Confirmed RFQ is missing QuoteStatus."),
+            confirmedQuote.Mode,
             confirmedQuote.Calculated,
             confirmedQuote.Manual,
             confirmedQuote.ConfirmedAt,
             confirmedQuote.ExpiryMinutes,
             confirmedQuote.ExpiresAt,
-            rfqCase.Version.Value);
+            rfqCase.Version);
     }
 }
+
+public sealed record ConfirmQuoteResult(
+    CaseId CaseId,
+    QuoteId QuoteId,
+    RevisionId RevisionId,
+    RfqStatus RfqStatus,
+    QuoteStatus QuoteStatus,
+    WorkingQuoteMode Mode,
+    CalculatedQuotePayload? Calculated,
+    ManualQuotePayload? Manual,
+    DateTimeOffset ConfirmedAt,
+    int? ExpiryMinutes,
+    DateTimeOffset? ExpiresAt,
+    StateVersion CurrentVersion);

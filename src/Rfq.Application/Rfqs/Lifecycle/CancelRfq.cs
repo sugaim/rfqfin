@@ -10,15 +10,15 @@ public sealed class CancelRfq(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
-    public async Task<LifecycleResult> ExecuteAsync(long caseId, long expectedVersion,
+    public async Task<LifecycleResult> ExecuteAsync(CaseId caseId, StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
         var rfq = await CloseRfq.LoadAsync(cases, caseId, cancellationToken);
         authorization.EnsureCanCancelOrReopen(currentUser.User, rfq);
-        rfq = RfqLifecycleTransitions.Cancel(rfq, new StateVersion(expectedVersion));
+        rfq = RfqLifecycleTransitions.Cancel(rfq, expectedVersion);
         cases.Update(rfq);
         events.Record(new(RfqTransitionKind.Cancelled, caseId,
-            currentUser.User.UserId.Value, timeProvider.GetUtcNow()));
+            currentUser.User.UserId, timeProvider.GetUtcNow()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return WithdrawQuote.ToResult(rfq);
     }

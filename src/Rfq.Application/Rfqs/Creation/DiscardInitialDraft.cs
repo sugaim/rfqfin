@@ -9,8 +9,8 @@ public sealed class DiscardInitialDraft(
     IUnitOfWork unitOfWork)
 {
     public async Task ExecuteAsync(
-        long caseId,
-        long expectedVersion,
+        CaseId caseId,
+        StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
         var rfqCase = await UpdateInitialDraft.GetCaseAsync(
@@ -19,7 +19,7 @@ public sealed class DiscardInitialDraft(
             cancellationToken);
         authorization.EnsureCanDiscardRevision(currentUser.User, rfqCase);
         rfqCase = InitialDraftTransitions.Discard(
-            rfqCase, new StateVersion(expectedVersion));
+            rfqCase, expectedVersion);
         rfqCases.Update(rfqCase);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

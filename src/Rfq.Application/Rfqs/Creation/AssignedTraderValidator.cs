@@ -7,14 +7,11 @@ public sealed class AssignedTraderValidator(
     ICurrentUser currentUser)
 {
     public async Task<UserId> ResolveAsync(
-        string? requestedTraderId,
-        string fallbackTraderId,
+        UserId? requestedTraderId,
+        UserId fallbackTraderId,
         CancellationToken cancellationToken = default)
     {
-        var assignedTraderId = UserId.Create(
-            string.IsNullOrWhiteSpace(requestedTraderId)
-                ? fallbackTraderId
-                : requestedTraderId);
+        var assignedTraderId = requestedTraderId ?? fallbackTraderId;
         var assignedTrader = await userDirectory.ResolveAsync(assignedTraderId, cancellationToken)
             ?? throw new KeyNotFoundException(
                 $"Assigned Trader '{assignedTraderId.Value}' was not found.");
