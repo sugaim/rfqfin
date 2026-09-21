@@ -1,7 +1,7 @@
 namespace Rfq.Application;
 
 public sealed record SalesRfqListItem(
-    Guid CaseId,
+    long CaseId,
     string ClientId,
     string SecurityId,
     string RfqStatus,

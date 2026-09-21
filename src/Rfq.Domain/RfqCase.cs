@@ -39,6 +39,7 @@ public sealed class RfqCase
     public RfqRevision InitialRevision { get; }
 
     public static RfqCase CreateDraft(
+        CaseId caseId,
         ClientId clientId,
         SecurityId securityId,
         UserId createdBy,
@@ -48,7 +49,6 @@ public sealed class RfqCase
         ArgumentNullException.ThrowIfNull(securityId);
         ArgumentNullException.ThrowIfNull(createdBy);
 
-        var caseId = CaseId.New();
         var utcCreatedAt = createdAt.ToUniversalTime();
         var initialRevision = RfqRevision.CreateInitialDraft(caseId, utcCreatedAt, createdBy);
 

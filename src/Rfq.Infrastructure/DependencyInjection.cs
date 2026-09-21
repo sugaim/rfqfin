@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddDbContext<RfqDbContext>(options =>
             DatabaseConfiguration.Configure(options, connectionString));
         services.AddSingleton(TimeProvider.System);
+        services.AddScoped<ICaseIdGenerator, PostgreSqlCaseIdGenerator>();
         services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<DevelopmentDataSeeder>();

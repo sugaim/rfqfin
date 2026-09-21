@@ -14,6 +14,7 @@ public sealed class CreateDraftTests
         var repository = new RecordingRfqCaseRepository();
         var unitOfWork = new RecordingUnitOfWork();
         var useCase = new CreateDraft(
+            new StubCaseIdGenerator(101),
             repository,
             unitOfWork,
             new StubCurrentUser(),
@@ -23,6 +24,7 @@ public sealed class CreateDraftTests
             new CreateDraftCommand("client-1", "security-1"));
 
         var created = Assert.Single(repository.Added);
+        Assert.Equal(101, result.CaseId);
         Assert.Equal(result.CaseId, created.CaseId.Value);
         Assert.Equal(result.RevisionId, created.InitialRevision.RevisionId.Value);
         Assert.Equal("Draft", result.RfqStatus);
@@ -41,7 +43,9 @@ public sealed class CreateDraftTests
     {
         var repository = new RecordingRfqCaseRepository();
         var unitOfWork = new RecordingUnitOfWork();
+        var caseIdGenerator = new StubCaseIdGenerator(101);
         var useCase = new CreateDraft(
+            caseIdGenerator,
             repository,
             unitOfWork,
             new StubCurrentUser(),
@@ -52,6 +56,18 @@ public sealed class CreateDraftTests
 
         Assert.Empty(repository.Added);
         Assert.Equal(0, unitOfWork.SaveCount);
+        Assert.Equal(0, caseIdGenerator.CallCount);
+    }
+
+    private sealed class StubCaseIdGenerator(long value) : ICaseIdGenerator
+    {
+        public int CallCount { get; private set; }
+
+        public Task<CaseId> NextAsync(CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(new CaseId(value));
+        }
     }
 
     private sealed class RecordingRfqCaseRepository : IRfqCaseRepository

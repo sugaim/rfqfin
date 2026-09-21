@@ -11,12 +11,13 @@ public sealed class RfqCaseTests
         var createdAt = new DateTimeOffset(2026, 9, 21, 1, 2, 3, TimeSpan.FromHours(9));
 
         var rfqCase = RfqCase.CreateDraft(
+            new CaseId(123),
             ClientId.Create("client-1"),
             SecurityId.Create("security-1"),
             creator,
             createdAt);
 
-        Assert.NotEqual(Guid.Empty, rfqCase.CaseId.Value);
+        Assert.Equal(123, rfqCase.CaseId.Value);
         Assert.NotEqual(Guid.Empty, rfqCase.InitialRevision.RevisionId.Value);
         Assert.Equal(rfqCase.CaseId, rfqCase.InitialRevision.CaseId);
         Assert.Equal(rfqCase.InitialRevision.RevisionId, rfqCase.Lifecycle.CurrentRevisionId);
@@ -25,6 +26,14 @@ public sealed class RfqCaseTests
         Assert.Equal(creator, rfqCase.CreatedBy);
         Assert.Equal(creator, rfqCase.SalesId);
         Assert.Equal(TimeSpan.Zero, rfqCase.CreatedAt.Offset);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void CaseIdRejectsNonPositiveValue(long value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CaseId(value));
     }
 
     [Theory]

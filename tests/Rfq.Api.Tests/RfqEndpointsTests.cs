@@ -8,7 +8,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     : IClassFixture<RfqApiFixture>
 {
     [Fact]
-    public async Task PostCreateThenGetListReturnsPersistedDraft()
+    public async Task PostTwoDraftsReturnsIncrementingIdsAndListsBoth()
     {
         using var client = fixture.Factory.CreateClient();
 
@@ -22,29 +22,40 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             $"Expected 201 Created but received {(int)postResponse.StatusCode}: {postResponseBody}");
         var created = await postResponse.Content.ReadFromJsonAsync<CreateDraftBody>();
         Assert.NotNull(created);
-        Assert.NotEqual(Guid.Empty, created.CaseId);
+        Assert.True(created.CaseId > 0);
         Assert.NotEqual(Guid.Empty, created.RevisionId);
         Assert.Equal("Draft", created.RfqStatus);
+
+        var secondPostResponse = await client.PostAsJsonAsync(
+            "/api/rfqs",
+            new { ClientId = "client-api-2", SecurityId = "security-api-2" });
+        Assert.Equal(HttpStatusCode.Created, secondPostResponse.StatusCode);
+        var secondCreated = await secondPostResponse.Content.ReadFromJsonAsync<CreateDraftBody>();
+        Assert.NotNull(secondCreated);
+        Assert.Equal(created.CaseId + 1, secondCreated.CaseId);
 
         var rows = await client.GetFromJsonAsync<List<SalesRfqBody>>(
             "/api/rfqs/active-sales");
 
-        var row = Assert.Single(Assert.IsType<List<SalesRfqBody>>(rows));
+        var list = Assert.IsType<List<SalesRfqBody>>(rows);
+        Assert.Equal(2, list.Count);
+        var row = Assert.Single(list, item => item.CaseId == created.CaseId);
         Assert.Equal(created.CaseId, row.CaseId);
         Assert.Equal("client-api", row.ClientId);
         Assert.Equal("security-api", row.SecurityId);
         Assert.Equal("Draft", row.RfqStatus);
         Assert.Equal("Draft", row.RevisionStatus);
+        Assert.Contains(list, item => item.CaseId == secondCreated.CaseId);
     }
 
     private sealed record CreateDraftBody(
-        Guid CaseId,
+        long CaseId,
         Guid RevisionId,
         string RfqStatus,
         DateTimeOffset CreatedAt);
 
     private sealed record SalesRfqBody(
-        Guid CaseId,
+        long CaseId,
         string ClientId,
         string SecurityId,
         string RfqStatus,

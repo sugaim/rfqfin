@@ -29,7 +29,7 @@ describe('AppShell', () => {
 describe('SalesScreen', () => {
   const rows: SalesRfq[] = [
     {
-      caseId: 'case-1',
+      caseId: 101,
       clientId: 'client-grid',
       securityId: 'security-grid',
       rfqStatus: 'Draft',

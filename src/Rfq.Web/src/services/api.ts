@@ -10,14 +10,14 @@ export interface CreateDraftRequest {
 }
 
 export interface CreateDraftResponse {
-  caseId: string
+  caseId: number
   revisionId: string
   rfqStatus: string
   createdAt: string
 }
 
 export interface SalesRfq {
-  caseId: string
+  caseId: number
   clientId: string
   securityId: string
   rfqStatus: string

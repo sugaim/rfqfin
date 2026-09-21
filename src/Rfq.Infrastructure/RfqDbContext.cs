@@ -15,6 +15,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasSequence<long>(PostgreSqlCaseIdGenerator.SequenceName);
+
         var seedMarker = modelBuilder.Entity<SeedMarker>();
         seedMarker.ToTable("seed_markers");
         seedMarker.HasKey(marker => marker.Key);
@@ -111,7 +113,7 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
 
 internal sealed class RfqCaseEntity
 {
-    public Guid CaseId { get; set; }
+    public long CaseId { get; set; }
 
     public string ClientId { get; set; } = string.Empty;
 
@@ -130,7 +132,7 @@ internal sealed class RfqCaseEntity
 
 internal sealed class CaseCurrentEntity
 {
-    public Guid CaseId { get; set; }
+    public long CaseId { get; set; }
 
     public RfqLifecycleKind Lifecycle { get; set; }
 
@@ -149,7 +151,7 @@ internal sealed class RfqRevisionEntity
 {
     public Guid RevisionId { get; set; }
 
-    public Guid CaseId { get; set; }
+    public long CaseId { get; set; }
 
     public RevisionStatus Status { get; set; }
 

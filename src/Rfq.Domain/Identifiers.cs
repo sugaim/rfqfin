@@ -1,8 +1,21 @@
 namespace Rfq.Domain;
 
-public readonly record struct CaseId(Guid Value)
+public readonly record struct CaseId
 {
-    public static CaseId New() => new(Guid.NewGuid());
+    public CaseId(long value)
+    {
+        if (value <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(value),
+                value,
+                "CaseId must be a positive integer.");
+        }
+
+        Value = value;
+    }
+
+    public long Value { get; }
 }
 
 public readonly record struct RevisionId(Guid Value)

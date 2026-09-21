@@ -5,12 +5,13 @@ namespace Rfq.Application;
 public sealed record CreateDraftCommand(string ClientId, string SecurityId);
 
 public sealed record CreateDraftResult(
-    Guid CaseId,
+    long CaseId,
     Guid RevisionId,
     string RfqStatus,
     DateTimeOffset CreatedAt);
 
 public sealed class CreateDraft(
+    ICaseIdGenerator caseIdGenerator,
     IRfqCaseRepository rfqCases,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
@@ -22,9 +23,13 @@ public sealed class CreateDraft(
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        var clientId = ClientId.Create(command.ClientId);
+        var securityId = SecurityId.Create(command.SecurityId);
+        var caseId = await caseIdGenerator.NextAsync(cancellationToken);
         var rfqCase = RfqCase.CreateDraft(
-            ClientId.Create(command.ClientId),
-            SecurityId.Create(command.SecurityId),
+            caseId,
+            clientId,
+            securityId,
             currentUser.User.UserId,
             timeProvider.GetUtcNow());
 

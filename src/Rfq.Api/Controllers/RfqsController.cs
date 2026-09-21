@@ -60,13 +60,13 @@ public sealed record CreateDraftRequest(
     [Required, MinLength(1)] string SecurityId);
 
 public sealed record CreateDraftResponse(
-    Guid CaseId,
+    long CaseId,
     Guid RevisionId,
     string RfqStatus,
     DateTimeOffset CreatedAt);
 
 public sealed record SalesRfqResponse(
-    Guid CaseId,
+    long CaseId,
     string ClientId,
     string SecurityId,
     string RfqStatus,

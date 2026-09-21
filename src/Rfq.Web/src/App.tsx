@@ -186,7 +186,7 @@ export function SalesScreen({
             <AgGridReact<SalesRfq>
               rowData={rfqs}
               columnDefs={columns}
-              getRowId={({ data }) => data.caseId}
+              getRowId={({ data }) => String(data.caseId)}
               defaultColDef={{ sortable: true, filter: true, resizable: true }}
             />
           </div>
