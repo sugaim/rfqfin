@@ -176,6 +176,102 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         Assert.False(read.ChangeTracker.HasChanges());
     }
 
+    [Fact]
+    public async Task Past_rfq_date_filters_use_the_current_desk_calendar_day()
+    {
+        await RecreateAndSeed();
+        long[] caseIds;
+        await using (var arrange = fixture.CreateContext())
+        {
+            caseIds = await arrange.RfqCases.OrderBy(item => item.CaseId)
+                .Select(item => item.CaseId).Take(4).ToArrayAsync();
+            await arrange.RfqCases.ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.CreatedAt,
+                    new DateTimeOffset(2026, 9, 18, 0, 0, 0, TimeSpan.Zero)));
+            var instants = new[]
+            {
+                new DateTimeOffset(2026, 9, 20, 14, 59, 59, TimeSpan.Zero),
+                new DateTimeOffset(2026, 9, 20, 15, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 9, 21, 14, 59, 59, TimeSpan.Zero),
+                new DateTimeOffset(2026, 9, 21, 15, 0, 0, TimeSpan.Zero),
+            };
+            for (var index = 0; index < caseIds.Length; index++)
+            {
+                var caseId = caseIds[index];
+                var instant = instants[index];
+                await arrange.RfqCases.Where(item => item.CaseId == caseId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(item => item.CreatedAt, instant));
+            }
+        }
+
+        await using var read = fixture.CreateContext();
+        var queries = new PostgreSqlOperationalQueries(
+            read, CurrentSales(), TimeProvider.System);
+        var result = await queries.SearchAsync(new PastRfqSearch(
+            From: new DateOnly(2026, 9, 21),
+            To: new DateOnly(2026, 9, 21)));
+
+        Assert.Equal(caseIds[1..3], result.Items.Select(item => item.CaseId.Value).Order().ToArray());
+    }
+
+    [Fact]
+    public async Task Eod_is_a_current_desk_wide_remaining_work_view()
+    {
+        await RecreateAndSeed();
+        await using (var arrange = fixture.CreateContext())
+        {
+            arrange.Desks.Add(new DeskEntity
+            {
+                DeskId = "other-desk",
+                Name = "Other Desk",
+                TimeZoneId = "UTC",
+            });
+            arrange.MasterUsers.Add(new MasterUserEntity
+            {
+                UserId = "trader-other",
+                Name = "Other Trader",
+                DeskId = "other-desk",
+                Roles = ["Trader"],
+            });
+            await arrange.CaseCurrents.ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.Lifecycle, RfqLifecycleKind.Cancelled)
+                .SetProperty(item => item.RfqStatus, RfqStatus.Cancelled));
+            var rows = await arrange.CaseCurrents.OrderBy(item => item.CaseId)
+                .Take(4).ToArrayAsync();
+            rows[0].Lifecycle = RfqLifecycleKind.Open;
+            rows[0].RfqStatus = RfqStatus.Active;
+            rows[1].Lifecycle = RfqLifecycleKind.Closed;
+            rows[1].RfqStatus = RfqStatus.Hit;
+            rows[2].Lifecycle = RfqLifecycleKind.Closed;
+            rows[2].RfqStatus = RfqStatus.Away;
+            rows[3].Lifecycle = RfqLifecycleKind.Open;
+            rows[3].RfqStatus = RfqStatus.Active;
+            foreach (var row in rows)
+            {
+                row.ContactOwnerId = "sales-dev";
+                row.AssignedTraderId = "trader-a";
+            }
+            rows[3].AssignedTraderId = "trader-other";
+            var oldCaseId = rows[0].CaseId;
+            await arrange.RfqCases.Where(item => item.CaseId == oldCaseId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    item => item.CreatedAt,
+                    new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+            await arrange.SaveChangesAsync();
+        }
+
+        await using var read = fixture.CreateContext();
+        var queries = new PostgreSqlOperationalQueries(
+            read, CurrentSales(), TimeProvider.System);
+        var item = Assert.Single(await queries.GetEodAsync(new DateOnly(2030, 1, 1)));
+
+        Assert.Equal(UserId.Create("sales-dev"), item.ContactOwnerId);
+        Assert.Equal(1, item.Open);
+        Assert.Equal(1, item.Hit);
+        Assert.Equal(1, item.Away);
+    }
+
     private async Task RecreateAndSeed()
     {
         await using var context = fixture.CreateContext();
@@ -183,6 +279,11 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         await context.Database.MigrateAsync();
         await new DevelopmentDataSeeder(context, TimeProvider.System).SeedAsync();
     }
+
+    private static ICurrentUser CurrentSales() => new CurrentUserService(new CurrentUser(
+        UserId.Create("sales-dev"),
+        new HashSet<UserRole> { UserRole.Sales },
+        DeskId.Create("jpy-credit")));
 
     private async Task<CaseId> AddCase()
     {

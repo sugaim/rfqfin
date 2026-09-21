@@ -19,15 +19,19 @@ public sealed class PostgreSqlOperationalQueries(
             .Where(item => dbContext.MasterUsers.Any(user =>
                 user.UserId == item.Current.AssignedTraderId
                 && user.DeskId == currentUser.User.DeskId.Value));
-        if (search.From is not null)
+        if (search.From is not null || search.To is not null)
         {
-            var from = new DateTimeOffset(search.From.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-            query = query.Where(item => item.CreatedAt >= from);
-        }
-        if (search.To is not null)
-        {
-            var to = new DateTimeOffset(search.To.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-            query = query.Where(item => item.CreatedAt < to);
+            var deskTimeZone = await ResolveDeskTimeZoneAsync(cancellationToken);
+            if (search.From is not null)
+            {
+                var from = DeskDateBoundary.ToUtc(search.From.Value, deskTimeZone);
+                query = query.Where(item => item.CreatedAt >= from);
+            }
+            if (search.To is not null)
+            {
+                var to = DeskDateBoundary.ToUtc(search.To.Value.AddDays(1), deskTimeZone);
+                query = query.Where(item => item.CreatedAt < to);
+            }
         }
         if (search.ClientId is not null) query = query.Where(item => item.ClientId == search.ClientId.Value);
         if (search.SecurityId is not null) query = query.Where(item => item.SecurityId == search.SecurityId.Value);
@@ -81,10 +85,16 @@ public sealed class PostgreSqlOperationalQueries(
     public async Task<IReadOnlyList<EodSummaryItem>> GetEodAsync(
         DateOnly date, CancellationToken cancellationToken = default)
     {
-        var from = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var to = from.AddDays(1);
+        _ = date;
+        var deskId = currentUser.User.DeskId.Value;
         var rows = await dbContext.RfqCases.AsNoTracking()
-            .Where(item => item.CreatedAt >= from && item.CreatedAt < to)
+            .Where(item => dbContext.MasterUsers.Any(user =>
+                    user.UserId == item.Current.AssignedTraderId
+                    && user.DeskId == deskId)
+                && (item.Current.RfqStatus == RfqStatus.Active
+                    || item.Current.RfqStatus == RfqStatus.Presented
+                    || item.Current.RfqStatus == RfqStatus.Hit
+                    || item.Current.RfqStatus == RfqStatus.Away))
             .Select(item => new { item.Current.ContactOwnerId, item.Current.RfqStatus })
             .ToListAsync(cancellationToken);
         return rows.GroupBy(item => item.ContactOwnerId)
@@ -92,7 +102,7 @@ public sealed class PostgreSqlOperationalQueries(
                 group.Count(item => item.RfqStatus is RfqStatus.Active or RfqStatus.Presented),
                 group.Count(item => item.RfqStatus == RfqStatus.Hit),
                 group.Count(item => item.RfqStatus == RfqStatus.Away)))
-            .OrderBy(item => item.ContactOwnerId).ToArray();
+            .OrderBy(item => item.ContactOwnerId.Value).ToArray();
     }
 
     public async Task<GridConfig?> GetGridConfigAsync(string screenId, string configKey,
@@ -126,4 +136,34 @@ public sealed class PostgreSqlOperationalQueries(
 
     private static GridConfig ToConfig(UserGridConfigEntity item) => new(
         item.ScreenId, item.ConfigKey, item.Version, item.ConfigJson, item.UpdatedAt);
+
+    private async Task<TimeZoneInfo> ResolveDeskTimeZoneAsync(
+        CancellationToken cancellationToken)
+    {
+        var deskId = currentUser.User.DeskId.Value;
+        var timeZoneId = await dbContext.Desks.AsNoTracking()
+            .Where(item => item.DeskId == deskId)
+            .Select(item => item.TimeZoneId)
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new KeyNotFoundException($"Desk '{deskId}' was not found.");
+        return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+    }
+}
+
+internal static class DeskDateBoundary
+{
+    public static DateTimeOffset ToUtc(DateOnly localDate, TimeZoneInfo timeZone)
+    {
+        ArgumentNullException.ThrowIfNull(timeZone);
+        var localMidnight = DateTime.SpecifyKind(
+            localDate.ToDateTime(TimeOnly.MinValue),
+            DateTimeKind.Unspecified);
+        if (timeZone.IsInvalidTime(localMidnight))
+        {
+            throw new InvalidOperationException(
+                $"Local midnight {localDate:yyyy-MM-dd} does not exist in timezone '{timeZone.Id}'.");
+        }
+
+        return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localMidnight, timeZone));
+    }
 }
