@@ -27,6 +27,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
             Detail = "One or more request values are invalid.",
         };
         problem.Extensions["code"] = "Validation";
+        problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
         return new BadRequestObjectResult(problem);
     };
 });
@@ -35,6 +36,7 @@ builder.Services.AddRfqApplication();
 builder.Services.AddRfqInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, DevelopmentCurrentUser>();
+builder.Services.AddSingleton<IIncidentReporter, LoggingIncidentReporter>();
 builder.Services.AddHostedService<QuoteExpiryWorker>();
 
 var app = builder.Build();

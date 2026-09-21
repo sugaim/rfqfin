@@ -1,34 +1,40 @@
 using Microsoft.AspNetCore.Mvc;
-using Rfq.Application;
 using Rfq.Domain;
 
 namespace Rfq.Api;
 
 public sealed class ApiErrorMiddleware(
     RequestDelegate next,
-    ILogger<ApiErrorMiddleware> logger)
+    IIncidentReporter incidentReporter)
 {
     public async Task InvokeAsync(HttpContext context)
     {
         try { await next(context); }
         catch (Exception exception)
         {
-            var (status, code) = exception switch
+            var mapped = default((int Status, string Code));
+            var isExpected = exception is ExpectedRfqException expected
+                && TryMap(expected.Kind, out mapped);
+            var (status, code) = isExpected
+                ? mapped
+                : (StatusCodes.Status500InternalServerError, "InternalServerError");
+            if (!isExpected)
             {
-                CalculationFailureException => (422, "CalculationFailure"),
-                UnauthorizedAccessException => (403, "Forbidden"),
-                KeyNotFoundException => (404, "NotFound"),
-                StateVersionMismatchException => (409, "Conflict"),
-                DomainRuleViolationException => (409, "Conflict"),
-                DomainValidationException => (400, "Validation"),
-                InvalidOperationException => (409, "Conflict"),
-                ArgumentException => (400, "Validation"),
-                _ => (500, "InternalServerError"),
-            };
-            if (status == StatusCodes.Status500InternalServerError)
-                logger.LogError(exception, "An unexpected error occurred while processing an HTTP request.");
+                try
+                {
+                    await incidentReporter.ReportAsync(new Incident(
+                        exception,
+                        "ApiErrorMiddleware",
+                        context.TraceIdentifier,
+                        $"{context.Request.Method} {context.Request.Path}"));
+                }
+                catch
+                {
+                    // Incident delivery is best-effort and must not replace the original response.
+                }
+            }
 
-            var detail = status == StatusCodes.Status500InternalServerError
+            var detail = !isExpected
                 ? "An unexpected error occurred."
                 : exception.Message;
             context.Response.StatusCode = status;
@@ -37,9 +43,28 @@ public sealed class ApiErrorMiddleware(
                 Status = status,
                 Title = code,
                 Detail = detail,
-                Extensions = { ["code"] = code },
+                Extensions =
+                {
+                    ["code"] = code,
+                    ["traceId"] = context.TraceIdentifier,
+                },
             });
         }
     }
 
+    private static bool TryMap(RfqErrorKind kind, out (int Status, string Code) mapped)
+    {
+        mapped = kind switch
+        {
+            RfqErrorKind.Validation => (StatusCodes.Status400BadRequest, "Validation"),
+            RfqErrorKind.InvalidState => (StatusCodes.Status409Conflict, "InvalidState"),
+            RfqErrorKind.VersionConflict => (StatusCodes.Status409Conflict, "VersionConflict"),
+            RfqErrorKind.NotFound => (StatusCodes.Status404NotFound, "NotFound"),
+            RfqErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
+            RfqErrorKind.CalculationFailure =>
+                (StatusCodes.Status422UnprocessableEntity, "CalculationFailure"),
+            _ => default,
+        };
+        return Enum.IsDefined(kind);
+    }
 }

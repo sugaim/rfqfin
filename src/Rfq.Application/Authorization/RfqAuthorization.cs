@@ -29,9 +29,8 @@ public sealed class RfqAuthorization : IRfqAuthorization
 
         if (rfqCase.AssignedTraderId != user.UserId && !confirmed)
         {
-            throw new ArgumentException(
-                "Confirmation is required to pick up an RFQ assigned to another Trader.",
-                nameof(confirmed));
+            throw new RfqRequestValidationException(
+                "Confirmation is required to pick up an RFQ assigned to another Trader.");
         }
     }
 
@@ -46,7 +45,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
 
         if (rfqCase.AssignedTraderId != user.UserId)
         {
-            throw new UnauthorizedAccessException("Only the owning Trader can release the RFQ.");
+            throw new RfqForbiddenException("Only the owning Trader can release the RFQ.");
         }
     }
 
@@ -66,19 +65,18 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureOpen(rfqCase);
         if (rfqCase.Ownership is not Owned)
         {
-            throw new InvalidOperationException("Unowned RFQs do not require Take Over.");
+            throw new DomainRuleViolationException("Unowned RFQs do not require Take Over.");
         }
 
         if (rfqCase.AssignedTraderId == user.UserId)
         {
-            throw new InvalidOperationException("The RFQ is already owned by this Trader.");
+            throw new DomainRuleViolationException("The RFQ is already owned by this Trader.");
         }
 
         if (!confirmed)
         {
-            throw new ArgumentException(
-                "Strong confirmation is required to take over an owned RFQ.",
-                nameof(confirmed));
+            throw new RfqRequestValidationException(
+                "Strong confirmation is required to take over an owned RFQ.");
         }
     }
 
@@ -87,18 +85,18 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureRole(user, UserRole.Trader);
         if (!state.IsOpen)
         {
-            throw new InvalidOperationException("Quotes can only be edited for an Open RFQ.");
+            throw new DomainRuleViolationException("Quotes can only be edited for an Open RFQ.");
         }
 
         if (state.Ownership is not Owned || state.AssignedTraderId != user.UserId)
         {
-            throw new UnauthorizedAccessException(
+            throw new RfqForbiddenException(
                 "Only the owning Trader can edit the WorkingQuote.");
         }
 
         if (state.QuoteState is not QuoteRequested)
         {
-            throw new InvalidOperationException(
+            throw new DomainRuleViolationException(
                 "WorkingQuote editing requires QuoteStatus Requested.");
         }
     }
@@ -109,7 +107,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureOpen(rfqCase);
         if (rfqCase.Ownership is not Owned || rfqCase.AssignedTraderId != user.UserId)
         {
-            throw new UnauthorizedAccessException(
+            throw new RfqForbiddenException(
                 "Only the owning Trader can Confirm the WorkingQuote.");
         }
 
@@ -125,7 +123,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureOpen(rfqCase);
         if (rfqCase.ContactOwnerId != user.UserId)
         {
-            throw new UnauthorizedAccessException(
+            throw new RfqForbiddenException(
                 "Only the current Contact Owner can Present or Unpresent the RFQ.");
         }
     }
@@ -136,7 +134,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureOpen(rfqCase);
         if (rfqCase.Ownership is not Owned || rfqCase.AssignedTraderId != user.UserId)
         {
-            throw new UnauthorizedAccessException(
+            throw new RfqForbiddenException(
                 "Only the owning Trader can withdraw a quote.");
         }
     }
@@ -155,7 +153,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureContactOwnerIdentity(user, rfqCase, "correct the outcome of");
         if (rfqCase.Lifecycle is not ClosedRfq)
         {
-            throw new InvalidOperationException("Only a Closed RFQ outcome can be corrected.");
+            throw new DomainRuleViolationException("Only a Closed RFQ outcome can be corrected.");
         }
     }
 
@@ -176,7 +174,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureSalesOrTrader(user);
         if (rfqCase.ContactOwnerId != user.UserId)
         {
-            throw new UnauthorizedAccessException(
+            throw new RfqForbiddenException(
                 "Only the current Contact Owner can change the Revision.");
         }
     }
@@ -188,7 +186,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         if (rfqCase.ContactOwnerId != user.UserId)
         {
-            throw new UnauthorizedAccessException(
+            throw new RfqForbiddenException(
                 $"Only the current Contact Owner can {operation} the RFQ.");
         }
     }
@@ -197,7 +195,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         if (!user.Roles.Contains(role))
         {
-            throw new UnauthorizedAccessException($"The {role} role is required.");
+            throw new RfqForbiddenException($"The {role} role is required.");
         }
     }
 
@@ -206,7 +204,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         if (!user.Roles.Contains(UserRole.Sales)
             && !user.Roles.Contains(UserRole.Trader))
         {
-            throw new UnauthorizedAccessException("The Sales or Trader role is required.");
+            throw new RfqForbiddenException("The Sales or Trader role is required.");
         }
     }
 

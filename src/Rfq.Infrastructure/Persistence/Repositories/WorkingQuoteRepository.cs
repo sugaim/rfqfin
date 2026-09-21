@@ -29,9 +29,9 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
             .SingleOrDefaultAsync(
                 item => item.RevisionId == rfqCase.Current.CurrentRevisionId,
                 cancellationToken)
-            ?? throw new KeyNotFoundException("WorkingQuote was not found.");
+            ?? throw new RfqInvariantException("WorkingQuote was not found.");
         var settlementDate = rfqCase.Current.CurrentRevision.SettlementDate
-            ?? throw new InvalidOperationException("Confirmed Revision is missing SettlementDate.");
+            ?? throw new RfqInvariantException("Confirmed Revision is missing SettlementDate.");
 
         if (rfqCase.Current.Lifecycle != RfqLifecycleKind.Open
             || rfqCase.Current.RfqStatus != RfqStatus.Active)
@@ -106,18 +106,28 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
 
 internal static class WorkingQuoteMapper
 {
-    public static WorkingQuote ToDomain(WorkingQuoteEntity entity) => WorkingQuote.Restore(
-        new RevisionId(entity.RevisionId),
-        entity.Mode,
-        entity.CalculatedPayloadJson is null ? null
-            : QuotePayloadPersistence.DeserializeCalculated(entity.CalculatedPayloadJson),
-        entity.ManualPayloadJson is null ? null
-            : QuotePayloadPersistence.DeserializeManual(entity.ManualPayloadJson),
-        new StateVersion(entity.Version),
-        entity.CreatedAt,
-        UserId.Create(entity.CreatedBy),
-        entity.UpdatedAt,
-        UserId.Create(entity.UpdatedBy));
+    public static WorkingQuote ToDomain(WorkingQuoteEntity entity)
+    {
+        try
+        {
+            return WorkingQuote.Restore(
+                new RevisionId(entity.RevisionId),
+                entity.Mode,
+                entity.CalculatedPayloadJson is null ? null
+                    : QuotePayloadPersistence.DeserializeCalculated(entity.CalculatedPayloadJson),
+                entity.ManualPayloadJson is null ? null
+                    : QuotePayloadPersistence.DeserializeManual(entity.ManualPayloadJson),
+                new StateVersion(entity.Version),
+                entity.CreatedAt,
+                UserId.Create(entity.CreatedBy),
+                entity.UpdatedAt,
+                UserId.Create(entity.UpdatedBy));
+        }
+        catch (DomainValidationException exception)
+        {
+            throw new RfqInvariantException("Persisted WorkingQuote is invalid.", exception);
+        }
+    }
 
     public static WorkingQuoteEntity ToEntity(WorkingQuote quote)
     {

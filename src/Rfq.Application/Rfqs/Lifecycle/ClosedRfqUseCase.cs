@@ -9,7 +9,7 @@ internal static class ClosedRfqUseCase
         CaseId caseId,
         CancellationToken cancellationToken) =>
         await cases.GetAsync(caseId, cancellationToken)
-            ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
+            ?? throw new RfqNotFoundException($"RFQ Case '{caseId}' was not found.");
 
     public static async Task<CloseRfqResult> ApplyAsync(
         RfqCase rfq,

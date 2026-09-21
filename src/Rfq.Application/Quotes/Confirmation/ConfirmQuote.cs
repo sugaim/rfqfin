@@ -32,7 +32,7 @@ public sealed class ConfirmQuote(
         var workingQuote = await workingQuotes.GetAsync(
             rfqCase.CurrentRevision.RevisionId,
             cancellationToken)
-            ?? throw new KeyNotFoundException("WorkingQuote was not found.");
+            ?? throw new RfqInvariantException("WorkingQuote was not found.");
         if (workingQuote.Version != expectedWorkingQuoteVersion)
         {
             throw new StateVersionMismatchException("The WorkingQuote was changed by another user.");

@@ -24,7 +24,7 @@ public sealed class UpdateTraderMemo(
             rfqCase,
             cancellationToken);
         var traderMemo = await memos.GetTraderAsync(caseId, cancellationToken)
-            ?? throw new KeyNotFoundException(
+            ?? throw new RfqInvariantException(
                 $"Trader Memo for RFQ Case '{caseId}' was not found.");
         traderMemo = TraderMemoTransitions.Update(traderMemo, memo, expectedVersion);
         memos.Update(traderMemo);

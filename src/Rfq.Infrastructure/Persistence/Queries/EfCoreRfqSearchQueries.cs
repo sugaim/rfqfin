@@ -68,7 +68,7 @@ public sealed class EfCoreRfqSearchQueries(
             .Where(item => item.DeskId == deskId)
             .Select(item => item.TimeZoneId)
             .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new KeyNotFoundException($"Desk '{deskId}' was not found.");
+            ?? throw new RfqInvariantException($"Desk '{deskId}' was not found.");
         return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
     }
 }

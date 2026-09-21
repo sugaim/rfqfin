@@ -61,7 +61,7 @@ public sealed class CalculateWorkingQuote(
         if (rfqCase.CurrentRevision.RevisionId != before.RevisionId
             || rfqCase.Version != expectedCurrentVersion)
         {
-            throw new InvalidOperationException(
+            throw new StateVersionMismatchException(
                 "The RFQ state changed while calculation was in progress.");
         }
 
@@ -69,7 +69,7 @@ public sealed class CalculateWorkingQuote(
         var quote = await workingQuotes.GetAsync(
             rfqCase.CurrentRevision.RevisionId,
             cancellationToken)
-            ?? throw new KeyNotFoundException("WorkingQuote was not found.");
+            ?? throw new RfqInvariantException("WorkingQuote was not found.");
         quote = WorkingQuoteTransitions.ApplyCalculated(
             quote,
             success.Payload,
@@ -85,7 +85,7 @@ public sealed class CalculateWorkingQuote(
         CaseId caseId,
         CancellationToken cancellationToken) =>
         await workingQuotes.GetEditContextAsync(caseId, cancellationToken)
-            ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
+            ?? throw new RfqNotFoundException($"RFQ Case '{caseId}' was not found.");
 
     private static void ValidateExpected(
         QuoteEditContext context,
@@ -94,12 +94,12 @@ public sealed class CalculateWorkingQuote(
     {
         if (context.Version != expectedCurrentVersion)
         {
-            throw new InvalidOperationException("The RFQ was changed by another user.");
+            throw new StateVersionMismatchException("The RFQ was changed by another user.");
         }
 
         if (context.WorkingQuote.Version != expectedWorkingQuoteVersion)
         {
-            throw new InvalidOperationException("The WorkingQuote was changed by another user.");
+            throw new StateVersionMismatchException("The WorkingQuote was changed by another user.");
         }
     }
 

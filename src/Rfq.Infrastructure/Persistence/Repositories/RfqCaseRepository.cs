@@ -171,7 +171,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         OpenRfq => RfqLifecycleKind.Open,
         CancelledRfq => RfqLifecycleKind.Cancelled,
         ClosedRfq => RfqLifecycleKind.Closed,
-        _ => throw new InvalidOperationException("Unsupported RFQ lifecycle."),
+        _ => throw new RfqInvariantException("Unsupported RFQ lifecycle."),
     };
 
     private static ClosedRfq RestoreClosed(CaseCurrentEntity current, RevisionId revisionId)

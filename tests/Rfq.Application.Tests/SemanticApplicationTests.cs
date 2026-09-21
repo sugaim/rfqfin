@@ -80,8 +80,32 @@ public sealed class SemanticApplicationTests
             new Securities(), new MissingRouting(), new Users(),
             new BusinessDate(), new Settlement(), current);
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+        await Assert.ThrowsAsync<RfqInvariantException>(() =>
             resolver.ExecuteAsync(SecurityId.Create("security")));
+    }
+
+    [Fact]
+    public async Task Request_validation_missing_resource_and_forbidden_are_semantically_typed()
+    {
+        var validator = new AssignedTraderValidator(
+            new Users(), Current(Sales, UserRole.Sales));
+        await Assert.ThrowsAsync<RfqRequestValidationException>(() =>
+            validator.ResolveAsync(Sales));
+
+        var missing = new UpdateInitialDraft(
+            new CaseRepository(null), validator, new RfqAuthorization(),
+            Current(Sales, UserRole.Sales), new UnitOfWork());
+        await Assert.ThrowsAsync<RfqNotFoundException>(() => missing.ExecuteAsync(
+            new UpdateInitialDraftCommand(new CaseId(999), 1_000_000,
+                Today, Today, "", Trader, new StateVersion(1))));
+
+        var draft = Draft();
+        var forbidden = new UpdateInitialDraft(
+            new CaseRepository(draft), validator, new RfqAuthorization(),
+            Current(Trader, UserRole.Trader), new UnitOfWork());
+        await Assert.ThrowsAsync<RfqForbiddenException>(() => forbidden.ExecuteAsync(
+            new UpdateInitialDraftCommand(draft.CaseId, 1_000_000,
+                Today, Today, "", Trader, draft.Version)));
     }
 
     [Fact]
@@ -167,7 +191,7 @@ public sealed class SemanticApplicationTests
             cases, working, calculation, new RfqAuthorization(),
             Current(Trader, UserRole.Trader), new UnitOfWork(), TimeProvider.System);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => useCase.ExecuteAsync(
+        await Assert.ThrowsAsync<StateVersionMismatchException>(() => useCase.ExecuteAsync(
             rfq.CaseId, CalculationDriver.Price, 100m, 0m,
             rfq.Version, quote.Version));
         Assert.Equal(0, working.Updates);
@@ -421,7 +445,7 @@ public sealed class SemanticApplicationTests
     private sealed class MissingRouting : ICategoryRouting
     {
         public Task<UserId> GetDefaultAssignedTraderAsync(CategoryId id, CancellationToken token = default) =>
-            throw new KeyNotFoundException("Category routing is missing.");
+            throw new RfqInvariantException("Category routing is missing.");
         public Task<IReadOnlyList<CategoryRoutingItem>> GetAllAsync(CancellationToken token = default) => throw new NotSupportedException();
         public Task<CategoryRoutingItem> SetDefaultAssignedTraderAsync(CategoryId id, UserId traderId, CancellationToken token = default) => throw new NotSupportedException();
     }

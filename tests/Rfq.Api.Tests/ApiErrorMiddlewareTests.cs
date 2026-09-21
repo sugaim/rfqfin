@@ -1,41 +1,90 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging.Abstractions;
+using Rfq.Application;
+using Rfq.Domain;
 using Xunit;
 
 namespace Rfq.Api.Tests;
 
 public sealed class ApiErrorMiddlewareTests
 {
-    [Fact]
-    public async Task Unknown_exception_returns_generic_500_without_internal_message()
+    public static TheoryData<Exception, int, string> ExpectedErrors => new()
     {
-        const string internalMessage = "password=secret; server=internal-db";
-        var response = await InvokeAsync(new Exception(internalMessage));
+        { new RfqRequestValidationException("validation"), 400, "Validation" },
+        { new DomainRuleViolationException("state"), 409, "InvalidState" },
+        { new StateVersionMismatchException("version"), 409, "VersionConflict" },
+        { new RfqNotFoundException("missing"), 404, "NotFound" },
+        { new RfqForbiddenException("forbidden"), 403, "Forbidden" },
+        { new CalculationFailureException(Guid.NewGuid(), "CALC", "calculation"),
+            422, "CalculationFailure" },
+    };
+
+    public static TheoryData<Exception> UnexpectedErrors => new()
+    {
+        new DomainInvariantException("domain invariant"),
+        new RfqInvariantException("system invariant"),
+        new InvalidOperationException("invalid operation"),
+        new ArgumentException("argument"),
+        new KeyNotFoundException("key"),
+        new UnauthorizedAccessException("unauthorized"),
+        new Exception("unknown"),
+    };
+
+    [Theory]
+    [MemberData(nameof(ExpectedErrors))]
+    public async Task Expected_error_kind_maps_to_http_contract(
+        Exception exception, int status, string code)
+    {
+        var reporter = new IncidentReporter();
+        var response = await InvokeAsync(exception, reporter);
+
+        Assert.Equal(status, response.Status);
+        Assert.Equal(code, response.Code);
+        Assert.Equal(exception.Message, response.Detail);
+        Assert.Equal("trace-07", response.TraceId);
+        Assert.Empty(reporter.Incidents);
+    }
+
+    [Theory]
+    [MemberData(nameof(UnexpectedErrors))]
+    public async Task Unexpected_and_bcl_exceptions_return_generic_500_and_report_once(
+        Exception exception)
+    {
+        var reporter = new IncidentReporter();
+        var response = await InvokeAsync(exception, reporter);
 
         Assert.Equal(StatusCodes.Status500InternalServerError, response.Status);
         Assert.Equal("InternalServerError", response.Code);
         Assert.Equal("An unexpected error occurred.", response.Detail);
-        Assert.DoesNotContain(internalMessage, response.Json, StringComparison.Ordinal);
+        Assert.Equal("trace-07", response.TraceId);
+        Assert.DoesNotContain(exception.Message, response.Json, StringComparison.Ordinal);
+        var incident = Assert.Single(reporter.Incidents);
+        Assert.Same(exception, incident.Exception);
+        Assert.Equal(response.TraceId, incident.TraceId);
+        Assert.Equal("POST /api/rfqs/1", incident.Operation);
     }
 
     [Fact]
-    public async Task Known_exception_keeps_status_code_and_detail_mapping()
+    public async Task Reporter_failure_does_not_replace_original_500_response()
     {
-        const string detail = "The requested RFQ was not found.";
-        var response = await InvokeAsync(new KeyNotFoundException(detail));
+        var response = await InvokeAsync(
+            new InvalidOperationException("internal"),
+            new IncidentReporter(shouldThrow: true));
 
-        Assert.Equal(StatusCodes.Status404NotFound, response.Status);
-        Assert.Equal("NotFound", response.Code);
-        Assert.Equal(detail, response.Detail);
+        Assert.Equal(StatusCodes.Status500InternalServerError, response.Status);
+        Assert.Equal("An unexpected error occurred.", response.Detail);
     }
 
-    private static async Task<ErrorResponse> InvokeAsync(Exception exception)
+    private static async Task<ErrorResponse> InvokeAsync(
+        Exception exception,
+        IIncidentReporter reporter)
     {
         var middleware = new ApiErrorMiddleware(
-            _ => Task.FromException(exception),
-            NullLogger<ApiErrorMiddleware>.Instance);
+            _ => Task.FromException(exception), reporter);
         var context = new DefaultHttpContext();
+        context.TraceIdentifier = "trace-07";
+        context.Request.Method = "POST";
+        context.Request.Path = "/api/rfqs/1";
         context.Response.Body = new MemoryStream();
 
         await middleware.InvokeAsync(context);
@@ -49,8 +98,27 @@ public sealed class ApiErrorMiddlewareTests
             context.Response.StatusCode,
             root.GetProperty("code").GetString(),
             root.GetProperty("detail").GetString(),
+            root.GetProperty("traceId").GetString(),
             json);
     }
 
-    private sealed record ErrorResponse(int Status, string? Code, string? Detail, string Json);
+    private sealed class IncidentReporter(bool shouldThrow = false) : IIncidentReporter
+    {
+        public List<Incident> Incidents { get; } = [];
+
+        public Task ReportAsync(Incident incident, CancellationToken cancellationToken = default)
+        {
+            Incidents.Add(incident);
+            return shouldThrow
+                ? Task.FromException(new Exception("reporter failed"))
+                : Task.CompletedTask;
+        }
+    }
+
+    private sealed record ErrorResponse(
+        int Status,
+        string? Code,
+        string? Detail,
+        string? TraceId,
+        string Json);
 }

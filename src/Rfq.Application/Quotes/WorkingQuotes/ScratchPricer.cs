@@ -23,7 +23,7 @@ public sealed class ScratchPricer(ICalculationClient calculationClient)
         {
             CalculationSuccess success => success.Payload,
             CalculationError error => throw new CalculationFailureException(id, error.Code, error.Message),
-            _ => throw new InvalidOperationException("Unknown calculation response."),
+            _ => throw new RfqInvariantException("Unknown calculation response."),
         };
     }
 }

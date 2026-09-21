@@ -15,7 +15,7 @@ public sealed class SemanticDomainTests
     {
         Assert.Throws<DomainValidationException>(() => new StateVersion(0));
         Assert.Equal(2, new StateVersion(1).Next().Value);
-        Assert.Throws<DomainValidationException>(() => new StateVersion(long.MaxValue).Next());
+        Assert.Throws<DomainInvariantException>(() => new StateVersion(long.MaxValue).Next());
     }
 
     [Fact]

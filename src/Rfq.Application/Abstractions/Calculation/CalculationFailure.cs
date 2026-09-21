@@ -5,7 +5,7 @@ namespace Rfq.Application;
 public sealed class CalculationFailureException(
     Guid failureLogId,
     string code,
-    string message) : Exception(message)
+    string message) : ExpectedRfqException(RfqErrorKind.CalculationFailure, message)
 {
     public Guid FailureLogId { get; } = failureLogId;
 

@@ -31,7 +31,8 @@ public sealed class UpdateSalesMemo(
         CaseId caseId,
         CancellationToken cancellationToken) =>
         await memos.GetSalesAsync(caseId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Sales Memo for RFQ Case '{caseId}' was not found.");
+            ?? throw new RfqInvariantException(
+                $"Sales Memo for RFQ Case '{caseId}' was not found.");
 
     internal static async Task EnsureDeskAccessAsync(
         IUserDirectory users,
@@ -44,7 +45,7 @@ public sealed class UpdateSalesMemo(
             cancellationToken);
         if (assignedTrader is null || assignedTrader.DeskId != user.DeskId)
         {
-            throw new UnauthorizedAccessException(
+            throw new RfqForbiddenException(
                 "The RFQ Case is outside the current user's desk scope.");
         }
     }

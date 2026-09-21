@@ -9,7 +9,7 @@ internal static class OwnershipUseCase
         CaseId caseId,
         CancellationToken cancellationToken) =>
         await rfqCases.GetAsync(caseId, cancellationToken)
-            ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
+            ?? throw new RfqNotFoundException($"RFQ Case '{caseId}' was not found.");
 
     public static async Task<OwnershipResult> SaveAsync(
         IRfqCaseRepository rfqCases,

@@ -12,14 +12,13 @@ public sealed class AssignedTraderValidator(
     {
         ArgumentNullException.ThrowIfNull(assignedTraderId);
         var assignedTrader = await userDirectory.ResolveAsync(assignedTraderId, cancellationToken)
-            ?? throw new KeyNotFoundException(
+            ?? throw new RfqNotFoundException(
                 $"Assigned Trader '{assignedTraderId.Value}' was not found.");
         if (!assignedTrader.Roles.Contains(UserRole.Trader)
             || assignedTrader.DeskId != currentUser.User.DeskId)
         {
-            throw new ArgumentException(
-                "Assigned Trader must be a Trader on the current user's desk.",
-                nameof(assignedTraderId));
+            throw new RfqRequestValidationException(
+                "Assigned Trader must be a Trader on the current user's desk.");
         }
 
         return assignedTraderId;

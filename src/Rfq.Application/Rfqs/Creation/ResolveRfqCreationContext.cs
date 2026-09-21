@@ -16,17 +16,17 @@ public sealed class ResolveRfqCreationContext(
     {
         var businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
         var security = await securitySearch.ResolveAsync(securityId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Security '{securityId}' was not found.");
+            ?? throw new RfqNotFoundException($"Security '{securityId}' was not found.");
         var categoryId = security.CategoryId;
         var assignedTraderId = await categoryRouting.GetDefaultAssignedTraderAsync(
             categoryId, cancellationToken);
         var assignedTrader = await userDirectory.ResolveAsync(assignedTraderId, cancellationToken)
-            ?? throw new KeyNotFoundException(
+            ?? throw new RfqInvariantException(
                 $"Assigned Trader '{assignedTraderId.Value}' was not found.");
         if (!assignedTrader.Roles.Contains(UserRole.Trader)
             || assignedTrader.DeskId != currentUser.User.DeskId)
         {
-            throw new InvalidOperationException(
+            throw new RfqInvariantException(
                 "The configured Assigned Trader must be a Trader on the current user's desk.");
         }
 

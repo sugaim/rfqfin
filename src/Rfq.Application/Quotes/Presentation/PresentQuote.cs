@@ -21,7 +21,7 @@ public sealed class PresentQuote(
             rfqCase, expectedCurrentVersion);
 
         var quoteId = rfqCase.CurrentQuoteId
-            ?? throw new InvalidOperationException("Current ConfirmedQuote was not found.");
+            ?? throw new RfqInvariantException("Current ConfirmedQuote was not found.");
         rfqCases.Update(rfqCase);
         eventSink.Record(new QuoteTransition(
             QuoteTransitionKind.Presented,

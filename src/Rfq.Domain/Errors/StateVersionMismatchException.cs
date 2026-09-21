@@ -1,8 +1,9 @@
 namespace Rfq.Domain;
 
-public sealed class StateVersionMismatchException : DomainException
+public sealed class StateVersionMismatchException : ExpectedRfqException
 {
-    public StateVersionMismatchException(string message) : base(message) { }
+    public StateVersionMismatchException(string message)
+        : base(RfqErrorKind.VersionConflict, message) { }
     public StateVersionMismatchException(string message, Exception innerException)
-        : base(message, innerException) { }
+        : base(RfqErrorKind.VersionConflict, message, innerException) { }
 }

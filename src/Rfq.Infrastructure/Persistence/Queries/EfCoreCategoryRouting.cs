@@ -19,22 +19,37 @@ public sealed class EfCoreCategoryRouting(
             .Where(routing => routing.CategoryId == categoryId.Value)
             .Select(routing => routing.DefaultTraderId)
             .SingleOrDefaultAsync(cancellationToken);
-        return traderId is null
-            ? throw new InvalidOperationException(
-                $"No default Assigned Trader is configured for category '{categoryId.Value}'.")
-            : UserId.Create(traderId);
+        if (traderId is null)
+            throw new RfqInvariantException(
+                $"No default Assigned Trader is configured for category '{categoryId.Value}'.");
+        try { return UserId.Create(traderId); }
+        catch (DomainValidationException exception)
+        {
+            throw new RfqInvariantException(
+                "The configured Assigned Trader ID is invalid.", exception);
+        }
     }
 
     public async Task<IReadOnlyList<CategoryRoutingItem>> GetAllAsync(
-        CancellationToken cancellationToken = default) => await (
-        from routing in dbContext.CategoryRoutings.AsNoTracking()
-        join category in dbContext.Categories.AsNoTracking()
-            on routing.CategoryId equals category.CategoryId
-        join trader in dbContext.MasterUsers.AsNoTracking()
-            on routing.DefaultTraderId equals trader.UserId
-        orderby category.Name
-        select new CategoryRoutingItem(CategoryId.Create(category.CategoryId), category.Name,
-            UserId.Create(trader.UserId), trader.Name)).ToListAsync(cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await (
+                from routing in dbContext.CategoryRoutings.AsNoTracking()
+                join category in dbContext.Categories.AsNoTracking()
+                    on routing.CategoryId equals category.CategoryId
+                join trader in dbContext.MasterUsers.AsNoTracking()
+                    on routing.DefaultTraderId equals trader.UserId
+                orderby category.Name
+                select new CategoryRoutingItem(CategoryId.Create(category.CategoryId), category.Name,
+                    UserId.Create(trader.UserId), trader.Name)).ToListAsync(cancellationToken);
+        }
+        catch (DomainValidationException exception)
+        {
+            throw new RfqInvariantException("Persisted category routing is invalid.", exception);
+        }
+    }
 
     public async Task<CategoryRoutingItem> SetDefaultAssignedTraderAsync(
         CategoryId categoryId,
@@ -43,18 +58,17 @@ public sealed class EfCoreCategoryRouting(
     {
         var category = await dbContext.Categories.SingleOrDefaultAsync(
             item => item.CategoryId == categoryId.Value, cancellationToken)
-            ?? throw new KeyNotFoundException($"Category '{categoryId.Value}' was not found.");
+            ?? throw new RfqNotFoundException($"Category '{categoryId.Value}' was not found.");
         var trader = await dbContext.MasterUsers.SingleOrDefaultAsync(
             item => item.UserId == traderId.Value, cancellationToken)
-            ?? throw new KeyNotFoundException($"Trader '{traderId.Value}' was not found.");
+            ?? throw new RfqNotFoundException($"Trader '{traderId.Value}' was not found.");
         if (!trader.Roles.Contains(UserRole.Trader.ToString())
             || trader.DeskId != currentUser.User.DeskId.Value)
-            throw new ArgumentException(
-                "Default Assigned Trader must be a Trader on the current user's desk.",
-                nameof(traderId));
+            throw new RfqRequestValidationException(
+                "Default Assigned Trader must be a Trader on the current user's desk.");
         var routing = await dbContext.CategoryRoutings.SingleOrDefaultAsync(
             item => item.CategoryId == categoryId.Value, cancellationToken)
-            ?? throw new InvalidOperationException(
+            ?? throw new RfqInvariantException(
                 $"No routing row exists for category '{categoryId.Value}'.");
         routing.DefaultTraderId = trader.UserId;
         await dbContext.SaveChangesAsync(cancellationToken);

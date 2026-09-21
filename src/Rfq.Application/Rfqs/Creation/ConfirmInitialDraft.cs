@@ -26,9 +26,8 @@ public sealed class ConfirmInitialDraft(
             command.AssignedTraderId,
             cancellationToken);
         if (command.StandardSettlementDate != rfqCase.CurrentRevision.StandardSettlementDate)
-            throw new ArgumentException(
-                "Standard Settlement Date cannot differ from the RFQ creation context.",
-                nameof(command));
+            throw new RfqRequestValidationException(
+                "Standard Settlement Date cannot differ from the RFQ creation context.");
         var businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
         rfqCase = RfqLifecycleTransitions.ConfirmInitial(

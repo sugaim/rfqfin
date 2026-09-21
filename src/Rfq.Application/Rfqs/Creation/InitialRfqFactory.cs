@@ -19,12 +19,11 @@ public sealed class InitialRfqFactory(
         ArgumentNullException.ThrowIfNull(command);
 
         _ = await clientSearch.ResolveAsync(command.ClientId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Client '{command.ClientId.Value}' was not found.");
+            ?? throw new RfqNotFoundException($"Client '{command.ClientId.Value}' was not found.");
         var context = await resolveCreationContext.ExecuteAsync(command.SecurityId, cancellationToken);
         if (command.StandardSettlementDate != context.StandardSettlementDate)
-            throw new ArgumentException(
-                "Standard Settlement Date no longer matches the authoritative creation context.",
-                nameof(command));
+            throw new RfqRequestValidationException(
+                "Standard Settlement Date no longer matches the authoritative creation context.");
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
             cancellationToken);

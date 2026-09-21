@@ -50,7 +50,7 @@ internal static class BulkOperation
                     ? BulkItemStatus.Succeeded
                     : BulkItemStatus.Skipped));
             }
-            catch (Exception exception) when (TryMap(exception, out var code))
+            catch (ExpectedRfqException exception) when (TryMap(exception.Kind, out var code))
             {
                 unitOfWork.DiscardChanges();
                 results.Add(new BulkItemResult(
@@ -61,22 +61,21 @@ internal static class BulkOperation
         return results;
     }
 
-    private static bool TryMap(Exception exception, out BulkFailureCode code)
+    private static bool TryMap(RfqErrorKind kind, out BulkFailureCode code)
     {
-        code = exception switch
+        code = kind switch
         {
-            StateVersionMismatchException => BulkFailureCode.VersionConflict,
-            DomainRuleViolationException => BulkFailureCode.InvalidState,
-            DomainValidationException or ArgumentException => BulkFailureCode.Validation,
-            UnauthorizedAccessException => BulkFailureCode.Forbidden,
-            KeyNotFoundException => BulkFailureCode.NotFound,
+            RfqErrorKind.Validation => BulkFailureCode.Validation,
+            RfqErrorKind.InvalidState => BulkFailureCode.InvalidState,
+            RfqErrorKind.VersionConflict => BulkFailureCode.VersionConflict,
+            RfqErrorKind.NotFound => BulkFailureCode.NotFound,
+            RfqErrorKind.Forbidden => BulkFailureCode.Forbidden,
             _ => default,
         };
-        return exception is StateVersionMismatchException
-            or DomainRuleViolationException
-            or DomainValidationException
-            or ArgumentException
-            or UnauthorizedAccessException
-            or KeyNotFoundException;
+        return kind is RfqErrorKind.Validation
+            or RfqErrorKind.InvalidState
+            or RfqErrorKind.VersionConflict
+            or RfqErrorKind.NotFound
+            or RfqErrorKind.Forbidden;
     }
 }

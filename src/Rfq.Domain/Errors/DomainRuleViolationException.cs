@@ -1,3 +1,4 @@
 namespace Rfq.Domain;
 
-public sealed class DomainRuleViolationException(string message) : DomainException(message);
+public sealed class DomainRuleViolationException(string message)
+    : ExpectedRfqException(RfqErrorKind.InvalidState, message);

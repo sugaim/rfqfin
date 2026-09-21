@@ -24,7 +24,7 @@ public sealed class DevelopmentCurrentUser(
                 "sales-a" => Create("sales-a", UserRole.Sales),
                 "trader-a" => Create("trader-a", UserRole.Trader),
                 "trader-b" => Create("trader-b", UserRole.Trader),
-                _ => throw new UnauthorizedAccessException(
+                _ => throw new RfqForbiddenException(
                     $"Unknown development identity '{userId}'."),
             };
         }

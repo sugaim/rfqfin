@@ -28,17 +28,17 @@ internal static class WorkingQuoteMutation
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         if (rfqCase.Version != expectedCurrentVersion)
         {
-            throw new InvalidOperationException("The RFQ was changed by another user.");
+            throw new StateVersionMismatchException("The RFQ was changed by another user.");
         }
 
         authorization.EnsureCanQuote(user, CalculateWorkingQuote.ToAuthorizationState(rfqCase));
         var quote = await workingQuotes.GetAsync(
             rfqCase.CurrentRevision.RevisionId,
             cancellationToken)
-            ?? throw new KeyNotFoundException("WorkingQuote was not found.");
+            ?? throw new RfqInvariantException("WorkingQuote was not found.");
         if (quote.Version != expectedWorkingQuoteVersion)
         {
-            throw new InvalidOperationException("The WorkingQuote was changed by another user.");
+            throw new StateVersionMismatchException("The WorkingQuote was changed by another user.");
         }
 
         return (rfqCase, quote);

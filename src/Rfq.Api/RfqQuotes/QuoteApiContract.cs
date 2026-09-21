@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Rfq.Application;
 using Rfq.Domain;
 
 namespace Rfq.Api.RfqQuotes;
@@ -27,11 +28,11 @@ public static class QuoteApiMapper
         QuoteExpiryType.None when request.Minutes is null => new QuoteExpiry.None(),
         QuoteExpiryType.After when request.Minutes is > 0 =>
             new QuoteExpiry.After(TimeSpan.FromMinutes(request.Minutes.Value)),
-        QuoteExpiryType.None => throw new ArgumentException(
-            "A none expiry must not include minutes.", nameof(request)),
-        QuoteExpiryType.After => throw new ArgumentException(
-            "An after expiry requires positive integer minutes.", nameof(request)),
-        _ => throw new ArgumentException("Unknown Quote Expiry type.", nameof(request)),
+        QuoteExpiryType.None => throw new RfqRequestValidationException(
+            "A none expiry must not include minutes."),
+        QuoteExpiryType.After => throw new RfqRequestValidationException(
+            "An after expiry requires positive integer minutes."),
+        _ => throw new RfqRequestValidationException("Unknown Quote Expiry type."),
     };
 
     public static QuoteExpiryResponse ToApi(QuoteExpiry expiry) => expiry switch
@@ -65,14 +66,14 @@ public static class QuoteApiMapper
         CalculationDriverValue.BbgYield => CalculationDriver.BbgYield,
         CalculationDriverValue.SimpleYield => CalculationDriver.SimpleYield,
         CalculationDriverValue.GSpread => CalculationDriver.GSpread,
-        _ => throw new ArgumentException("Unknown Calculation Driver.", nameof(driver)),
+        _ => throw new RfqRequestValidationException("Unknown Calculation Driver."),
     };
 
     public static WorkingQuoteMode ToDomain(QuoteMode mode) => mode switch
     {
         QuoteMode.Calculated => WorkingQuoteMode.Calculated,
         QuoteMode.Manual => WorkingQuoteMode.Manual,
-        _ => throw new ArgumentException("Unknown Quote Mode.", nameof(mode)),
+        _ => throw new RfqRequestValidationException("Unknown Quote Mode."),
     };
 
     public static QuoteMode ToApi(WorkingQuoteMode mode) => mode switch

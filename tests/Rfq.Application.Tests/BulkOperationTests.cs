@@ -5,6 +5,24 @@ namespace Rfq.Application.Tests;
 
 public sealed class BulkOperationTests
 {
+    public static TheoryData<ExpectedRfqException, BulkFailureCode> SupportedErrors => new()
+    {
+        { new RfqRequestValidationException("validation"), BulkFailureCode.Validation },
+        { new DomainRuleViolationException("state"), BulkFailureCode.InvalidState },
+        { new StateVersionMismatchException("version"), BulkFailureCode.VersionConflict },
+        { new RfqNotFoundException("missing"), BulkFailureCode.NotFound },
+        { new RfqForbiddenException("forbidden"), BulkFailureCode.Forbidden },
+    };
+
+    public static TheoryData<Exception> FatalErrors => new()
+    {
+        new CalculationFailureException(Guid.NewGuid(), "CALC", "calculation"),
+        new InvalidOperationException("invalid operation"),
+        new DomainInvariantException("domain invariant"),
+        new RfqInvariantException("system invariant"),
+        new Exception("unknown"),
+    };
+
     [Fact]
     public async Task Successful_items_commit_independently()
     {
@@ -49,8 +67,11 @@ public sealed class BulkOperationTests
         Assert.Equal(1, unitOfWork.Discards);
     }
 
-    [Fact]
-    public async Task Domain_rule_violation_is_failed_invalid_state_and_next_item_runs()
+    [Theory]
+    [MemberData(nameof(SupportedErrors))]
+    public async Task Supported_error_kind_is_failed_discarded_and_next_item_runs(
+        ExpectedRfqException exception,
+        BulkFailureCode expectedCode)
     {
         var unitOfWork = new UnitOfWork();
         var executed = new List<long>();
@@ -61,49 +82,37 @@ public sealed class BulkOperationTests
             {
                 executed.Add(item.Value);
                 return item.Value == 1
-                    ? Task.FromException<BulkActionOutcome>(
-                        new DomainRuleViolationException("invalid business state"))
+                    ? Task.FromException<BulkActionOutcome>(exception)
                     : Task.FromResult(BulkActionOutcome.Succeeded);
             }, unitOfWork, CancellationToken.None);
 
         Assert.Equal([1L, 2L], executed);
         Assert.Equal(BulkItemStatus.Failed, results[0].Status);
-        Assert.Equal(BulkFailureCode.InvalidState, results[0].Code);
+        Assert.Equal(expectedCode, results[0].Code);
         Assert.Equal(BulkItemStatus.Succeeded, results[1].Status);
         Assert.Equal(1, unitOfWork.Discards);
     }
 
-    [Fact]
-    public async Task Invalid_operation_aborts_bulk_without_running_next_item()
+    [Theory]
+    [MemberData(nameof(FatalErrors))]
+    public async Task Unsupported_or_unexpected_error_aborts_without_running_next_item(
+        Exception exception)
     {
         var unitOfWork = new UnitOfWork();
         var executed = new List<long>();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => BulkOperation.ExecuteAsync(
+        var thrown = await Assert.ThrowsAsync(exception.GetType(), () => BulkOperation.ExecuteAsync(
             [new CaseId(1), new CaseId(2)], item => item,
             (item, _) =>
             {
                 executed.Add(item.Value);
                 return item.Value == 1
-                    ? Task.FromException<BulkActionOutcome>(
-                        new InvalidOperationException("unexpected state"))
+                    ? Task.FromException<BulkActionOutcome>(exception)
                     : Task.FromResult(BulkActionOutcome.Succeeded);
             }, unitOfWork, CancellationToken.None));
 
+        Assert.Same(exception, thrown);
         Assert.Equal([1L], executed);
-        Assert.Equal(0, unitOfWork.Discards);
-    }
-
-    [Fact]
-    public async Task Fatal_exception_aborts_without_being_converted_to_item_failure()
-    {
-        var unitOfWork = new UnitOfWork();
-        await Assert.ThrowsAsync<DomainInvariantException>(() => BulkOperation.ExecuteAsync(
-            [new CaseId(1), new CaseId(2)], item => item,
-            (item, _) => item.Value == 1
-                ? Task.FromException<BulkActionOutcome>(new DomainInvariantException("fatal"))
-                : Task.FromResult(BulkActionOutcome.Succeeded),
-            unitOfWork, CancellationToken.None));
         Assert.Equal(0, unitOfWork.Discards);
     }
 

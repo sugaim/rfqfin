@@ -22,9 +22,8 @@ public sealed class UpdateInitialDraft(
             command.AssignedTraderId,
             cancellationToken);
         if (command.StandardSettlementDate != rfqCase.CurrentRevision.StandardSettlementDate)
-            throw new ArgumentException(
-                "Standard Settlement Date cannot differ from the RFQ creation context.",
-                nameof(command));
+            throw new RfqRequestValidationException(
+                "Standard Settlement Date cannot differ from the RFQ creation context.");
         rfqCase = InitialDraftTransitions.Update(
             rfqCase,
             new RevisionTerms(command.Notional, command.SettlementDate,
@@ -44,7 +43,7 @@ public sealed class UpdateInitialDraft(
         CancellationToken cancellationToken)
     {
         var rfqCase = await rfqCases.GetAsync(caseId, cancellationToken)
-            ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
+            ?? throw new RfqNotFoundException($"RFQ Case '{caseId}' was not found.");
         return rfqCase;
     }
 }

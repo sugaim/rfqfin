@@ -16,7 +16,7 @@ public sealed class EfCoreDeskLocalDateResolver(RfqDbContext dbContext)
             .Where(item => item.DeskId == deskId.Value)
             .Select(item => item.TimeZoneId)
             .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new KeyNotFoundException($"Desk '{deskId.Value}' was not found.");
+            ?? throw new RfqInvariantException($"Desk '{deskId.Value}' was not found.");
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, timeZone).DateTime);
     }

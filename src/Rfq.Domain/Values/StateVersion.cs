@@ -22,8 +22,8 @@ public readonly record struct StateVersion
         }
         catch (OverflowException exception)
         {
-            throw new DomainValidationException(
-                $"StateVersion {Value} cannot be incremented: {exception.Message}");
+            throw new DomainInvariantException(
+                $"StateVersion {Value} cannot be incremented.", exception);
         }
     }
 

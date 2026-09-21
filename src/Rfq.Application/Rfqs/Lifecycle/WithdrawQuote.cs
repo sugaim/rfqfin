@@ -20,7 +20,7 @@ public sealed class WithdrawQuote(
         if (rfq.Lifecycle is ActiveRfq { QuoteState: QuoteRequested })
             return new WithdrawQuoteResult(WithdrawQuoteOutcome.AlreadyRequested, ToResult(rfq));
         var quoteId = rfq.CurrentQuoteId
-            ?? throw new InvalidOperationException("Current quote was not found.");
+            ?? throw new RfqInvariantException("Current quote was not found.");
         rfq = QuoteTransitions.Withdraw(rfq, expectedVersion);
         cases.Update(rfq);
         events.Record(new(QuoteTransitionKind.Withdrawn, quoteId,
