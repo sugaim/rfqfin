@@ -66,7 +66,7 @@ internal static class BulkOperation
         code = exception switch
         {
             StateVersionMismatchException => BulkFailureCode.VersionConflict,
-            DomainRuleViolationException or InvalidOperationException => BulkFailureCode.InvalidState,
+            DomainRuleViolationException => BulkFailureCode.InvalidState,
             DomainValidationException or ArgumentException => BulkFailureCode.Validation,
             UnauthorizedAccessException => BulkFailureCode.Forbidden,
             KeyNotFoundException => BulkFailureCode.NotFound,
@@ -74,7 +74,6 @@ internal static class BulkOperation
         };
         return exception is StateVersionMismatchException
             or DomainRuleViolationException
-            or InvalidOperationException
             or DomainValidationException
             or ArgumentException
             or UnauthorizedAccessException

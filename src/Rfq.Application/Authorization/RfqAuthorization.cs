@@ -24,7 +24,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureOpen(rfqCase);
         if (rfqCase.Ownership is Owned)
         {
-            throw new InvalidOperationException("Owned RFQs cannot be picked up; use Take Over.");
+            throw new DomainRuleViolationException("Owned RFQs cannot be picked up; use Take Over.");
         }
 
         if (rfqCase.AssignedTraderId != user.UserId && !confirmed)
@@ -41,7 +41,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureOpen(rfqCase);
         if (rfqCase.Ownership is not Owned)
         {
-            throw new InvalidOperationException("The RFQ is not owned.");
+            throw new DomainRuleViolationException("The RFQ is not owned.");
         }
 
         if (rfqCase.AssignedTraderId != user.UserId)
@@ -56,7 +56,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
         EnsureOpen(rfqCase);
         if (rfqCase.Ownership is Owned)
         {
-            throw new InvalidOperationException("Owned RFQs cannot be assigned.");
+            throw new DomainRuleViolationException("Owned RFQs cannot be assigned.");
         }
     }
 
@@ -115,7 +115,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
 
         if (rfqCase.QuoteStatus != Domain.QuoteStatus.Requested)
         {
-            throw new InvalidOperationException(
+            throw new DomainRuleViolationException(
                 "Quote Confirm requires QuoteStatus Requested.");
         }
     }
@@ -214,7 +214,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         if (rfqCase.Lifecycle is not OpenRfq)
         {
-            throw new InvalidOperationException("Ownership can only change for an Open RFQ.");
+            throw new DomainRuleViolationException("The operation requires an Open RFQ.");
         }
     }
 }

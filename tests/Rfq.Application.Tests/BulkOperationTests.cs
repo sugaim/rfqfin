@@ -50,6 +50,51 @@ public sealed class BulkOperationTests
     }
 
     [Fact]
+    public async Task Domain_rule_violation_is_failed_invalid_state_and_next_item_runs()
+    {
+        var unitOfWork = new UnitOfWork();
+        var executed = new List<long>();
+
+        var results = await BulkOperation.ExecuteAsync(
+            [new CaseId(1), new CaseId(2)], item => item,
+            (item, _) =>
+            {
+                executed.Add(item.Value);
+                return item.Value == 1
+                    ? Task.FromException<BulkActionOutcome>(
+                        new DomainRuleViolationException("invalid business state"))
+                    : Task.FromResult(BulkActionOutcome.Succeeded);
+            }, unitOfWork, CancellationToken.None);
+
+        Assert.Equal([1L, 2L], executed);
+        Assert.Equal(BulkItemStatus.Failed, results[0].Status);
+        Assert.Equal(BulkFailureCode.InvalidState, results[0].Code);
+        Assert.Equal(BulkItemStatus.Succeeded, results[1].Status);
+        Assert.Equal(1, unitOfWork.Discards);
+    }
+
+    [Fact]
+    public async Task Invalid_operation_aborts_bulk_without_running_next_item()
+    {
+        var unitOfWork = new UnitOfWork();
+        var executed = new List<long>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => BulkOperation.ExecuteAsync(
+            [new CaseId(1), new CaseId(2)], item => item,
+            (item, _) =>
+            {
+                executed.Add(item.Value);
+                return item.Value == 1
+                    ? Task.FromException<BulkActionOutcome>(
+                        new InvalidOperationException("unexpected state"))
+                    : Task.FromResult(BulkActionOutcome.Succeeded);
+            }, unitOfWork, CancellationToken.None));
+
+        Assert.Equal([1L], executed);
+        Assert.Equal(0, unitOfWork.Discards);
+    }
+
+    [Fact]
     public async Task Fatal_exception_aborts_without_being_converted_to_item_failure()
     {
         var unitOfWork = new UnitOfWork();
