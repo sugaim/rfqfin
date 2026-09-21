@@ -23,7 +23,7 @@ public sealed class EfCoreGridConfigStore(
         string screenId,
         string configKey,
         int version,
-        string configJson,
+        string config,
         CancellationToken cancellationToken = default)
     {
         var userId = currentUser.User.UserId.Value;
@@ -36,7 +36,7 @@ public sealed class EfCoreGridConfigStore(
             dbContext.UserGridConfigs.Add(item);
         }
         item.Version = version;
-        item.ConfigJson = configJson;
+        item.ConfigJson = config;
         item.UpdatedAt = timeProvider.GetUtcNow();
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToConfig(item);

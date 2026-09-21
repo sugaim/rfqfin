@@ -9,7 +9,7 @@ public sealed class ApiErrorMiddleware(RequestDelegate next)
     public async Task InvokeAsync(HttpContext context)
     {
         try { await next(context); }
-        catch (Exception exception) when (IsExpected(exception))
+        catch (Exception exception)
         {
             var (status, code) = exception switch
             {
@@ -20,7 +20,8 @@ public sealed class ApiErrorMiddleware(RequestDelegate next)
                 DomainRuleViolationException => (409, "Conflict"),
                 DomainValidationException => (400, "Validation"),
                 InvalidOperationException => (409, "Conflict"),
-                _ => (400, "Validation"),
+                ArgumentException => (400, "Validation"),
+                _ => (500, "InternalServerError"),
             };
             context.Response.StatusCode = status;
             await context.Response.WriteAsJsonAsync(new ProblemDetails
@@ -33,9 +34,4 @@ public sealed class ApiErrorMiddleware(RequestDelegate next)
         }
     }
 
-    private static bool IsExpected(Exception exception) => exception is
-        ArgumentException or InvalidOperationException or UnauthorizedAccessException
-        or KeyNotFoundException or CalculationFailureException
-        or StateVersionMismatchException or DomainRuleViolationException
-        or DomainValidationException;
 }

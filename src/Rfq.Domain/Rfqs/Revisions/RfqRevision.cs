@@ -65,13 +65,13 @@ public sealed class RfqRevision
 
     internal RfqRevision Confirm(
         RevisionTerms terms,
-        DateOnly systemDate,
+        DateOnly businessDate,
         UserId confirmedBy,
         DateTimeOffset confirmedAt,
         StateVersion expectedVersion)
     {
         EnsureDraft(expectedVersion);
-        ValidateConfirmedTerms(terms, systemDate);
+        ValidateConfirmedTerms(terms, businessDate);
         return Copy(
             status: RevisionStatus.Confirmed,
             terms: terms,
@@ -119,13 +119,13 @@ public sealed class RfqRevision
         DomainGuards.EnsureVersion(Version, expectedVersion, "Revision");
     }
 
-    private static void ValidateConfirmedTerms(RevisionTerms terms, DateOnly systemDate)
+    private static void ValidateConfirmedTerms(RevisionTerms terms, DateOnly businessDate)
     {
         if (terms.Notional is null or <= 0)
             throw new DomainValidationException("Notional must be greater than zero.");
         if (terms.SettlementDate is null)
             throw new DomainValidationException("Settlement date is required.");
-        if (terms.SettlementDate < systemDate)
+        if (terms.SettlementDate < businessDate)
             throw new DomainValidationException("Settlement date must be on or after the system date.");
     }
 

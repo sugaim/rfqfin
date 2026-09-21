@@ -27,8 +27,4 @@ public abstract class QuoteExpiry
         }
         public TimeSpan Duration { get; }
     }
-
-    public static QuoteExpiry FromMinutes(int? minutes) => minutes is null
-        ? new None()
-        : new After(TimeSpan.FromMinutes(minutes.Value));
 }

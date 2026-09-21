@@ -9,7 +9,7 @@ public static class DependencyInjection
         services.AddSingleton<IRfqAuthorization, RfqAuthorization>();
         services.AddScoped<CreateDraft>();
         services.AddScoped<GetActiveSalesRfqs>();
-        services.AddScoped<ResolveRfqDefaults>();
+        services.AddScoped<ResolveRfqCreationContext>();
         services.AddScoped<AssignedTraderValidator>();
         services.AddScoped<InitialRfqFactory>();
         services.AddScoped<UpdateInitialDraft>();

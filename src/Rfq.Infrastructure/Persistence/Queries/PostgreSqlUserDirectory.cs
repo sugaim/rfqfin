@@ -41,6 +41,5 @@ public sealed class PostgreSqlUserDirectory(RfqDbContext dbContext) : IUserDirec
         user.Roles
             .Select(role => Enum.Parse<UserRole>(role, ignoreCase: false))
             .ToHashSet(),
-        DeskId.Create(user.DeskId),
-        user.DefaultQuoteExpiryMinutes);
+        DeskId.Create(user.DeskId));
 }

@@ -21,7 +21,6 @@ public sealed class AssignTrader(
         authorization.EnsureCanAssignTrader(currentUser.User, rfqCase);
         var target = await assignedTraderValidator.ResolveAsync(
             targetTraderId,
-            rfqCase.AssignedTraderId,
             cancellationToken);
         var previous = rfqCase.AssignedTraderId.Value;
         rfqCase = RfqOwnershipTransitions.Assign(

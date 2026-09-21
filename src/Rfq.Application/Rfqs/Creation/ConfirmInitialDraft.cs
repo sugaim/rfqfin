@@ -6,7 +6,7 @@ public sealed class ConfirmInitialDraft(
     IRfqCaseRepository rfqCases,
     AssignedTraderValidator assignedTraderValidator,
     IWorkingQuoteRepository workingQuotes,
-    ISystemDateProvider systemDateProvider,
+    IBusinessDateProvider businessDateProvider,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
@@ -24,17 +24,20 @@ public sealed class ConfirmInitialDraft(
         authorization.EnsureCanConfirmRevision(currentUser.User, rfqCase);
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
-            rfqCase.AssignedTraderId,
             cancellationToken);
-        var systemDate = await systemDateProvider.GetTodayAsync(cancellationToken);
+        if (command.StandardSettlementDate != rfqCase.CurrentRevision.StandardSettlementDate)
+            throw new ArgumentException(
+                "Standard Settlement Date cannot differ from the RFQ creation context.",
+                nameof(command));
+        var businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
         rfqCase = RfqLifecycleTransitions.ConfirmInitial(
             rfqCase,
             new RevisionTerms(command.Notional, command.SettlementDate,
-                rfqCase.CurrentRevision.StandardSettlementDate,
+                command.StandardSettlementDate,
                 command.SalesAndTradingMessage),
             assignedTraderId,
-            systemDate,
+            businessDate,
             currentUser.User.UserId,
             now,
             command.ExpectedVersion);

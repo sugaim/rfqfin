@@ -7,21 +7,23 @@ import {
   useBulkConfirmAmendmentsMutation, useBulkDiscardAmendmentsMutation,
   useCancelRfqMutation, useConfirmAmendmentMutation, useCreateFromExistingMutation,
   useDiscardAmendmentMutation, useGetEodQuery, useGetEventsQuery, useReopenRfqMutation,
-  useSaveAmendmentMutation, useSearchPastRfqsQuery, useWithdrawQuoteMutation,
+  useSaveAmendmentMutation, useSearchRfqsQuery, useWithdrawQuoteMutation,
   useScratchPriceMutation,
   useGetGridConfigQuery, useSaveGridConfigMutation,
   useBulkCloseRfqsMutation, useCalculateWorkingQuoteMutation, useChangeContactOwnerMutation,
   useChangeWorkingQuoteModeMutation, useCloseRfqMutation,
   useConfirmDraftMutation, useConfirmNewRfqMutation, useConfirmQuoteMutation, useCorrectRfqOutcomeMutation, useCreateDraftMutation,
   useDiscardDraftMutation, useGetActiveSalesRfqsQuery, useGetActiveTraderRfqsQuery,
-  useGetCurrentUserQuery, useGetHealthQuery,
-  useGetSystemDateQuery, useGetUsersQuery, useLazyResolveRfqDefaultsQuery,
+  useGetMeQuery, useGetHealthQuery,
+  useGetBusinessDateQuery, useGetQuoteExpiryQuery,
+  useGetAssignableTradersQuery, useGetContactOwnerCandidatesQuery,
+  useLazyResolveRfqCreationContextQuery,
   useLazySearchClientsQuery, useLazySearchSecuritiesQuery, usePickUpRfqMutation,
   usePresentQuoteMutation, useReleaseRfqMutation, useTakeOverRfqMutation,
   useUnpresentQuoteMutation, useUpdateDraftMutation, useUpdateManualWorkingQuoteMutation,
   useUpdateSalesMemoMutation, useUpdateTraderMemoMutation,
   type BulkCloseItemResult,
-  type ClientSearchResult, type CreateDraftRequest, type RfqDefaults,
+  type ClientSearchResult, type CreateDraftRequest, type RfqCreationContext,
   type SalesRfq, type SecuritySearchResult, type TraderRfq, type UpdateDraftRequest,
 } from './services/api'
 
@@ -43,7 +45,7 @@ const toAbsoluteNotional = (notionalInMillions?: number) =>
 
 export interface AppShellProps {
   health: 'checking' | 'ok' | 'error'
-  systemDate?: string
+  businessDate?: string
   children?: ReactNode
   activeView?: string
   currentUserId?: string
@@ -55,7 +57,7 @@ export interface AppShellProps {
 
 export function AppShell({
   health,
-  systemDate,
+  businessDate,
   children,
   activeView = 'sales',
   currentUserId = 'sales-dev',
@@ -87,7 +89,7 @@ export function AppShell({
           ]}
           style={{ width: 130 }}
         />
-        {systemDate && <Tag color="blue">System Date: {systemDate}</Tag>}
+        {businessDate && <Tag color="blue">Business Date: {businessDate}</Tag>}
         {pendingUpdates > 0 && <Button size="small" type="primary" onClick={onRefreshUpdates}>Updates Available ({pendingUpdates})</Button>}
         <Tag color={healthPresentation.color}>{healthPresentation.text}</Tag>
       </Layout.Header>
@@ -117,7 +119,7 @@ export interface SalesScreenProps {
   isMutating: boolean
   onClientSearch: (query: string) => void | Promise<void>
   onSecuritySearch: (query: string) => void | Promise<void>
-  onResolveDefaults: (securityId: string) => Promise<RfqDefaults>
+  onResolveDefaults: (securityId: string) => Promise<RfqCreationContext>
   onCreate: (request: CreateDraftRequest) => Promise<void>
   onUpdate: (caseId: number, request: UpdateDraftRequest) => Promise<void>
   onConfirmNew: (request: CreateDraftRequest) => Promise<void>
@@ -218,8 +220,8 @@ export function SalesScreen(props: SalesScreenProps) {
       const defaults = await onResolveDefaults(securityId)
       form.setFieldsValue({
         categoryName: defaults.categoryName,
-        contactOwnerName: defaults.contactOwnerName,
-        assignedTraderId: defaults.assignedTraderId,
+        contactOwnerName: currentUserId,
+        assignedTraderId: defaults.defaultAssignedTraderId,
         standardSettlementDate: defaults.standardSettlementDate,
         settlementDate: defaults.standardSettlementDate,
       })
@@ -241,15 +243,17 @@ export function SalesScreen(props: SalesScreenProps) {
     clientId: values.clientId,
     securityId: values.securityId,
     notional: toAbsoluteNotional(values.notional),
-    settlementDate: values.settlementDate || undefined,
-    salesAndTradingMessage: values.salesAndTradingMessage,
+    settlementDate: values.settlementDate,
+    standardSettlementDate: values.standardSettlementDate,
+    salesAndTradingMessage: values.salesAndTradingMessage ?? '',
     assignedTraderId: values.assignedTraderId,
   })
 
   const toUpdateRequest = (values: RfqFormValues, draft: SalesRfq): UpdateDraftRequest => ({
     notional: toAbsoluteNotional(values.notional),
-    settlementDate: values.settlementDate || undefined,
-    salesAndTradingMessage: values.salesAndTradingMessage,
+    settlementDate: values.settlementDate,
+    standardSettlementDate: values.standardSettlementDate,
+    salesAndTradingMessage: values.salesAndTradingMessage ?? '',
     assignedTraderId: values.assignedTraderId,
     expectedVersion: draft.version,
   })
@@ -280,7 +284,9 @@ export function SalesScreen(props: SalesScreenProps) {
   const saveDraft = async () => {
     let required: Partial<RfqFormValues>
     try {
-      required = await form.validateFields(['clientId', 'securityId'])
+      required = await form.validateFields([
+        'clientId', 'securityId', 'assignedTraderId', 'settlementDate',
+      ])
     } catch {
       return
     }
@@ -387,7 +393,7 @@ export function SalesScreen(props: SalesScreenProps) {
   return (
     <div className="sales-workspace">
       <Card className="work-pane" title={editingDraft ? `Draft Case ${editingDraft.caseId}` : 'New RFQ'} extra={<Button onClick={startNew}>New</Button>}>
-        <Typography.Paragraph type="secondary">Save may be incomplete. Confirm requires notional, settlement, and trader.</Typography.Paragraph>
+        <Typography.Paragraph type="secondary">Notional may be omitted when saving. Confirm requires notional.</Typography.Paragraph>
         {actionError && <Alert type="error" showIcon message={actionError} className="form-alert" />}
         {defaultsError && <Alert type="error" showIcon message="Security defaults could not be resolved." className="form-alert" />}
         <Spin spinning={isResolvingDefaults}>
@@ -571,7 +577,7 @@ export function SalesScreen(props: SalesScreenProps) {
               onClick={() => void runAction(() => onUpdateMemo(
                 selectedRfq.caseId,
                 memoDraft,
-                selectedRfq.memoVersion,
+                selectedRfq.salesMemoVersion,
               ))}
             >
               Save Sales Memo
@@ -1112,7 +1118,7 @@ export function TraderScreen({
             onClick={() => void runAction(() => onUpdateMemo(
               selected.caseId,
               memoDraft,
-              selected.memoVersion,
+              selected.traderMemoVersion,
             ))}
           >
             Save Trader Memo
@@ -1140,14 +1146,16 @@ export function App() {
   )
   const [refreshEventId, setRefreshEventId] = useState(0)
   const healthQuery = useGetHealthQuery()
-  const systemDateQuery = useGetSystemDateQuery()
-  const currentUserQuery = useGetCurrentUserQuery()
+  const businessDateQuery = useGetBusinessDateQuery()
+  const currentUserQuery = useGetMeQuery()
   const rfqsQuery = useGetActiveSalesRfqsQuery(undefined, { skip: activeView !== 'sales' })
   const traderRfqsQuery = useGetActiveTraderRfqsQuery(undefined, { skip: activeView !== 'trader' })
-  const usersQuery = useGetUsersQuery()
+  const tradersQuery = useGetAssignableTradersQuery()
+  const usersQuery = useGetContactOwnerCandidatesQuery()
+  const quoteExpiryQuery = useGetQuoteExpiryQuery()
   const eventsQuery = useGetEventsQuery(refreshEventId)
-  const eodQuery = useGetEodQuery(systemDateQuery.data?.date ?? '2026-09-21', { skip: activeView !== 'eod' })
-  const pastQuery = useSearchPastRfqsQuery(undefined, { skip: activeView !== 'eod' })
+  const eodQuery = useGetEodQuery(businessDateQuery.data?.date ?? '2026-09-21', { skip: activeView !== 'eod' })
+  const pastQuery = useSearchRfqsQuery(undefined, { skip: activeView !== 'eod' })
   const gridConfigQuery = useGetGridConfigQuery({ screenId: 'sales', configKey: 'main' }, { skip: activeView !== 'sales' })
   const [createDraft, createState] = useCreateDraftMutation()
   const [updateDraft, updateState] = useUpdateDraftMutation()
@@ -1183,11 +1191,11 @@ export function App() {
   const [saveGridConfig] = useSaveGridConfigMutation()
   const [searchClients] = useLazySearchClientsQuery()
   const [searchSecurities] = useLazySearchSecuritiesQuery()
-  const [resolveDefaults] = useLazyResolveRfqDefaultsQuery()
+  const [resolveDefaults] = useLazyResolveRfqCreationContextQuery()
   const [clients, setClients] = useState<ClientSearchResult[]>([])
   const [securities, setSecurities] = useState<SecuritySearchResult[]>([])
   const health = healthQuery.isLoading ? 'checking' : healthQuery.isError || healthQuery.data?.status !== 'ok' ? 'error' : 'ok'
-  const systemDate = systemDateQuery.isLoading ? 'checking' : systemDateQuery.isError ? 'unavailable' : systemDateQuery.data?.date
+  const businessDate = businessDateQuery.isLoading ? 'checking' : businessDateQuery.isError ? 'unavailable' : businessDateQuery.data?.date
   const handleClientSearch = async (query: string) => setClients(query.trim() ? await searchClients(query).unwrap() : [])
   const handleSecuritySearch = async (query: string) => setSecurities(query.trim() ? await searchSecurities(query).unwrap() : [])
   const isMutating = [
@@ -1224,9 +1232,7 @@ export function App() {
     withdrawState,
   ].some((state) => state.isLoading)
   const users = (usersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))
-  const traders = (usersQuery.data ?? [])
-    .filter((user) => user.roles.includes('Trader'))
-    .map((user) => ({ userId: user.userId, name: user.name }))
+  const traders = (tradersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))
 
   const closeCase = (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) =>
     closeRfq({ caseId, outcome, expectedCurrentVersion }).unwrap().then(() => undefined)
@@ -1270,7 +1276,7 @@ export function App() {
   return (
     <AppShell
       health={health}
-      systemDate={systemDate}
+      businessDate={businessDate}
       activeView={activeView}
       currentUserId={currentUserQuery.data?.userId ?? configuredIdentity}
       onNavigate={setActiveView}
@@ -1328,8 +1334,8 @@ export function App() {
           onReopen={(row) => reopenRfq({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion }).unwrap().then(() => undefined)}
           onBulkConfirmAmendments={(rows) => bulkConfirmAmendments({ items: rows.map((row) => ({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! })) }).unwrap().then((results) => { void message.info(results.map((item) => `Case ${item.caseId}: ${item.result}${item.error ? ` (${item.error})` : ''}`).join('; ')) })}
           onBulkDiscardAmendments={(rows) => bulkDiscardAmendments({ items: rows.map((row) => ({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! })) }).unwrap().then((results) => { void message.info(results.map((item) => `Case ${item.caseId}: ${item.result}${item.error ? ` (${item.error})` : ''}`).join('; ')) })}
-          gridConfigJson={gridConfigQuery.data?.configJson}
-          onSaveGridConfig={(configJson) => saveGridConfig({ screenId: 'sales', configKey: 'main', version: 1, configJson }).unwrap().then(() => undefined)}
+          gridConfigJson={gridConfigQuery.data ? JSON.stringify(gridConfigQuery.data.config) : undefined}
+          onSaveGridConfig={(configJson) => saveGridConfig({ screenId: 'sales', configKey: 'main', version: 1, config: JSON.parse(configJson) }).unwrap().then(() => undefined)}
           onReload={rfqsQuery.refetch}
         />
       )}
@@ -1339,7 +1345,7 @@ export function App() {
           traders={traders}
           users={users}
           currentUserId={currentUserQuery.data?.userId ?? configuredIdentity}
-          defaultExpiryMinutes={currentUserQuery.data?.defaultQuoteExpiryMinutes ?? null}
+          defaultExpiryMinutes={quoteExpiryQuery.data?.type === 'After' ? quoteExpiryQuery.data.minutes : null}
           isLoading={traderRfqsQuery.isLoading || traderRfqsQuery.isFetching}
           isError={traderRfqsQuery.isError}
           isMutating={isOwnershipMutating}
@@ -1378,7 +1384,9 @@ export function App() {
           onConfirmQuote={(row, expiryMinutes) =>
             confirmQuote({
               caseId: row.caseId,
-              expiryMinutes,
+              expiry: expiryMinutes === null
+                ? { type: 'None', minutes: null }
+                : { type: 'After', minutes: expiryMinutes },
               expectedCurrentVersion: row.currentVersion,
               expectedWorkingQuoteVersion: row.workingQuoteVersion,
             }).unwrap().then(() => undefined)}

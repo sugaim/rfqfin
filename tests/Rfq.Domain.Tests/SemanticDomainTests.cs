@@ -246,13 +246,17 @@ public sealed class SemanticDomainTests
     }
 
     [Fact]
-    public void Case_memo_transitions_are_immutable_and_versioned()
+    public void Sales_and_trader_memos_are_independently_versioned()
     {
-        var memo = CaseMemo.Create(new CaseId(1));
-        var updated = CaseMemoTransitions.UpdateSales(memo, " note ", memo.Version);
-        Assert.Equal("", memo.SalesMemo);
-        Assert.Equal("note", updated.SalesMemo);
-        Assert.Equal(2, updated.Version.Value);
+        var sales = SalesMemo.Create(new CaseId(1));
+        var trader = TraderMemo.Create(new CaseId(1));
+        var updatedSales = SalesMemoTransitions.Update(sales, " sales ", sales.Version);
+        var updatedTrader = TraderMemoTransitions.Update(trader, " trader ", trader.Version);
+        Assert.Equal("", sales.Value);
+        Assert.Equal("sales", updatedSales.Value);
+        Assert.Equal("trader", updatedTrader.Value);
+        Assert.Equal(2, updatedSales.Version.Value);
+        Assert.Equal(2, updatedTrader.Version.Value);
     }
 
     private static RfqCase Open()

@@ -6,5 +6,5 @@ namespace Rfq.Application;
 
 public interface IStandardSettlementResolver
 {
-    DateOnly Resolve(SecurityId securityId, DateOnly systemDate);
+    DateOnly Resolve(SecurityId securityId, DateOnly businessDate);
 }

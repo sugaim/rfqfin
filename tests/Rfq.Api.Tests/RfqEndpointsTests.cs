@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Rfq.Infrastructure;
@@ -16,13 +17,13 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         using var client = fixture.Factory.CreateClient();
 
         var saveResponse = await client.PostAsJsonAsync(
-            "/api/rfqs",
-            new { ClientId = "client-001", SecurityId = "sec-jgb-375" });
+            "/api/rfqs/drafts",
+            DraftRequest("client-001", "sec-jgb-375"));
         var saved = await AssertCreatedAsync(saveResponse);
         Assert.Equal("Draft", saved.RfqStatus);
         Assert.Equal("Draft", saved.RevisionStatus);
         Assert.Null(saved.Notional);
-        Assert.Null(saved.SettlementDate);
+        Assert.Equal(new DateOnly(2026, 9, 24), saved.SettlementDate);
         Assert.Null(saved.QuoteStatus);
         Assert.Equal(1, saved.Version);
 
@@ -32,6 +33,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             {
                 Notional = 100_000_000m,
                 SettlementDate = "2026-09-24",
+                StandardSettlementDate = "2026-09-23",
                 SalesAndTradingMessage = "Please quote",
                 AssignedTraderId = "trader-a",
                 ExpectedVersion = saved.Version,
@@ -43,11 +45,12 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(100_000_000m, updated.Notional);
 
         var confirmResponse = await client.PostAsJsonAsync(
-            $"/api/rfqs/{saved.CaseId}/confirm",
+            $"/api/rfqs/{saved.CaseId}/draft/confirm",
             new
             {
                 updated.Notional,
                 SettlementDate = "2026-09-24",
+                StandardSettlementDate = "2026-09-23",
                 updated.SalesAndTradingMessage,
                 updated.AssignedTraderId,
                 ExpectedVersion = updated.Version,
@@ -62,13 +65,14 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(3, confirmed.Version);
 
         var directResponse = await client.PostAsJsonAsync(
-            "/api/rfqs/confirm",
+            "/api/rfqs/drafts/confirm",
             new
             {
                 ClientId = "client-002",
                 SecurityId = "sec-toyota-1",
                 Notional = 50_000_000m,
                 SettlementDate = "2026-09-24",
+                StandardSettlementDate = "2026-09-23",
                 SalesAndTradingMessage = "Direct confirmation",
                 AssignedTraderId = "trader-b",
             });
@@ -80,16 +84,16 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal("Initial", directlyConfirmed.QuoteRequestReason);
 
         var discardSaveResponse = await client.PostAsJsonAsync(
-            "/api/rfqs",
-            new { ClientId = "client-003", SecurityId = "sec-jgb-375" });
+            "/api/rfqs/drafts",
+            DraftRequest("client-003", "sec-jgb-375"));
         var toDiscard = await AssertCreatedAsync(discardSaveResponse);
         var discardResponse = await client.PostAsJsonAsync(
-            $"/api/rfqs/{toDiscard.CaseId}/discard",
+            $"/api/rfqs/{toDiscard.CaseId}/draft/discard",
             new { ExpectedVersion = toDiscard.Version });
         Assert.Equal(HttpStatusCode.NoContent, discardResponse.StatusCode);
 
         var rows = await client.GetFromJsonAsync<List<SalesRfqBody>>(
-            "/api/rfqs/active-sales");
+            "/api/sales-rfqs");
         var list = Assert.IsType<List<SalesRfqBody>>(rows);
         var confirmedRow = Assert.Single(list, item => item.CaseId == saved.CaseId);
         Assert.Equal("青空銀行", confirmedRow.ClientName);
@@ -107,7 +111,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     {
         using var client = fixture.Factory.CreateClient();
         var response = await client.PostAsJsonAsync(
-            "/api/rfqs/confirm",
+            "/api/rfqs/drafts/confirm",
             new { ClientId = "client-004", SecurityId = "sec-jgb-375" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -118,33 +122,35 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     {
         using var sales = CreateClient("sales-dev");
         var createResponse = await sales.PostAsJsonAsync(
-            "/api/rfqs/confirm",
+            "/api/rfqs/drafts/confirm",
             new
             {
                 ClientId = "client-001",
                 SecurityId = "sec-jgb-375",
                 Notional = 100_000_000m,
                 SettlementDate = "2026-09-24",
+                StandardSettlementDate = "2026-09-23",
+                SalesAndTradingMessage = "",
                 AssignedTraderId = "trader-a",
             });
         var created = await AssertCreatedAsync(createResponse);
 
         using var traderA = CreateClient("trader-a");
         var rows = await traderA.GetFromJsonAsync<List<TraderRfqBody>>(
-            "/api/trader/rfqs/active");
+            "/api/trader-rfqs");
         var row = Assert.Single(rows!, item => item.CaseId == created.CaseId);
         Assert.False(row.Owned);
         Assert.Equal("trader-a", row.AssignedTraderId);
 
         var pickUp = await traderA.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/pick-up",
+            $"/api/rfqs/{created.CaseId}/ownership/pick-up",
             new { row.ExpectedVersion, Confirmed = false });
         var pickedUp = await AssertOwnershipOkAsync(pickUp);
         Assert.True(pickedUp.Owned);
         Assert.Equal("trader-a", pickedUp.AssignedTraderId);
 
         var calculateResponse = await traderA.PutAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/working-quote/calculate",
+            $"/api/rfqs/{created.CaseId}/working-quote/calculate",
             new
             {
                 Driver = "Price",
@@ -161,7 +167,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             calculated.Calculated?.FinalSimpleYield);
 
         var failedCalculation = await traderA.PutAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/working-quote/calculate",
+            $"/api/rfqs/{created.CaseId}/working-quote/calculate",
             new
             {
                 Driver = "Price",
@@ -183,7 +189,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         }
 
         var manualModeResponse = await traderA.PutAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/working-quote/mode",
+            $"/api/rfqs/{created.CaseId}/working-quote/mode",
             new
             {
                 Mode = "Manual",
@@ -196,7 +202,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(calculated.Calculated, manualMode.Calculated);
 
         var manualUpdateResponse = await traderA.PutAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/working-quote/manual",
+            $"/api/rfqs/{created.CaseId}/working-quote/manual",
             new
             {
                 Price = 98.75m,
@@ -209,7 +215,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(1.25m, manualUpdate.Manual?.FinalSimpleYield);
 
         var calculatedModeResponse = await traderA.PutAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/working-quote/mode",
+            $"/api/rfqs/{created.CaseId}/working-quote/mode",
             new
             {
                 Mode = "Calculated",
@@ -220,10 +226,10 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(calculated.Calculated, restoredCalculated.Calculated);
 
         var confirmQuoteResponse = await traderA.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/confirm-quote",
+            $"/api/rfqs/{created.CaseId}/quote/confirm",
             new
             {
-                ExpiryMinutes = 5,
+                Expiry = new { Type = "After", Minutes = 5 },
                 ExpectedCurrentVersion = pickedUp.CurrentVersion,
                 ExpectedWorkingQuoteVersion = restoredCalculated.Version,
             });
@@ -234,17 +240,17 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(confirmedQuote.ExpiresAt, confirmedQuote.ConfirmedAt?.AddMinutes(5));
 
         var secondConfirm = await traderA.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/confirm-quote",
+            $"/api/rfqs/{created.CaseId}/quote/confirm",
             new
             {
-                ExpiryMinutes = 5,
+                Expiry = new { Type = "After", Minutes = 5 },
                 ExpectedCurrentVersion = confirmedQuote.CurrentVersion,
                 ExpectedWorkingQuoteVersion = restoredCalculated.Version,
             });
         Assert.Equal(HttpStatusCode.Conflict, secondConfirm.StatusCode);
 
         var editQuoted = await traderA.PutAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/working-quote/calculate",
+            $"/api/rfqs/{created.CaseId}/working-quote/calculate",
             new
             {
                 Driver = "Price",
@@ -275,50 +281,50 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(confirmedQuote.QuoteId, unpresented.QuoteId);
 
         var release = await traderA.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/release",
+            $"/api/rfqs/{created.CaseId}/ownership/release",
             new { ExpectedVersion = unpresented.CurrentVersion });
         var released = await AssertOwnershipOkAsync(release);
         Assert.False(released.Owned);
 
-        var assign = await traderA.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/assign",
-            new { TargetTraderId = "trader-b", ExpectedVersion = released.CurrentVersion });
+        var assign = await traderA.PutAsJsonAsync(
+            $"/api/rfqs/{created.CaseId}/assigned-trader",
+            new { AssignedTraderId = "trader-b", ExpectedVersion = released.CurrentVersion });
         var assigned = await AssertOwnershipOkAsync(assign);
         Assert.Equal("trader-b", assigned.AssignedTraderId);
         Assert.False(assigned.Owned);
 
         var missingConfirmation = await traderA.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/pick-up",
+            $"/api/rfqs/{created.CaseId}/ownership/pick-up",
             new { ExpectedVersion = assigned.CurrentVersion, Confirmed = false });
         Assert.Equal(HttpStatusCode.BadRequest, missingConfirmation.StatusCode);
 
         using var traderB = CreateClient("trader-b");
         var ownerBResponse = await traderB.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/pick-up",
+            $"/api/rfqs/{created.CaseId}/ownership/pick-up",
             new { ExpectedVersion = assigned.CurrentVersion, Confirmed = false });
         var ownerB = await AssertOwnershipOkAsync(ownerBResponse);
         Assert.True(ownerB.Owned);
 
         var forbiddenRelease = await traderA.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/release",
+            $"/api/rfqs/{created.CaseId}/ownership/release",
             new { ExpectedVersion = ownerB.CurrentVersion });
         Assert.Equal(HttpStatusCode.Forbidden, forbiddenRelease.StatusCode);
 
         var takeOverResponse = await traderA.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/take-over",
+            $"/api/rfqs/{created.CaseId}/ownership/take-over",
             new { ExpectedVersion = ownerB.CurrentVersion, Confirmed = true });
         var takenOver = await AssertOwnershipOkAsync(takeOverResponse);
         Assert.True(takenOver.Owned);
         Assert.Equal("trader-a", takenOver.AssignedTraderId);
 
         var staleTakeOver = await traderB.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/take-over",
+            $"/api/rfqs/{created.CaseId}/ownership/take-over",
             new { ExpectedVersion = ownerB.CurrentVersion, Confirmed = true });
         Assert.Equal(HttpStatusCode.Conflict, staleTakeOver.StatusCode);
 
         var traderCreate = await traderA.PostAsJsonAsync(
-            "/api/rfqs",
-            new { ClientId = "client-001", SecurityId = "sec-jgb-375" });
+            "/api/rfqs/drafts",
+            DraftRequest("client-001", "sec-jgb-375"));
         var traderCreated = await AssertCreatedAsync(traderCreate);
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var traderDbContext = scope.ServiceProvider.GetRequiredService<RfqDbContext>();
@@ -335,8 +341,8 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     {
         using var owner = CreateClient("sales-dev");
         var createResponse = await owner.PostAsJsonAsync(
-            "/api/rfqs",
-            new { ClientId = "client-004", SecurityId = "sec-other-1" });
+            "/api/rfqs/drafts",
+            DraftRequest("client-004", "sec-other-1", "trader-b"));
         var draft = await AssertCreatedAsync(createResponse);
 
         using var otherSales = CreateClient("sales-a");
@@ -346,6 +352,9 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             {
                 Notional = 1_000_000m,
                 SettlementDate = "2026-09-24",
+                StandardSettlementDate = "2026-09-23",
+                SalesAndTradingMessage = "",
+                AssignedTraderId = "trader-b",
                 ExpectedVersion = draft.Version,
             });
 
@@ -375,24 +384,24 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal("Away", away.RfqStatus);
 
         var closedOperation = await trader.PostAsJsonAsync(
-            $"/api/trader/rfqs/{hit.CaseId}/release",
+            $"/api/rfqs/{hit.CaseId}/ownership/release",
             new { ExpectedVersion = hit.CurrentVersion });
         Assert.Equal(HttpStatusCode.Conflict, closedOperation.StatusCode);
 
         var salesMemoResponse = await sales.PutAsJsonAsync(
-            $"/api/rfqs/{hit.CaseId}/sales-memo",
+            $"/api/rfqs/{hit.CaseId}/memos/sales",
             new { Memo = "customer follow-up", ExpectedVersion = 1 });
         var salesMemo = await AssertMemoOkAsync(salesMemoResponse);
         Assert.Equal("customer follow-up", salesMemo.Memo);
 
         var forbiddenSalesMemo = await trader.PutAsJsonAsync(
-            $"/api/rfqs/{hit.CaseId}/sales-memo",
+            $"/api/rfqs/{hit.CaseId}/memos/sales",
             new { Memo = "forbidden", ExpectedVersion = salesMemo.Version });
         Assert.Equal(HttpStatusCode.Forbidden, forbiddenSalesMemo.StatusCode);
 
         var traderMemoResponse = await trader.PutAsJsonAsync(
-            $"/api/rfqs/{hit.CaseId}/trader-memo",
-            new { Memo = "desk follow-up", ExpectedVersion = salesMemo.Version });
+            $"/api/rfqs/{hit.CaseId}/memos/trader",
+            new { Memo = "desk follow-up", ExpectedVersion = 1 });
         var traderMemo = await AssertMemoOkAsync(traderMemoResponse);
         Assert.Equal("desk follow-up", traderMemo.Memo);
 
@@ -408,41 +417,31 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal("Away", corrected.RfqStatus);
         Assert.Equal(hit.ClosedQuoteId, corrected.ClosedQuoteId);
 
-        var handoffResponse = await sales.PostAsJsonAsync(
+        var handoffResponse = await sales.PutAsJsonAsync(
             $"/api/rfqs/{hit.CaseId}/contact-owner",
             new
             {
-                TargetUserId = "trader-a",
+                ContactOwnerId = "trader-a",
                 ExpectedCurrentVersion = corrected.CurrentVersion,
                 Confirmed = true,
             });
-        var handoffBody = await handoffResponse.Content.ReadFromJsonAsync<ContactOwnerBody>();
-        Assert.Equal(HttpStatusCode.OK, handoffResponse.StatusCode);
-        Assert.Equal("trader-a", handoffBody?.ContactOwnerId);
-
-        var previousOwnerCorrection = await sales.PostAsJsonAsync(
-            $"/api/rfqs/{hit.CaseId}/correct-outcome",
-            new
-            {
-                Outcome = "Hit",
-                ExpectedCurrentVersion = handoffBody?.CurrentVersion,
-            });
-        Assert.Equal(HttpStatusCode.Forbidden, previousOwnerCorrection.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, handoffResponse.StatusCode);
 
         var salesRows = await sales.GetFromJsonAsync<List<ManagedSalesRfqBody>>(
-            "/api/rfqs/active-sales");
+            "/api/sales-rfqs");
         var closedSalesRow = Assert.Single(salesRows!, item => item.CaseId == hit.CaseId);
         Assert.Equal("Away", closedSalesRow.RfqStatus);
         Assert.Null(closedSalesRow.CurrentQuoteId);
         Assert.Equal(hit.ClosedQuoteId, closedSalesRow.ClosedQuoteId);
         Assert.Equal("customer follow-up", closedSalesRow.SalesMemo);
-        Assert.Equal(traderMemo.Version, closedSalesRow.MemoVersion);
+        Assert.Equal(salesMemo.Version, closedSalesRow.SalesMemoVersion);
 
         var traderRows = await trader.GetFromJsonAsync<List<ManagedTraderRfqBody>>(
-            "/api/trader/rfqs/active");
+            "/api/trader-rfqs");
         var closedTraderRow = Assert.Single(traderRows!, item => item.CaseId == hit.CaseId);
         Assert.Equal("Away", closedTraderRow.RfqStatus);
         Assert.Equal("desk follow-up", closedTraderRow.TraderMemo);
+        Assert.Equal(traderMemo.Version, closedTraderRow.TraderMemoVersion);
     }
 
     [Fact]
@@ -451,25 +450,81 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         using var client = fixture.Factory.CreateClient();
 
         var securities = await client.GetFromJsonAsync<List<SecurityBody>>(
-            "/api/masters/securities/search?q=375-1");
+            "/api/rfqs/candidates/securities?q=375-1");
         var clients = await client.GetFromJsonAsync<List<ClientBody>>(
-            "/api/masters/clients/search?q=C001");
+            "/api/rfqs/candidates/clients?q=C001");
         var users = await client.GetFromJsonAsync<List<UserBody>>(
-            "/api/masters/users?role=Trader");
+            "/api/assignable-traders");
         var defaults = await client.GetFromJsonAsync<DefaultsBody>(
-            "/api/rfq-defaults?securityId=sec-jgb-375");
-        var systemDate = await client.GetFromJsonAsync<SystemDateBody>("/api/system-date");
+            "/api/rfqs/creation-context?securityId=sec-jgb-375");
+        var businessDate = await client.GetFromJsonAsync<BusinessDateBody>("/api/business-date");
 
         Assert.Equal("sec-jgb-375", Assert.Single(securities!).SecurityId);
         Assert.Equal("client-001", Assert.Single(clients!).ClientId);
         Assert.Equal(2, users!.Count);
         Assert.NotNull(defaults);
         Assert.Equal("JGB", defaults.CategoryId);
-        Assert.Equal("sales-dev", defaults.ContactOwnerId);
-        Assert.Equal("trader-a", defaults.AssignedTraderId);
+        Assert.Equal("trader-a", defaults.DefaultAssignedTraderId);
         Assert.Equal(new DateOnly(2026, 9, 23), defaults.StandardSettlementDate);
-        Assert.Equal(new DateOnly(2026, 9, 21), systemDate?.Date);
+        Assert.Equal(new DateOnly(2026, 9, 21), businessDate?.Date);
     }
+
+    [Fact]
+    public async Task Feature_contracts_use_typed_events_tagged_expiry_json_grid_and_created_filters()
+    {
+        using var client = CreateClient("sales-dev");
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/rfqs/drafts/confirm",
+            DraftRequest("client-001", "sec-jgb-375", notional: 100_000_000m));
+        var created = await AssertCreatedAsync(createResponse);
+
+        using var eventDocument = JsonDocument.Parse(
+            await client.GetStringAsync("/api/events?after=0"));
+        var revisionEvent = eventDocument.RootElement.EnumerateArray().Single(item =>
+            item.GetProperty("caseId").GetInt64() == created.CaseId
+            && item.GetProperty("type").GetString() == "rfqRevisionConfirmed");
+        Assert.False(revisionEvent.TryGetProperty("payloadJson", out _));
+
+        var expiryResponse = await client.PutAsJsonAsync(
+            "/api/me/settings/quote-expiry",
+            new { Type = "None", Minutes = (int?)null });
+        Assert.Equal(HttpStatusCode.OK, expiryResponse.StatusCode);
+        var expiry = await expiryResponse.Content.ReadFromJsonAsync<QuoteExpiryBody>();
+        Assert.Equal("None", expiry?.Type);
+        Assert.Null(expiry?.Minutes);
+
+        var gridResponse = await client.PutAsJsonAsync(
+            "/api/me/grid-configs/sales/main",
+            new { Version = 1, Config = new { Columns = Array.Empty<object>() } });
+        Assert.Equal(HttpStatusCode.OK, gridResponse.StatusCode);
+        using var gridDocument = JsonDocument.Parse(await gridResponse.Content.ReadAsStringAsync());
+        Assert.Equal(JsonValueKind.Object,
+            gridDocument.RootElement.GetProperty("config").ValueKind);
+        Assert.Equal(JsonValueKind.Array,
+            gridDocument.RootElement.GetProperty("config").GetProperty("columns").ValueKind);
+
+        var tokyoDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(
+            created.CreatedAt, TimeZoneInfo.FindSystemTimeZoneById("Asia/Tokyo")).DateTime);
+        var search = await client.GetFromJsonAsync<RfqSearchBody>(
+            $"/api/rfqs/search?createdFrom={tokyoDate:yyyy-MM-dd}&createdTo={tokyoDate:yyyy-MM-dd}");
+        Assert.Contains(search!.Items, item => item.CaseId == created.CaseId);
+    }
+
+    private static object DraftRequest(
+        string clientId,
+        string securityId,
+        string assignedTraderId = "trader-a",
+        decimal? notional = null) => new
+    {
+        ClientId = clientId,
+        SecurityId = securityId,
+        Notional = notional,
+        SettlementDate = "2026-09-24",
+        StandardSettlementDate = "2026-09-23",
+        SalesAndTradingMessage = "",
+        AssignedTraderId = assignedTraderId,
+    };
 
     private static async Task<InitialRfqBody> AssertCreatedAsync(HttpResponseMessage response)
     {
@@ -538,25 +593,27 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         string clientId)
     {
         var createResponse = await sales.PostAsJsonAsync(
-            "/api/rfqs/confirm",
+            "/api/rfqs/drafts/confirm",
             new
             {
                 ClientId = clientId,
                 SecurityId = "sec-jgb-375",
                 Notional = 100_000_000m,
                 SettlementDate = "2026-09-24",
+                StandardSettlementDate = "2026-09-23",
+                SalesAndTradingMessage = "",
                 AssignedTraderId = "trader-a",
             });
         var created = await AssertCreatedAsync(createResponse);
         var rows = await trader.GetFromJsonAsync<List<TraderRfqBody>>(
-            "/api/trader/rfqs/active");
+            "/api/trader-rfqs");
         var row = Assert.Single(rows!, item => item.CaseId == created.CaseId);
         var pickUpResponse = await trader.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/pick-up",
+            $"/api/rfqs/{created.CaseId}/ownership/pick-up",
             new { row.ExpectedVersion, Confirmed = false });
         var pickedUp = await AssertOwnershipOkAsync(pickUpResponse);
         var calculateResponse = await trader.PutAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/working-quote/calculate",
+            $"/api/rfqs/{created.CaseId}/working-quote/calculate",
             new
             {
                 Driver = "Price",
@@ -567,10 +624,10 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             });
         var calculated = await AssertWorkingQuoteOkAsync(calculateResponse);
         var confirmResponse = await trader.PostAsJsonAsync(
-            $"/api/trader/rfqs/{created.CaseId}/confirm-quote",
+            $"/api/rfqs/{created.CaseId}/quote/confirm",
             new
             {
-                ExpiryMinutes = (int?)null,
+                Expiry = new { Type = "None", Minutes = (int?)null },
                 ExpectedCurrentVersion = pickedUp.CurrentVersion,
                 ExpectedWorkingQuoteVersion = calculated.Version,
             });
@@ -588,14 +645,14 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             await response.Content.ReadFromJsonAsync<CloseRfqBody>());
     }
 
-    private static async Task<CaseMemoBody> AssertMemoOkAsync(HttpResponseMessage response)
+    private static async Task<MemoBody> AssertMemoOkAsync(HttpResponseMessage response)
     {
         var responseBody = await response.Content.ReadAsStringAsync();
         Assert.True(
             response.StatusCode == HttpStatusCode.OK,
             $"Expected 200 OK but received {(int)response.StatusCode}: {responseBody}");
-        return Assert.IsType<CaseMemoBody>(
-            await response.Content.ReadFromJsonAsync<CaseMemoBody>());
+        return Assert.IsType<MemoBody>(
+            await response.Content.ReadFromJsonAsync<MemoBody>());
     }
 
     private sealed record InitialRfqBody(
@@ -666,6 +723,11 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         decimal? Price,
         decimal? FinalSimpleYield);
 
+    private sealed record QuoteExpiryBody(string Type, int? Minutes);
+    private sealed record RfqSearchBody(IReadOnlyList<RfqSearchItemBody> Items,
+        bool RequiresNarrowing);
+    private sealed record RfqSearchItemBody(long CaseId);
+
     private sealed record ConfirmQuoteBody(
         long CaseId,
         Guid QuoteId,
@@ -675,7 +737,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         string Mode,
         CalculatedQuoteBody? Calculated,
         ManualQuoteBody? Manual,
-        int? ExpiryMinutes,
+        QuoteExpiryBody Expiry,
         DateTimeOffset? ConfirmedAt,
         DateTimeOffset? ExpiresAt,
         long CurrentVersion);
@@ -694,12 +756,7 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         bool Owned,
         long CurrentVersion);
 
-    private sealed record CaseMemoBody(long CaseId, string Memo, long Version);
-
-    private sealed record ContactOwnerBody(
-        long CaseId,
-        string ContactOwnerId,
-        long CurrentVersion);
+    private sealed record MemoBody(long CaseId, string Memo, long Version);
 
     private sealed record ManagedSalesRfqBody(
         long CaseId,
@@ -707,21 +764,20 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Guid? CurrentQuoteId,
         Guid? ClosedQuoteId,
         string SalesMemo,
-        long MemoVersion);
+        long SalesMemoVersion);
 
     private sealed record ManagedTraderRfqBody(
         long CaseId,
         string RfqStatus,
         string TraderMemo,
-        long MemoVersion);
+        long TraderMemoVersion);
 
     private sealed record SecurityBody(string SecurityId);
     private sealed record ClientBody(string ClientId);
     private sealed record UserBody(string UserId);
     private sealed record DefaultsBody(
         string CategoryId,
-        string ContactOwnerId,
-        string AssignedTraderId,
+        string DefaultAssignedTraderId,
         DateOnly StandardSettlementDate);
-    private sealed record SystemDateBody(DateOnly Date);
+    private sealed record BusinessDateBody(DateOnly Date);
 }

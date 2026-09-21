@@ -19,11 +19,11 @@ public sealed class SemanticApplicationTests
         var uow = new UnitOfWork();
         var useCase = new ConfirmInitialDraft(
             cases, new AssignedTraderValidator(new Users(), Current(Sales, UserRole.Sales)),
-            working, new SystemDate(), new RfqAuthorization(),
+            working, new BusinessDate(), new RfqAuthorization(),
             Current(Sales, UserRole.Sales), uow, TimeProvider.System, new RfqEvents());
 
         await useCase.ExecuteAsync(new UpdateInitialDraftCommand(
-            draft.CaseId, 1_000_000, Today.AddDays(2), "confirmed",
+            draft.CaseId, 1_000_000, Today.AddDays(2), Today.AddDays(2), "confirmed",
             Trader, draft.CurrentRevision.Version));
 
         Assert.Single(working.Added);
@@ -39,7 +39,7 @@ public sealed class SemanticApplicationTests
         var working = new WorkingRepository();
         var uow = new UnitOfWork();
         var useCase = new ConfirmNewRfq(
-            Factory(current), cases, working, new SystemDate(), new RfqAuthorization(),
+            Factory(current), cases, working, new BusinessDate(), new RfqAuthorization(),
             current, uow, TimeProvider.System, new RfqEvents());
 
         var result = await useCase.ExecuteAsync(Command());
@@ -73,10 +73,22 @@ public sealed class SemanticApplicationTests
     }
 
     [Fact]
+    public async Task Creation_context_requires_category_routing()
+    {
+        var current = Current(Sales, UserRole.Sales);
+        var resolver = new ResolveRfqCreationContext(
+            new Securities(), new MissingRouting(), new Users(),
+            new BusinessDate(), new Settlement(), current);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            resolver.ExecuteAsync(SecurityId.Create("security")));
+    }
+
+    [Fact]
     public async Task Trader_screen_query_does_not_write()
     {
         var cases = new CaseRepository(null);
-        var queries = new ActiveRfqQueries([]);
+        var queries = new TraderRfqQueries([]);
         var useCase = new GetActiveTraderRfqs(
             queries, new RfqAuthorization(), Current(Trader, UserRole.Trader));
 
@@ -103,7 +115,7 @@ public sealed class SemanticApplicationTests
             Current(Trader, UserRole.Trader), new QuoteEvents(), uow, TimeProvider.System);
 
         var result = await useCase.ExecuteAsync(
-            rfq.CaseId, 5, rfq.Version, quote.Version);
+            rfq.CaseId, new QuoteExpiry.After(TimeSpan.FromMinutes(5)), rfq.Version, quote.Version);
 
         Assert.NotEqual(Guid.Empty, result.QuoteId.Value);
         Assert.Equal(result.QuoteId, Assert.Single(confirmed.Added).QuoteId);
@@ -124,7 +136,7 @@ public sealed class SemanticApplicationTests
         var working = new WorkingRepository(seed);
         var uow = new UnitOfWork();
         var useCase = new ConfirmAmendment(
-            cases, working, new SystemDate(), new RfqAuthorization(),
+            cases, working, new BusinessDate(), new RfqAuthorization(),
             Current(Sales, UserRole.Sales), new RfqEvents(), uow, TimeProvider.System);
 
         await useCase.ExecuteAsync(new AmendmentItem(
@@ -188,26 +200,29 @@ public sealed class SemanticApplicationTests
         var cases = new CaseRepository(source);
         var current = Current(Sales, UserRole.Sales);
         var factory = Factory(current);
-        var businessDates = new BusinessDates(Today);
+        var deskLocalDates = new DeskLocalDates(Today);
         var useCase = new CreateFromExisting(
-            cases, factory, new SystemDate(), businessDates,
+            cases, factory, new ResolveRfqCreationContext(
+                new Securities(), new Routing(), new Users(),
+                new BusinessDate(), new Settlement(), current),
+            new BusinessDate(), deskLocalDates,
             new RfqAuthorization(), current, new UnitOfWork());
 
         await useCase.ExecuteAsync(source.CaseId);
 
-        Assert.Equal(createdAt, businessDates.ReceivedInstant);
+        Assert.Equal(createdAt, deskLocalDates.ReceivedInstant);
         Assert.Equal(source.CurrentRevision.SettlementDate, cases.Added!.CurrentRevision.SettlementDate);
     }
 
     private static InitialRfqFactory Factory(ICurrentUser current) => new(
         new CaseIds(), new Clients(),
-        new ResolveRfqDefaults(new Securities(), new Routing(), new Users(),
-            new SystemDate(), new Settlement(), current),
+        new ResolveRfqCreationContext(new Securities(), new Routing(), new Users(),
+            new BusinessDate(), new Settlement(), current),
         new AssignedTraderValidator(new Users(), current), current, TimeProvider.System);
 
     private static CreateDraftCommand Command() => new(
         ClientId.Create("client"), SecurityId.Create("security"), 1_000_000,
-        Today.AddDays(2), "message", Trader);
+        Today.AddDays(2), Today.AddDays(2), "message", Trader);
 
     private static RfqCase Draft(DateTimeOffset? createdAt = null) => RfqCase.CreateDraft(
         new CaseId(10), RevisionId.New(), ClientId.Create("client"), SecurityId.Create("security"),
@@ -245,17 +260,12 @@ public sealed class SemanticApplicationTests
         public void UpdateRevision(RfqRevision revision) => ChangedRevisions.Add(revision);
     }
 
-    private sealed class ActiveRfqQueries(
-        IReadOnlyList<TraderRfqListItem> traderRows) : IActiveRfqQueries
+    private sealed class TraderRfqQueries(
+        IReadOnlyList<TraderRfqListItem> traderRows) : ITraderRfqQueries
     {
         public int TraderQueries { get; private set; }
 
-        public Task<IReadOnlyList<SalesRfqListItem>> GetSalesAsync(
-            UserId salesUserId,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<TraderRfqListItem>> GetTraderAsync(
+        public Task<IReadOnlyList<TraderRfqListItem>> GetAsync(
             DeskId desk,
             CancellationToken token = default)
         {
@@ -325,8 +335,8 @@ public sealed class SemanticApplicationTests
     }
     private sealed class QuoteEvents : IQuoteEventSink { public void Record(QuoteTransition transition) { } }
     private sealed class RfqEvents : IRfqEventSink { public void Record(RfqTransition transition) { } }
-    private sealed class SystemDate : ISystemDateProvider { public Task<DateOnly> GetTodayAsync(CancellationToken token = default) => Task.FromResult(Today); }
-    private sealed class BusinessDates(DateOnly date) : IBusinessDateResolver
+    private sealed class BusinessDate : IBusinessDateProvider { public Task<DateOnly> GetCurrentAsync(CancellationToken token = default) => Task.FromResult(Today); }
+    private sealed class DeskLocalDates(DateOnly date) : IDeskLocalDateResolver
     {
         public DateTimeOffset? ReceivedInstant { get; private set; }
         public Task<DateOnly> ResolveAsync(
@@ -346,7 +356,19 @@ public sealed class SemanticApplicationTests
         public Task<IReadOnlyList<SecuritySearchResult>> SearchAsync(string q, CancellationToken token = default) => throw new NotSupportedException();
         public Task<SecuritySearchResult?> ResolveAsync(SecurityId id, CancellationToken token = default) => Task.FromResult<SecuritySearchResult?>(new(id, "Security", "SEC", "1-01-0001-00001", "ISIN", CategoryId.Create("category"), "Category"));
     }
-    private sealed class Routing : ICategoryRouting { public Task<UserId?> GetDefaultAssignedTraderAsync(CategoryId id, CancellationToken token = default) => Task.FromResult<UserId?>(Trader); }
+    private sealed class Routing : ICategoryRouting
+    {
+        public Task<UserId> GetDefaultAssignedTraderAsync(CategoryId id, CancellationToken token = default) => Task.FromResult(Trader);
+        public Task<IReadOnlyList<CategoryRoutingItem>> GetAllAsync(CancellationToken token = default) => throw new NotSupportedException();
+        public Task<CategoryRoutingItem> SetDefaultAssignedTraderAsync(CategoryId id, UserId traderId, CancellationToken token = default) => throw new NotSupportedException();
+    }
+    private sealed class MissingRouting : ICategoryRouting
+    {
+        public Task<UserId> GetDefaultAssignedTraderAsync(CategoryId id, CancellationToken token = default) =>
+            throw new KeyNotFoundException("Category routing is missing.");
+        public Task<IReadOnlyList<CategoryRoutingItem>> GetAllAsync(CancellationToken token = default) => throw new NotSupportedException();
+        public Task<CategoryRoutingItem> SetDefaultAssignedTraderAsync(CategoryId id, UserId traderId, CancellationToken token = default) => throw new NotSupportedException();
+    }
     private sealed class Settlement : IStandardSettlementResolver { public DateOnly Resolve(SecurityId id, DateOnly date) => date.AddDays(2); }
     private sealed class Users : IUserDirectory
     {

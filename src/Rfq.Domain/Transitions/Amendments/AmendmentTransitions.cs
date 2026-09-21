@@ -28,7 +28,7 @@ public static class AmendmentTransitions
     }
 
     public static AmendmentConfirmResult Confirm(
-        RfqCase rfq, DateOnly systemDate, UserId confirmedBy,
+        RfqCase rfq, DateOnly businessDate, UserId confirmedBy,
         DateTimeOffset confirmedAt, StateVersion expectedCaseVersion,
         StateVersion expectedDraftVersion)
     {
@@ -37,7 +37,7 @@ public static class AmendmentTransitions
             ?? throw new DomainRuleViolationException("The RFQ Case has no Draft amendment.");
         var superseded = rfq.CurrentRevision.Supersede();
         var confirmed = draft.Confirm(
-            draft.Terms, systemDate, confirmedBy, confirmedAt, expectedDraftVersion);
+            draft.Terms, businessDate, confirmedBy, confirmedAt, expectedDraftVersion);
         var next = rfq.Next(
             lifecycle: new ActiveRfq(confirmed.RevisionId, open.Ownership,
                 new QuoteRequested(QuoteRequestReason.Revised)),

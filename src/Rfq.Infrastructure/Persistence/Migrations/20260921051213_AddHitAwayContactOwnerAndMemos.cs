@@ -18,19 +18,37 @@ namespace Rfq.Infrastructure.Migrations
                 nullable: true);
 
             migrationBuilder.CreateTable(
-                name: "case_memos",
+                name: "sales_memos",
                 columns: table => new
                 {
                     case_id = table.Column<long>(type: "bigint", nullable: false),
-                    sales_memo = table.Column<string>(type: "text", nullable: false),
-                    trader_memo = table.Column<string>(type: "text", nullable: false),
+                    value = table.Column<string>(type: "text", nullable: false),
                     version = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_case_memos", x => x.case_id);
+                    table.PrimaryKey("PK_sales_memos", x => x.case_id);
                     table.ForeignKey(
-                        name: "FK_case_memos_rfq_cases_case_id",
+                        name: "FK_sales_memos_rfq_cases_case_id",
+                        column: x => x.case_id,
+                        principalTable: "rfq_cases",
+                        principalColumn: "case_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "trader_memos",
+                columns: table => new
+                {
+                    case_id = table.Column<long>(type: "bigint", nullable: false),
+                    value = table.Column<string>(type: "text", nullable: false),
+                    version = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_trader_memos", x => x.case_id);
+                    table.ForeignKey(
+                        name: "FK_trader_memos_rfq_cases_case_id",
                         column: x => x.case_id,
                         principalTable: "rfq_cases",
                         principalColumn: "case_id",
@@ -39,8 +57,16 @@ namespace Rfq.Infrastructure.Migrations
 
             migrationBuilder.Sql(
                 """
-                INSERT INTO case_memos (case_id, sales_memo, trader_memo, version)
-                SELECT case_id, '', '', 1
+                INSERT INTO sales_memos (case_id, value, version)
+                SELECT case_id, '', 1
+                FROM rfq_cases
+                ON CONFLICT (case_id) DO NOTHING;
+                """);
+
+            migrationBuilder.Sql(
+                """
+                INSERT INTO trader_memos (case_id, value, version)
+                SELECT case_id, '', 1
                 FROM rfq_cases
                 ON CONFLICT (case_id) DO NOTHING;
                 """);
@@ -66,8 +92,8 @@ namespace Rfq.Infrastructure.Migrations
                 name: "FK_case_currents_confirmed_quotes_closed_quote_id",
                 table: "case_currents");
 
-            migrationBuilder.DropTable(
-                name: "case_memos");
+            migrationBuilder.DropTable(name: "sales_memos");
+            migrationBuilder.DropTable(name: "trader_memos");
 
             migrationBuilder.DropIndex(
                 name: "IX_case_currents_closed_quote_id",

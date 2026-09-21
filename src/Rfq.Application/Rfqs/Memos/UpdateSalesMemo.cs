@@ -4,13 +4,13 @@ namespace Rfq.Application;
 
 public sealed class UpdateSalesMemo(
     IRfqCaseRepository rfqCases,
-    ICaseMemoRepository memos,
+    IRfqMemoRepository memos,
     IUserDirectory users,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
-    public async Task<CaseMemoResult> ExecuteAsync(
+    public async Task<MemoResult> ExecuteAsync(
         CaseId caseId,
         string? memo,
         StateVersion expectedVersion,
@@ -19,20 +19,19 @@ public sealed class UpdateSalesMemo(
         authorization.EnsureCanUpdateSalesMemo(currentUser.User);
         var rfqCase = await CloseRfq.LoadAsync(rfqCases, caseId, cancellationToken);
         await EnsureDeskAccessAsync(users, currentUser.User, rfqCase, cancellationToken);
-        var caseMemo = await GetMemoAsync(memos, caseId, cancellationToken);
-        caseMemo = CaseMemoTransitions.UpdateSales(
-            caseMemo, memo, expectedVersion);
-        memos.Update(caseMemo);
+        var salesMemo = await GetMemoAsync(memos, caseId, cancellationToken);
+        salesMemo = SalesMemoTransitions.Update(salesMemo, memo, expectedVersion);
+        memos.Update(salesMemo);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new CaseMemoResult(caseId, caseMemo.SalesMemo, caseMemo.Version);
+        return new MemoResult(caseId, salesMemo.Value, salesMemo.Version);
     }
 
-    internal static async Task<CaseMemo> GetMemoAsync(
-        ICaseMemoRepository memos,
+    internal static async Task<SalesMemo> GetMemoAsync(
+        IRfqMemoRepository memos,
         CaseId caseId,
         CancellationToken cancellationToken) =>
-        await memos.GetAsync(caseId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Case Memo for RFQ Case '{caseId}' was not found.");
+        await memos.GetSalesAsync(caseId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Sales Memo for RFQ Case '{caseId}' was not found.");
 
     internal static async Task EnsureDeskAccessAsync(
         IUserDirectory users,

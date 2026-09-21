@@ -72,16 +72,24 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         var secondRepo = new RfqCaseRepository(second);
         var a = (await firstRepo.GetAsync(caseId))!;
         var b = (await secondRepo.GetAsync(caseId))!;
-        a = RfqResponsibilityTransitions.ChangeContactOwner(
-            a, UserId.Create("sales-a"), a.Version);
-        b = RfqResponsibilityTransitions.ChangeContactOwner(
-            b, UserId.Create("sales-a"), b.Version);
+        a = InitialDraftTransitions.Update(a,
+            UpdatedTerms(a),
+            a.AssignedTraderId, a.Version);
+        b = InitialDraftTransitions.Update(b,
+            UpdatedTerms(b),
+            b.AssignedTraderId, b.Version);
         firstRepo.Update(a);
         secondRepo.Update(b);
         await new PostgreSqlUnitOfWork(first).SaveChangesAsync();
 
         await Assert.ThrowsAsync<StateVersionMismatchException>(
             () => new PostgreSqlUnitOfWork(second).SaveChangesAsync());
+
+        static RevisionTerms UpdatedTerms(RfqCase value) => new(
+            value.CurrentRevision.Notional,
+            value.CurrentRevision.SettlementDate,
+            value.CurrentRevision.StandardSettlementDate,
+            "updated");
     }
 
     [Fact]
@@ -169,9 +177,9 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         Assert.Null(restored.SalesId);
         var before = await read.WorkingQuotes.CountAsync();
 
-        var activeQueries = new EfCoreActiveRfqQueries(read);
+        var activeQueries = new EfCoreTraderRfqQueries(read);
         await Assert.ThrowsAsync<DomainInvariantException>(
-            () => activeQueries.GetTraderAsync(DeskId.Create("jpy-credit")));
+            () => activeQueries.GetAsync(DeskId.Create("jpy-credit")));
 
         Assert.Equal(before, await read.WorkingQuotes.CountAsync());
         Assert.False(read.ChangeTracker.HasChanges());
@@ -207,10 +215,10 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         }
 
         await using var read = fixture.CreateContext();
-        var queries = new EfCorePastRfqQueries(read, CurrentSales());
-        var result = await queries.SearchAsync(new PastRfqSearch(
-            From: new DateOnly(2026, 9, 21),
-            To: new DateOnly(2026, 9, 21)));
+        var queries = new EfCoreRfqSearchQueries(read, CurrentSales());
+        var result = await queries.SearchAsync(new RfqSearch(
+            CreatedFrom: new DateOnly(2026, 9, 21),
+            CreatedTo: new DateOnly(2026, 9, 21)));
 
         Assert.Equal(caseIds[1..3], result.Items.Select(item => item.CaseId.Value).Order().ToArray());
     }

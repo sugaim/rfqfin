@@ -39,11 +39,8 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             SalesId = rfqCase.SalesId?.Value,
             CopiedFromCaseId = rfqCase.CopiedFromCaseId?.Value,
             Revisions = [revision],
-            Memo = new CaseMemoEntity
-            {
-                CaseId = rfqCase.CaseId.Value,
-                Version = 1,
-            },
+            SalesMemo = new SalesMemoEntity { CaseId = rfqCase.CaseId.Value, Version = 1 },
+            TraderMemo = new TraderMemoEntity { CaseId = rfqCase.CaseId.Value, Version = 1 },
             Current = new CaseCurrentEntity
             {
                 CaseId = rfqCase.CaseId.Value,

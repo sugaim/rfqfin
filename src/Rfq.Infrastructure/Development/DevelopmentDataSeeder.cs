@@ -9,9 +9,9 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
 
     public const string MasterDataSeedKey = "master-data-v1";
 
-    public const string SystemDateSeedKey = "system-date-v1";
+    public const string BusinessDateSeedKey = "business-date-v1";
 
-    public const string SystemDateKey = "business-today";
+    public const string BusinessDateKey = "business-today";
     public const string DemoHistorySeedKey = "demo-history-v1";
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
@@ -32,15 +32,15 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 new SeedMarker(MasterDataSeedKey, timeProvider.GetUtcNow()));
         }
 
-        if (!seedKeys.Contains(SystemDateSeedKey, StringComparer.Ordinal))
+        if (!seedKeys.Contains(BusinessDateSeedKey, StringComparer.Ordinal))
         {
-            dbContext.SystemDates.Add(new SystemDateEntity
+            dbContext.BusinessDates.Add(new BusinessDateEntity
             {
-                Key = SystemDateKey,
+                Key = BusinessDateKey,
                 BusinessDate = new DateOnly(2026, 9, 21),
             });
             dbContext.SeedMarkers.Add(
-                new SeedMarker(SystemDateSeedKey, timeProvider.GetUtcNow()));
+                new SeedMarker(BusinessDateSeedKey, timeProvider.GetUtcNow()));
         }
 
         if (!seedKeys.Contains(DemoHistorySeedKey, StringComparer.Ordinal))
@@ -122,11 +122,16 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 CreatedBy = revision.CreatedBy,
                 SalesId = index == 1 ? null : revision.CreatedBy,
                 Revisions = [revision],
-                Memo = new CaseMemoEntity
+                SalesMemo = new SalesMemoEntity
                 {
                     CaseId = caseId,
-                    SalesMemo = index % 10 == 0 ? "Follow up with client" : string.Empty,
-                    TraderMemo = index % 13 == 0 ? "Watch liquidity" : string.Empty,
+                    Value = index % 10 == 0 ? "Follow up with client" : string.Empty,
+                    Version = 1,
+                },
+                TraderMemo = new TraderMemoEntity
+                {
+                    CaseId = caseId,
+                    Value = index % 13 == 0 ? "Watch liquidity" : string.Empty,
                     Version = 1,
                 },
                 Current = new CaseCurrentEntity

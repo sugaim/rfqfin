@@ -20,12 +20,15 @@ public sealed class UpdateInitialDraft(
         authorization.EnsureCanEditRevision(currentUser.User, rfqCase);
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
-            rfqCase.AssignedTraderId,
             cancellationToken);
+        if (command.StandardSettlementDate != rfqCase.CurrentRevision.StandardSettlementDate)
+            throw new ArgumentException(
+                "Standard Settlement Date cannot differ from the RFQ creation context.",
+                nameof(command));
         rfqCase = InitialDraftTransitions.Update(
             rfqCase,
             new RevisionTerms(command.Notional, command.SettlementDate,
-                rfqCase.CurrentRevision.StandardSettlementDate,
+                command.StandardSettlementDate,
                 command.SalesAndTradingMessage),
             assignedTraderId,
             command.ExpectedVersion);

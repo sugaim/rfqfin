@@ -14,6 +14,6 @@ internal sealed class RfqCaseEntity
     public long? CopiedFromCaseId { get; set; }
     public List<RfqRevisionEntity> Revisions { get; set; } = [];
     public CaseCurrentEntity Current { get; set; } = null!;
-    public CaseMemoEntity Memo { get; set; } = null!;
+    public SalesMemoEntity SalesMemo { get; set; } = null!;
+    public TraderMemoEntity TraderMemo { get; set; } = null!;
 }
-

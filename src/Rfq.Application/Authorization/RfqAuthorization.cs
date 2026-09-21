@@ -159,8 +159,11 @@ public sealed class RfqAuthorization : IRfqAuthorization
         }
     }
 
-    public void EnsureCanChangeContactOwner(CurrentUser user, RfqCase rfqCase) =>
+    public void EnsureCanChangeContactOwner(CurrentUser user, RfqCase rfqCase)
+    {
         EnsureContactOwnerIdentity(user, rfqCase, "change the Contact Owner of");
+        EnsureOpen(rfqCase);
+    }
 
     public void EnsureCanUpdateSalesMemo(CurrentUser user) =>
         EnsureRole(user, UserRole.Sales);

@@ -5,11 +5,11 @@ namespace Rfq.Infrastructure;
 
 public sealed class MockStandardSettlementResolver : IStandardSettlementResolver
 {
-    public DateOnly Resolve(SecurityId securityId, DateOnly systemDate)
+    public DateOnly Resolve(SecurityId securityId, DateOnly businessDate)
     {
         ArgumentNullException.ThrowIfNull(securityId);
 
-        var result = systemDate;
+        var result = businessDate;
         for (var businessDays = 0; businessDays < 2;)
         {
             result = result.AddDays(1);

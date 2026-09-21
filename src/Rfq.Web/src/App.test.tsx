@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { AppShell, SalesScreen, TraderScreen, type SalesScreenProps, type TraderScreenProps } from './App'
-import type { ClientSearchResult, RfqDefaults, SalesRfq, SecuritySearchResult, TraderRfq } from './services/api'
+import type { ClientSearchResult, SalesRfq, SecuritySearchResult, TraderRfq } from './services/api'
 
 type GridRow = SalesRfq | TraderRfq
 type GridColumn = {
@@ -86,15 +86,13 @@ const securities: SecuritySearchResult[] = [
     categoryName: '日本国債',
   },
 ]
-const defaults: RfqDefaults = {
-  securityId: 'sec-jgb-375',
+const defaults = {
   categoryId: 'JGB',
   categoryName: '日本国債',
-  contactOwnerId: 'sales-dev',
   contactOwnerName: '開発 営業',
-  assignedTraderId: 'trader-a',
+  defaultAssignedTraderId: 'trader-a',
+  defaultAssignedTraderName: 'Trader A',
   assignedTraderName: '国債 トレーダー',
-  systemDate: '2026-09-21',
   standardSettlementDate: '2026-09-23',
 }
 
@@ -153,7 +151,7 @@ const draftRow: SalesRfq = {
   notional: 100000000,
   salesAndTradingMessage: 'initial note',
   salesMemo: '',
-  memoVersion: 1,
+  salesMemoVersion: 1,
   version: 3,
   createdAt: '2026-09-21T00:00:00Z',
 }
@@ -168,12 +166,12 @@ async function selectRequiredMasters() {
 
 describe('AppShell', () => {
   it('shows navigation, system date, and healthy API state', () => {
-    render(<AppShell health="ok" systemDate="2026-09-21" />)
+    render(<AppShell health="ok" businessDate="2026-09-21" />)
     expect(screen.getAllByText('Sales')).toHaveLength(2)
     expect(screen.getByText('Trader')).toBeInTheDocument()
     expect(screen.getByText('EOD')).toBeInTheDocument()
     expect(screen.getByText('API healthy')).toBeInTheDocument()
-    expect(screen.getByText('System Date: 2026-09-21')).toBeInTheDocument()
+    expect(screen.getByText('Business Date: 2026-09-21')).toBeInTheDocument()
   })
 })
 
@@ -190,20 +188,20 @@ describe('SalesScreen', () => {
     expect(screen.getByText(/Active Confirmed Requested Initial/)).toBeInTheDocument()
   })
 
-  it('populates defaults and saves an incomplete draft', async () => {
+  it('populates creation context and saves a draft with nullable notional', async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
     render(<SalesScreen {...baseProps} onCreate={onCreate} onReload={onReload} />)
     await selectRequiredMasters()
-    fireEvent.change(screen.getByLabelText('Settlement Date'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith({
       clientId: 'client-001',
       securityId: 'sec-jgb-375',
       notional: undefined,
-      settlementDate: undefined,
-      salesAndTradingMessage: undefined,
+      settlementDate: '2026-09-23',
+      standardSettlementDate: '2026-09-23',
+      salesAndTradingMessage: '',
       assignedTraderId: 'trader-a',
     }))
     expect(onReload).toHaveBeenCalledOnce()
@@ -222,6 +220,7 @@ describe('SalesScreen', () => {
       securityId: 'sec-jgb-375',
       notional: 250000000,
       settlementDate: '2026-09-23',
+      standardSettlementDate: '2026-09-23',
       salesAndTradingMessage: 'please quote',
       assignedTraderId: 'trader-a',
     }))
@@ -238,6 +237,7 @@ describe('SalesScreen', () => {
     await waitFor(() => expect(onConfirmDraft).toHaveBeenCalledWith(101, {
       notional: 100000000,
       settlementDate: '2026-09-23',
+      standardSettlementDate: '2026-09-23',
       salesAndTradingMessage: 'initial note',
       assignedTraderId: 'trader-a',
       expectedVersion: 3,
@@ -322,7 +322,7 @@ describe('SalesScreen', () => {
           currentQuoteId: null,
           closedQuoteId: '12345678-1234-1234-1234-123456789abc',
           salesMemo: 'existing note',
-          memoVersion: 3,
+          salesMemoVersion: 3,
         }]}
       />,
     )
@@ -369,7 +369,7 @@ const traderRow: TraderRfq = {
   manual: null,
   workingQuoteVersion: 1,
   traderMemo: '',
-  memoVersion: 1,
+  traderMemoVersion: 1,
   createdAt: '2026-09-21T00:00:00Z',
 }
 
@@ -613,7 +613,7 @@ describe('TraderScreen', () => {
           closedQuoteId: '00000000-0000-0000-0000-000000000301',
           owned: false,
           traderMemo: 'existing desk note',
-          memoVersion: 4,
+          traderMemoVersion: 4,
         }]}
       />,
     )

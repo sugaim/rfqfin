@@ -15,10 +15,11 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
     internal DbSet<CategoryRoutingEntity> CategoryRoutings => Set<CategoryRoutingEntity>();
     internal DbSet<ClientEntity> Clients => Set<ClientEntity>();
     internal DbSet<SecurityEntity> Securities => Set<SecurityEntity>();
-    internal DbSet<SystemDateEntity> SystemDates => Set<SystemDateEntity>();
+    internal DbSet<BusinessDateEntity> BusinessDates => Set<BusinessDateEntity>();
     internal DbSet<WorkingQuoteEntity> WorkingQuotes => Set<WorkingQuoteEntity>();
     internal DbSet<ConfirmedQuoteEntity> ConfirmedQuotes => Set<ConfirmedQuoteEntity>();
-    internal DbSet<CaseMemoEntity> CaseMemos => Set<CaseMemoEntity>();
+    internal DbSet<SalesMemoEntity> SalesMemos => Set<SalesMemoEntity>();
+    internal DbSet<TraderMemoEntity> TraderMemos => Set<TraderMemoEntity>();
     internal DbSet<CalculationFailureLogEntity> CalculationFailureLogs =>
         Set<CalculationFailureLogEntity>();
     internal DbSet<EventCursorEntity> EventCursors => Set<EventCursorEntity>();

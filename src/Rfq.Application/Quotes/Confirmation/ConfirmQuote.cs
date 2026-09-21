@@ -14,7 +14,7 @@ public sealed class ConfirmQuote(
 {
     public async Task<ConfirmQuoteResult> ExecuteAsync(
         CaseId caseId,
-        int? expiryMinutes,
+        QuoteExpiry expiry,
         StateVersion expectedCurrentVersion,
         StateVersion expectedWorkingQuoteVersion,
         CancellationToken cancellationToken = default)
@@ -41,8 +41,7 @@ public sealed class ConfirmQuote(
         var now = timeProvider.GetUtcNow();
         var transition = QuoteTransitions.Confirm(
             rfqCase, workingQuote, QuoteId.New(),
-            new QuoteConfirmation(currentUser.User.UserId, now,
-                QuoteExpiry.FromMinutes(expiryMinutes)));
+            new QuoteConfirmation(currentUser.User.UserId, now, expiry));
         rfqCase = transition.Rfq;
         var confirmedQuote = transition.ConfirmedQuote;
         confirmedQuotes.Add(confirmedQuote);
@@ -65,7 +64,7 @@ public sealed class ConfirmQuote(
             confirmedQuote.Calculated,
             confirmedQuote.Manual,
             confirmedQuote.ConfirmedAt,
-            confirmedQuote.ExpiryMinutes,
+            expiry,
             confirmedQuote.ExpiresAt,
             rfqCase.Version);
     }
@@ -81,6 +80,6 @@ public sealed record ConfirmQuoteResult(
     CalculatedQuotePayload? Calculated,
     ManualQuotePayload? Manual,
     DateTimeOffset ConfirmedAt,
-    int? ExpiryMinutes,
+    QuoteExpiry Expiry,
     DateTimeOffset? ExpiresAt,
     StateVersion CurrentVersion);

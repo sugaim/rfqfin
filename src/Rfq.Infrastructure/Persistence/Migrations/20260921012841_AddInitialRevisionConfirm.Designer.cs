@@ -398,7 +398,7 @@ namespace Rfq.Infrastructure.Migrations
                     b.ToTable("seed_markers", (string)null);
                 });
 
-            modelBuilder.Entity("Rfq.Infrastructure.SystemDateEntity", b =>
+            modelBuilder.Entity("Rfq.Infrastructure.BusinessDateEntity", b =>
                 {
                     b.Property<string>("Key")
                         .HasMaxLength(50)
@@ -411,7 +411,7 @@ namespace Rfq.Infrastructure.Migrations
 
                     b.HasKey("Key");
 
-                    b.ToTable("system_dates", (string)null);
+                    b.ToTable("business_dates", (string)null);
                 });
 
             modelBuilder.Entity("Rfq.Infrastructure.WorkingQuoteEntity", b =>

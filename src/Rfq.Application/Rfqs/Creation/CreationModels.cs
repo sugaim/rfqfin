@@ -6,16 +6,18 @@ public sealed record CreateDraftCommand(
     ClientId ClientId,
     SecurityId SecurityId,
     decimal? Notional,
-    DateOnly? SettlementDate,
-    string? SalesAndTradingMessage,
-    UserId? AssignedTraderId);
+    DateOnly SettlementDate,
+    DateOnly StandardSettlementDate,
+    string SalesAndTradingMessage,
+    UserId AssignedTraderId);
 
 public sealed record UpdateInitialDraftCommand(
     CaseId CaseId,
     decimal? Notional,
-    DateOnly? SettlementDate,
-    string? SalesAndTradingMessage,
-    UserId? AssignedTraderId,
+    DateOnly SettlementDate,
+    DateOnly StandardSettlementDate,
+    string SalesAndTradingMessage,
+    UserId AssignedTraderId,
     StateVersion ExpectedVersion);
 
 public sealed record InitialRfqResult(
@@ -53,13 +55,9 @@ public sealed record InitialRfqResult(
         rfqCase.CreatedAt);
 }
 
-public sealed record RfqDefaultsResult(
-    SecurityId SecurityId,
+public sealed record RfqCreationContext(
     CategoryId CategoryId,
     string CategoryName,
-    UserId ContactOwnerId,
-    string ContactOwnerName,
-    UserId AssignedTraderId,
-    string AssignedTraderName,
-    DateOnly SystemDate,
+    UserId DefaultAssignedTraderId,
+    string DefaultAssignedTraderName,
     DateOnly StandardSettlementDate);

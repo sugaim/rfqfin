@@ -3,7 +3,7 @@ using Rfq.Domain;
 namespace Rfq.Application;
 
 public sealed class GetActiveTraderRfqs(
-    IActiveRfqQueries activeRfqs,
+    ITraderRfqQueries activeRfqs,
     IRfqAuthorization authorization,
     ICurrentUser currentUser)
 {
@@ -11,7 +11,7 @@ public sealed class GetActiveTraderRfqs(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanViewTraderScreen(currentUser.User);
-        return await activeRfqs.GetTraderAsync(
+        return await activeRfqs.GetAsync(
             currentUser.User.DeskId,
             cancellationToken);
     }
@@ -45,5 +45,5 @@ public sealed record TraderRfqListItem(
     ManualQuotePayload? Manual,
     StateVersion WorkingQuoteVersion,
     string TraderMemo,
-    StateVersion MemoVersion,
+    StateVersion TraderMemoVersion,
     DateTimeOffset CreatedAt);

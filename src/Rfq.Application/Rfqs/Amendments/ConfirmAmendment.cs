@@ -5,7 +5,7 @@ namespace Rfq.Application;
 public sealed class ConfirmAmendment(
     IRfqCaseRepository cases,
     IWorkingQuoteRepository workingQuotes,
-    ISystemDateProvider systemDate,
+    IBusinessDateProvider businessDate,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IRfqEventSink events,
@@ -21,7 +21,7 @@ public sealed class ConfirmAmendment(
         var now = timeProvider.GetUtcNow();
         var transition = AmendmentTransitions.Confirm(
             rfq,
-            await systemDate.GetTodayAsync(cancellationToken),
+            await businessDate.GetCurrentAsync(cancellationToken),
             currentUser.User.UserId,
             now,
             command.ExpectedCurrentVersion,

@@ -11,6 +11,6 @@ public interface IGridConfigStore
         string screenId,
         string configKey,
         int version,
-        string configJson,
+        string config,
         CancellationToken cancellationToken = default);
 }

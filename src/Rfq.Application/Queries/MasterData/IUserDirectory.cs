@@ -19,5 +19,4 @@ public sealed record UserSummary(
     UserId UserId,
     string Name,
     IReadOnlySet<UserRole> Roles,
-    DeskId DeskId,
-    int? DefaultQuoteExpiryMinutes = null);
+    DeskId DeskId);

@@ -6,7 +6,7 @@ public sealed class ConfirmNewRfq(
     InitialRfqFactory initialRfqFactory,
     IRfqCaseRepository rfqCases,
     IWorkingQuoteRepository workingQuotes,
-    ISystemDateProvider systemDateProvider,
+    IBusinessDateProvider businessDateProvider,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
@@ -19,11 +19,11 @@ public sealed class ConfirmNewRfq(
     {
         authorization.EnsureCanCreateRevision(currentUser.User);
         var rfqCase = await initialRfqFactory.CreateAsync(command, cancellationToken);
-        var systemDate = await systemDateProvider.GetTodayAsync(cancellationToken);
+        var businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
         rfqCase = RfqLifecycleTransitions.ConfirmInitial(
             rfqCase, rfqCase.CurrentRevision.Terms, rfqCase.AssignedTraderId,
-            systemDate, currentUser.User.UserId, now, rfqCase.CurrentRevision.Version);
+            businessDate, currentUser.User.UserId, now, rfqCase.CurrentRevision.Version);
 
         rfqCases.Add(rfqCase);
         workingQuotes.Add(WorkingQuoteFactory.CreateInitialFor(

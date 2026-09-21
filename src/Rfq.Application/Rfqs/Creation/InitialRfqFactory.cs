@@ -5,7 +5,7 @@ namespace Rfq.Application;
 public sealed class InitialRfqFactory(
     ICaseIdGenerator caseIdGenerator,
     IClientSearch clientSearch,
-    ResolveRfqDefaults resolveDefaults,
+    ResolveRfqCreationContext resolveCreationContext,
     AssignedTraderValidator assignedTraderValidator,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
@@ -20,10 +20,13 @@ public sealed class InitialRfqFactory(
 
         _ = await clientSearch.ResolveAsync(command.ClientId, cancellationToken)
             ?? throw new KeyNotFoundException($"Client '{command.ClientId.Value}' was not found.");
-        var defaults = await resolveDefaults.ExecuteAsync(command.SecurityId, cancellationToken);
+        var context = await resolveCreationContext.ExecuteAsync(command.SecurityId, cancellationToken);
+        if (command.StandardSettlementDate != context.StandardSettlementDate)
+            throw new ArgumentException(
+                "Standard Settlement Date no longer matches the authoritative creation context.",
+                nameof(command));
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
-            defaults.AssignedTraderId,
             cancellationToken);
         var caseId = await caseIdGenerator.NextAsync(cancellationToken);
         var salesId = currentUser.User.Roles.Contains(UserRole.Sales)
@@ -34,13 +37,13 @@ public sealed class InitialRfqFactory(
             caseId,
             RevisionId.New(),
             command.ClientId,
-            defaults.SecurityId,
-            defaults.CategoryId,
+            command.SecurityId,
+            context.CategoryId,
             assignedTraderId,
             new RevisionTerms(
                 command.Notional,
                 command.SettlementDate,
-                defaults.StandardSettlementDate,
+                command.StandardSettlementDate,
                 command.SalesAndTradingMessage),
             currentUser.User.UserId,
             timeProvider.GetUtcNow(),

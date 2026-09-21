@@ -4,12 +4,12 @@ public static class RfqLifecycleTransitions
 {
     public static RfqCase ConfirmInitial(
         RfqCase rfq, RevisionTerms terms, UserId assignedTraderId,
-        DateOnly systemDate, UserId confirmedBy, DateTimeOffset confirmedAt,
+        DateOnly businessDate, UserId confirmedBy, DateTimeOffset confirmedAt,
         StateVersion expectedRevisionVersion)
     {
         InitialDraftTransitions.EnsureInitialDraft(rfq);
         var revision = rfq.CurrentRevision.Confirm(
-            terms, systemDate, confirmedBy, confirmedAt, expectedRevisionVersion);
+            terms, businessDate, confirmedBy, confirmedAt, expectedRevisionVersion);
         return rfq.Next(
             currentRevision: revision,
             assignedTraderId: assignedTraderId,

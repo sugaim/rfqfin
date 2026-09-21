@@ -3,13 +3,13 @@ using Rfq.Domain;
 namespace Rfq.Application;
 
 public sealed class GetActiveSalesRfqs(
-    IActiveRfqQueries activeRfqs,
+    ISalesRfqQueries activeRfqs,
     ICurrentUser currentUser)
 {
     public Task<IReadOnlyList<SalesRfqListItem>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
-        return activeRfqs.GetSalesAsync(
+        return activeRfqs.GetAsync(
             currentUser.User.UserId,
             cancellationToken);
     }
@@ -38,7 +38,7 @@ public sealed record SalesRfqListItem(
     decimal? Notional,
     string SalesAndTradingMessage,
     string SalesMemo,
-    StateVersion MemoVersion,
+    StateVersion SalesMemoVersion,
     StateVersion Version,
     DateTimeOffset CreatedAt,
     RevisionId? DraftRevisionId,

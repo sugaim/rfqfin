@@ -4,13 +4,13 @@ namespace Rfq.Application;
 
 public sealed class UpdateTraderMemo(
     IRfqCaseRepository rfqCases,
-    ICaseMemoRepository memos,
+    IRfqMemoRepository memos,
     IUserDirectory users,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
-    public async Task<CaseMemoResult> ExecuteAsync(
+    public async Task<MemoResult> ExecuteAsync(
         CaseId caseId,
         string? memo,
         StateVersion expectedVersion,
@@ -23,14 +23,12 @@ public sealed class UpdateTraderMemo(
             currentUser.User,
             rfqCase,
             cancellationToken);
-        var caseMemo = await UpdateSalesMemo.GetMemoAsync(
-            memos,
-            caseId,
-            cancellationToken);
-        caseMemo = CaseMemoTransitions.UpdateTrader(
-            caseMemo, memo, expectedVersion);
-        memos.Update(caseMemo);
+        var traderMemo = await memos.GetTraderAsync(caseId, cancellationToken)
+            ?? throw new KeyNotFoundException(
+                $"Trader Memo for RFQ Case '{caseId}' was not found.");
+        traderMemo = TraderMemoTransitions.Update(traderMemo, memo, expectedVersion);
+        memos.Update(traderMemo);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new CaseMemoResult(caseId, caseMemo.TraderMemo, caseMemo.Version);
+        return new MemoResult(caseId, traderMemo.Value, traderMemo.Version);
     }
 }

@@ -24,6 +24,22 @@ namespace Rfq.Infrastructure.Migrations
 
             modelBuilder.HasSequence("rfq_case_id_seq");
 
+            modelBuilder.Entity("Rfq.Infrastructure.BusinessDateEntity", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("key");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("business_dates", (string)null);
+                });
+
             modelBuilder.Entity("Rfq.Infrastructure.CalculationFailureLogEntity", b =>
                 {
                     b.Property<Guid>("FailureLogId")
@@ -169,32 +185,6 @@ namespace Rfq.Infrastructure.Migrations
                     b.HasIndex("CurrentRevisionId");
 
                     b.ToTable("case_currents", (string)null);
-                });
-
-            modelBuilder.Entity("Rfq.Infrastructure.CaseMemoEntity", b =>
-                {
-                    b.Property<long>("CaseId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("case_id");
-
-                    b.Property<string>("SalesMemo")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("sales_memo");
-
-                    b.Property<string>("TraderMemo")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("trader_memo");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("version");
-
-                    b.HasKey("CaseId");
-
-                    b.ToTable("case_memos", (string)null);
                 });
 
             modelBuilder.Entity("Rfq.Infrastructure.CategoryEntity", b =>
@@ -620,6 +610,27 @@ namespace Rfq.Infrastructure.Migrations
                     b.ToTable("rfq_revisions", (string)null);
                 });
 
+            modelBuilder.Entity("Rfq.Infrastructure.SalesMemoEntity", b =>
+                {
+                    b.Property<long>("CaseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("case_id");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("value");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("CaseId");
+
+                    b.ToTable("sales_memos", (string)null);
+                });
+
             modelBuilder.Entity("Rfq.Infrastructure.SecurityEntity", b =>
                 {
                     b.Property<string>("SecurityId")
@@ -694,20 +705,25 @@ namespace Rfq.Infrastructure.Migrations
                     b.ToTable("seed_markers", (string)null);
                 });
 
-            modelBuilder.Entity("Rfq.Infrastructure.SystemDateEntity", b =>
+            modelBuilder.Entity("Rfq.Infrastructure.TraderMemoEntity", b =>
                 {
-                    b.Property<string>("Key")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("key");
+                    b.Property<long>("CaseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("case_id");
 
-                    b.Property<DateOnly>("BusinessDate")
-                        .HasColumnType("date")
-                        .HasColumnName("business_date");
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("value");
 
-                    b.HasKey("Key");
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
 
-                    b.ToTable("system_dates", (string)null);
+                    b.HasKey("CaseId");
+
+                    b.ToTable("trader_memos", (string)null);
                 });
 
             modelBuilder.Entity("Rfq.Infrastructure.UserGridConfigEntity", b =>
@@ -843,17 +859,6 @@ namespace Rfq.Infrastructure.Migrations
                     b.Navigation("RfqCase");
                 });
 
-            modelBuilder.Entity("Rfq.Infrastructure.CaseMemoEntity", b =>
-                {
-                    b.HasOne("Rfq.Infrastructure.RfqCaseEntity", "RfqCase")
-                        .WithOne("Memo")
-                        .HasForeignKey("Rfq.Infrastructure.CaseMemoEntity", "CaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RfqCase");
-                });
-
             modelBuilder.Entity("Rfq.Infrastructure.CategoryRoutingEntity", b =>
                 {
                     b.HasOne("Rfq.Infrastructure.CategoryEntity", null)
@@ -952,6 +957,17 @@ namespace Rfq.Infrastructure.Migrations
                     b.Navigation("RfqCase");
                 });
 
+            modelBuilder.Entity("Rfq.Infrastructure.SalesMemoEntity", b =>
+                {
+                    b.HasOne("Rfq.Infrastructure.RfqCaseEntity", "RfqCase")
+                        .WithOne("SalesMemo")
+                        .HasForeignKey("Rfq.Infrastructure.SalesMemoEntity", "CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RfqCase");
+                });
+
             modelBuilder.Entity("Rfq.Infrastructure.SecurityEntity", b =>
                 {
                     b.HasOne("Rfq.Infrastructure.CategoryEntity", "Category")
@@ -961,6 +977,17 @@ namespace Rfq.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("Rfq.Infrastructure.TraderMemoEntity", b =>
+                {
+                    b.HasOne("Rfq.Infrastructure.RfqCaseEntity", "RfqCase")
+                        .WithOne("TraderMemo")
+                        .HasForeignKey("Rfq.Infrastructure.TraderMemoEntity", "CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RfqCase");
                 });
 
             modelBuilder.Entity("Rfq.Infrastructure.WorkingQuoteEntity", b =>
@@ -979,10 +1006,13 @@ namespace Rfq.Infrastructure.Migrations
                     b.Navigation("Current")
                         .IsRequired();
 
-                    b.Navigation("Memo")
+                    b.Navigation("Revisions");
+
+                    b.Navigation("SalesMemo")
                         .IsRequired();
 
-                    b.Navigation("Revisions");
+                    b.Navigation("TraderMemo")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

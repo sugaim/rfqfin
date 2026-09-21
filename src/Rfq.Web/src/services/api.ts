@@ -8,16 +8,18 @@ export interface CreateDraftRequest {
   clientId: string
   securityId: string
   notional?: number
-  settlementDate?: string
-  salesAndTradingMessage?: string
-  assignedTraderId?: string
+  settlementDate: string
+  standardSettlementDate: string
+  salesAndTradingMessage: string
+  assignedTraderId: string
 }
 
 export interface UpdateDraftRequest {
   notional?: number
-  settlementDate?: string
-  salesAndTradingMessage?: string
-  assignedTraderId?: string
+  settlementDate: string
+  standardSettlementDate: string
+  salesAndTradingMessage: string
+  assignedTraderId: string
   expectedVersion: number
 }
 
@@ -62,7 +64,7 @@ export interface SalesRfq {
   notional: number | null
   salesAndTradingMessage: string
   salesMemo: string
-  memoVersion: number
+  salesMemoVersion: number
   version: number
   createdAt: string
   draftRevisionId?: string | null
@@ -75,11 +77,11 @@ export interface SalesRfq {
 export interface AmendmentResult { caseId: number; currentRevisionId: string; draftRevisionId: string | null; currentVersion: number; draftVersion: number | null; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null }
 export interface AmendmentItemResult { caseId: number; result: string; error: string | null }
 export interface LifecycleResult { caseId: number; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null; currentVersion: number }
-export interface PersistedEvent { eventId: number; occurredAt: string; actorUserId: string | null; caseId: number; kind: string; type: string; payloadJson: string }
+export interface PersistedEvent { type: string; eventId: number; occurredAt: string; actorUserId: string | null; caseId: number; quoteId?: string; [key: string]: unknown }
 export interface EodSummary { contactOwnerId: string; open: number; hit: number; away: number }
-export interface PastRfq { caseId: number; createdAt: string; clientId: string; clientName: string; securityId: string; securityName: string; categoryId: string; status: string; quoteStatus: string | null; contactOwnerId: string; salesId: string; assignedTraderId: string; notional: number | null; settlementDate: string | null }
-export interface PastRfqResult { items: PastRfq[]; requiresNarrowing: boolean }
-export interface GridConfig { screenId: string; configKey: string; version: number; configJson: string; updatedAt: string }
+export interface RfqSearchItem { caseId: number; createdAt: string; clientId: string; clientName: string; securityId: string; securityName: string; categoryId: string; status: string; quoteStatus: string | null; contactOwnerId: string; salesId: string | null; assignedTraderId: string; notional: number | null; settlementDate: string | null }
+export interface RfqSearchResult { items: RfqSearchItem[]; requiresNarrowing: boolean }
+export interface GridConfig { screenId: string; configKey: string; version: number; config: unknown; updatedAt: string }
 
 export interface SecuritySearchResult {
   securityId: string
@@ -100,24 +102,17 @@ export interface ClientSearchResult {
 export interface UserSummary {
   userId: string
   name: string
-  roles: string[]
-  deskId: string
-  defaultQuoteExpiryMinutes: number | null
 }
 
-export interface RfqDefaults {
-  securityId: string
+export interface RfqCreationContext {
   categoryId: string
   categoryName: string
-  contactOwnerId: string
-  contactOwnerName: string
-  assignedTraderId: string
-  assignedTraderName: string
-  systemDate: string
+  defaultAssignedTraderId: string
+  defaultAssignedTraderName: string
   standardSettlementDate: string
 }
 
-export interface SystemDateResponse {
+export interface BusinessDateResponse {
   date: string
 }
 
@@ -125,8 +120,11 @@ export interface CurrentUserResponse {
   userId: string
   roles: string[]
   deskId: string
-  defaultQuoteExpiryMinutes: number | null
 }
+
+export type QuoteExpiry =
+  | { type: 'None'; minutes: null }
+  | { type: 'After'; minutes: number }
 
 export interface TraderRfq {
   caseId: number
@@ -156,7 +154,7 @@ export interface TraderRfq {
   manual: ManualQuotePayload | null
   workingQuoteVersion: number
   traderMemo: string
-  memoVersion: number
+  traderMemoVersion: number
   createdAt: string
 }
 
@@ -205,7 +203,7 @@ export interface ConfirmQuoteResult {
   calculated: CalculatedQuotePayload | null
   manual: ManualQuotePayload | null
   confirmedAt: string
-  expiryMinutes: number | null
+  expiry: QuoteExpiry
   expiresAt: string | null
   currentVersion: number
 }
@@ -239,7 +237,7 @@ export interface ContactOwnerResult {
   currentVersion: number
 }
 
-export interface CaseMemoResult {
+export interface MemoResult {
   caseId: number
   memo: string
   version: number
@@ -259,23 +257,25 @@ export const api = createApi({
     getHealth: builder.query<HealthResponse, void>({
       query: () => '/health',
     }),
-    getSystemDate: builder.query<SystemDateResponse, void>({
-      query: () => '/system-date',
+    getBusinessDate: builder.query<BusinessDateResponse, void>({
+      query: () => '/business-date',
     }),
-    getCurrentUser: builder.query<CurrentUserResponse, void>({
-      query: () => '/current-user',
+    getMe: builder.query<CurrentUserResponse, void>({
+      query: () => '/me',
     }),
     getActiveSalesRfqs: builder.query<SalesRfq[], void>({
-      query: () => '/rfqs/active-sales',
+      query: () => '/sales-rfqs',
     }),
     getEvents: builder.query<PersistedEvent[], number>({ query: (after) => ({ url: '/events', params: { after } }) }),
-    getEod: builder.query<EodSummary[], string>({ query: (date) => ({ url: '/operations/eod', params: { date } }) }),
-    searchPastRfqs: builder.query<PastRfqResult, void>({ query: () => '/operations/past-rfqs' }),
-    getGridConfig: builder.query<GridConfig, { screenId: string; configKey: string }>({ query: ({ screenId, configKey }) => `/operations/grid-config/${screenId}/${configKey}` }),
-    saveGridConfig: builder.mutation<GridConfig, { screenId: string; configKey: string; version: number; configJson: string }>({ query: ({ screenId, configKey, ...body }) => ({ url: `/operations/grid-config/${screenId}/${configKey}`, method: 'PUT', body }) }),
+    getEod: builder.query<EodSummary[], string>({ query: (date) => ({ url: '/eod', params: { date } }) }),
+    searchRfqs: builder.query<RfqSearchResult, void>({ query: () => '/rfqs/search' }),
+    getGridConfig: builder.query<GridConfig, { screenId: string; configKey: string }>({ query: ({ screenId, configKey }) => `/me/grid-configs/${screenId}/${configKey}` }),
+    saveGridConfig: builder.mutation<GridConfig, { screenId: string; configKey: string; version: number; config: unknown }>({ query: ({ screenId, configKey, ...body }) => ({ url: `/me/grid-configs/${screenId}/${configKey}`, method: 'PUT', body }) }),
+    getQuoteExpiry: builder.query<QuoteExpiry, void>({ query: () => '/me/settings/quote-expiry' }),
+    saveQuoteExpiry: builder.mutation<QuoteExpiry, QuoteExpiry>({ query: (body) => ({ url: '/me/settings/quote-expiry', method: 'PUT', body }) }),
     createDraft: builder.mutation<InitialRfqResponse, CreateDraftRequest>({
       query: (body) => ({
-        url: '/rfqs',
+        url: '/rfqs/drafts',
         method: 'POST',
         body,
       }),
@@ -292,7 +292,7 @@ export const api = createApi({
     }),
     confirmNewRfq: builder.mutation<InitialRfqResponse, CreateDraftRequest>({
       query: (body) => ({
-        url: '/rfqs/confirm',
+        url: '/rfqs/drafts/confirm',
         method: 'POST',
         body,
       }),
@@ -302,27 +302,27 @@ export const api = createApi({
       { caseId: number; body: UpdateDraftRequest }
     >({
       query: ({ caseId, body }) => ({
-        url: `/rfqs/${caseId}/confirm`,
+        url: `/rfqs/${caseId}/draft/confirm`,
         method: 'POST',
         body,
       }),
     }),
     discardDraft: builder.mutation<void, { caseId: number; expectedVersion: number }>({
       query: ({ caseId, expectedVersion }) => ({
-        url: `/rfqs/${caseId}/discard`,
+        url: `/rfqs/${caseId}/draft/discard`,
         method: 'POST',
         body: { expectedVersion },
       }),
     }),
     getActiveTraderRfqs: builder.query<TraderRfq[], void>({
-      query: () => '/trader/rfqs/active',
+      query: () => '/trader-rfqs',
     }),
     pickUpRfq: builder.mutation<
       OwnershipResult,
       { caseId: number; expectedVersion: number; confirmed: boolean }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/trader/rfqs/${caseId}/pick-up`,
+        url: `/rfqs/${caseId}/ownership/pick-up`,
         method: 'POST',
         body,
       }),
@@ -332,7 +332,7 @@ export const api = createApi({
       { caseId: number; expectedVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/trader/rfqs/${caseId}/release`,
+        url: `/rfqs/${caseId}/ownership/release`,
         method: 'POST',
         body,
       }),
@@ -341,10 +341,10 @@ export const api = createApi({
       OwnershipResult,
       { caseId: number; targetTraderId: string; expectedVersion: number }
     >({
-      query: ({ caseId, ...body }) => ({
-        url: `/trader/rfqs/${caseId}/assign`,
-        method: 'POST',
-        body,
+      query: ({ caseId, targetTraderId, ...body }) => ({
+        url: `/rfqs/${caseId}/assigned-trader`,
+        method: 'PUT',
+        body: { assignedTraderId: targetTraderId, ...body },
       }),
     }),
     takeOverRfq: builder.mutation<
@@ -352,7 +352,7 @@ export const api = createApi({
       { caseId: number; expectedVersion: number; confirmed: boolean }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/trader/rfqs/${caseId}/take-over`,
+        url: `/rfqs/${caseId}/ownership/take-over`,
         method: 'POST',
         body,
       }),
@@ -369,7 +369,7 @@ export const api = createApi({
       }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/trader/rfqs/${caseId}/working-quote/calculate`,
+        url: `/rfqs/${caseId}/working-quote/calculate`,
         method: 'PUT',
         body,
       }),
@@ -384,7 +384,7 @@ export const api = createApi({
       }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/trader/rfqs/${caseId}/working-quote/mode`,
+        url: `/rfqs/${caseId}/working-quote/mode`,
         method: 'PUT',
         body,
       }),
@@ -400,7 +400,7 @@ export const api = createApi({
       }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/trader/rfqs/${caseId}/working-quote/manual`,
+        url: `/rfqs/${caseId}/working-quote/manual`,
         method: 'PUT',
         body,
       }),
@@ -409,13 +409,13 @@ export const api = createApi({
       ConfirmQuoteResult,
       {
         caseId: number
-        expiryMinutes: number | null
+        expiry: QuoteExpiry
         expectedCurrentVersion: number
         expectedWorkingQuoteVersion: number
       }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/trader/rfqs/${caseId}/confirm-quote`,
+        url: `/rfqs/${caseId}/quote/confirm`,
         method: 'POST',
         body,
       }),
@@ -483,28 +483,28 @@ export const api = createApi({
         confirmed: boolean
       }
     >({
-      query: ({ caseId, ...body }) => ({
+      query: ({ caseId, targetUserId, ...body }) => ({
         url: `/rfqs/${caseId}/contact-owner`,
-        method: 'POST',
-        body,
+        method: 'PUT',
+        body: { contactOwnerId: targetUserId, ...body },
       }),
     }),
     updateSalesMemo: builder.mutation<
-      CaseMemoResult,
+      MemoResult,
       { caseId: number; memo: string; expectedVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/sales-memo`,
+        url: `/rfqs/${caseId}/memos/sales`,
         method: 'PUT',
         body,
       }),
     }),
     updateTraderMemo: builder.mutation<
-      CaseMemoResult,
+      MemoResult,
       { caseId: number; memo: string; expectedVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/trader-memo`,
+        url: `/rfqs/${caseId}/memos/trader`,
         method: 'PUT',
         body,
       }),
@@ -523,24 +523,23 @@ export const api = createApi({
     createFromExisting: builder.mutation<InitialRfqResponse, number>({ query: (caseId) => ({ url: `/rfqs/${caseId}/create-from-existing`, method: 'POST' }) }),
     cancelRfq: builder.mutation<LifecycleResult, { caseId: number; expectedCurrentVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/cancel`, method: 'POST', body }) }),
     reopenRfq: builder.mutation<LifecycleResult, { caseId: number; expectedCurrentVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/reopen`, method: 'POST', body }) }),
-    withdrawQuote: builder.mutation<LifecycleResult, { caseId: number; expectedVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/trader/rfqs/${caseId}/withdraw`, method: 'POST', body }) }),
-    scratchPrice: builder.mutation<CalculatedQuotePayload, { securityId: string; settlementDate: string; driver: string; value: number; simpleYieldSlide: number }>({ query: (body) => ({ url: '/operations/pricer', method: 'POST', body }) }),
+    withdrawQuote: builder.mutation<LifecycleResult, { caseId: number; expectedVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/quote/withdraw`, method: 'POST', body }) }),
+    scratchPrice: builder.mutation<CalculatedQuotePayload, { securityId: string; settlementDate: string; driver: string; value: number; simpleYieldSlide: number }>({ query: (body) => ({ url: '/pricer', method: 'POST', body }) }),
     searchClients: builder.query<ClientSearchResult[], string>({
-      query: (q) => ({ url: '/masters/clients/search', params: { q } }),
+      query: (q) => ({ url: '/rfqs/candidates/clients', params: { q } }),
       keepUnusedDataFor: 0,
     }),
     searchSecurities: builder.query<SecuritySearchResult[], string>({
-      query: (q) => ({ url: '/masters/securities/search', params: { q } }),
+      query: (q) => ({ url: '/rfqs/candidates/securities', params: { q } }),
       keepUnusedDataFor: 0,
     }),
-    getUsers: builder.query<UserSummary[], string | void>({
-      query: (role) => ({ url: '/masters/users', params: role ? { role } : undefined }),
-    }),
-    resolveRfqDefaults: builder.query<
-      RfqDefaults,
+    getAssignableTraders: builder.query<UserSummary[], void>({ query: () => '/assignable-traders' }),
+    getContactOwnerCandidates: builder.query<UserSummary[], void>({ query: () => '/contact-owner-candidates' }),
+    resolveRfqCreationContext: builder.query<
+      RfqCreationContext,
       { securityId: string }
     >({
-      query: (params) => ({ url: '/rfq-defaults', params }),
+      query: (params) => ({ url: '/rfqs/creation-context', params }),
       keepUnusedDataFor: 0,
     }),
   }),
@@ -571,16 +570,19 @@ export const {
   useScratchPriceMutation,
   useGetEodQuery,
   useGetEventsQuery,
-  useSearchPastRfqsQuery,
+  useSearchRfqsQuery,
   useGetGridConfigQuery,
   useSaveGridConfigMutation,
   useGetActiveTraderRfqsQuery,
   useGetActiveSalesRfqsQuery,
-  useGetCurrentUserQuery,
+  useGetMeQuery,
   useGetHealthQuery,
-  useGetSystemDateQuery,
-  useGetUsersQuery,
-  useLazyResolveRfqDefaultsQuery,
+  useGetBusinessDateQuery,
+  useGetQuoteExpiryQuery,
+  useSaveQuoteExpiryMutation,
+  useGetAssignableTradersQuery,
+  useGetContactOwnerCandidatesQuery,
+  useLazyResolveRfqCreationContextQuery,
   useLazySearchClientsQuery,
   useLazySearchSecuritiesQuery,
   usePickUpRfqMutation,

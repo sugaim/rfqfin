@@ -7,11 +7,10 @@ public sealed class AssignedTraderValidator(
     ICurrentUser currentUser)
 {
     public async Task<UserId> ResolveAsync(
-        UserId? requestedTraderId,
-        UserId fallbackTraderId,
+        UserId assignedTraderId,
         CancellationToken cancellationToken = default)
     {
-        var assignedTraderId = requestedTraderId ?? fallbackTraderId;
+        ArgumentNullException.ThrowIfNull(assignedTraderId);
         var assignedTrader = await userDirectory.ResolveAsync(assignedTraderId, cancellationToken)
             ?? throw new KeyNotFoundException(
                 $"Assigned Trader '{assignedTraderId.Value}' was not found.");
@@ -20,7 +19,7 @@ public sealed class AssignedTraderValidator(
         {
             throw new ArgumentException(
                 "Assigned Trader must be a Trader on the current user's desk.",
-                nameof(requestedTraderId));
+                nameof(assignedTraderId));
         }
 
         return assignedTraderId;
