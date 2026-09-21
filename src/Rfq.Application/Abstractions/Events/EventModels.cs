@@ -7,7 +7,6 @@ public abstract record PersistedEvent(
     DateTimeOffset OccurredAt,
     UserId? ActorUserId,
     CaseId CaseId,
-    string Type,
     string PayloadJson)
 {
     public abstract PersistedEventKind Kind { get; }
@@ -18,9 +17,9 @@ public sealed record PersistedRfqEvent(
     DateTimeOffset OccurredAt,
     UserId? ActorUserId,
     CaseId CaseId,
-    string Type,
+    RfqTransitionKind Type,
     string PayloadJson)
-    : PersistedEvent(EventId, OccurredAt, ActorUserId, CaseId, Type, PayloadJson)
+    : PersistedEvent(EventId, OccurredAt, ActorUserId, CaseId, PayloadJson)
 {
     public override PersistedEventKind Kind => PersistedEventKind.Rfq;
 }
@@ -31,9 +30,9 @@ public sealed record PersistedQuoteEvent(
     UserId? ActorUserId,
     CaseId CaseId,
     QuoteId QuoteId,
-    string Type,
+    QuoteTransitionKind Type,
     string PayloadJson)
-    : PersistedEvent(EventId, OccurredAt, ActorUserId, CaseId, Type, PayloadJson)
+    : PersistedEvent(EventId, OccurredAt, ActorUserId, CaseId, PayloadJson)
 {
     public override PersistedEventKind Kind => PersistedEventKind.Quote;
 }

@@ -57,7 +57,7 @@ public sealed class PostgreSqlEventFeed(
             row.OccurredAt,
             ToUserId(row.ActorUserId),
             new CaseId(row.CaseId),
-            row.Type,
+            PersistedEventTypeParser.ParseRfq(row.Type),
             row.PayloadJson));
         var quoteItems = quoteRows.Select(row => (PersistedEvent)new PersistedQuoteEvent(
             row.EventId,
@@ -65,7 +65,7 @@ public sealed class PostgreSqlEventFeed(
             ToUserId(row.ActorUserId),
             new CaseId(row.CaseId),
             new QuoteId(row.QuoteId),
-            row.Type,
+            PersistedEventTypeParser.ParseQuote(row.Type),
             row.PayloadJson));
         return rfqItems.Concat(quoteItems)
             .OrderBy(item => item.EventId)
@@ -97,4 +97,26 @@ public sealed class PostgreSqlEventFeed(
         Guid QuoteId,
         string Type,
         string PayloadJson);
+}
+
+internal static class PersistedEventTypeParser
+{
+    public static RfqTransitionKind ParseRfq(string value) =>
+        Parse<RfqTransitionKind>(value, "RFQ");
+
+    public static QuoteTransitionKind ParseQuote(string value) =>
+        Parse<QuoteTransitionKind>(value, "Quote");
+
+    private static TKind Parse<TKind>(string value, string eventKind)
+        where TKind : struct, Enum
+    {
+        if (Enum.TryParse<TKind>(value, ignoreCase: false, out var parsed)
+            && Enum.IsDefined(parsed))
+        {
+            return parsed;
+        }
+
+        throw new DomainInvariantException(
+            $"Persisted {eventKind} event type '{value}' is invalid.");
+    }
 }

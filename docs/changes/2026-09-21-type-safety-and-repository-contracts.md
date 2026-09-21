@@ -13,6 +13,9 @@ the database schema or public HTTP JSON shapes.
   at Infrastructure boundaries.
 - Changed `PersistedEvent` identifiers to `CaseId`, nullable `UserId`, and—on quote events—required
   `QuoteId`.
+- Changed persisted RFQ and Quote event `Type` values from raw strings to
+  `RfqTransitionKind` and `QuoteTransitionKind`. Infrastructure parses DB strings strictly and
+  rejects unknown or undefined values; the API maps the enums back to the existing strings.
 - Added typed RFQ/Quote persisted-event variants and `PersistedEventKind`; Application and
   Infrastructure no longer use `"Rfq"` / `"Quote"` string branching.
 - Replaced the nullable-ID `PendingEvent` record with `PendingRfqEvent` and `PendingQuoteEvent`.

@@ -27,4 +27,20 @@ public sealed class EventContractTests
         Assert.Equal(quoteId, quoteEvent.QuoteId);
         Assert.Equal(actor, quoteEvent.ActorUserId);
     }
+
+    [Fact]
+    public void Persisted_event_types_parse_strictly_from_database_strings()
+    {
+        Assert.Equal(
+            RfqTransitionKind.RevisionConfirmed,
+            PersistedEventTypeParser.ParseRfq("RevisionConfirmed"));
+        Assert.Equal(
+            QuoteTransitionKind.Confirmed,
+            PersistedEventTypeParser.ParseQuote("Confirmed"));
+
+        Assert.Throws<DomainInvariantException>(
+            () => PersistedEventTypeParser.ParseRfq("Unknown"));
+        Assert.Throws<DomainInvariantException>(
+            () => PersistedEventTypeParser.ParseQuote("999"));
+    }
 }

@@ -52,6 +52,12 @@ public sealed record PersistedEventResponse(
         item.ActorUserId?.Value,
         item.CaseId.Value,
         item.Kind.ToString(),
-        item.Type,
+        item switch
+        {
+            PersistedRfqEvent rfqEvent => rfqEvent.Type.ToString(),
+            PersistedQuoteEvent quoteEvent => quoteEvent.Type.ToString(),
+            _ => throw new InvalidOperationException(
+                $"Unsupported persisted event type '{item.GetType().Name}'."),
+        },
         item.PayloadJson);
 }
