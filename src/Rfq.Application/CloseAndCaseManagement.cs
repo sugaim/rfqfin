@@ -84,8 +84,12 @@ public sealed class CloseRfq(
     {
         var rfqCase = await LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanClose(currentUser.User, rfqCase);
-        rfqCase.Close(outcome, expectedCurrentVersion);
+        var transition = RfqLifecycleTransitions.Close(
+            rfqCase, outcome, new StateVersion(expectedCurrentVersion));
+        rfqCase = transition.Rfq;
         rfqCases.Update(rfqCase);
+        if (transition.DiscardedRevision is not null)
+            rfqCases.UpdateRevision(transition.DiscardedRevision);
         RecordClosed(eventSink, currentUser.User, timeProvider, rfqCase, outcome);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToResult(rfqCase);
@@ -102,8 +106,8 @@ public sealed class CloseRfq(
         rfqCase.CaseId.Value,
         rfqCase.Status.ToString(),
         rfqCase.ClosedQuoteId!.Value.Value,
-        rfqCase.Owned,
-        rfqCase.CurrentVersion);
+        rfqCase.Ownership is Owned,
+        rfqCase.Version.Value);
 
     internal static void RecordClosed(
         IRfqEventSink eventSink,
@@ -155,8 +159,12 @@ public sealed class BulkCloseRfqs(
                 }
 
                 authorization.EnsureCanClose(currentUser.User, rfqCase);
-                rfqCase.Close(outcome, item.ExpectedCurrentVersion);
+                var transition = RfqLifecycleTransitions.Close(
+                    rfqCase, outcome, new StateVersion(item.ExpectedCurrentVersion));
+                rfqCase = transition.Rfq;
                 rfqCases.Update(rfqCase);
+                if (transition.DiscardedRevision is not null)
+                    rfqCases.UpdateRevision(transition.DiscardedRevision);
                 CloseRfq.RecordClosed(
                     eventSink,
                     currentUser.User,
@@ -185,7 +193,8 @@ public sealed class BulkCloseRfqs(
 
     private static bool IsExpected(Exception exception) => exception is
         ArgumentException or KeyNotFoundException or InvalidOperationException
-        or UnauthorizedAccessException;
+        or UnauthorizedAccessException or DomainRuleViolationException
+        or DomainValidationException or StateVersionMismatchException;
 }
 
 public sealed class CorrectRfqOutcome(
@@ -206,7 +215,8 @@ public sealed class CorrectRfqOutcome(
         var rfqCase = await CloseRfq.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanCorrectOutcome(currentUser.User, rfqCase);
         var previous = rfqCase.Status;
-        rfqCase.CorrectOutcome(outcome, expectedCurrentVersion);
+        rfqCase = RfqLifecycleTransitions.CorrectOutcome(
+            rfqCase, outcome, new StateVersion(expectedCurrentVersion));
         rfqCases.Update(rfqCase);
         eventSink.Record(new RfqTransition(
             RfqTransitionKind.OutcomeCorrected,
@@ -257,7 +267,8 @@ public sealed class ChangeContactOwner(
         }
 
         var previous = rfqCase.ContactOwnerId.Value;
-        rfqCase.ChangeContactOwner(targetId, expectedCurrentVersion);
+        rfqCase = RfqResponsibilityTransitions.ChangeContactOwner(
+            rfqCase, targetId, new StateVersion(expectedCurrentVersion));
         rfqCases.Update(rfqCase);
         eventSink.Record(new RfqTransition(
             RfqTransitionKind.ContactOwnerChanged,
@@ -267,7 +278,7 @@ public sealed class ChangeContactOwner(
             From: previous,
             To: targetId.Value));
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new ContactOwnerResult(caseId, targetId.Value, rfqCase.CurrentVersion);
+        return new ContactOwnerResult(caseId, targetId.Value, rfqCase.Version.Value);
     }
 }
 
@@ -289,10 +300,11 @@ public sealed class UpdateSalesMemo(
         var rfqCase = await CloseRfq.LoadAsync(rfqCases, caseId, cancellationToken);
         await EnsureDeskAccessAsync(users, currentUser.User, rfqCase, cancellationToken);
         var caseMemo = await GetMemoAsync(memos, caseId, cancellationToken);
-        caseMemo.UpdateSales(memo, expectedVersion);
+        caseMemo = CaseMemoTransitions.UpdateSales(
+            caseMemo, memo, new StateVersion(expectedVersion));
         memos.Update(caseMemo);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new CaseMemoResult(caseId, caseMemo.SalesMemo, caseMemo.Version);
+        return new CaseMemoResult(caseId, caseMemo.SalesMemo, caseMemo.Version.Value);
     }
 
     internal static async Task<CaseMemo> GetMemoAsync(
@@ -344,9 +356,10 @@ public sealed class UpdateTraderMemo(
             memos,
             caseId,
             cancellationToken);
-        caseMemo.UpdateTrader(memo, expectedVersion);
+        caseMemo = CaseMemoTransitions.UpdateTrader(
+            caseMemo, memo, new StateVersion(expectedVersion));
         memos.Update(caseMemo);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new CaseMemoResult(caseId, caseMemo.TraderMemo, caseMemo.Version);
+        return new CaseMemoResult(caseId, caseMemo.TraderMemo, caseMemo.Version.Value);
     }
 }

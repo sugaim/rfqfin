@@ -1,193 +1,146 @@
 # 08. Testing and Seed Data
 
-## 1. Test strategy
+## 1. Domain unit tests
 
-Use different test styles for different risks.
+Focus on typed state and transition invariants.
 
-### Domain unit tests
+At minimum cover:
 
-Focus on state-machine/business invariants:
+- initial Draft -> Active/Open confirm
+- Active -> Presented -> Active
+- Open -> Cancelled -> Active/Reopened
+- Open -> Closed Hit/Away
+- `QuoteRequested` / `QuoteConfirmed` construction and transitions
+- invalid state combinations cannot be constructed through public APIs
+- Quote Confirm coherently returns updated RFQ + immutable ConfirmedQuote
+- Quote Confirm validates WorkingQuote/current Revision association
+- Withdraw rejects Presented
+- Expire from Active and Presented
+- Amendment Save/Confirm/Discard
+- old current Revision -> Superseded on amendment Confirm
+- WorkingQuote transition behavior
+- CaseMemo transitions
+- ownership PickUp/Release/Assign/TakeOver
+- `StateVersion` validation / checked Next
+- representative Domain exception categories
 
-- Draft -> Open
-- Open -> Cancelled -> Open
-- Open -> Closed
-- Present / Unpresent
-- Requested / Quoted
-- Revision Confirm
-- Withdraw / Expire
-- invalid lifecycle transitions
-- Quote request reasons
+Test Domain transitions as pure business operations without repository/clock dependencies.
 
-### Application/use-case tests
+---
 
-Use repository mocks/fakes.
+## 2. Application/use-case tests
 
-Focus on:
-
-- correct domain operation invoked
-- correct authorization checks
-- correct related objects updated
-- expected errors returned
-- bulk partial success behavior
-- EnsureWorkingQuote behavior
-
-### Infrastructure integration tests
-
-Use **real PostgreSQL**, ideally via Testcontainers.
+Use repository mocks/fakes where appropriate.
 
 Focus on:
 
-- EF mapping
-- migration
+- correct Domain transition/factory invoked
+- central authorization invoked
+- IDs/time/business date allocated outside Domain
+- initial Confirm creates WorkingQuote and persists atomically
+- amendment Confirm creates/seeds a new WorkingQuote for the new Revision
+- Quote Confirm allocates QuoteId outside Domain and persists both outputs
+- calculation success revalidates state after external calculation
+- calculation failure leaves WorkingQuote unchanged
+- bulk partial-success behavior
+- `CreateFromExisting` desk/business-date rule, including UTC/JST boundary regression
+
+Application tests should use typed IDs/state rather than string status comparisons.
+
+---
+
+## 3. Infrastructure integration tests
+
+Use **real PostgreSQL**, preferably Testcontainers.
+
+Focus on:
+
+- EF mappings/rehydration of typed lifecycle state
+- migrations from the existing schema
 - transaction atomicity
-- unique/partial indexes
-- optimistic concurrency
-- JSONB Event serialization/deserialization
-- queries
+- one Draft partial unique index
+- one WorkingQuote per Revision
+- optimistic concurrency / `StateVersion` mapping
+- Category/Security/Routing FKs
+- JSONB event payloads
+- quote-event joins after removal of `QuoteEvent.CaseId`
 - expiry worker selection/transition behavior
 
-Do not rely on EF InMemory provider as a substitute for PostgreSQL behavior.
+Do not use EF InMemory/SQLite as a PostgreSQL substitute.
 
-### API tests
+### Required event-cursor concurrency test
+
+Prove the global event feed cannot lose an event when concurrent event-producing transactions are ordered/committed oppositely.
+
+The test must exercise real PostgreSQL and the actual cursor-lock/allocation mechanism.
+
+The invariant to prove is:
+
+```text
+once a client advances lastSeenEventId after committed events,
+no event that later becomes visible may exist at a skipped lower cursor value
+```
+
+---
+
+## 4. API tests
 
 Cover representative:
 
 - happy paths
-- validation
-- 403
+- 400 validation
+- 403 authorization
 - 404
-- 409 conflict
-- CalculationFailure mapping
-- OpenAPI generation smoke test
+- 409 version conflict
+- calculation failure mapping
+- existing external DTO/JSON compatibility after internal typed refactor
+- OpenAPI smoke test
 
-### FE tests
+---
 
-Focus on important behavior, not every component:
+## 5. FE tests
 
-- grid edit -> expected API
-- calculation failure reverts cell
-- conflict reload behavior
-- Refresh discards FE-only edits
-- Pending / Last Refresh change windows
-- permission-based disable/availability
-- Grid config restore
+Existing FE test scope remains unchanged; backend semantic refactor should not require FE changes.
 
-### E2E
+---
 
-Keep a small number of representative business journeys:
+## 6. E2E journeys
+
+Keep representative journeys:
 
 1. Sales creates RFQ -> Trader quotes -> Sales presents -> Hit
 2. Sales revises RFQ -> Trader requotes -> Away
 3. Quote expires -> Requested/Expired -> requote
 4. Cancel -> Reopen -> requote
-5. WorkingQuote conflict / Revision conflict
+5. WorkingQuote / Revision concurrency conflict
 
 ---
 
-## 2. Mock/master strategy
+## 7. Master/seed strategy
 
-Initial implementation uses mock/seed master data.
-
-Prepare only what the app needs.
-
-### User
-
-Fields:
-
-- UserId
-- Name
-- roles
-- Desk
-
-Include several Sales, Traders, and optionally Manager-shaped records.
-
-### Desk
-
-A few fixed desks are sufficient.
+Keep realistic but mock/seed master data.
 
 ### Category
 
-A small realistic set is sufficient, e.g. JGB / Corporate / Other or desk-appropriate categories.
+Category is master data, not enum.
 
-### Routing
+Seed a small set such as JGB / Corporate / Other with:
 
-Simple:
+- stable CategoryId
+- display Name
+- CategoryRouting to default trader
 
-```text
-Category -> Default Trader
-```
+Security rows reference CategoryId by FK.
 
-### Client
+### Other master data
 
-Tens of fictional/seed clients are sufficient.
+Retain current pragmatic User/Desk/Client/Security seeds.
 
-### Security
-
-Use realistic data because security-search behavior matters.
+Security data should remain realistic enough to exercise search.
 
 ---
 
-## 3. Security seed from JSDA reference-price data
-
-Use the publicly available Japanese bond reference-price/security list data as a convenient realistic source where practical.
-
-Extract useful fields such as:
-
-- bond/security code
-- name
-- coupon
-- maturity
-
-Generate application `SecurityId`.
-
-Add mock fields as needed:
-
-- ISIN
-- ticker / BBG-style display
-- category
-
-The goal is realistic search/demo data, not a legally authoritative security master.
-
----
-
-## 4. Mock ISIN
-
-For seed/demo purposes, generate structurally valid JP-prefixed ISIN-like identifiers with valid check digits where convenient.
-
-They do not need to reproduce the real issue's actual ISIN.
-
-The important test properties are:
-
-- full 12-character lookup
-- prefix lookup
-- alphanumeric support
-- checksum path if implemented
-
----
-
-## 5. Calculation mock data
-
-Do not build fake holiday, curve, convention, or yield-spread master systems inside the RFQ app.
-
-Hide those behind the mock CalculationClient.
-
-The mock may use one deterministic formula across arbitrary securities.
-
-It should produce plausible:
-
-- price
-- yield
-- simple yield
-- spread
-- accrued
-- settlement amount
-- delta
-
-and support controlled errors.
-
----
-
-## 6. Demo RFQ seed
+## 8. Demo RFQ seed
 
 Generate enough RFQs to exercise:
 
@@ -200,10 +153,53 @@ Generate enough RFQs to exercise:
 - Away
 - Revised history
 - Expired/Withdrawn events
-- multiple Contact Owners
-- multiple Assigned Traders
+- multiple Contact Owners / Assigned Traders / ownership states
 - Past RFQ search
 
-Hundreds to a few thousand synthetic historical Cases are enough for early UI/search testing.
+Seed data must be constructible through the new valid Domain model or equivalent trusted persistence setup; do not seed impossible field combinations that Domain could not rehydrate.
 
-Performance testing can generate much larger volumes separately.
+---
+
+## 9. Security seed from realistic Japanese bond data
+
+Where practical, use public Japanese bond reference-price/security-list data as a realistic source for demo/search seed.
+
+Useful extracted fields include:
+
+- bond/security code
+- name
+- coupon
+- maturity
+
+Generate application `SecurityId` and add mock fields where needed:
+
+- ISIN
+- ticker / BBG-style display
+- CategoryId
+
+The goal is realistic search/demo behavior, not a legally authoritative security master.
+
+---
+
+## 10. Mock ISIN
+
+For demo seed, structurally valid JP-prefixed ISIN-like identifiers with valid check digits may be generated where convenient.
+
+They do not need to reproduce an issue's actual ISIN.
+
+Important test properties:
+
+- full 12-character lookup
+- prefix lookup
+- alphanumeric support
+- checksum path if implemented
+
+---
+
+## 11. Calculation mock data
+
+Do not build fake holiday, curve, convention, or yield-spread master systems inside the RFQ app.
+
+Hide them behind MockCalculationClient.
+
+The mock may use one deterministic formula across arbitrary securities and should produce plausible price/yield/simple-yield/spread/accrued/settlement/delta values plus controlled errors.

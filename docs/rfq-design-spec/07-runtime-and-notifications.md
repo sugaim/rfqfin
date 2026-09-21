@@ -98,6 +98,8 @@ GetEventsAfter(lastSeenEventId)
 
 Server resolves child RfqEvent/QuoteEvent information and filters as appropriate for the current screen/user.
 
+For QuoteEvent, Case context is derived by joining `QuoteId -> ConfirmedQuote -> Revision -> Case`; QuoteEvent itself does not redundantly store CaseId.
+
 This endpoint powers:
 
 - Updates Available
@@ -123,28 +125,21 @@ Worker finds current quoted items with:
 ExpiresAt <= now
 ```
 
-and runs the normal `ExpireQuote` application use case.
+and runs the normal `ExpireQuote` application use case, which invokes the Domain `QuoteTransitions.Expire` transition.
 
-Do not implement expiry as an ad-hoc SQL state mutation disconnected from domain/application rules.
+Do not implement expiry as ad-hoc SQL state mutation disconnected from Domain/Application rules.
 
 ---
 
 ## 7. Expiry idempotency and concurrency
 
-Initial deployment assumes one App Server, but ExpireQuote should still be safe if attempted more than once.
+Initial deployment assumes one App Server, but ExpireQuote should be safe if attempted more than once.
 
-Use state/version preconditions so only a still-current quoted item can transition.
+Use typed state and `StateVersion` preconditions so only a still-current confirmed quote can transition.
 
-If a human action already Withdrawn/Closed/Revised the RFQ, expiry should do nothing or return a harmless no-op/conflict outcome.
+If a human action already Withdrawn/Closed/Revised the RFQ, expiry should do nothing or return a harmless no-op/conflict outcome according to the use-case contract.
 
-Future multi-instance deployment may require:
-
-- DB locking strategy
-- `FOR UPDATE SKIP LOCKED`
-- advisory lock
-- distributed coordination/pub-sub
-
-but none is required initially.
+Future multi-instance coordination is deferred.
 
 ---
 
@@ -152,9 +147,9 @@ but none is required initially.
 
 Keep four concerns separate.
 
-### Domain audit
+### Domain/business audit
 
-Use:
+Use persisted:
 
 - RfqEvent
 - QuoteEvent
@@ -167,24 +162,11 @@ Use:
 
 ### Technical logging
 
-Use .NET standard:
-
-```text
-ILogger<T>
-```
-
-Do not invent another generic logging abstraction without a concrete need.
+Use `ILogger<T>`.
 
 ### Tracing / metrics
 
-Use .NET standard primitives:
-
-```text
-ActivitySource
-Meter
-```
-
-This allows later OpenTelemetry exporters without changing application/domain code.
+Use standard .NET primitives such as `ActivitySource` and `Meter`.
 
 ---
 
@@ -192,11 +174,7 @@ This allows later OpenTelemetry exporters without changing application/domain co
 
 Initial implementation does not delete Events by count or age.
 
-Retain events.
-
-A few million rows are not in themselves a reason to introduce retention complexity.
-
-Archive/partition/retention may be added if actual growth or compliance policy demands it.
+Retain events; archive/partition later only if actual growth/compliance requires it.
 
 ---
 
@@ -204,20 +182,14 @@ Archive/partition/retention may be added if actual growth or compliance policy d
 
 Do not toast every Desk event.
 
-The server uses current-user/screen scope to decide which events are important to this user.
-
-Normal events can still set `Updates Available`.
-
-Important-event candidates are documented in the UI spec.
+Server uses current-user/screen scope to decide which events are important; normal events can still set Updates Available.
 
 ---
 
 ## 11. Authentication scope
 
-The environment can identify current user and role(s) somehow.
+The environment identifies current user and roles somehow.
 
-The exact token/header/session mechanism is not part of this initial design.
+Exact token/header/session mechanism is not part of this design.
 
-The application consumes a `CurrentUser` abstraction.
-
-SSE/auth transport should be adapted to the actual hosting environment rather than driving the domain design.
+Application consumes `CurrentUser`; transport does not drive Domain design.

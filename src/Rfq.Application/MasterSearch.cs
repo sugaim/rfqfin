@@ -75,6 +75,14 @@ public interface ISystemDateProvider
     Task<DateOnly> GetTodayAsync(CancellationToken cancellationToken = default);
 }
 
+public interface IBusinessDateResolver
+{
+    Task<DateOnly> ResolveAsync(
+        DateTimeOffset instant,
+        string deskId,
+        CancellationToken cancellationToken = default);
+}
+
 public static partial class SecuritySearchNormalizer
 {
     public static string? NormalizeInternalCode(string query)

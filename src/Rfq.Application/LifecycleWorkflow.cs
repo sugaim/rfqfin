@@ -27,9 +27,9 @@ public sealed class WithdrawQuote(
         authorization.EnsureCanWithdraw(currentUser.User, rfq);
         var quoteId = rfq.CurrentQuoteId
             ?? throw new InvalidOperationException("Current quote was not found.");
-        rfq.WithdrawQuote(expectedVersion);
+        rfq = QuoteTransitions.Withdraw(rfq, new StateVersion(expectedVersion));
         cases.Update(rfq);
-        events.Record(new(QuoteTransitionKind.Withdrawn, caseId, quoteId.Value,
+        events.Record(new(QuoteTransitionKind.Withdrawn, quoteId.Value,
             currentUser.User.UserId.Value, timeProvider.GetUtcNow()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToResult(rfq);
@@ -37,7 +37,7 @@ public sealed class WithdrawQuote(
 
     internal static LifecycleResult ToResult(RfqCase rfq) => new(
         rfq.CaseId.Value, rfq.Status.ToString(), rfq.QuoteStatus?.ToString(),
-        rfq.QuoteRequestReason?.ToString(), rfq.CurrentVersion);
+        rfq.QuoteRequestReason?.ToString(), rfq.Version.Value);
 }
 
 public sealed class BulkWithdrawQuotes(WithdrawQuote withdraw)
@@ -55,7 +55,9 @@ public sealed class BulkWithdrawQuotes(WithdrawQuote withdraw)
                 results.Add(new(item.CaseId, "Withdrawn", null));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
-                or UnauthorizedAccessException or KeyNotFoundException)
+                or UnauthorizedAccessException or KeyNotFoundException
+                or DomainRuleViolationException or DomainValidationException
+                or StateVersionMismatchException)
             {
                 results.Add(new(item.CaseId,
                     ex.Message.Contains("Presented", StringComparison.Ordinal) ? "Skipped" : "Failed",
@@ -79,7 +81,7 @@ public sealed class CancelRfq(
     {
         var rfq = await CloseRfq.LoadAsync(cases, caseId, cancellationToken);
         authorization.EnsureCanCancelOrReopen(currentUser.User, rfq);
-        rfq.Cancel(expectedVersion);
+        rfq = RfqLifecycleTransitions.Cancel(rfq, new StateVersion(expectedVersion));
         cases.Update(rfq);
         events.Record(new(RfqTransitionKind.Cancelled, caseId,
             currentUser.User.UserId.Value, timeProvider.GetUtcNow()));
@@ -101,7 +103,7 @@ public sealed class ReopenRfq(
     {
         var rfq = await CloseRfq.LoadAsync(cases, caseId, cancellationToken);
         authorization.EnsureCanCancelOrReopen(currentUser.User, rfq);
-        rfq.Reopen(expectedVersion);
+        rfq = RfqLifecycleTransitions.Reopen(rfq, new StateVersion(expectedVersion));
         cases.Update(rfq);
         events.Record(new(RfqTransitionKind.Reopened, caseId,
             currentUser.User.UserId.Value, timeProvider.GetUtcNow()));
@@ -120,12 +122,22 @@ public sealed class ExpireQuote(
         CancellationToken cancellationToken = default)
     {
         var rfq = await cases.GetAsync(new CaseId(candidate.CaseId), cancellationToken);
-        if (rfq is null || !rfq.ExpireQuote(new QuoteId(candidate.QuoteId), candidate.CurrentVersion))
+        if (rfq is null)
+        {
+            return false;
+        }
+        try
+        {
+            rfq = QuoteTransitions.Expire(
+                rfq, new QuoteId(candidate.QuoteId),
+                new StateVersion(candidate.CurrentVersion));
+        }
+        catch (DomainRuleViolationException)
         {
             return false;
         }
         cases.Update(rfq);
-        events.Record(new(QuoteTransitionKind.Expired, candidate.CaseId, candidate.QuoteId,
+        events.Record(new(QuoteTransitionKind.Expired, candidate.QuoteId,
             "system", timeProvider.GetUtcNow()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return true;

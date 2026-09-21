@@ -35,15 +35,16 @@ public sealed class WorkingQuoteEnsurer(RfqDbContext dbContext) : IWorkingQuoteE
                     cancellationToken)
                 ?? throw new KeyNotFoundException(
                     $"Quote seed Revision '{quoteSeedRevisionId.Value.Value}' was not found.");
-            quote = WorkingQuote.Clone(
-                revisionId,
-                WorkingQuoteMapper.ToDomain(seed),
-                createdBy,
-                createdAt);
+            var source = WorkingQuoteMapper.ToDomain(seed);
+            quote = WorkingQuote.Restore(
+                revisionId, source.Mode, source.Calculated, source.Manual,
+                new StateVersion(1), createdAt, createdBy, createdAt, createdBy);
         }
         else
         {
-            quote = WorkingQuote.CreateEmpty(revisionId, createdBy, createdAt);
+            quote = WorkingQuote.Restore(
+                revisionId, WorkingQuoteMode.Calculated, null, null,
+                new StateVersion(1), createdAt, createdBy, createdAt, createdBy);
         }
 
         dbContext.WorkingQuotes.Add(WorkingQuoteMapper.ToEntity(quote));
@@ -53,6 +54,9 @@ public sealed class WorkingQuoteEnsurer(RfqDbContext dbContext) : IWorkingQuoteE
 
 public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuoteRepository
 {
+    public void Add(WorkingQuote workingQuote) =>
+        dbContext.WorkingQuotes.Add(WorkingQuoteMapper.ToEntity(workingQuote));
+
     public async Task<QuoteEditContext?> GetEditContextAsync(
         CaseId caseId,
         CancellationToken cancellationToken = default)
@@ -76,15 +80,28 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
         var settlementDate = rfqCase.Current.CurrentRevision.SettlementDate
             ?? throw new InvalidOperationException("Confirmed Revision is missing SettlementDate.");
 
+        if (rfqCase.Current.Lifecycle != RfqLifecycleKind.Open
+            || rfqCase.Current.RfqStatus != RfqStatus.Active)
+            throw new DomainInvariantException("WorkingQuote context requires an Active RFQ.");
+        var quoteState = rfqCase.Current.QuoteStatus switch
+        {
+            QuoteStatus.Requested => (ActiveQuoteState)new QuoteRequested(
+                rfqCase.Current.QuoteRequestReason
+                    ?? throw new DomainInvariantException("Requested RFQ is missing reason.")),
+            QuoteStatus.Quoted => new QuoteConfirmed(new QuoteId(
+                rfqCase.Current.CurrentQuoteId
+                    ?? throw new DomainInvariantException("Quoted RFQ is missing quote id."))),
+            _ => throw new DomainInvariantException("Open RFQ is missing quote state."),
+        };
         return new QuoteEditContext(
-            rfqCase.CaseId,
-            rfqCase.Current.CurrentRevisionId,
-            rfqCase.SecurityId,
+            new CaseId(rfqCase.CaseId),
+            new RevisionId(rfqCase.Current.CurrentRevisionId),
+            SecurityId.Create(rfqCase.SecurityId),
             settlementDate,
-            rfqCase.Current.Version,
-            rfqCase.Current.AssignedTraderId,
-            rfqCase.Current.Owned,
-            rfqCase.Current.QuoteStatus?.ToString() ?? string.Empty,
+            new StateVersion(rfqCase.Current.Version),
+            UserId.Create(rfqCase.Current.AssignedTraderId),
+            rfqCase.Current.Owned ? new Owned() : new Unowned(),
+            quoteState,
             WorkingQuoteMapper.ToDomain(quoteEntity));
     }
 
@@ -141,7 +158,7 @@ internal static class WorkingQuoteMapper
         entity.Mode,
         Deserialize<CalculatedQuotePayload>(entity.CalculatedPayloadJson),
         Deserialize<ManualQuotePayload>(entity.ManualPayloadJson),
-        entity.Version,
+        new StateVersion(entity.Version),
         entity.CreatedAt,
         UserId.Create(entity.CreatedBy),
         entity.UpdatedAt,
@@ -161,7 +178,7 @@ internal static class WorkingQuoteMapper
         entity.Mode = quote.Mode;
         entity.CalculatedPayloadJson = Serialize(quote.Calculated);
         entity.ManualPayloadJson = Serialize(quote.Manual);
-        entity.Version = quote.Version;
+        entity.Version = quote.Version.Value;
         entity.UpdatedAt = quote.UpdatedAt;
         entity.UpdatedBy = quote.UpdatedBy.Value;
     }

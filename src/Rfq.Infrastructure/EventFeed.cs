@@ -26,7 +26,9 @@ public sealed class PostgreSqlEventFeed(
                             parent.ActorUserId, child.CaseId, "Rfq", child.Type, child.PayloadJson);
         var quoteEvents = from child in dbContext.QuoteEvents.AsNoTracking()
                           join parent in dbContext.Events.AsNoTracking() on child.EventId equals parent.EventId
-                          join rfq in dbContext.RfqCases.AsNoTracking() on child.CaseId equals rfq.CaseId
+                          join quote in dbContext.ConfirmedQuotes.AsNoTracking() on child.QuoteId equals quote.QuoteId
+                          join revision in dbContext.RfqRevisions.AsNoTracking() on quote.RevisionId equals revision.RevisionId
+                          join rfq in dbContext.RfqCases.AsNoTracking() on revision.CaseId equals rfq.CaseId
                           where child.EventId > eventId
                               && (rfq.SalesId == user.UserId.Value
                                   || rfq.Current.ContactOwnerId == user.UserId.Value
@@ -35,7 +37,7 @@ public sealed class PostgreSqlEventFeed(
                                       && master.DeskId == user.DeskId))
                           orderby child.EventId
                           select new PersistedEvent(child.EventId, parent.OccurredAt,
-                              parent.ActorUserId, child.CaseId, "Quote", child.Type, child.PayloadJson);
+                              parent.ActorUserId, revision.CaseId, "Quote", child.Type, child.PayloadJson);
         var rfqItems = await rfqEvents.Take(1000).ToListAsync(cancellationToken);
         var quoteItems = await quoteEvents.Take(1000).ToListAsync(cancellationToken);
         return rfqItems.Concat(quoteItems)

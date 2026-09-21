@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Rfq.Application;
+using Rfq.Domain;
 
 namespace Rfq.Api;
 
@@ -15,6 +16,9 @@ public sealed class ApiErrorMiddleware(RequestDelegate next)
                 CalculationFailureException => (422, "CalculationFailure"),
                 UnauthorizedAccessException => (403, "Forbidden"),
                 KeyNotFoundException => (404, "NotFound"),
+                StateVersionMismatchException => (409, "Conflict"),
+                DomainRuleViolationException => (409, "Conflict"),
+                DomainValidationException => (400, "Validation"),
                 InvalidOperationException => (409, "Conflict"),
                 _ => (400, "Validation"),
             };
@@ -31,5 +35,7 @@ public sealed class ApiErrorMiddleware(RequestDelegate next)
 
     private static bool IsExpected(Exception exception) => exception is
         ArgumentException or InvalidOperationException or UnauthorizedAccessException
-        or KeyNotFoundException or CalculationFailureException;
+        or KeyNotFoundException or CalculationFailureException
+        or StateVersionMismatchException or DomainRuleViolationException
+        or DomainValidationException;
 }

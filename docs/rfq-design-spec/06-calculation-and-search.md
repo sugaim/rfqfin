@@ -2,26 +2,26 @@
 
 ## 1. Calculation service boundary
 
-The RFQ application should not own security convention, curve resolution, or detailed pricing logic.
+The RFQ application does not own detailed pricing conventions, curve resolution, or security convention logic.
 
-The calculation service boundary receives, per item:
+Calculation receives typed business/application inputs per item, conceptually:
 
-- Security ID
-- Settlement Date
-- Calculation Type
-- typed Calculation Parameters
+- SecurityId
+- SettlementDate
+- CalculationDriver
+- typed CalculationParameter
+- independent SimpleYieldSlide where applicable
+- correlation/request ID
 
-and returns a result per request.
-
-Conceptually:
+and returns one result per request.
 
 ```text
 CalculateBulk(requests[]) -> results[]
 ```
 
-Each request has a correlation/request ID.
-
 Do not rely on array ordering alone.
+
+External transport may map typed IDs to strings/Guids at the adapter boundary.
 
 ---
 
@@ -29,52 +29,28 @@ Do not rely on array ordering alone.
 
 One failed calculation does not fail the entire batch.
 
-Example:
-
-```text
-Request A -> Success
-Request B -> Error
-Request C -> Success
-```
-
-Result is therefore logically:
-
 ```text
 CalculationResult =
-    Success { ...outputs... }
+    Success { payload }
   | Error { code, message }
 ```
 
-This supports multi-row trader calculation and bulk workflows.
-
 ---
 
-## 3. Initial implementation: mock calculation client
+## 3. Initial mock calculation client
 
-Use an interface such as:
+Keep `ICalculationClient` with mock implementation.
 
-```text
-ICalculationClient
-```
-
-with:
-
-```text
-MockCalculationClient
-RealCalculationClient   // future
-```
-
-Initial mock requirements:
+Mock requirements:
 
 - deterministic
 - arbitrary Security IDs work
-- same broad logic for all securities is acceptable
-- returns plausible-looking values
-- supports typed calculation requests
-- can intentionally return per-item failures for testing
-- preserves the real bulk request/response shape
+- plausible-looking values
+- typed requests/results
+- controllable per-item failure
+- same broad bulk shape expected from future real service
 
-The initial goal is UI/application-flow validation, not pricing accuracy.
+Pricing accuracy is not the purpose of this application.
 
 ---
 
@@ -82,120 +58,166 @@ The initial goal is UI/application-flow validation, not pricing accuracy.
 
 Trader edits a quote cell.
 
-1. determine driver from edited column
-2. read current WorkingQuote and expected version
-3. build calculation request
-4. call bulk calculation interface
-5. on Success:
-   - commit WorkingQuote/result
-   - increment WorkingQuote version
+1. load typed edit context including CaseId, RevisionId, SecurityId, ownership/state, `StateVersion`, and WorkingQuote
+2. authorize actor centrally
+3. verify expected Case/WorkingQuote versions
+4. build typed calculation request
+5. call calculation outside DB transaction
 6. on Error:
-   - do not update WorkingQuote
-   - FE reverts attempted cell
-   - show failure toast
+   - do not change WorkingQuote
    - persist CalculationFailureLog
+   - return failure so FE reverts attempted edit
+7. on Success:
+   - reload current RFQ state
+   - revalidate current Revision, ownership/authorization, Case Version, WorkingQuote Version
+   - call `WorkingQuoteTransitions.ApplyCalculated`
+   - persist returned WorkingQuote
 
-Prefer calculating before a short DB write transaction.
+Do not compare statuses as strings such as `"Requested"`.
 
-Do not hold DB locks during an external/heavy calculation.
-
-Use optimistic version check when writing result.
+Do not hold DB locks during external/heavy calculation.
 
 ---
 
-## 5. Calculation failure log
+## 5. WorkingQuote factory
 
-Initial design logs failures, not every successful calculation attempt.
+Creation is separate from update transitions.
 
-Suggested data:
+Use a Domain factory that creates a WorkingQuote only for an eligible confirmed/current Revision.
+
+Initial Confirm:
+
+```text
+RfqLifecycleTransitions.ConfirmInitial
+-> WorkingQuoteFactory.CreateInitialFor(...)
+-> persist atomically
+```
+
+Amendment Confirm:
+
+- create a new WorkingQuote for the new current Revision
+- supply seed WorkingQuote loaded by Application/Infrastructure when `QuoteSeedRevisionId` requires it
+- Domain factory decides empty vs clone semantics from explicit inputs
+
+Database uniqueness remains the final one-per-Revision guard.
+
+---
+
+## 6. Calculation failure log
+
+Keep append-only failure logging with enough context to reproduce the attempted request:
 
 - FailureLogId
 - CaseId
 - RevisionId
 - TraderId
-- attempted driver/type/value
-- prior WorkingQuote
-- calculation/market context
-- request payload or reproducible request snapshot/reference
-- error code
-- error message
+- RequestId
+- driver/type/value
+- slide
+- prior WorkingQuote snapshot
+- request/calculation context
+- error code/message
 - timestamp
 
-The API returns the failure log ID to the UI where useful.
-
-A future requirement for complete calculation auditing can generalize this into `CalculationAttempt`.
+Use typed Domain/Application IDs before persistence mapping.
 
 ---
 
-## 6. Calculation context
+## 7. Calculation context
 
-Calculated ConfirmedQuotes must preserve enough context for historical reproducibility.
+Calculated ConfirmedQuotes preserve enough context for historical reproducibility, such as:
 
-Examples:
-
-- market date / as-of
+- market date/as-of
 - snapshot tag
-- reference security IDs
-- relevant reference yields
+- reference securities/yields
 - curve/context identifiers
 - method-specific inputs
 
-Avoid a giant nullable column forest in the domain model.
-
-Use typed family-specific context payloads.
+Use typed family-specific payloads; avoid a giant nullable field forest.
 
 ---
 
-## 7. Standard settlement
+## 8. Standard settlement
 
-Standard settlement is resolved by the calculation library/service, not reimplemented in the RFQ application.
-
-Conceptually:
+Resolved by calculation/library boundary, not reimplemented in RFQ Domain.
 
 ```text
-ResolveStandardSettlementDate(
-    SecurityId,
-    TradeDate
-) -> SettlementDate
+ResolveStandardSettlementDate(SecurityId, TradeDate)
+    -> SettlementDate
 ```
 
-On security change before confirm, recompute the standard settlement.
+On security change before confirm, recompute standard settlement.
 
-Store the resolved standard alongside the actual settlement in the Revision.
+Store standard and actual settlement in Revision terms.
 
-Initial mock returns a deterministic plausible date.
+Business date is resolved through the configured desk/business timezone abstraction, not server-local or UTC calendar date shortcuts.
 
 ---
 
-## 8. Security search API
+## 9. Security and Category resolution
 
-Security search belongs to the RFQ App Server API boundary, not directly to the calculation server.
+Security search belongs to the RFQ App Server boundary.
 
-Conceptual internal abstraction:
+Conceptual abstraction:
 
 ```text
 ISecuritySearch
 - Search(query)
-- Resolve(id)
+- Resolve(SecurityId)
 ```
 
-Initial implementation may query local/mock master data.
+Save canonical typed `SecurityId` in Application/Domain.
 
-Future implementation may delegate to another service without changing the FE contract.
+Security -> Category is master/DB data, not a hard-coded Domain enum rule.
 
-Save canonical `SecurityId` on the RFQ.
+The consolidated defaults resolver may coordinate:
+
+```text
+SecurityId
+-> CategoryId
+-> Default Assigned Trader
+-> Standard Settlement Date
+```
 
 ---
 
-## 9. Security search behavior
+## 10. Security search behavior
 
-One input field supports several search strategies.
+Retain current search behavior and normalization strategies for:
 
-Search strategies may run together; do not force every query through one exclusive parser branch.
+- internal code
+- BBG-like display/search
+- ISIN prefix/full lookup
 
-Union results, deduplicate, then rank.
+Union/deduplicate/rank results; exact/normalized exact matches rank above broad partials.
 
-Exact/normalized exact/structured matches rank above prefix/partial matches.
+Do not hardcode JP-only numeric ISIN assumptions.
+
+---
+
+## 11. Client search
+
+Simple autocomplete/partial search over available name/code fields.
+
+Return canonical `ClientId`.
+
+---
+
+## 12. Search caching
+
+Initial behavior remains direct PostgreSQL search/exact lookup.
+
+Do not preload the full security master or aggressively cache arbitrary autocomplete queries.
+
+If later needed, exact ID lookup is the first reasonable cache target.
+
+---
+
+## 13. Security search details
+
+Retain the current canonical search rules.
+
+Search strategies may run together; do not force every query through one exclusive parser branch. Union results, deduplicate, then rank. Exact/normalized exact/structured matches rank above prefix/partial matches.
 
 ### Internal code
 
@@ -211,7 +233,7 @@ Normalize conceptually to:
 0-02-XXXX-YYYYY
 ```
 
-Trimming components and zero-padding the latter fields.
+by trimming components and zero-padding latter fields.
 
 Full form:
 
@@ -219,13 +241,7 @@ Full form:
 {int}-{int}-{int}-{int}
 ```
 
-Normalize widths approximately:
-
-```text
-[1, 2, 4, 5]
-```
-
-Prefix/partial search is supported.
+Normalize widths approximately `[1, 2, 4, 5]` and support prefix/partial search.
 
 ### BBG-like search
 
@@ -243,13 +259,13 @@ Rules:
 - coupon is decimal form
 - maturity accepts `MM/DD/YY` and `MM/DD/YYYY`
 - `#Series` optional
-- ticker + coupon may search even without maturity
+- ticker + coupon may search without maturity
 
 ### ISIN
 
 After trim + uppercase, support prefix candidates.
 
-Useful search candidate:
+Useful candidate pattern:
 
 ```text
 ^[A-Z]{2}[A-Z0-9]{5,10}$
@@ -258,7 +274,7 @@ Useful search candidate:
 - 7–11 characters -> prefix search
 - 12 characters -> validate structure/checksum if desired
 
-Do not hardcode JP-only numeric assumptions; ISIN NSIN content can be alphanumeric.
+Do not hardcode JP-only numeric NSIN assumptions.
 
 ### Result display
 
@@ -275,59 +291,18 @@ Limit results to top N and ask for more input when matches are broad.
 
 ---
 
-## 10. Client search
+## 14. RFQ defaults resolver
 
-Simpler autocomplete/partial search.
-
-Support as available:
-
-- Japanese/English name
-- internal client code
-
-Return canonical `ClientId`.
-
-No need for complex parser logic.
-
----
-
-## 11. Search caching
-
-Initial implementation:
-
-```text
-Search -> PostgreSQL
-Exact ID lookup -> PostgreSQL
-```
-
-Do not preload the entire security master into application memory.
-
-Do not aggressively cache autocomplete query strings.
-
-If performance later requires caching, the first good targets are exact lookups:
-
-```text
-SecurityId -> Security
-ClientId -> Client
-```
-
-rather than arbitrary prefix-query result sets.
-
----
-
-## 12. RFQ defaults resolver
-
-The FE benefits from a consolidated query after Security selection.
-
-Conceptually:
+The FE may use a consolidated query after Security selection:
 
 ```text
 ResolveRfqDefaults(SecurityId, TradeDate)
 ```
 
-May return:
+It may return:
 
-- Category
+- CategoryId / category display data
 - Default Assigned Trader
 - Standard Settlement Date
 
-This keeps the FE simple while allowing the application server to coordinate routing/master/calculation-service lookups.
+This keeps FE simple while Application coordinates master/routing/calculation lookups.

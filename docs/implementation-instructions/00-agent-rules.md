@@ -1,24 +1,18 @@
-# Agent Rules for Every Implementation Step
-
-Apply these rules to every step.
+# Agent Rules for Implementation Work
 
 ## 1. Scope discipline
 
 Implement only the requested step.
 
-Do not proactively build later features, generic frameworks, speculative abstractions, or "future-proof" subsystems.
+Do not proactively build speculative frameworks/future features.
 
-Do not rewrite unrelated code merely to improve style.
-
-If a later requirement is visible in the canonical design, preserve a reasonable extension point but do not implement the later feature.
-
-A step may defer later behavior, but it must not knowingly violate a canonical invariant that is already applicable to the state it creates. Prefer a minimal real representation over a temporary no-op that leaves canonically invalid persisted state.
+A step may defer later behavior but must not knowingly create persisted state that violates currently applicable canonical invariants.
 
 ---
 
-## 2. Preserve canonical terminology
+## 2. Canonical terminology
 
-Use the canonical domain terms exactly where practical:
+Use the canonical terms where practical:
 
 - RFQ Case
 - Revision
@@ -26,158 +20,132 @@ Use the canonical domain terms exactly where practical:
 - ConfirmedQuote
 - Contact Owner
 - Assigned Trader
-- Owned
-- RfqStatus
-- QuoteStatus
+- Ownership / Owned / Unowned
+- Active / Presented / Cancelled / Hit / Away
+- QuoteRequested / QuoteConfirmed in Domain
+- Requested / Quoted as boundary/display status
 - QuoteRequestReason
-- Presented
-- Hit
-- Away
 
-Do not invent synonyms such as:
+Do not reintroduce a Domain `bool Owned` as source of truth.
 
-- ActiveQuote as a business term
-- RequoteStatus
-- Amending status
-- generic Closed status replacing Hit/Away
-
-Internal implementation fields such as `CurrentQuoteId` are allowed where the design explicitly permits them.
+Do not invent composite statuses such as `AmendingQuoted` or generic `Closed` replacing Hit/Away.
 
 ---
 
-## 3. No accidental architecture expansion
+## 3. Domain rules
 
-Do not introduce:
+Domain business state is immutable from callers.
 
-- MediatR unless explicitly requested later
+State changes go through explicit Domain transitions/factories.
+
+Transitions are grouped by business meaning, not by how many objects they update.
+
+Domain must not perform repository queries, current-user lookup, external service calls, or clock lookup.
+
+---
+
+## 4. Application rules
+
+`Rfq.Application` is the Use Case layer.
+
+Application owns:
+
+- loading/querying
+- centralized authorization
+- ID/time/business-date resolution
+- external calculation
+- persistence/event orchestration
+- transaction boundary
+
+Use typed Domain IDs/value objects inside Application business logic; map raw transport primitives at boundaries.
+
+---
+
+## 5. No accidental architecture expansion
+
+Do not introduce without explicit need:
+
+- MediatR
 - event sourcing framework
 - message bus
 - Redis
 - distributed locks
-- separate worker service
-- microservices
-- repository-per-table
-- generic base repository
-- generic Result framework for the whole solution
-- AutoMapper solely to remove a few assignments
-- custom logging abstraction over `ILogger<T>`
-- `Shared` / `Common` dumping-ground projects
-
-Simple explicit code is preferred.
+- microservices/separate worker
+- generic repository/base repository
+- generic Result framework
+- AutoMapper solely to remove assignments
+- custom logging abstraction
+- Shared/Common dumping-ground projects
+- separate UseCases assembly
+- generic state-machine framework
 
 ---
 
-## 4. Transactions
+## 6. Transactions
 
-One business use case that changes multiple persistence objects must commit atomically.
+One business use case that changes multiple persisted objects commits atomically.
 
 Repository methods do not independently call `SaveChanges`.
 
-Use the scoped EF Core `DbContext` behind Infrastructure repositories and an application-facing `IUnitOfWork`.
+Do not expose `DbContext` to Domain/Application.
 
-Do not expose `DbContext` to Domain or Application.
+Do not hold DB locks during external/heavy calculation.
 
 ---
 
-## 5. Date/time rules
+## 7. Date/time
 
 Use:
 
 ```text
 business dates -> DateOnly
-instants        -> UTC timestamp
+instants        -> UTC DateTimeOffset/timestamp
 ```
 
-Do not use local server time as stored business truth.
-
-Prefer an injectable time abstraction for use cases that depend on "now". Do not add a third-party time library initially unless a concrete need appears.
+Business today is resolved through configured desk/business timezone (initially JST / Asia/Tokyo), not `DateTime.UtcNow.Date`.
 
 ---
 
-## 6. Numeric rules
+## 8. Numeric rules
 
-Use `decimal` for persisted/application business values such as:
+Use decimal for persisted/application business values such as notional/price/yields/spreads as appropriate.
 
-- notional
-- price
-- displayed yields/spreads where appropriate
-
-The mock/internal calculation implementation may use `double` internally.
-
-Do not attempt to implement production-quality financial numerical conventions in this project.
+Mock/internal calculation may use double internally.
 
 ---
 
-## 7. API style
+## 9. API / frontend
 
-Use ASP.NET Core Controllers.
+Use ASP.NET Core Controllers and code-first OpenAPI.
 
-API is code-first; OpenAPI is generated from the implementation.
+API request/response DTOs may use primitive transport values.
 
-Do not create a separate Contracts project initially.
+Do not expose internal Domain state hierarchy directly as transport merely because it exists.
 
-API request/response DTOs may live in `Rfq.Api`.
-
----
-
-## 8. Frontend style
-
-Primary technologies:
-
-- React
-- TypeScript
-- Vite
-- Ant Design
-- AG Grid Community
-- Redux Toolkit / RTK Query
-
-Use Ant Design for surrounding application UI:
-
-- forms
-- drawer
-- modal
-- tabs
-- buttons
-- date inputs
-- select/autocomplete wrappers
-- notifications/toasts
-
-Use AG Grid for RFQ tabular workflows.
-
-Do not rebuild a second grid using Ant Design Table for the main RFQ screens.
+Frontend changes are out of scope unless the requested step explicitly includes them.
 
 ---
 
-## 9. Main-grid refresh rule
-
-Do not silently replace rows in an actively editable RFQ grid when server notifications arrive.
-
-Later event/SSE work must indicate pending changes and reload only on explicit Refresh.
-
----
-
-## 10. Testing rule
-
-Every step must add tests appropriate to the code introduced.
+## 10. Testing
 
 Use:
 
 - xUnit for .NET tests
-- Testcontainers + real PostgreSQL for PostgreSQL-specific infrastructure tests
-- Vitest for frontend unit/component logic where useful
+- real PostgreSQL via Testcontainers for persistence/concurrency tests
+- no EF InMemory substitute for PostgreSQL-specific behavior
 
-Do not use EF Core InMemory as a substitute for PostgreSQL integration tests.
+Every semantic transition change must have focused invariant tests.
 
 ---
 
-## 11. Completion response from coding agent
+## 11. Completion report
 
-At the end of each step, the coding agent should report only:
+At the end of a step report:
 
 1. what changed
-2. important design decisions made within the allowed scope
-3. commands run and results
-4. exact manual verification procedure
-5. any known limitation that belongs to a later step
+2. material design choices within allowed freedom
+3. migrations
+4. commands/tests run and results
+5. exact deferred items
 
-Do not proceed into the next step automatically.
+Do not proceed to the next step automatically.

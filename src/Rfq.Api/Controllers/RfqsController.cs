@@ -390,7 +390,10 @@ public sealed class RfqsController(
         exception is ArgumentException
             or KeyNotFoundException
             or InvalidOperationException
-            or UnauthorizedAccessException;
+            or UnauthorizedAccessException
+            or StateVersionMismatchException
+            or DomainRuleViolationException
+            or DomainValidationException;
 
     private ObjectResult ToProblem(Exception exception)
     {
@@ -398,6 +401,9 @@ public sealed class RfqsController(
         {
             UnauthorizedAccessException => StatusCodes.Status403Forbidden,
             KeyNotFoundException => StatusCodes.Status404NotFound,
+            StateVersionMismatchException => StatusCodes.Status409Conflict,
+            DomainRuleViolationException => StatusCodes.Status409Conflict,
+            DomainValidationException => StatusCodes.Status400BadRequest,
             InvalidOperationException => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
         };
@@ -415,6 +421,8 @@ public sealed class RfqsController(
     {
         UnauthorizedAccessException => "Forbidden",
         KeyNotFoundException => "NotFound",
+        StateVersionMismatchException or DomainRuleViolationException => "Conflict",
+        DomainValidationException => "Validation",
         InvalidOperationException => "Conflict",
         _ => "Validation",
     };

@@ -437,10 +437,6 @@ namespace Rfq.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("event_id");
 
-                    b.Property<long>("CaseId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("case_id");
-
                     b.Property<string>("PayloadJson")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -457,8 +453,6 @@ namespace Rfq.Infrastructure.Migrations
                         .HasColumnName("type");
 
                     b.HasKey("EventId");
-
-                    b.HasIndex("CaseId");
 
                     b.HasIndex("QuoteId");
 
@@ -898,12 +892,6 @@ namespace Rfq.Infrastructure.Migrations
 
             modelBuilder.Entity("Rfq.Infrastructure.QuoteEventEntity", b =>
                 {
-                    b.HasOne("Rfq.Infrastructure.RfqCaseEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("Rfq.Infrastructure.EventEntity", "Event")
                         .WithOne()
                         .HasForeignKey("Rfq.Infrastructure.QuoteEventEntity", "EventId")

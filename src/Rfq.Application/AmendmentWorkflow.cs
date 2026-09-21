@@ -36,14 +36,18 @@ public sealed class SaveAmendment(
     {
         var rfq = await CloseRfq.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanEditRevision(currentUser.User, rfq);
-        rfq.SaveAmendmentDraft(
-            command.Notional,
-            command.SettlementDate,
-            command.SalesAndTradingMessage,
+        var transition = AmendmentTransitions.SaveDraft(
+            rfq,
+            RevisionId.New(),
+            new RevisionTerms(command.Notional, command.SettlementDate,
+                rfq.CurrentRevision.StandardSettlementDate,
+                command.SalesAndTradingMessage),
             currentUser.User.UserId,
             timeProvider.GetUtcNow(),
-            command.ExpectedCurrentVersion,
-            command.ExpectedDraftVersion);
+            new StateVersion(command.ExpectedCurrentVersion),
+            command.ExpectedDraftVersion is null
+                ? null : new StateVersion(command.ExpectedDraftVersion.Value));
+        rfq = transition.Rfq;
         cases.Update(rfq);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToResult(rfq);
@@ -53,8 +57,8 @@ public sealed class SaveAmendment(
         rfq.CaseId.Value,
         rfq.CurrentRevision.RevisionId.Value,
         rfq.PendingDraftRevision?.RevisionId.Value,
-        rfq.CurrentVersion,
-        rfq.PendingDraftRevision?.Version,
+        rfq.Version.Value,
+        rfq.PendingDraftRevision?.Version.Value,
         rfq.Status.ToString(),
         rfq.QuoteStatus?.ToString(),
         rfq.QuoteRequestReason?.ToString());
@@ -62,7 +66,7 @@ public sealed class SaveAmendment(
 
 public sealed class ConfirmAmendment(
     IRfqCaseRepository cases,
-    IWorkingQuoteEnsurer workingQuotes,
+    IWorkingQuoteRepository workingQuotes,
     ISystemDateProvider systemDate,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
@@ -77,25 +81,28 @@ public sealed class ConfirmAmendment(
         var rfq = await CloseRfq.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanConfirmRevision(currentUser.User, rfq);
         var now = timeProvider.GetUtcNow();
-        rfq.ConfirmAmendment(
+        var transition = AmendmentTransitions.Confirm(
+            rfq,
             await systemDate.GetTodayAsync(cancellationToken),
             currentUser.User.UserId,
             now,
-            command.ExpectedCurrentVersion,
-            command.ExpectedDraftVersion);
+            new StateVersion(command.ExpectedCurrentVersion),
+            new StateVersion(command.ExpectedDraftVersion));
+        rfq = transition.Rfq;
         cases.Update(rfq);
-        await workingQuotes.EnsureAsync(
-            rfq.CurrentRevision.RevisionId,
-            rfq.CurrentRevision.QuoteSeedRevisionId,
-            currentUser.User.UserId,
-            now,
-            cancellationToken);
+        cases.UpdateRevision(transition.SupersededRevision);
+        var seed = rfq.CurrentRevision.QuoteSeedRevisionId is null
+            ? null
+            : await workingQuotes.GetAsync(
+                rfq.CurrentRevision.QuoteSeedRevisionId.Value, cancellationToken);
+        workingQuotes.Add(WorkingQuoteFactory.CreateForAmendment(
+            rfq, seed, currentUser.User.UserId, now));
         events.Record(new RfqTransition(
             RfqTransitionKind.RevisionConfirmed,
             rfq.CaseId.Value,
             currentUser.User.UserId.Value,
             now,
-            From: rfq.PreviousRevision?.RevisionId.Value.ToString(),
+            From: transition.SupersededRevision.RevisionId.Value.ToString(),
             To: rfq.CurrentRevision.RevisionId.Value.ToString()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return SaveAmendment.ToResult(rfq);
@@ -114,8 +121,12 @@ public sealed class DiscardAmendment(
     {
         var rfq = await CloseRfq.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanDiscardRevision(currentUser.User, rfq);
-        rfq.DiscardAmendment(command.ExpectedCurrentVersion, command.ExpectedDraftVersion);
+        var transition = AmendmentTransitions.Discard(
+            rfq, new StateVersion(command.ExpectedCurrentVersion),
+            new StateVersion(command.ExpectedDraftVersion));
+        rfq = transition.Rfq;
         cases.Update(rfq);
+        cases.UpdateRevision(transition.DiscardedRevision);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return SaveAmendment.ToResult(rfq);
     }
@@ -155,7 +166,8 @@ internal static class AmendmentBulk
             }
             catch (Exception exception) when (exception is ArgumentException
                 or InvalidOperationException or KeyNotFoundException
-                or UnauthorizedAccessException)
+                or UnauthorizedAccessException or DomainRuleViolationException
+                or DomainValidationException or StateVersionMismatchException)
             {
                 results.Add(new(item.CaseId, "Failed", exception.Message));
             }
@@ -168,6 +180,7 @@ public sealed class CreateFromExisting(
     IRfqCaseRepository cases,
     InitialRfqFactory factory,
     ISystemDateProvider systemDate,
+    IBusinessDateResolver businessDateResolver,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
@@ -179,7 +192,9 @@ public sealed class CreateFromExisting(
         authorization.EnsureCanCreateRevision(currentUser.User);
         var source = await CloseRfq.LoadAsync(cases, sourceCaseId, cancellationToken);
         var today = await systemDate.GetTodayAsync(cancellationToken);
-        var settlement = DateOnly.FromDateTime(source.CreatedAt.UtcDateTime) == today
+        var sourceBusinessDate = await businessDateResolver.ResolveAsync(
+            source.CreatedAt, currentUser.User.DeskId, cancellationToken);
+        var settlement = sourceBusinessDate == today
             ? source.CurrentRevision.SettlementDate
             : null;
         var copy = await factory.CreateAsync(new CreateDraftCommand(

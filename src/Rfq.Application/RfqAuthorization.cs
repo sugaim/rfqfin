@@ -5,8 +5,8 @@ namespace Rfq.Application;
 public sealed record QuoteAuthorizationState(
     bool IsOpen,
     UserId AssignedTraderId,
-    bool Owned,
-    string? QuoteStatus);
+    Ownership? Ownership,
+    ActiveQuoteState? QuoteState);
 
 public interface IRfqAuthorization
 {
@@ -67,7 +67,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         EnsureRole(user, UserRole.Trader);
         EnsureOpen(rfqCase);
-        if (rfqCase.Owned)
+        if (rfqCase.Ownership is Owned)
         {
             throw new InvalidOperationException("Owned RFQs cannot be picked up; use Take Over.");
         }
@@ -84,7 +84,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         EnsureRole(user, UserRole.Trader);
         EnsureOpen(rfqCase);
-        if (!rfqCase.Owned)
+        if (rfqCase.Ownership is not Owned)
         {
             throw new InvalidOperationException("The RFQ is not owned.");
         }
@@ -99,7 +99,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         EnsureRole(user, UserRole.Trader);
         EnsureOpen(rfqCase);
-        if (rfqCase.Owned)
+        if (rfqCase.Ownership is Owned)
         {
             throw new InvalidOperationException("Owned RFQs cannot be assigned.");
         }
@@ -109,7 +109,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         EnsureRole(user, UserRole.Trader);
         EnsureOpen(rfqCase);
-        if (!rfqCase.Owned)
+        if (rfqCase.Ownership is not Owned)
         {
             throw new InvalidOperationException("Unowned RFQs do not require Take Over.");
         }
@@ -135,13 +135,13 @@ public sealed class RfqAuthorization : IRfqAuthorization
             throw new InvalidOperationException("Quotes can only be edited for an Open RFQ.");
         }
 
-        if (!state.Owned || state.AssignedTraderId != user.UserId)
+        if (state.Ownership is not Owned || state.AssignedTraderId != user.UserId)
         {
             throw new UnauthorizedAccessException(
                 "Only the owning Trader can edit the WorkingQuote.");
         }
 
-        if (!string.Equals(state.QuoteStatus, "Requested", StringComparison.Ordinal))
+        if (state.QuoteState is not QuoteRequested)
         {
             throw new InvalidOperationException(
                 "WorkingQuote editing requires QuoteStatus Requested.");
@@ -152,7 +152,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         EnsureRole(user, UserRole.Trader);
         EnsureOpen(rfqCase);
-        if (!rfqCase.Owned || rfqCase.AssignedTraderId != user.UserId)
+        if (rfqCase.Ownership is not Owned || rfqCase.AssignedTraderId != user.UserId)
         {
             throw new UnauthorizedAccessException(
                 "Only the owning Trader can Confirm the WorkingQuote.");
@@ -179,7 +179,7 @@ public sealed class RfqAuthorization : IRfqAuthorization
     {
         EnsureRole(user, UserRole.Trader);
         EnsureOpen(rfqCase);
-        if (!rfqCase.Owned || rfqCase.AssignedTraderId != user.UserId)
+        if (rfqCase.Ownership is not Owned || rfqCase.AssignedTraderId != user.UserId)
         {
             throw new UnauthorizedAccessException(
                 "Only the owning Trader can withdraw a quote.");

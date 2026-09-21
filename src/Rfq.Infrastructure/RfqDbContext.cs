@@ -507,12 +507,10 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
         quoteEvent.ToTable("quote_events");
         quoteEvent.HasKey(entity => entity.EventId);
         quoteEvent.Property(entity => entity.EventId).HasColumnName("event_id").ValueGeneratedNever();
-        quoteEvent.Property(entity => entity.CaseId).HasColumnName("case_id");
         quoteEvent.Property(entity => entity.QuoteId).HasColumnName("quote_id");
         quoteEvent.Property(entity => entity.Type).HasColumnName("type").HasMaxLength(100);
         quoteEvent.Property(entity => entity.PayloadJson).HasColumnName("payload").HasColumnType("jsonb");
         quoteEvent.HasOne(entity => entity.Event).WithOne().HasForeignKey<QuoteEventEntity>(entity => entity.EventId).OnDelete(DeleteBehavior.Cascade);
-        quoteEvent.HasOne<RfqCaseEntity>().WithMany().HasForeignKey(entity => entity.CaseId).OnDelete(DeleteBehavior.Cascade);
         quoteEvent.HasOne<ConfirmedQuoteEntity>().WithMany().HasForeignKey(entity => entity.QuoteId).OnDelete(DeleteBehavior.Cascade);
 
         var gridConfig = modelBuilder.Entity<UserGridConfigEntity>();
@@ -727,7 +725,6 @@ internal sealed class RfqEventEntity
 internal sealed class QuoteEventEntity
 {
     public long EventId { get; set; }
-    public long CaseId { get; set; }
     public Guid QuoteId { get; set; }
     public string Type { get; set; } = string.Empty;
     public string PayloadJson { get; set; } = "{}";

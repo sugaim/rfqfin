@@ -1,7 +1,5 @@
 # Technical Baseline
 
-This file fixes the implementation baseline for the first working version.
-
 ## Backend
 
 ```text
@@ -16,29 +14,43 @@ API style:         Controllers
 Nullable:          enabled
 ```
 
-Use current compatible patch releases within these major versions.
+Use compatible patch releases within these majors.
 
-Do not target .NET 10 or .NET 11.
+Do not target .NET 10/11 for this project baseline.
 
-### Date/time baseline
+---
+
+## Domain type style
+
+Use ordinary C# types/records, not preview union syntax.
+
+Conceptually:
+
+```text
+RfqLifecycle
+├─ DraftRfq
+├─ OpenRfq
+│  ├─ ActiveRfq
+│  │  ├─ QuoteRequested
+│  │  └─ QuoteConfirmed
+│  └─ PresentedRfq
+├─ CancelledRfq
+└─ ClosedRfq
+```
+
+Domain business-state values are immutable from callers.
+
+Use typed IDs/value objects, including `StateVersion`.
+
+Persistence may flatten typed state into EF columns.
+
+---
+
+## Date/time baseline
 
 Use `DateOnly` for business dates and UTC timestamps for instants.
 
-Business `today` is not `DateTime.UtcNow.Date`. Resolve business dates through an injectable time abstraction using the configured desk/business timezone (initially JST / `Asia/Tokyo` for this JPY desk), then represent the result as `DateOnly`. Do not store local server time as business truth.
-
-### Domain type style
-
-For coarse typed lifecycle state, use ordinary C# constructs such as:
-
-```csharp
-abstract record RfqLifecycle;
-sealed record DraftRfq(...) : RfqLifecycle;
-sealed record OpenRfq(...) : RfqLifecycle;
-sealed record CancelledRfq(...) : RfqLifecycle;
-sealed record ClosedRfq(...) : RfqLifecycle;
-```
-
-Do not depend on preview C# union syntax.
+Business `today` is resolved using configured desk/business timezone (initially JST / `Asia/Tokyo`), not UTC calendar date.
 
 ---
 
@@ -51,9 +63,9 @@ EF Core migrations
 
 Migrations live with Infrastructure.
 
-The API must not automatically run migrations or seed data.
+API must not auto-run migrations/seed.
 
-A separate `Rfq.DbTool` project provides local/deployment-support commands:
+`Rfq.DbTool` provides local/deployment-support commands such as:
 
 ```text
 migrate
@@ -61,37 +73,30 @@ seed
 reset-dev
 ```
 
-`reset-dev` is development-only and may recreate the local database before migrating and seeding.
-
-Production deployment mechanics are deliberately undecided.
-
 ---
 
 ## Frontend
 
+Current frontend baseline remains:
+
 ```text
-Node:              Node 24 LTS
-React:             React 19.3
-TypeScript:        5.8+
-Vite:              current compatible Vite 8 release
-Ant Design:        6.x
-AG Grid:           Community 36.x
-Redux Toolkit:     2.x
-RTK Query:         included with Redux Toolkit
-Package manager:   npm
+Node 24 LTS
+React 19.3
+TypeScript 5.8+
+Vite 8 compatible
+Ant Design 6.x
+AG Grid Community 36.x
+Redux Toolkit 2.x / RTK Query
+npm
 ```
 
-Use current compatible patch releases, then commit `package-lock.json`.
-
-Do not depend on experimental React features.
-
-AG Grid Community is the baseline; do not use Enterprise-only APIs.
+The backend semantic refactor does not require frontend refactoring.
 
 ---
 
-## Version locking
+## Version locking / compiler settings
 
-Backend:
+Continue using:
 
 ```text
 global.json
@@ -99,23 +104,9 @@ Directory.Packages.props
 Directory.Build.props
 ```
 
-Frontend:
+`Nullable` and implicit usings are enabled.
 
-```text
-package.json
-package-lock.json
-```
-
-Use central package management for .NET packages.
-
-`Directory.Build.props` should at least enable:
-
-```xml
-<Nullable>enable</Nullable>
-<ImplicitUsings>enable</ImplicitUsings>
-```
-
-Warnings-as-errors may be enabled for the solution's own code once bootstrap noise is under control. Do not block initial bootstrap on analyzer churn.
+The intended code-quality baseline also includes warnings-as-errors plus `.editorconfig` / `dotnet format`, but the solution-wide hygiene pass is a **separate commit** from the semantic domain refactor to keep reviewable diffs. Do not mix unrelated formatting/analyzer churn into the semantic commit.
 
 ---
 
@@ -123,7 +114,7 @@ Warnings-as-errors may be enabled for the solution's own code once bootstrap noi
 
 Local PostgreSQL runs via Docker Compose.
 
-Normal development components:
+Normal components:
 
 ```text
 PostgreSQL   -> Docker Compose
@@ -131,16 +122,12 @@ ASP.NET API  -> Visual Studio 2022 or dotnet run
 React/Vite   -> npm run dev
 ```
 
-Do not require Docker for the API or frontend during normal development.
-
 ---
 
 ## OpenAPI
 
-The ASP.NET Core server implementation is authoritative.
+ASP.NET Core implementation is authoritative.
 
-Generate OpenAPI from the server.
+Generate OpenAPI from server DTO/endpoints.
 
-Do not begin with a manually maintained contract-first specification.
-
-Frontend API client generation may be added later if it proves useful; initial vertical slices may use explicit typed RTK Query endpoints.
+Do not begin a separate contract-first specification solely for this refactor.

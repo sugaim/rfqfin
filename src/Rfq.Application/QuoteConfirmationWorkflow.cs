@@ -22,7 +22,6 @@ public enum QuoteTransitionKind
 
 public sealed record QuoteTransition(
     QuoteTransitionKind Kind,
-    long CaseId,
     Guid QuoteId,
     string PerformedBy,
     DateTimeOffset OccurredAt);
@@ -75,45 +74,31 @@ public sealed class ConfirmQuote(
             caseId,
             cancellationToken);
         authorization.EnsureCanConfirmQuote(currentUser.User, rfqCase);
-        if (rfqCase.CurrentVersion != expectedCurrentVersion)
+        if (rfqCase.Version != new StateVersion(expectedCurrentVersion))
         {
-            throw new InvalidOperationException("The RFQ Case was changed by another user.");
+            throw new StateVersionMismatchException("The RFQ Case was changed by another user.");
         }
 
-        var open = (OpenRfq)rfqCase.Lifecycle;
         var workingQuote = await workingQuotes.GetAsync(
-            open.CurrentRevisionId,
+            rfqCase.CurrentRevision.RevisionId,
             cancellationToken)
             ?? throw new KeyNotFoundException("WorkingQuote was not found.");
-        if (workingQuote.Version != expectedWorkingQuoteVersion)
+        if (workingQuote.Version != new StateVersion(expectedWorkingQuoteVersion))
         {
-            throw new InvalidOperationException("The WorkingQuote was changed by another user.");
+            throw new StateVersionMismatchException("The WorkingQuote was changed by another user.");
         }
 
-        var requestReason = open.QuoteRequestReason
-            ?? throw new InvalidOperationException("Requested RFQ is missing QuoteRequestReason.");
-        var settlementDate = rfqCase.InitialRevision.SettlementDate
-            ?? throw new InvalidOperationException("Current Revision is missing SettlementDate.");
         var now = timeProvider.GetUtcNow();
-        var confirmedQuote = ConfirmedQuote.Create(
-            QuoteId.New(),
-            workingQuote,
-            rfqCase.SecurityId,
-            settlementDate,
-            currentUser.User.UserId,
-            now,
-            expiryMinutes,
-            requestReason);
-
-        rfqCase.ConfirmQuote(
-            confirmedQuote.QuoteId,
-            workingQuote.RevisionId,
-            expectedCurrentVersion);
+        var transition = QuoteTransitions.Confirm(
+            rfqCase, workingQuote, QuoteId.New(),
+            new QuoteConfirmation(currentUser.User.UserId, now,
+                QuoteExpiry.FromMinutes(expiryMinutes)));
+        rfqCase = transition.Rfq;
+        var confirmedQuote = transition.ConfirmedQuote;
         confirmedQuotes.Add(confirmedQuote);
         rfqCases.Update(rfqCase);
         eventSink.Record(new QuoteTransition(
             QuoteTransitionKind.Confirmed,
-            caseId,
             confirmedQuote.QuoteId.Value,
             currentUser.User.UserId.Value,
             now));
@@ -131,7 +116,7 @@ public sealed class ConfirmQuote(
             confirmedQuote.ConfirmedAt,
             confirmedQuote.ExpiryMinutes,
             confirmedQuote.ExpiresAt,
-            rfqCase.CurrentVersion);
+            rfqCase.Version.Value);
     }
 }
 
@@ -150,14 +135,14 @@ public sealed class PresentQuote(
     {
         var rfqCase = await UpdateInitialDraft.GetCaseAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanPresent(currentUser.User, rfqCase);
-        rfqCase.Present(expectedCurrentVersion);
+        rfqCase = RfqLifecycleTransitions.Present(
+            rfqCase, new StateVersion(expectedCurrentVersion));
 
         var quoteId = rfqCase.CurrentQuoteId
             ?? throw new InvalidOperationException("Current ConfirmedQuote was not found.");
         rfqCases.Update(rfqCase);
         eventSink.Record(new QuoteTransition(
             QuoteTransitionKind.Presented,
-            caseId,
             quoteId.Value,
             currentUser.User.UserId.Value,
             timeProvider.GetUtcNow()));
@@ -167,7 +152,7 @@ public sealed class PresentQuote(
             quoteId.Value,
             rfqCase.Status.ToString(),
             rfqCase.QuoteStatus!.Value.ToString(),
-            rfqCase.CurrentVersion);
+            rfqCase.Version.Value);
     }
 }
 
@@ -186,13 +171,13 @@ public sealed class UnpresentQuote(
     {
         var rfqCase = await UpdateInitialDraft.GetCaseAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanPresent(currentUser.User, rfqCase);
-        rfqCase.Unpresent(expectedCurrentVersion);
+        rfqCase = RfqLifecycleTransitions.Unpresent(
+            rfqCase, new StateVersion(expectedCurrentVersion));
         var quoteId = rfqCase.CurrentQuoteId
             ?? throw new InvalidOperationException("Current ConfirmedQuote was not found.");
         rfqCases.Update(rfqCase);
         eventSink.Record(new QuoteTransition(
             QuoteTransitionKind.Unpresented,
-            caseId,
             quoteId.Value,
             currentUser.User.UserId.Value,
             timeProvider.GetUtcNow()));
@@ -202,6 +187,6 @@ public sealed class UnpresentQuote(
             quoteId.Value,
             rfqCase.Status.ToString(),
             rfqCase.QuoteStatus!.Value.ToString(),
-            rfqCase.CurrentVersion);
+            rfqCase.Version.Value);
     }
 }

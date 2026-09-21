@@ -1,15 +1,50 @@
 # 03. Use Cases and Authorization
 
-## 1. Application use cases
+## 1. Layer meaning
 
-Initial use-case surface:
+`Rfq.Application` is the Use Case layer. Do not create a separate `Rfq.UseCases` project.
+
+A useful distinction is:
+
+```text
+Domain transition/factory
+= given business data and explicit inputs, what valid business state results?
+
+Application use case
+= how does the system obtain inputs, authorize the actor, call Domain logic,
+  persist outputs, record events, and commit?
+```
+
+Application owns:
+
+- repository/query access
+- current-user lookup
+- role/desk authorization
+- Case/Revision/Quote ID allocation orchestration
+- current instant / business-date resolution
+- external calculation calls
+- event recording
+- transaction/unit of work
+
+Domain owns:
+
+- construction invariants
+- state preconditions
+- state transition rules
+- coherent creation of related Domain outputs where separate public operations would permit an invalid business state
+
+---
+
+## 2. Application use cases
+
+Representative surface:
 
 ### RFQ / Revision
 
 - `CreateDraft`
 - `ConfirmInitialRevision`
 - `UpdateDraftRevision`
-- `ConfirmRevision`
+- `ConfirmRevision` / Confirm Amendment
 - `DiscardRevision`
 - `CreateFromExisting`
 
@@ -61,101 +96,115 @@ Initial use-case surface:
 - `ResolveStandardSettlement`
 - `CalculateBulk`
 
-This list defines application responsibilities, not mandatory one-to-one HTTP endpoints.
+This is application responsibility, not mandatory one-to-one HTTP endpoint naming.
 
 ---
 
-## 2. Command / Query separation
+## 3. Use-case orchestration pattern
+
+A mutating use case normally follows:
+
+```text
+load/query required state
+-> central authorization
+-> validate expected StateVersion values
+-> allocate IDs / resolve time/business date
+-> call Domain transition/factory
+-> persist all outputs
+-> append required persisted events
+-> one atomic commit
+```
+
+Do not move repository access into Domain transitions.
+
+Domain transition inputs may use a typed value object where values form a real domain concept (for example `QuoteConfirmation`). Do not create wrapper objects solely because a method has many arguments.
+
+---
+
+## 4. Typed values in Application
+
+Inside Application business logic, use Domain types rather than raw transport primitives whenever a Domain concept exists.
+
+Examples:
+
+```text
+CaseId       not long
+RevisionId   not Guid
+QuoteId      not Guid
+SecurityId   not string
+UserId       not string
+CategoryId   not string
+StateVersion not long
+```
+
+Do not compare statuses as strings.
+
+Raw primitives remain appropriate at HTTP, EF/DB, JSON, and external transport boundaries.
+
+API controllers map raw DTOs to typed Application inputs immediately and map typed results back outward.
+
+---
+
+## 5. Command / Query separation
 
 Use a lightweight command/query split.
 
 ### Commands
 
-Commands change state and pass through domain/application rules and repositories.
-
-Examples:
-
-- ConfirmRevision
-- ConfirmQuote
-- WithdrawQuote
-- CloseHit
-- CancelRfq
+Mutate state and pass through authorization + Domain transitions + repositories.
 
 ### Queries
 
-Queries do not mutate business state and may read directly into DTOs optimized for screens.
+Read-only paths may query directly into screen DTOs without reconstructing full Domain objects.
 
-Examples:
-
-- SearchPastRfqs
-- GetEodSummary
-- GetRevisionHistory
-- GetQuoteHistory
-
-Do not require query paths to reconstruct full domain aggregates.
-
-A useful rule:
+Rule:
 
 ```text
-Command side = minimum domain state required to make a valid business decision
-Query side   = efficient projection shaped for the screen
+Command side = minimum typed Domain state required to make a valid business decision
+Query side   = efficient projection shaped for the consumer
 ```
+
+This is pragmatic separation, not a full CQRS platform.
 
 ---
 
-## 3. Authorization boundary
+## 6. Authorization boundary
 
-Centralize business authorization in one service rather than scattering checks through handlers.
-
-Conceptually:
-
-```text
-IRfqAuthorization
-- CanEditRevision(...)
-- CanConfirmRevision(...)
-- CanQuote(...)
-- CanPresent(...)
-- CanClose(...)
-- CanTakeOver(...)
-- CanChangeContactOwner(...)
-- ...
-```
+Centralize actor authorization in `IRfqAuthorization` or equivalent Application policy service.
 
 Inputs may include:
 
-- Current User
+- current user
 - roles
 - Desk
 - Contact Owner
 - Assigned Trader
-- Owned
-- Manager/override permissions in the future
+- Open Ownership state
+- future Manager/override permissions
 
-Do not embed repeated checks such as `role == Trader && assignedTrader == me && owned` throughout the application.
+Do not scatter role/actor predicates across controllers and use cases.
 
----
+### Domain vs authorization
 
-## 4. Roles and overlap
+Domain transitions validate **whether a state transition is valid**:
 
-Roles are not necessarily mutually exclusive.
+- Presented cannot Withdraw
+- only Active+Requested can Quote Confirm
+- Unpresent requires Presented
+- Release requires Open+Owned state
 
-Conceptually:
+Application authorization validates **whether this actor may perform it**:
 
-```text
-Sales
-Trader
-Manager   // future
-```
+- Contact Owner may Present/Close
+- owning trader may Quote/Release
+- role/desk scope
+- future Manager override
 
-A user may hold multiple roles.
-
-Manager is not automatically an RFQ owner. Manager-specific overrides should be added in the centralized authorization layer later.
-
-Initial implementation may allow both Sales and Trader views to be accessible while identity/role plumbing is still simplified.
+This distinction must remain even when a rule uses both state and actor data.
 
 ---
 
-## 5. Initial authorization matrix
+## 7. Initial authorization matrix
 
 | Operation | Contact Owner | Owner Trader | Assigned Trader, unowned | Other desk member |
 |---|---:|---:|---:|---:|
@@ -172,17 +221,15 @@ Initial implementation may allow both Sales and Trader views to be accessible wh
 | Sales-only memo | Sales role | no | no | Sales role |
 | Trader-only memo | Trader role | yes | Trader role | Trader role |
 
-\* If the Contact Owner is also the owning Trader, their Trader role/ownership grants quote access.
+\* If Contact Owner is also the owning Trader, their Trader role/ownership grants quote access.
 
-Access is still constrained to the relevant Desk/application scope.
+Access is still constrained to relevant Desk/application scope.
 
 ---
 
-## 6. Current user
+## 8. Current user
 
-The application assumes a server-side `CurrentUser` abstraction is available.
-
-At minimum:
+The server provides a `CurrentUser` abstraction with at least:
 
 ```text
 UserId
@@ -190,48 +237,35 @@ Roles
 DeskId
 ```
 
-The mechanism by which the existing environment identifies the user is outside the initial design.
-
-The business/application layers should not depend on a specific Authorization-header scheme.
+Authentication transport is outside this design.
 
 ---
 
-## 7. Optimistic concurrency
+## 9. Optimistic concurrency
 
-Use optimistic concurrency rather than long-lived locks.
+Use `StateVersion` in Domain/Application and raw `bigint`/`long` at persistence/transport boundaries.
 
-Versioned mutable state includes at least:
+Versioned state includes at least:
 
-- `CaseCurrent`
+- current RFQ state
 - `RfqRevision`
 - `WorkingQuote`
+- `CaseMemo`
 
-FE sends expected version.
-
-Update pattern:
-
-```text
-UPDATE ... WHERE Version = expectedVersion
-```
-
-On success:
-
-```text
-Version = Version + 1
-```
+FE sends expected versions.
 
 On mismatch:
 
-- return Conflict
-- reload the affected RFQ
-- discard the conflicting FE edit
-- show a concise toast
+- raise/map `StateVersionMismatchException`
+- API returns Conflict
+- reload affected state
+- no automatic merge initially
 
-Do not auto-merge in the initial implementation.
+Database concurrency token behavior remains authoritative for concurrent writes.
 
 ---
 
-## 8. Critical concurrent transitions
+## 10. Critical concurrent transitions
 
 Example:
 
@@ -240,17 +274,29 @@ Sales: Confirm Rev2
 Trader: Confirm Quote against Rev1
 ```
 
-Both operations must validate the same current Case/Revision state/version.
+Both must validate the same current Case/Revision state/version.
 
-Only one can commit against the expected state. The loser gets Conflict and reloads.
+Only one may commit against the expected state. The loser gets Conflict/reload.
 
-Revision Confirm should atomically perform its multi-entity effects.
+External calculation flow must re-read/revalidate RFQ/WorkingQuote state after the external calculation returns and before applying the result.
 
 ---
 
-## 9. Error categories
+## 11. Domain exceptions and application errors
 
-Use a small application-level error taxonomy:
+Use a small Domain exception taxonomy:
+
+```text
+DomainException
+├─ DomainRuleViolationException
+├─ DomainValidationException
+├─ StateVersionMismatchException
+└─ DomainInvariantException
+```
+
+Do not create an exception subclass per operation.
+
+Application/API still distinguishes categories such as:
 
 ```text
 Validation
@@ -258,38 +304,64 @@ Conflict
 Forbidden
 NotFound
 CalculationFailure
+Invariant/Server fault
 ```
 
-Each error may include a stable `code` and structured details.
+Stable error codes may be exposed where useful.
 
-Examples:
-
-```text
-WORKING_QUOTE_VERSION_MISMATCH
-INVALID_SETTLEMENT_DATE
-NOT_CONTACT_OWNER
-```
-
-Do not create a large exception class hierarchy for every business condition.
-
-HTTP mapping can be conventional, e.g.:
+Typical HTTP mapping:
 
 - Validation -> 400
 - Forbidden -> 403
 - NotFound -> 404
 - Conflict -> 409
-- CalculationFailure -> 422 or equivalent application response
+- CalculationFailure -> 422 or application equivalent
+- invariant/data-corruption failure -> 5xx/operational alert, not normal user validation
 
-Bulk operations return per-item success/error rather than failing the entire batch when one item fails.
+Bulk operations return per-item success/error where already designed.
 
 ---
 
-## 10. API contract approach
+## 12. IDs and time
 
-Use code-first ASP.NET Core endpoints/DTOs as the authoritative implementation contract.
+Application supplies non-deterministic/system values to Domain operations.
 
-Generate OpenAPI from server implementation.
+- `CaseId`: existing DB/application sequence path
+- `RevisionId`: allocate in Application, pass to Domain
+- `QuoteId`: allocate in Application, pass to Domain
+- `ConfirmedAt` / edit timestamps: obtain from `TimeProvider`, pass to Domain
+- business date: obtain from business-date abstraction, pass to Domain
 
-OpenAPI may later be used to generate FE clients.
+Do not create Guid-generator interfaces without concrete need.
 
-Do not spend the initial phase hand-authoring a detailed contract-first OpenAPI document; refine operation names, DTOs, and error schemas once implementation feedback exists.
+Do not call clock/repository services from Domain transitions.
+
+---
+
+## 13. API contract approach
+
+ASP.NET Core implementation remains code-first and authoritative.
+
+API DTOs may use raw transport primitives.
+
+Preserve existing external JSON/endpoint behavior through internal refactors where practical.
+
+Do not expose the internal lifecycle class hierarchy directly as a transport contract merely because it exists in Domain.
+
+---
+
+## 14. Roles and overlap
+
+Roles are not necessarily mutually exclusive.
+
+Conceptually:
+
+```text
+Sales
+Trader
+Manager   // future policy
+```
+
+A user may hold multiple roles.
+
+Manager is not automatically an RFQ owner. Future Manager overrides belong in centralized authorization rather than Domain lifecycle rules or scattered endpoint checks.

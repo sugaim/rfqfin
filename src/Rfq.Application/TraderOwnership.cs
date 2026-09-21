@@ -95,7 +95,8 @@ public sealed class PickUpRfq(
     {
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanPickUp(currentUser.User, rfqCase, confirmed);
-        rfqCase.PickUp(currentUser.User.UserId, expectedVersion);
+        rfqCase = RfqOwnershipTransitions.PickUp(
+            rfqCase, currentUser.User.UserId, new StateVersion(expectedVersion));
         Record(events, timeProvider, RfqTransitionKind.PickedUp, rfqCase, currentUser.User.UserId);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
     }
@@ -122,7 +123,8 @@ public sealed class ReleaseRfq(
     {
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanRelease(currentUser.User, rfqCase);
-        rfqCase.Release(currentUser.User.UserId, expectedVersion);
+        rfqCase = RfqOwnershipTransitions.Release(
+            rfqCase, currentUser.User.UserId, new StateVersion(expectedVersion));
         PickUpRfq.Record(events, timeProvider, RfqTransitionKind.Released,
             rfqCase, currentUser.User.UserId);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
@@ -151,7 +153,8 @@ public sealed class AssignTrader(
             rfqCase.AssignedTraderId.Value,
             cancellationToken);
         var previous = rfqCase.AssignedTraderId.Value;
-        rfqCase.AssignTo(target, expectedVersion);
+        rfqCase = RfqOwnershipTransitions.Assign(
+            rfqCase, target, new StateVersion(expectedVersion));
         PickUpRfq.Record(events, timeProvider, RfqTransitionKind.AssignedTraderChanged,
             rfqCase, currentUser.User.UserId, previous);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
@@ -175,7 +178,8 @@ public sealed class TakeOverRfq(
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanTakeOver(currentUser.User, rfqCase, confirmed);
         var previous = rfqCase.AssignedTraderId.Value;
-        rfqCase.TakeOver(currentUser.User.UserId, expectedVersion);
+        rfqCase = RfqOwnershipTransitions.TakeOver(
+            rfqCase, currentUser.User.UserId, new StateVersion(expectedVersion));
         PickUpRfq.Record(events, timeProvider, RfqTransitionKind.TakenOver,
             rfqCase, currentUser.User.UserId, previous);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
@@ -202,7 +206,7 @@ internal static class OwnershipUseCase
         return new OwnershipResult(
             rfqCase.CaseId.Value,
             rfqCase.AssignedTraderId.Value,
-            rfqCase.Owned,
-            rfqCase.CurrentVersion);
+            rfqCase.Ownership is Owned,
+            rfqCase.Version.Value);
     }
 }

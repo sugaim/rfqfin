@@ -30,14 +30,16 @@ public sealed class InitialRfqFactory(
 
         return RfqCase.CreateDraft(
             caseId,
+            RevisionId.New(),
             clientId,
             SecurityId.Create(defaults.SecurityId),
             CategoryId.Create(defaults.CategoryId),
             assignedTraderId,
-            command.Notional,
-            command.SettlementDate,
-            defaults.StandardSettlementDate,
-            command.SalesAndTradingMessage,
+            new RevisionTerms(
+                command.Notional,
+                command.SettlementDate,
+                defaults.StandardSettlementDate,
+                command.SalesAndTradingMessage),
             currentUser.User.UserId,
             timeProvider.GetUtcNow(),
             copiedFromCaseId,

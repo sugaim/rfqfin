@@ -286,3 +286,21 @@ public sealed class PostgreSqlSystemDateProvider(RfqDbContext dbContext) : ISyst
             ?? throw new InvalidOperationException("The system date is not configured.");
     }
 }
+
+public sealed class PostgreSqlBusinessDateResolver(RfqDbContext dbContext)
+    : IBusinessDateResolver
+{
+    public async Task<DateOnly> ResolveAsync(
+        DateTimeOffset instant,
+        string deskId,
+        CancellationToken cancellationToken = default)
+    {
+        var timeZoneId = await dbContext.Desks.AsNoTracking()
+            .Where(item => item.DeskId == deskId)
+            .Select(item => item.TimeZoneId)
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new KeyNotFoundException($"Desk '{deskId}' was not found.");
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, timeZone).DateTime);
+    }
+}

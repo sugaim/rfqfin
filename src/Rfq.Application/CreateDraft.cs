@@ -29,19 +29,19 @@ public sealed record InitialRfqResult(
 {
     public static InitialRfqResult From(RfqCase rfqCase) => new(
         rfqCase.CaseId.Value,
-        rfqCase.InitialRevision.RevisionId.Value,
+        rfqCase.CurrentRevision.RevisionId.Value,
         rfqCase.Status.ToString(),
-        rfqCase.InitialRevision.Status.ToString(),
+        rfqCase.CurrentRevision.Status.ToString(),
         rfqCase.QuoteStatus?.ToString(),
         rfqCase.QuoteRequestReason?.ToString(),
         rfqCase.CategorySnapshot.Value,
         rfqCase.ContactOwnerId.Value,
         rfqCase.AssignedTraderId.Value,
-        rfqCase.InitialRevision.Notional,
-        rfqCase.InitialRevision.SettlementDate,
-        rfqCase.InitialRevision.StandardSettlementDate,
-        rfqCase.InitialRevision.SalesAndTradingMessage,
-        rfqCase.InitialRevision.Version,
+        rfqCase.CurrentRevision.Notional,
+        rfqCase.CurrentRevision.SettlementDate,
+        rfqCase.CurrentRevision.StandardSettlementDate,
+        rfqCase.CurrentRevision.SalesAndTradingMessage,
+        rfqCase.CurrentRevision.Version.Value,
         rfqCase.CreatedAt);
 }
 

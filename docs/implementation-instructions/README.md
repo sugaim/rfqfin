@@ -1,90 +1,40 @@
 # RFQ Implementation Instructions
 
-These instructions implement the canonical RFQ design incrementally.
+These instructions implement the canonical RFQ design.
 
 ## Authority
 
-The canonical design specification is authoritative for business behavior.
+The canonical design under `docs/rfq-design-spec/` is authoritative for current business/domain behavior.
 
-Recommended companion package:
+If an implementation instruction conflicts with the canonical design, **follow the canonical design unless it has been explicitly revised**.
+
+## Repository history and current refactor step
+
+Steps `01`–`15` describe the original incremental build sequence and are retained as implementation history/reference.
+
+The repository has already completed that sequence.
+
+For the current post-build backend refactor, use:
 
 ```text
-rfq-design-spec/
-  README.md
-  01-domain-model.md
-  ...
-  10-design-decisions.md
+16-semantic-domain-refactor.md
 ```
 
-If these implementation instructions and the canonical design conflict, **stop and follow the canonical design** unless the design has been explicitly revised.
+This step intentionally revises some implementation-shape assumptions that appear in the original steps, including:
 
-These instructions deliberately specify implementation sequence, local-development setup, and completion checks. They are not a replacement for the canonical design.
+- mutable Domain objects
+- `Owned` as a Domain boolean
+- Open RFQ status stored as a field combination
+- generic `EnsureWorkingQuote` as the primary creation behavior
+- primitive/string-heavy Application contexts
 
----
+Where those historical step files conflict with the updated canonical design or step 16, **the updated canonical design and step 16 win**.
 
-## How to use these instructions with Codex / another coding agent
-
-Give the agent:
-
-1. the canonical design package
-2. `00-technical-baseline.md`
-3. `00-agent-rules.md`
-4. exactly **one step file at a time**
-
-Do not give several implementation steps and ask the agent to "continue until done".
-
-Each step is designed to end in a runnable/testable repository state.
-
-After each step:
-
-1. inspect the diff
-2. run the listed verification commands
-3. manually exercise the listed scenario
-4. commit
-5. only then start the next step
-
-If rate limits or an interrupted session occur, resume from the first uncommitted step. Do not ask the next agent to reconstruct unfinished intent from chat history.
+A later structure/hygiene step will handle broad file organization, comments, formatter/editorconfig, and warnings-as-errors cleanup. Do not mix that mechanical pass into step 16 beyond files materially rewritten by the semantic refactor.
 
 ---
 
-## Sequence
-
-### Foundation
-
-- `01-solution-bootstrap.md`
-- `02-database-foundation.md`
-
-### First usable vertical slice
-
-- `03-rfq-create-and-list.md`
-- `04-master-search-and-defaults.md`
-- `05-sales-draft-and-confirm.md`
-
-### Trader workflow
-
-- `06-trader-routing-and-ownership.md`
-- `07-working-quote-and-calculation.md`
-- `08-confirm-and-present-quote.md`
-- `09-hit-away-and-contact-owner.md`
-
-### Lifecycle completion
-
-- `10-amendment-and-requote.md`
-- `11-cancel-reopen-withdraw-expiry.md`
-
-### Notifications / history / secondary screens
-
-- `12-events-refresh-and-sse.md`
-- `13-past-search-eod-pricer-grid-config.md`
-
-### Hardening
-
-- `14-concurrency-errors-and-integration-tests.md`
-- `15-seed-data-and-demo-readiness.md`
-
----
-
-## Expected repository shape
+## Expected solution projects
 
 ```text
 Rfq.sln
@@ -102,31 +52,13 @@ tests/
   Rfq.Application.Tests/
   Rfq.Infrastructure.Tests/
   Rfq.Api.Tests/
-
-docker-compose.yml
-global.json
-Directory.Build.props
-Directory.Packages.props
 ```
 
-No `Shared`, `Common`, or `Contracts` project should be created initially.
+Do not add a separate UseCases, Shared, Common, or Contracts project for the current design.
 
 ---
 
 ## Dependency direction
-
-```text
-Rfq.Domain
-    ↑
-Rfq.Application
-    ↑
-Rfq.Infrastructure
-
-Rfq.Api -> Application + Infrastructure
-Rfq.DbTool -> Infrastructure
-```
-
-More precisely:
 
 ```text
 Application    -> Domain
@@ -135,23 +67,18 @@ Api            -> Application + Infrastructure
 DbTool         -> Infrastructure
 ```
 
-`Domain` must not depend on EF Core, ASP.NET Core, PostgreSQL, JSON serialization, or frontend concepts.
+`Domain` must not depend on EF Core, ASP.NET Core, PostgreSQL, JSON serialization, current-user infrastructure, or frontend concepts.
+
+`Application` is the Use Case layer.
 
 ---
 
-## Local development target
+## Current implementation sequence
 
-The normal local loop should eventually be:
+For the current repository state:
 
-```bash
-docker compose up -d
-dotnet run --project src/Rfq.DbTool -- reset-dev
-dotnet run --project src/Rfq.Api
-cd src/Rfq.Web
-npm install
-npm run dev
-```
+1. `16-semantic-domain-refactor.md`
+2. review/commit
+3. later structure/hygiene instruction (separate commit)
 
-Visual Studio 2022 should be able to build/debug the .NET solution.
-
-The API must never automatically reset or seed the database on normal startup.
+Do not automatically perform step 2 while implementing step 1.

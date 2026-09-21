@@ -2,11 +2,12 @@
 
 ## 1. Persistence principles
 
-- Persistence shape is allowed to differ from domain type shape.
-- Domain types should not expose DB implementation details.
-- Current operational state is stored directly; this is not full event sourcing.
-- Events provide audit/history and notification feed, not the only source for rebuilding current state.
-- Confirmed business snapshots remain immutable.
+- Persistence shape may differ from Domain type shape.
+- Domain types do not expose DB implementation details.
+- Current operational state is stored directly; this is not event sourcing.
+- Events provide audit/history and notification feed, not the sole state-rebuild source.
+- Confirmed business snapshots are immutable.
+- Flattened persistence status columns are projections of the typed Domain state, not a second Domain source of truth.
 
 ---
 
@@ -14,14 +15,14 @@
 
 ### `RfqCase`
 
-Primary key: `CaseId`
+Primary key: `CaseId`.
 
-Contains relatively stable Case facts:
+Contains stable Case facts such as:
 
 - ClientId
 - SecurityId
 - SalesId?
-- CategorySnapshot
+- CategorySnapshot (`CategoryId`)
 - CreatedAt
 - CreatedBy
 - CopiedFromCaseId?
@@ -29,41 +30,34 @@ Contains relatively stable Case facts:
 
 ### `CaseCurrent`
 
-Primary key: `CaseId`
+Primary key: `CaseId`, 1:1 with `RfqCase`.
 
-1:1 with `RfqCase`.
+A flattened current projection may contain:
 
-Contains mutable current projection:
-
-- Lifecycle
-- RfqStatus
-- QuoteStatus? (operationally meaningful while Open)
-- QuoteRequestReason?
+- lifecycle kind / RFQ status projection
+- quote status projection / request reason projection
 - CurrentRevisionId
 - CurrentQuoteId?
 - ClosedQuoteId?
 - ContactOwnerId
 - AssignedTraderId
-- Owned
-- Version
+- ownership boolean projection
+- Version (`bigint`)
 
-`CurrentQuoteId` is an internal reference to identify the currently operational ConfirmedQuote; UI/business language remains `Quoted`.
+This flattened shape is acceptable even though Domain uses `ActiveRfq`, `PresentedRfq`, `QuoteRequested`, `QuoteConfirmed`, and typed `Ownership`.
 
-`ClosedQuoteId` records the immutable ConfirmedQuote against which a Closed Case was resolved Hit/Away. It is null before Close and remains available after `CurrentQuoteId` is no longer operational.
+Mapper logic must derive these columns from Domain state and reconstruct only valid Domain state on load.
+
+`CurrentQuoteId` is operational. `ClosedQuoteId` records the immutable ConfirmedQuote used to resolve a closed Hit/Away case.
 
 ### `RfqRevision`
 
-Primary key: `RevisionId`
-
-FK to `CaseId`.
+Primary key: `RevisionId`, FK to Case.
 
 Contains:
 
 - Status
-- Notional
-- SettlementDate
-- StandardSettlementDate
-- SalesAndTradingMessage
+- Revision terms
 - CopiedFromRevisionId?
 - QuoteSeedRevisionId?
 - Version
@@ -71,7 +65,7 @@ Contains:
 
 ### `WorkingQuote`
 
-Primary key may be `RevisionId` to enforce 0..1 per Revision.
+Primary key may be `RevisionId` to enforce one-per-Revision.
 
 Contains:
 
@@ -80,45 +74,80 @@ Contains:
 - calculated payload
 - manual payload
 - version
-- update metadata
+- audit/update metadata
+
+The persistence row may be updated in place even though the Domain object is immutable; repository mapping applies the returned new Domain value to the tracked EF entity.
 
 ### `ConfirmedQuote`
 
-Primary key: `QuoteId`
-
-FK to `RevisionId`.
+Primary key: `QuoteId`, FK to `RevisionId`.
 
 Immutable snapshot.
 
-No mutable lifecycle-status column is required for Presented/Withdrawn/Expired.
+No mutable Presented/Withdrawn/Expired flags belong on it.
+
+Current supported expiry persistence may remain:
+
+- expiry minutes / null
+- resolved ExpiresAt / null
+
+while Domain uses a typed expiry policy.
 
 ### `CaseMemo`
 
-1:1 per Case is sufficient initially.
+1:1 per Case initially.
 
-Contains:
+Contains SalesMemo, TraderMemo, Version, and any needed audit metadata.
 
-- SalesMemo
-- TraderMemo
-- update metadata as needed
+### `Category`
 
-### `CalculationFailureLog`
+Master data:
 
-Append-only failure record.
+```text
+CategoryId   // stable key
+Name         // mutable display name
+```
 
-Contains enough information to reproduce the attempted calculation.
+`Security.CategoryId` and `CategoryRouting.CategoryId` reference this master through FKs.
 
-### `UserGridConfig`
+### Other existing tables
 
-See UI document.
+Retain current logical roles for:
+
+- `CategoryRouting`
+- `CalculationFailureLog`
+- `UserGridConfig`
+- event cursor / Event tables
 
 ---
 
-## 3. Event persistence
+## 3. StateVersion mapping
 
-Use a thin shared persistence parent **only at the DB level**.
+Domain/Application use `StateVersion`.
 
-Domain types do not need a shared base type.
+DB remains signed `bigint`/`long` and EF concurrency token.
+
+Map at the Infrastructure boundary.
+
+Do not change DB columns to unsigned types.
+
+---
+
+## 4. Domain rehydration
+
+Persistence reconstruction must not require public mutable setters or public arbitrary `Restore` escape hatches.
+
+Use non-public constructors / `internal Restore` or equivalent and narrowly allow Infrastructure access, e.g. `InternalsVisibleTo("Rfq.Infrastructure")`.
+
+Application code should use public factories/transitions, not rehydration APIs.
+
+If persisted columns represent an impossible combination, mapping should fail as a Domain invariant/data-integrity problem rather than silently constructing invalid state.
+
+---
+
+## 5. Event persistence
+
+Use a thin shared parent **at DB level**.
 
 ### `Event`
 
@@ -128,19 +157,16 @@ OccurredAt
 ActorUserId?
 ```
 
-`EventId` is global and monotonic for event retrieval/cursor purposes.
+`EventId` is global for event retrieval/cursor purposes.
 
-The notification cursor must be **commit-order safe**. A plain database identity/sequence allocated before commit is not sufficient by itself: concurrent transactions can allocate EventIds in one order and commit in another, causing `GetEventsAfter(lastSeenEventId)` to miss a late-committing lower ID.
+The cursor must be **commit-order safe**. Plain identity/sequence allocation before commit is not sufficient by itself.
 
-The implementation must therefore use a mechanism whose visible cursor order is consistent with commit visibility, for example a DB-serialized event cursor allocator held until transaction commit, or another mechanism proven by integration test to prevent this gap. The exact mechanism is infrastructure-level; the no-loss property is canonical.
+A DB-serialized cursor allocator held through transaction commit is acceptable. Whatever mechanism is used must be proven by a real PostgreSQL concurrency test that no late-committing event can be permanently skipped.
 
 ### `RfqEvent`
 
-Primary key / FK: `EventId -> Event`
-
-Contains:
-
 ```text
+EventId -> Event
 CaseId
 Type
 Payload jsonb
@@ -148,28 +174,32 @@ Payload jsonb
 
 ### `QuoteEvent`
 
-Primary key / FK: `EventId -> Event`
-
-Contains:
-
 ```text
+EventId -> Event
 QuoteId
 Type
 Payload jsonb
 ```
 
-This arrangement gives:
+**Do not store `CaseId` on `QuoteEvent`.**
 
-- one global event cursor
-- RFQ/Quote-specific ownership
-- no fake `CaseId` on generic Event
-- no requirement for a shared domain inheritance hierarchy
+Case identity is derived through:
+
+```text
+QuoteEvent.QuoteId
+-> ConfirmedQuote.RevisionId
+-> RfqRevision.CaseId
+```
+
+This prevents the DB from permitting a QuoteEvent whose CaseId and QuoteId refer to different Cases.
+
+Queries that need CaseId join through the relation.
 
 ---
 
-## 4. RFQ event types
+## 6. Event types
 
-Initial candidates:
+### RFQ event candidates
 
 - RevisionConfirmed
 - Cancelled
@@ -179,30 +209,9 @@ Initial candidates:
 - OutcomeCorrected
 - ContactOwnerChanged
 - TakenOver
+- PickedUp / Released / AssignedTraderChanged where useful
 
-Also reasonable where audit is useful:
-
-- PickedUp
-- Released
-- AssignedTraderChanged
-
-Payload is typed in the domain and serialized to JSONB by persistence.
-
-Examples:
-
-```text
-RevisionConfirmed -> RevisionId
-ClosedHit/Away -> QuoteId
-OutcomeCorrected -> From, To
-ContactOwnerChanged -> FromUserId, ToUserId
-TakenOver -> FromTraderId, ToTraderId
-```
-
----
-
-## 5. Quote event types
-
-Initial:
+### Quote event types
 
 - Confirmed
 - Presented
@@ -210,185 +219,142 @@ Initial:
 - Withdrawn
 - Expired
 
-All refer to an immutable ConfirmedQuote via `QuoteId`.
+Quote events refer to immutable ConfirmedQuote by `QuoteId`.
 
-`Confirmed` is emitted when a WorkingQuote is snapshotted and becomes the current operational quote. This ensures the persisted change feed can notify other sessions of `Requested -> Quoted`, not only later presentation/withdrawal/expiry changes.
+Quote Confirm emits `Confirmed` so other sessions can discover Requested -> Quoted through the persisted feed.
 
-The event itself does not mutate the ConfirmedQuote.
-
-Current state changes are applied to `CaseCurrent` in the same use case/transaction.
+State mutation and event append occur in the same use-case transaction.
 
 ---
 
-## 6. Authoritative data vs projection
+## 7. Authoritative data vs projection
 
-### Authoritative
+Authoritative business data includes:
 
-- RfqCase
+- RfqCase / lifecycle state as persisted through tables
 - RfqRevision
 - WorkingQuote
 - ConfirmedQuote
+- CaseMemo
 - Event / RfqEvent / QuoteEvent
-- UserGridConfig
-- CalculationFailureLog
+- configuration/master data
+- calculation failure log
 
-### Projection
-
-- CaseCurrent
-- any future Past RFQ search projection
-
-CaseCurrent is maintained transactionally as the current operational slice.
+`CaseCurrent` is the transactionally maintained current operational projection/flattened persistence slice.
 
 Do not rebuild it from events on every request.
 
 ---
 
-## 7. Repository boundaries
+## 8. Repository boundaries
 
-Suggested application-facing repositories:
+Application-facing repositories remain business/domain-oriented.
 
-```text
-IRfqCaseRepository
-IQuoteRepository
-IUnitOfWork
-```
-
-Exact API should remain business-oriented, not column-oriented.
-
-Avoid exposing persistence operations like:
+Avoid exposing column operations such as:
 
 ```text
 SetCurrentQuoteId(null)
-SetRfqStatus(...)
-InsertEvent(...)
+SetStatusColumn(...)
+InsertQuoteEventRow(...)
 ```
 
-as the primary application API.
+Application invokes Domain transitions/factories and asks repositories to persist the resulting typed values.
 
-Instead, application use cases perform domain transitions and repositories persist the result.
+Query-side repositories/readers may project directly into query DTOs.
 
 ---
 
-## 8. Unit of Work / transactions
+## 9. Unit of Work / transactions
 
-ASP.NET Core / EF Core implementation may use one scoped DbContext shared by repositories.
+A scoped EF `DbContext` may back multiple repositories.
 
-Application layer sees an abstraction such as:
-
-```text
-IUnitOfWork.CommitAsync()
-```
-
-or an equivalent transactional decorator.
-
-Application/domain should not depend on `DbContext`.
+Application sees `IUnitOfWork` or equivalent.
 
 General rule:
 
 ```text
-one use case
--> repository changes
+one business use case
+-> all related persistence updates/events
 -> one atomic commit
 ```
 
-A use case such as ExpireQuote may update:
+Examples include:
 
-- CaseCurrent
-- create Event
-- create QuoteEvent
+- Quote Confirm: CaseCurrent + ConfirmedQuote + QuoteEvent
+- Initial Confirm: Case/Revision current state + WorkingQuote + event(s)
+- Amendment Confirm: revisions + CaseCurrent + new WorkingQuote + event(s)
+- Expire: CaseCurrent + QuoteEvent
 
-in one transaction.
-
-ConfirmedQuote remains unchanged.
+Do not hold DB locks while performing external/heavy calculation.
 
 ---
 
-## 9. Loading strategy
+## 10. Loading strategy
 
-Do not load an entire historical object graph simply because the Case is conceptually an aggregate.
+Command-side retrieval loads only state needed for the transition:
 
-Command-side retrieval should load only the current state required for the transition:
-
-- Case facts
-- CaseCurrent
+- Case facts/current lifecycle
 - Current Revision
-- Draft Revision if relevant
-- WorkingQuote/current ConfirmedQuote as needed
+- pending Draft if relevant
+- WorkingQuote/current ConfirmedQuote/seed WorkingQuote as relevant
 
-Do not routinely load:
+Do not routinely load all historical Revisions, all quotes, or all Events.
 
-- all historical Revisions
-- all ConfirmedQuotes
-- all Events
-
-History/search belongs to query-side DTOs.
+History/search uses query-side DTOs.
 
 ---
 
-## 10. DB constraints
+## 11. DB constraints
 
-Minimum useful constraints:
+Minimum constraints include:
 
-- one `CaseCurrent` per Case
+- one CaseCurrent per Case
 - at most one Draft Revision per Case
 - at most one WorkingQuote per Revision
-- valid FK from CurrentRevisionId
-- valid FK from CurrentQuoteId if non-null
-- valid FK from ClosedQuoteId if non-null
-- optimistic-concurrency version columns
+- valid CurrentRevision FK
+- valid CurrentQuote FK when present
+- valid ClosedQuote FK when present
+- Security -> Category FK
+- CategoryRouting -> Category FK
+- optimistic concurrency version columns
 
-PostgreSQL partial unique index is appropriate for one Draft per Case.
+PostgreSQL partial unique index remains appropriate for one Draft per Case.
 
-Example concept:
-
-```sql
-UNIQUE (case_id) WHERE revision_status = 'Draft'
-```
-
-Domain rules and DB constraints should both protect critical invariants.
+Domain rules and DB constraints both protect critical invariants.
 
 ---
 
-## 11. Indexing
+## 12. Indexing and search projection
 
-Initial indexes should cover:
+Keep current pragmatic indexing strategy for expiry worker and Past RFQ search.
 
-- expiry worker: quoted/current + `ExpiresAt`
-- Past RFQ search:
-  - date
-  - client
-  - security
-  - category
-  - contact owner
-  - assigned trader
-  - RFQ status
-- stable primary/foreign key joins
+Do not create broad speculative compound indexes or a full copied search model until usage requires it.
 
-Do not pre-create every possible compound index.
-
-Observe actual search patterns and add targeted indexes later.
+A future thin search projection may store references, but do not duplicate every display field prematurely.
 
 ---
 
-## 12. Past RFQ read model
+## 13. Initial indexing
 
-Do not build a large copied search snapshot before there is evidence it is required.
+Initial indexes should cover actual operational queries, including:
+
+- expiry worker: current confirmed/quoted items + `ExpiresAt`
+- Past RFQ search by date/client/security/category/contact owner/assigned trader/status
+- stable PK/FK joins
+
+Do not pre-create every possible compound index. Observe real search patterns and add targeted indexes.
+
+---
+
+## 14. Past RFQ read model
+
+Do not build a large copied snapshot before evidence requires it.
 
 Initial approach:
 
 - ordinary relational joins
 - direct query DTO
 - indexes
-- at most a very thin projection/reference if needed
+- optionally a very thin reference projection if proven useful
 
-If a projection is introduced, keep it minimal, e.g. references such as:
-
-```text
-CaseId
-DisplayRevisionId
-DisplayQuoteId
-```
-
-Do not duplicate every display field prematurely.
-
-PostgreSQL materialized views are available but are not the default choice because freshness/refresh management would add unnecessary complexity at this stage.
+Do not duplicate every display field prematurely or default to materialized views with refresh-management complexity.

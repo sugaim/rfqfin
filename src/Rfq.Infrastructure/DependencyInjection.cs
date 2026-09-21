@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IUserDirectory, PostgreSqlUserDirectory>();
         services.AddScoped<ICategoryRouting, PostgreSqlCategoryRouting>();
         services.AddScoped<ISystemDateProvider, PostgreSqlSystemDateProvider>();
+        services.AddScoped<IBusinessDateResolver, PostgreSqlBusinessDateResolver>();
         services.AddSingleton<IStandardSettlementResolver, MockStandardSettlementResolver>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<DevelopmentDataSeeder>();

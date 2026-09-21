@@ -64,7 +64,7 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
 
     public void Record(QuoteTransition transition)
     {
-        pending.Add(new("Quote", transition.CaseId, transition.QuoteId,
+        pending.Add(new("Quote", null, transition.QuoteId,
             transition.Kind.ToString(), transition.PerformedBy, transition.OccurredAt,
             JsonSerializer.Serialize(transition)));
     }
@@ -81,7 +81,7 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
 
 internal sealed record PendingEvent(
     string Kind,
-    long CaseId,
+    long? CaseId,
     Guid? QuoteId,
     string Type,
     string? ActorUserId,
@@ -102,7 +102,7 @@ public sealed class CaseMemoRepository(RfqDbContext dbContext) : ICaseMemoReposi
                 new CaseId(entity.CaseId),
                 entity.SalesMemo,
                 entity.TraderMemo,
-                entity.Version);
+                new StateVersion(entity.Version));
     }
 
     public void Update(CaseMemo memo)
@@ -113,6 +113,6 @@ public sealed class CaseMemoRepository(RfqDbContext dbContext) : ICaseMemoReposi
                 "The Case Memo must be loaded before it can be updated.");
         entity.SalesMemo = memo.SalesMemo;
         entity.TraderMemo = memo.TraderMemo;
-        entity.Version = memo.Version;
+        entity.Version = memo.Version.Value;
     }
 }

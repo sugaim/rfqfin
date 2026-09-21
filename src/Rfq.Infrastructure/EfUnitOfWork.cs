@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Rfq.Application;
+using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
@@ -38,7 +39,7 @@ public sealed class EfUnitOfWork(
                     dbContext.RfqEvents.Add(new RfqEventEntity
                     {
                         EventId = parent.EventId,
-                        CaseId = pending.CaseId,
+                        CaseId = pending.CaseId!.Value,
                         Type = pending.Type,
                         PayloadJson = pending.PayloadJson,
                     });
@@ -48,7 +49,6 @@ public sealed class EfUnitOfWork(
                     dbContext.QuoteEvents.Add(new QuoteEventEntity
                     {
                         EventId = parent.EventId,
-                        CaseId = pending.CaseId,
                         QuoteId = pending.QuoteId!.Value,
                         Type = pending.Type,
                         PayloadJson = pending.PayloadJson,
@@ -61,7 +61,7 @@ public sealed class EfUnitOfWork(
         }
         catch (DbUpdateConcurrencyException exception)
         {
-            throw new InvalidOperationException(
+            throw new StateVersionMismatchException(
                 "The RFQ was changed by another user. Reload and try again.",
                 exception);
         }

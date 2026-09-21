@@ -10,6 +10,8 @@ public interface IRfqCaseRepository
 
     void Update(RfqCase rfqCase);
 
+    void UpdateRevision(RfqRevision revision);
+
     Task<IReadOnlyList<SalesRfqListItem>> GetActiveSalesRfqsAsync(
         UserId salesUserId,
         CancellationToken cancellationToken = default);
