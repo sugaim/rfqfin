@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Rfq.Infrastructure;
 
-public static class DatabaseConfiguration
+public static class PostgreSqlDatabaseConfiguration
 {
     public const string ConnectionStringName = "RfqDatabase";
 

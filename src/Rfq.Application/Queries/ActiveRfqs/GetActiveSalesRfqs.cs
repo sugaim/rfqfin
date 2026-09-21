@@ -3,13 +3,13 @@ using Rfq.Domain;
 namespace Rfq.Application;
 
 public sealed class GetActiveSalesRfqs(
-    IRfqCaseRepository rfqCases,
+    IActiveRfqQueries activeRfqs,
     ICurrentUser currentUser)
 {
     public Task<IReadOnlyList<SalesRfqListItem>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
-        return rfqCases.GetActiveSalesRfqsAsync(
+        return activeRfqs.GetSalesAsync(
             currentUser.User.UserId,
             cancellationToken);
     }

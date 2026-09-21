@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Rfq.Infrastructure;
 
+
 public sealed class RfqDbContextFactory : IDesignTimeDbContextFactory<RfqDbContext>
 {
     private const string DevelopmentConnectionString =
@@ -11,11 +12,11 @@ public sealed class RfqDbContextFactory : IDesignTimeDbContextFactory<RfqDbConte
     public RfqDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable(
-                $"ConnectionStrings__{DatabaseConfiguration.ConnectionStringName}")
+                $"ConnectionStrings__{PostgreSqlDatabaseConfiguration.ConnectionStringName}")
             ?? DevelopmentConnectionString;
 
         var options = new DbContextOptionsBuilder<RfqDbContext>();
-        DatabaseConfiguration.Configure(options, connectionString);
+        PostgreSqlDatabaseConfiguration.Configure(options, connectionString);
         return new RfqDbContext(options.Options);
     }
 }

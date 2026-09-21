@@ -16,9 +16,9 @@ public sealed class QuoteExpiryWorker(
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var repository = scope.ServiceProvider.GetRequiredService<IRfqCaseRepository>();
+                var expiryQueries = scope.ServiceProvider.GetRequiredService<IQuoteExpiryQueries>();
                 var useCase = scope.ServiceProvider.GetRequiredService<ExpireQuote>();
-                foreach (var candidate in await repository.GetExpiredQuotesAsync(
+                foreach (var candidate in await expiryQueries.GetExpiredAsync(
                     DateTimeOffset.UtcNow, stoppingToken))
                 {
                     try { await useCase.ExecuteAsync(candidate, stoppingToken); }

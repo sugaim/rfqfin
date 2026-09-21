@@ -3,6 +3,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
+
 public sealed class MockCalculationClient : ICalculationClient
 {
     public Task<IReadOnlyList<CalculationResult>> CalculateBulkAsync(

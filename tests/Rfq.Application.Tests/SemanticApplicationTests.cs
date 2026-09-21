@@ -75,14 +75,15 @@ public sealed class SemanticApplicationTests
     [Fact]
     public async Task Trader_screen_query_does_not_write()
     {
-        var cases = new CaseRepository(null, []);
+        var cases = new CaseRepository(null);
+        var queries = new ActiveRfqQueries([]);
         var useCase = new GetActiveTraderRfqs(
-            cases, new RfqAuthorization(), Current(Trader, UserRole.Trader));
+            queries, new RfqAuthorization(), Current(Trader, UserRole.Trader));
 
         var result = await useCase.ExecuteAsync();
 
         Assert.Empty(result);
-        Assert.Equal(1, cases.TraderQueries);
+        Assert.Equal(1, queries.TraderQueries);
         Assert.Equal(0, cases.Updates);
     }
 
@@ -231,32 +232,36 @@ public sealed class SemanticApplicationTests
 
     private sealed record CurrentUserService(CurrentUser User) : ICurrentUser;
 
-    private sealed class CaseRepository(
-        RfqCase? value,
-        IReadOnlyList<TraderRfqListItem>? traderRows = null) : IRfqCaseRepository
+    private sealed class CaseRepository(RfqCase? value) : IRfqCaseRepository
     {
         public RfqCase? Case { get; set; } = value;
         public RfqCase? Added { get; private set; }
         public List<RfqRevision> ChangedRevisions { get; } = [];
         public int Updates { get; private set; }
-        public int TraderQueries { get; private set; }
         public void Add(RfqCase rfq) { Added = rfq; Case = rfq; }
         public Task<RfqCase?> GetAsync(CaseId id, CancellationToken token = default) =>
             Task.FromResult(Case?.CaseId == id ? Case : null);
         public void Update(RfqCase rfq) { Updates++; Case = rfq; }
         public void UpdateRevision(RfqRevision revision) => ChangedRevisions.Add(revision);
-        public Task<IReadOnlyList<SalesRfqListItem>> GetActiveSalesRfqsAsync(UserId id, CancellationToken token = default) => throw new NotSupportedException();
-        public Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
+    }
+
+    private sealed class ActiveRfqQueries(
+        IReadOnlyList<TraderRfqListItem> traderRows) : IActiveRfqQueries
+    {
+        public int TraderQueries { get; private set; }
+
+        public Task<IReadOnlyList<SalesRfqListItem>> GetSalesAsync(
+            UserId salesUserId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TraderRfqListItem>> GetTraderAsync(
             DeskId desk,
             CancellationToken token = default)
         {
             TraderQueries++;
-            return Task.FromResult(traderRows ?? (IReadOnlyList<TraderRfqListItem>)[]);
+            return Task.FromResult(traderRows);
         }
-        public Task<IReadOnlyList<ExpiredQuoteCandidate>> GetExpiredQuotesAsync(
-            DateTimeOffset now,
-            CancellationToken token = default) =>
-            Task.FromResult<IReadOnlyList<ExpiredQuoteCandidate>>([]);
     }
 
     private sealed class WorkingRepository : IWorkingQuoteRepository

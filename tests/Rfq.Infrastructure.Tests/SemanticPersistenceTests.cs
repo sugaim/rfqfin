@@ -48,7 +48,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
             var sink = new PersistedEventSink();
             sink.Record(new QuoteTransition(
                 QuoteTransitionKind.Confirmed, new QuoteId(quoteId), UserId.Create("trader-a"), DateTimeOffset.UtcNow));
-            await new EfUnitOfWork(context, sink).SaveChangesAsync();
+            await new PostgreSqlUnitOfWork(context, sink).SaveChangesAsync();
         }
 
         await using var read = fixture.CreateContext();
@@ -78,10 +78,10 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
             b, UserId.Create("sales-a"), b.Version);
         firstRepo.Update(a);
         secondRepo.Update(b);
-        await new EfUnitOfWork(first).SaveChangesAsync();
+        await new PostgreSqlUnitOfWork(first).SaveChangesAsync();
 
         await Assert.ThrowsAsync<StateVersionMismatchException>(
-            () => new EfUnitOfWork(second).SaveChangesAsync());
+            () => new PostgreSqlUnitOfWork(second).SaveChangesAsync());
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         sink.Record(new RfqTransition(
             RfqTransitionKind.ContactOwnerChanged, new CaseId(caseId), UserId.Create("sales-dev"),
             DateTimeOffset.UtcNow));
-        var secondSave = new EfUnitOfWork(second, sink).SaveChangesAsync();
+        var secondSave = new PostgreSqlUnitOfWork(second, sink).SaveChangesAsync();
         await Task.Delay(200);
         Assert.False(secondSave.IsCompleted);
         await transaction.CommitAsync();
@@ -159,7 +159,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
                 new DateOnly(2026, 9, 21), trader, DateTimeOffset.UtcNow,
                 draft.CurrentRevision.Version);
             new RfqCaseRepository(write).Add(open);
-            await new EfUnitOfWork(write).SaveChangesAsync();
+            await new PostgreSqlUnitOfWork(write).SaveChangesAsync();
         }
 
         await using var read = fixture.CreateContext();
@@ -169,8 +169,9 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         Assert.Null(restored.SalesId);
         var before = await read.WorkingQuotes.CountAsync();
 
+        var activeQueries = new PostgreSqlActiveRfqQueries(read);
         await Assert.ThrowsAsync<DomainInvariantException>(
-            () => repository.GetActiveTraderRfqsAsync(DeskId.Create("jpy-credit")));
+            () => activeQueries.GetTraderAsync(DeskId.Create("jpy-credit")));
 
         Assert.Equal(before, await read.WorkingQuotes.CountAsync());
         Assert.False(read.ChangeTracker.HasChanges());
@@ -329,7 +330,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
                 new DateOnly(2026, 9, 23), ""),
             UserId.Create("sales-dev"), DateTimeOffset.UtcNow);
         new RfqCaseRepository(context).Add(draft);
-        await new EfUnitOfWork(context).SaveChangesAsync();
+        await new PostgreSqlUnitOfWork(context).SaveChangesAsync();
         return id;
     }
 

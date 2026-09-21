@@ -4,11 +4,11 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-public sealed class EfUnitOfWork(
+public sealed class PostgreSqlUnitOfWork(
     RfqDbContext dbContext,
     PersistedEventSink eventSink) : IUnitOfWork
 {
-    public EfUnitOfWork(RfqDbContext dbContext) : this(dbContext, new PersistedEventSink()) { }
+    public PostgreSqlUnitOfWork(RfqDbContext dbContext) : this(dbContext, new PersistedEventSink()) { }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {

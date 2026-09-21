@@ -10,15 +10,17 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString(DatabaseConfiguration.ConnectionStringName)
+        var connectionString = configuration.GetConnectionString(PostgreSqlDatabaseConfiguration.ConnectionStringName)
             ?? throw new InvalidOperationException(
-                $"Connection string '{DatabaseConfiguration.ConnectionStringName}' is not configured.");
+                $"Connection string '{PostgreSqlDatabaseConfiguration.ConnectionStringName}' is not configured.");
 
         services.AddDbContext<RfqDbContext>(options =>
-            DatabaseConfiguration.Configure(options, connectionString));
+            PostgreSqlDatabaseConfiguration.Configure(options, connectionString));
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICaseIdGenerator, PostgreSqlCaseIdGenerator>();
         services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
+        services.AddScoped<IActiveRfqQueries, PostgreSqlActiveRfqQueries>();
+        services.AddScoped<IQuoteExpiryQueries, PostgreSqlQuoteExpiryQueries>();
         services.AddScoped<IWorkingQuoteRepository, WorkingQuoteRepository>();
         services.AddScoped<IConfirmedQuoteRepository, ConfirmedQuoteRepository>();
         services.AddScoped<ICaseMemoRepository, CaseMemoRepository>();
@@ -32,8 +34,10 @@ public static class DependencyInjection
         services.AddScoped<ICategoryRouting, PostgreSqlCategoryRouting>();
         services.AddScoped<ISystemDateProvider, PostgreSqlSystemDateProvider>();
         services.AddScoped<IBusinessDateResolver, PostgreSqlBusinessDateResolver>();
+        services.AddScoped<IEventFeed, PostgreSqlEventFeed>();
+        services.AddScoped<IOperationalQueries, PostgreSqlOperationalQueries>();
         services.AddSingleton<IStandardSettlementResolver, MockStandardSettlementResolver>();
-        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<IUnitOfWork, PostgreSqlUnitOfWork>();
         services.AddScoped<DevelopmentDataSeeder>();
         services.AddScoped<DatabaseOperations>();
 

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Rfq.Infrastructure;
 
+
 public sealed class DatabaseOperations(
     RfqDbContext dbContext,
     DevelopmentDataSeeder dataSeeder)
@@ -23,7 +24,7 @@ public sealed class DatabaseOperations(
         var connectionString = dbContext.Database.GetConnectionString()
             ?? throw new InvalidOperationException("The RFQ database connection string is missing.");
 
-        ResetDevSafetyGuard.EnsureAllowed(environmentName, connectionString);
+        PostgreSqlResetDevSafetyGuard.EnsureAllowed(environmentName, connectionString);
 
         await dbContext.Database.EnsureDeletedAsync(cancellationToken);
         await dbContext.Database.MigrateAsync(cancellationToken);

@@ -11,16 +11,4 @@ public interface IRfqCaseRepository
     void Update(RfqCase rfqCase);
 
     void UpdateRevision(RfqRevision revision);
-
-    Task<IReadOnlyList<SalesRfqListItem>> GetActiveSalesRfqsAsync(
-        UserId salesUserId,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
-        DeskId deskId,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<ExpiredQuoteCandidate>> GetExpiredQuotesAsync(
-        DateTimeOffset now,
-        CancellationToken cancellationToken = default);
 }

@@ -2,7 +2,8 @@ using Npgsql;
 
 namespace Rfq.Infrastructure;
 
-public static class ResetDevSafetyGuard
+
+public static class PostgreSqlResetDevSafetyGuard
 {
     public const string DevelopmentEnvironment = "Development";
 

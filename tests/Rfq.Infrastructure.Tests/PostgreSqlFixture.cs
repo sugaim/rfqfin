@@ -25,7 +25,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     public RfqDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<RfqDbContext>();
-        DatabaseConfiguration.Configure(options, Container.GetConnectionString());
+        PostgreSqlDatabaseConfiguration.Configure(options, Container.GetConnectionString());
         return new RfqDbContext(options.Options);
     }
 }

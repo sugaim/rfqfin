@@ -3,7 +3,7 @@ using Rfq.Domain;
 namespace Rfq.Application;
 
 public sealed class GetActiveTraderRfqs(
-    IRfqCaseRepository rfqCases,
+    IActiveRfqQueries activeRfqs,
     IRfqAuthorization authorization,
     ICurrentUser currentUser)
 {
@@ -11,7 +11,7 @@ public sealed class GetActiveTraderRfqs(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanViewTraderScreen(currentUser.User);
-        return await rfqCases.GetActiveTraderRfqsAsync(
+        return await activeRfqs.GetTraderAsync(
             currentUser.User.DeskId,
             cancellationToken);
     }

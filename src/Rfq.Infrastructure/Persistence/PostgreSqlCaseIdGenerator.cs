@@ -4,6 +4,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
+
 public sealed class PostgreSqlCaseIdGenerator(RfqDbContext dbContext) : ICaseIdGenerator
 {
     public const string SequenceName = "rfq_case_id_seq";
@@ -11,7 +12,7 @@ public sealed class PostgreSqlCaseIdGenerator(RfqDbContext dbContext) : ICaseIdG
     public async Task<CaseId> NextAsync(CancellationToken cancellationToken = default)
     {
         var value = await dbContext.Database
-            .SqlQuery<long>($"SELECT nextval('rfq_case_id_seq') AS \"Value\"")
+            .SqlQueryRaw<long>("SELECT nextval('rfq_case_id_seq') AS \"Value\"")
             .SingleAsync(cancellationToken);
 
         return new CaseId(value);
