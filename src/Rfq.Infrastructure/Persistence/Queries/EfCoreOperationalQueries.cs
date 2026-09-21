@@ -4,8 +4,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-
-public sealed class PostgreSqlOperationalQueries(
+public sealed class EfCoreOperationalQueries(
     RfqDbContext dbContext,
     ICurrentUser currentUser,
     TimeProvider timeProvider) : IOperationalQueries

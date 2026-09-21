@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Rfq.Infrastructure;
 
-
 public sealed class DatabaseOperations(
     RfqDbContext dbContext,
     DevelopmentDataSeeder dataSeeder)

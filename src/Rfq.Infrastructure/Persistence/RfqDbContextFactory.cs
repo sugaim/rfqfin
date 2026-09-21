@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Rfq.Infrastructure;
 
-
 public sealed class RfqDbContextFactory : IDesignTimeDbContextFactory<RfqDbContext>
 {
     private const string DevelopmentConnectionString =

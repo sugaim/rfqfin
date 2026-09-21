@@ -4,7 +4,6 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-
 public sealed class PostgreSqlSecuritySearch(RfqDbContext dbContext) : ISecuritySearch
 {
     private const int ResultLimit = 20;

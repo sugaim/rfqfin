@@ -19,8 +19,8 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICaseIdGenerator, PostgreSqlCaseIdGenerator>();
         services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
-        services.AddScoped<IActiveRfqQueries, PostgreSqlActiveRfqQueries>();
-        services.AddScoped<IQuoteExpiryQueries, PostgreSqlQuoteExpiryQueries>();
+        services.AddScoped<IActiveRfqQueries, EfCoreActiveRfqQueries>();
+        services.AddScoped<IQuoteExpiryQueries, EfCoreQuoteExpiryQueries>();
         services.AddScoped<IWorkingQuoteRepository, WorkingQuoteRepository>();
         services.AddScoped<IConfirmedQuoteRepository, ConfirmedQuoteRepository>();
         services.AddScoped<ICaseMemoRepository, CaseMemoRepository>();
@@ -31,11 +31,11 @@ public static class DependencyInjection
         services.AddScoped<ISecuritySearch, PostgreSqlSecuritySearch>();
         services.AddScoped<IClientSearch, PostgreSqlClientSearch>();
         services.AddScoped<IUserDirectory, PostgreSqlUserDirectory>();
-        services.AddScoped<ICategoryRouting, PostgreSqlCategoryRouting>();
-        services.AddScoped<ISystemDateProvider, PostgreSqlSystemDateProvider>();
-        services.AddScoped<IBusinessDateResolver, PostgreSqlBusinessDateResolver>();
-        services.AddScoped<IEventFeed, PostgreSqlEventFeed>();
-        services.AddScoped<IOperationalQueries, PostgreSqlOperationalQueries>();
+        services.AddScoped<ICategoryRouting, EfCoreCategoryRouting>();
+        services.AddScoped<ISystemDateProvider, EfCoreSystemDateProvider>();
+        services.AddScoped<IBusinessDateResolver, EfCoreBusinessDateResolver>();
+        services.AddScoped<IEventFeed, EfCoreEventFeed>();
+        services.AddScoped<IOperationalQueries, EfCoreOperationalQueries>();
         services.AddSingleton<IStandardSettlementResolver, MockStandardSettlementResolver>();
         services.AddScoped<IUnitOfWork, PostgreSqlUnitOfWork>();
         services.AddScoped<DevelopmentDataSeeder>();

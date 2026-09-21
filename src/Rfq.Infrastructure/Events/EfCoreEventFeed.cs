@@ -4,8 +4,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-
-public sealed class PostgreSqlEventFeed(
+public sealed class EfCoreEventFeed(
     RfqDbContext dbContext,
     ICurrentUser currentUser) : IEventFeed
 {

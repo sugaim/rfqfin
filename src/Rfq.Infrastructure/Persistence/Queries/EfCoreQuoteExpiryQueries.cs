@@ -4,7 +4,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-public sealed class PostgreSqlQuoteExpiryQueries(RfqDbContext dbContext) : IQuoteExpiryQueries
+public sealed class EfCoreQuoteExpiryQueries(RfqDbContext dbContext) : IQuoteExpiryQueries
 {
     public async Task<IReadOnlyList<ExpiredQuoteCandidate>> GetExpiredAsync(
         DateTimeOffset now,

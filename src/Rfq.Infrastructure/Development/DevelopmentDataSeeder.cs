@@ -4,7 +4,6 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-
 public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider timeProvider)
 {
     public const string FoundationSeedKey = "database-foundation-v1";

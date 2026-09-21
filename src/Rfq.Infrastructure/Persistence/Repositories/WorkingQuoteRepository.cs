@@ -5,7 +5,6 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-
 public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuoteRepository
 {
     public void Add(WorkingQuote workingQuote) =>

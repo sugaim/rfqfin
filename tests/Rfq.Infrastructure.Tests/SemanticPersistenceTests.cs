@@ -52,7 +52,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         }
 
         await using var read = fixture.CreateContext();
-        var feed = new PostgreSqlEventFeed(read, new CurrentUserService(
+        var feed = new EfCoreEventFeed(read, new CurrentUserService(
             new CurrentUser(UserId.Create(salesId), new HashSet<UserRole> { UserRole.Sales },
                 DeskId.Create("jpy-credit"))));
         var item = Assert.Single(await feed.GetAfterAsync(0));
@@ -169,7 +169,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         Assert.Null(restored.SalesId);
         var before = await read.WorkingQuotes.CountAsync();
 
-        var activeQueries = new PostgreSqlActiveRfqQueries(read);
+        var activeQueries = new EfCoreActiveRfqQueries(read);
         await Assert.ThrowsAsync<DomainInvariantException>(
             () => activeQueries.GetTraderAsync(DeskId.Create("jpy-credit")));
 
@@ -207,7 +207,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         }
 
         await using var read = fixture.CreateContext();
-        var queries = new PostgreSqlOperationalQueries(
+        var queries = new EfCoreOperationalQueries(
             read, CurrentSales(), TimeProvider.System);
         var result = await queries.SearchAsync(new PastRfqSearch(
             From: new DateOnly(2026, 9, 21),
@@ -273,7 +273,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         }
 
         await using var read = fixture.CreateContext();
-        var queries = new PostgreSqlOperationalQueries(
+        var queries = new EfCoreOperationalQueries(
             read, CurrentSales(), TimeProvider.System);
         var item = Assert.Single(await queries.GetEodAsync(new DateOnly(2026, 9, 21)));
 

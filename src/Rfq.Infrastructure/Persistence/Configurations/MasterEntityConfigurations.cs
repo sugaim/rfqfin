@@ -15,7 +15,7 @@ internal sealed class PostgreSqlSeedMarkerConfiguration : IEntityTypeConfigurati
     }
 }
 
-internal sealed class PostgreSqlDeskConfiguration : IEntityTypeConfiguration<DeskEntity>
+internal sealed class EfCoreDeskConfiguration : IEntityTypeConfiguration<DeskEntity>
 {
     public void Configure(EntityTypeBuilder<DeskEntity> builder)
     {
@@ -43,7 +43,7 @@ internal sealed class PostgreSqlMasterUserConfiguration : IEntityTypeConfigurati
     }
 }
 
-internal sealed class PostgreSqlCategoryConfiguration : IEntityTypeConfiguration<CategoryEntity>
+internal sealed class EfCoreCategoryConfiguration : IEntityTypeConfiguration<CategoryEntity>
 {
     public void Configure(EntityTypeBuilder<CategoryEntity> builder)
     {
@@ -54,7 +54,7 @@ internal sealed class PostgreSqlCategoryConfiguration : IEntityTypeConfiguration
     }
 }
 
-internal sealed class PostgreSqlCategoryRoutingConfiguration
+internal sealed class EfCoreCategoryRoutingConfiguration
     : IEntityTypeConfiguration<CategoryRoutingEntity>
 {
     public void Configure(EntityTypeBuilder<CategoryRoutingEntity> builder)
@@ -70,7 +70,7 @@ internal sealed class PostgreSqlCategoryRoutingConfiguration
     }
 }
 
-internal sealed class PostgreSqlClientConfiguration : IEntityTypeConfiguration<ClientEntity>
+internal sealed class EfCoreClientConfiguration : IEntityTypeConfiguration<ClientEntity>
 {
     public void Configure(EntityTypeBuilder<ClientEntity> builder)
     {
@@ -83,7 +83,7 @@ internal sealed class PostgreSqlClientConfiguration : IEntityTypeConfiguration<C
     }
 }
 
-internal sealed class PostgreSqlSecurityConfiguration : IEntityTypeConfiguration<SecurityEntity>
+internal sealed class EfCoreSecurityConfiguration : IEntityTypeConfiguration<SecurityEntity>
 {
     public void Configure(EntityTypeBuilder<SecurityEntity> builder)
     {
@@ -104,7 +104,7 @@ internal sealed class PostgreSqlSecurityConfiguration : IEntityTypeConfiguration
     }
 }
 
-internal sealed class PostgreSqlSystemDateConfiguration : IEntityTypeConfiguration<SystemDateEntity>
+internal sealed class EfCoreSystemDateConfiguration : IEntityTypeConfiguration<SystemDateEntity>
 {
     public void Configure(EntityTypeBuilder<SystemDateEntity> builder)
     {

@@ -4,7 +4,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-public sealed class PostgreSqlBusinessDateResolver(RfqDbContext dbContext)
+public sealed class EfCoreBusinessDateResolver(RfqDbContext dbContext)
     : IBusinessDateResolver
 {
     public async Task<DateOnly> ResolveAsync(

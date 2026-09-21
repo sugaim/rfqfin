@@ -4,7 +4,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-public sealed class PostgreSqlActiveRfqQueries(RfqDbContext dbContext) : IActiveRfqQueries
+public sealed class EfCoreActiveRfqQueries(RfqDbContext dbContext) : IActiveRfqQueries
 {
     public async Task<IReadOnlyList<SalesRfqListItem>> GetSalesAsync(
         UserId salesUserId,

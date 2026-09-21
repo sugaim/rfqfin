@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Rfq.Infrastructure;
 
-internal sealed class PostgreSqlEventCursorConfiguration : IEntityTypeConfiguration<EventCursorEntity>
+internal sealed class EfCoreEventCursorConfiguration : IEntityTypeConfiguration<EventCursorEntity>
 {
     public void Configure(EntityTypeBuilder<EventCursorEntity> builder)
     {

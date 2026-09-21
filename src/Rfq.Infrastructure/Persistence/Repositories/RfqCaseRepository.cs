@@ -4,7 +4,6 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-
 public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseRepository
 {
     public void Add(RfqCase rfqCase)

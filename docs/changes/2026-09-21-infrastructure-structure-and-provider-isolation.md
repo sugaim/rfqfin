@@ -23,14 +23,16 @@ existing database schema, HTTP behavior, and Domain model.
   boundaries.
 - Removed Sales/Trader list projections and expiry-candidate retrieval from
   `IRfqCaseRepository`.
-- Added `IActiveRfqQueries` and `IQuoteExpiryQueries`, implemented by dedicated PostgreSQL
+- Added `IActiveRfqQueries` and `IQuoteExpiryQueries`, implemented by dedicated EF Core
   query adapters.
 
 ## PostgreSQL isolation and DI
 
 - Made provider-specific infrastructure explicit through `PostgreSql...` class names for
-  database configuration, unit of work locking, sequence allocation, event feed, queries,
-  time providers, and reset safety validation.
+  database configuration, unit of work locking, sequence allocation, PostgreSQL search and
+  array operations, provider-specific mappings, and reset safety validation.
+- Named provider-neutral event, operational, active-RFQ, expiry, routing, and date adapters
+  with the `EfCore...` prefix.
 - Retained the correctness-critical `FOR UPDATE`, sequence `nextval`, PostgreSQL search
   operators, provider types, and migrations in localized infrastructure code.
 - Kept raw SQL static; normal business reads continue to use EF Core/LINQ.

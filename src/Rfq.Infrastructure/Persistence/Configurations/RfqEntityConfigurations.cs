@@ -9,7 +9,7 @@ internal static class PostgreSqlModelConfiguration
         modelBuilder.HasSequence<long>(PostgreSqlCaseIdGenerator.SequenceName);
 }
 
-internal sealed class PostgreSqlRfqCaseConfiguration : IEntityTypeConfiguration<RfqCaseEntity>
+internal sealed class EfCoreRfqCaseConfiguration : IEntityTypeConfiguration<RfqCaseEntity>
 {
     public void Configure(EntityTypeBuilder<RfqCaseEntity> builder)
     {
@@ -61,7 +61,7 @@ internal sealed class PostgreSqlRfqRevisionConfiguration : IEntityTypeConfigurat
     }
 }
 
-internal sealed class PostgreSqlCaseCurrentConfiguration : IEntityTypeConfiguration<CaseCurrentEntity>
+internal sealed class EfCoreCaseCurrentConfiguration : IEntityTypeConfiguration<CaseCurrentEntity>
 {
     public void Configure(EntityTypeBuilder<CaseCurrentEntity> builder)
     {
@@ -90,7 +90,7 @@ internal sealed class PostgreSqlCaseCurrentConfiguration : IEntityTypeConfigurat
     }
 }
 
-internal sealed class PostgreSqlCaseMemoConfiguration : IEntityTypeConfiguration<CaseMemoEntity>
+internal sealed class EfCoreCaseMemoConfiguration : IEntityTypeConfiguration<CaseMemoEntity>
 {
     public void Configure(EntityTypeBuilder<CaseMemoEntity> builder)
     {

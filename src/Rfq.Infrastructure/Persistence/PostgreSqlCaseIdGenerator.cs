@@ -4,7 +4,6 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-
 public sealed class PostgreSqlCaseIdGenerator(RfqDbContext dbContext) : ICaseIdGenerator
 {
     public const string SequenceName = "rfq_case_id_seq";

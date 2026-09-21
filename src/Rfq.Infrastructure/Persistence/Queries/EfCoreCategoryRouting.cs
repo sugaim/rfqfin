@@ -4,7 +4,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-public sealed class PostgreSqlCategoryRouting(RfqDbContext dbContext) : ICategoryRouting
+public sealed class EfCoreCategoryRouting(RfqDbContext dbContext) : ICategoryRouting
 {
     public async Task<UserId?> GetDefaultAssignedTraderAsync(
         CategoryId categoryId,

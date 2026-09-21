@@ -3,7 +3,7 @@ using Rfq.Application;
 
 namespace Rfq.Infrastructure;
 
-public sealed class PostgreSqlSystemDateProvider(RfqDbContext dbContext) : ISystemDateProvider
+public sealed class EfCoreSystemDateProvider(RfqDbContext dbContext) : ISystemDateProvider
 {
     public async Task<DateOnly> GetTodayAsync(CancellationToken cancellationToken = default)
     {
