@@ -21,7 +21,15 @@ public sealed class RfqsController(
     CorrectRfqOutcome correctRfqOutcome,
     ChangeContactOwner changeContactOwner,
     UpdateSalesMemo updateSalesMemo,
-    UpdateTraderMemo updateTraderMemo) : ControllerBase
+    UpdateTraderMemo updateTraderMemo,
+    SaveAmendment saveAmendment,
+    ConfirmAmendment confirmAmendment,
+    DiscardAmendment discardAmendment,
+    BulkConfirmAmendments bulkConfirmAmendments,
+    BulkDiscardAmendments bulkDiscardAmendments,
+    CreateFromExisting createFromExisting,
+    CancelRfq cancelRfq,
+    ReopenRfq reopenRfq) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<InitialRfqResponse>> Create(
@@ -143,8 +151,87 @@ public sealed class RfqsController(
             item.SalesMemo,
             item.MemoVersion,
             item.Version,
-            item.CreatedAt)));
+            item.CreatedAt,
+            item.DraftRevisionId,
+            item.DraftVersion,
+            item.DraftSettlementDate,
+            item.DraftNotional,
+            item.DraftSalesAndTradingMessage)));
     }
+
+    [HttpPut("{caseId:long}/amendment")]
+    public Task<ActionResult<AmendmentResult>> SaveAmendment(
+        long caseId,
+        SaveAmendmentRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            saveAmendment.ExecuteAsync(new SaveAmendmentCommand(
+                caseId,
+                request.Notional,
+                request.SettlementDate,
+                request.SalesAndTradingMessage,
+                request.ExpectedCurrentVersion,
+                request.ExpectedDraftVersion), cancellationToken));
+
+    [HttpPost("{caseId:long}/amendment/confirm")]
+    public Task<ActionResult<AmendmentResult>> ConfirmAmendment(
+        long caseId,
+        AmendmentActionRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            confirmAmendment.ExecuteAsync(new AmendmentItem(
+                caseId, request.ExpectedCurrentVersion, request.ExpectedDraftVersion),
+                cancellationToken));
+
+    [HttpPost("{caseId:long}/amendment/discard")]
+    public Task<ActionResult<AmendmentResult>> DiscardAmendment(
+        long caseId,
+        AmendmentActionRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            discardAmendment.ExecuteAsync(new AmendmentItem(
+                caseId, request.ExpectedCurrentVersion, request.ExpectedDraftVersion),
+                cancellationToken));
+
+    [HttpPost("amendment/bulk-confirm")]
+    public Task<ActionResult<IReadOnlyList<AmendmentItemResult>>> BulkConfirmAmendment(
+        BulkAmendmentRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            bulkConfirmAmendments.ExecuteAsync(request.Items.Select(ToItem).ToArray(), cancellationToken));
+
+    [HttpPost("amendment/bulk-discard")]
+    public Task<ActionResult<IReadOnlyList<AmendmentItemResult>>> BulkDiscardAmendment(
+        BulkAmendmentRequest request,
+        CancellationToken cancellationToken) => ExecuteCaseActionAsync(() =>
+            bulkDiscardAmendments.ExecuteAsync(request.Items.Select(ToItem).ToArray(), cancellationToken));
+
+    [HttpPost("{caseId:long}/create-from-existing")]
+    public async Task<ActionResult<InitialRfqResponse>> CreateFromExisting(
+        long caseId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await createFromExisting.ExecuteAsync(caseId, cancellationToken);
+            return Created("/api/rfqs/active-sales", ToResponse(result));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return ToProblem(exception);
+        }
+    }
+
+    [HttpPost("{caseId:long}/cancel")]
+    public Task<ActionResult<LifecycleResult>> Cancel(
+        long caseId, LifecycleActionRequest request, CancellationToken cancellationToken) =>
+        ExecuteCaseActionAsync(() => cancelRfq.ExecuteAsync(
+            caseId, request.ExpectedCurrentVersion, cancellationToken));
+
+    [HttpPost("{caseId:long}/reopen")]
+    public Task<ActionResult<LifecycleResult>> Reopen(
+        long caseId, LifecycleActionRequest request, CancellationToken cancellationToken) =>
+        ExecuteCaseActionAsync(() => reopenRfq.ExecuteAsync(
+            caseId, request.ExpectedCurrentVersion, cancellationToken));
+
+    private static AmendmentItem ToItem(AmendmentActionItemRequest item) =>
+        new(item.CaseId, item.ExpectedCurrentVersion, item.ExpectedDraftVersion);
 
     [HttpPost("{caseId:long}/present")]
     public Task<ActionResult<PresentationResult>> Present(
@@ -314,8 +401,23 @@ public sealed class RfqsController(
             InvalidOperationException => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
         };
-        return Problem(statusCode: statusCode, detail: exception.Message);
+        var problem = new ProblemDetails
+        {
+            Status = statusCode,
+            Title = ErrorCode(exception),
+            Detail = exception.Message,
+        };
+        problem.Extensions["code"] = ErrorCode(exception);
+        return StatusCode(statusCode, problem);
     }
+
+    private static string ErrorCode(Exception exception) => exception switch
+    {
+        UnauthorizedAccessException => "Forbidden",
+        KeyNotFoundException => "NotFound",
+        InvalidOperationException => "Conflict",
+        _ => "Validation",
+    };
 }
 
 public sealed record CreateDraftRequest(
@@ -365,6 +467,28 @@ public sealed record UpdateMemoRequest(
     string? Memo,
     [Range(1, long.MaxValue)] long ExpectedVersion);
 
+public sealed record SaveAmendmentRequest(
+    decimal? Notional,
+    DateOnly? SettlementDate,
+    string? SalesAndTradingMessage,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    long? ExpectedDraftVersion);
+
+public sealed record AmendmentActionRequest(
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    [Range(1, long.MaxValue)] long ExpectedDraftVersion);
+
+public sealed record AmendmentActionItemRequest(
+    [Range(1, long.MaxValue)] long CaseId,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    [Range(1, long.MaxValue)] long ExpectedDraftVersion);
+
+public sealed record BulkAmendmentRequest(
+    [Required, MinLength(1)] IReadOnlyList<AmendmentActionItemRequest> Items);
+
+public sealed record LifecycleActionRequest(
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
+
 public sealed record InitialRfqResponse(
     long CaseId,
     Guid RevisionId,
@@ -407,4 +531,9 @@ public sealed record SalesRfqResponse(
     string SalesMemo,
     long MemoVersion,
     long Version,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid? DraftRevisionId,
+    long? DraftVersion,
+    DateOnly? DraftSettlementDate,
+    decimal? DraftNotional,
+    string? DraftSalesAndTradingMessage);

@@ -83,7 +83,9 @@ public sealed class PickUpRfq(
     IRfqCaseRepository rfqCases,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IRfqEventSink? events = null,
+    TimeProvider? timeProvider = null)
 {
     public async Task<OwnershipResult> ExecuteAsync(
         long caseId,
@@ -94,15 +96,24 @@ public sealed class PickUpRfq(
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanPickUp(currentUser.User, rfqCase, confirmed);
         rfqCase.PickUp(currentUser.User.UserId, expectedVersion);
+        Record(events, timeProvider, RfqTransitionKind.PickedUp, rfqCase, currentUser.User.UserId);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
     }
+
+    internal static void Record(IRfqEventSink? events, TimeProvider? timeProvider,
+        RfqTransitionKind kind, RfqCase rfqCase, UserId actor, string? from = null) =>
+        events?.Record(new RfqTransition(kind, rfqCase.CaseId.Value, actor.Value,
+            (timeProvider ?? TimeProvider.System).GetUtcNow(), From: from,
+            To: rfqCase.AssignedTraderId.Value));
 }
 
 public sealed class ReleaseRfq(
     IRfqCaseRepository rfqCases,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IRfqEventSink? events = null,
+    TimeProvider? timeProvider = null)
 {
     public async Task<OwnershipResult> ExecuteAsync(
         long caseId,
@@ -112,6 +123,8 @@ public sealed class ReleaseRfq(
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanRelease(currentUser.User, rfqCase);
         rfqCase.Release(currentUser.User.UserId, expectedVersion);
+        PickUpRfq.Record(events, timeProvider, RfqTransitionKind.Released,
+            rfqCase, currentUser.User.UserId);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
     }
 }
@@ -121,7 +134,9 @@ public sealed class AssignTrader(
     AssignedTraderValidator assignedTraderValidator,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IRfqEventSink? events = null,
+    TimeProvider? timeProvider = null)
 {
     public async Task<OwnershipResult> ExecuteAsync(
         long caseId,
@@ -135,7 +150,10 @@ public sealed class AssignTrader(
             targetTraderId,
             rfqCase.AssignedTraderId.Value,
             cancellationToken);
+        var previous = rfqCase.AssignedTraderId.Value;
         rfqCase.AssignTo(target, expectedVersion);
+        PickUpRfq.Record(events, timeProvider, RfqTransitionKind.AssignedTraderChanged,
+            rfqCase, currentUser.User.UserId, previous);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
     }
 }
@@ -144,7 +162,9 @@ public sealed class TakeOverRfq(
     IRfqCaseRepository rfqCases,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IRfqEventSink? events = null,
+    TimeProvider? timeProvider = null)
 {
     public async Task<OwnershipResult> ExecuteAsync(
         long caseId,
@@ -154,7 +174,10 @@ public sealed class TakeOverRfq(
     {
         var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanTakeOver(currentUser.User, rfqCase, confirmed);
+        var previous = rfqCase.AssignedTraderId.Value;
         rfqCase.TakeOver(currentUser.User.UserId, expectedVersion);
+        PickUpRfq.Record(events, timeProvider, RfqTransitionKind.TakenOver,
+            rfqCase, currentUser.User.UserId, previous);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
     }
 }

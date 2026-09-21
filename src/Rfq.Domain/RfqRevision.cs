@@ -10,6 +10,7 @@ public sealed class RfqRevision
         DateOnly? settlementDate,
         DateOnly standardSettlementDate,
         string salesAndTradingMessage,
+        RevisionId? copiedFromRevisionId,
         RevisionId? quoteSeedRevisionId,
         long version,
         DateTimeOffset createdAt,
@@ -24,6 +25,7 @@ public sealed class RfqRevision
         SettlementDate = settlementDate;
         StandardSettlementDate = standardSettlementDate;
         SalesAndTradingMessage = salesAndTradingMessage;
+        CopiedFromRevisionId = copiedFromRevisionId;
         QuoteSeedRevisionId = quoteSeedRevisionId;
         Version = version;
         CreatedAt = createdAt;
@@ -46,6 +48,8 @@ public sealed class RfqRevision
 
     public string SalesAndTradingMessage { get; private set; }
 
+    public RevisionId? CopiedFromRevisionId { get; }
+
     public RevisionId? QuoteSeedRevisionId { get; }
 
     public long Version { get; private set; }
@@ -65,7 +69,8 @@ public sealed class RfqRevision
         DateOnly standardSettlementDate,
         string? salesAndTradingMessage,
         DateTimeOffset createdAt,
-        UserId createdBy)
+        UserId createdBy,
+        RevisionId? copiedFromRevisionId = null)
     {
         return new RfqRevision(
             RevisionId.New(),
@@ -75,6 +80,7 @@ public sealed class RfqRevision
             settlementDate,
             standardSettlementDate,
             NormalizeMessage(salesAndTradingMessage),
+            copiedFromRevisionId,
             null,
             1,
             createdAt,
@@ -91,6 +97,7 @@ public sealed class RfqRevision
         DateOnly? settlementDate,
         DateOnly standardSettlementDate,
         string salesAndTradingMessage,
+        RevisionId? copiedFromRevisionId,
         RevisionId? quoteSeedRevisionId,
         long version,
         DateTimeOffset createdAt,
@@ -106,6 +113,7 @@ public sealed class RfqRevision
             settlementDate,
             standardSettlementDate,
             salesAndTradingMessage,
+            copiedFromRevisionId,
             quoteSeedRevisionId,
             version,
             createdAt,
@@ -113,6 +121,31 @@ public sealed class RfqRevision
             confirmedAt,
             confirmedBy);
     }
+
+    internal static RfqRevision CreateAmendment(
+        CaseId caseId,
+        decimal? notional,
+        DateOnly? settlementDate,
+        DateOnly standardSettlementDate,
+        string? salesAndTradingMessage,
+        RevisionId copiedFromRevisionId,
+        RevisionId quoteSeedRevisionId,
+        DateTimeOffset createdAt,
+        UserId createdBy) => new(
+            RevisionId.New(),
+            caseId,
+            RevisionStatus.Draft,
+            notional,
+            settlementDate,
+            standardSettlementDate,
+            NormalizeMessage(salesAndTradingMessage),
+            copiedFromRevisionId,
+            quoteSeedRevisionId,
+            1,
+            createdAt.ToUniversalTime(),
+            createdBy,
+            null,
+            null);
 
     internal void UpdateDraft(
         decimal? notional,
@@ -158,6 +191,17 @@ public sealed class RfqRevision
     {
         EnsureDraft(expectedVersion);
         Status = RevisionStatus.Discarded;
+        Version++;
+    }
+
+    internal void Supersede()
+    {
+        if (Status != RevisionStatus.Confirmed)
+        {
+            throw new InvalidOperationException("Only a Confirmed Revision can be Superseded.");
+        }
+
+        Status = RevisionStatus.Superseded;
         Version++;
     }
 

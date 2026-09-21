@@ -16,6 +16,8 @@ public enum QuoteTransitionKind
     Confirmed,
     Presented,
     Unpresented,
+    Withdrawn,
+    Expired,
 }
 
 public sealed record QuoteTransition(

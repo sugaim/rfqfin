@@ -12,7 +12,9 @@ public sealed class InitialRfqFactory(
 {
     public async Task<RfqCase> CreateAsync(
         CreateDraftCommand command,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        CaseId? copiedFromCaseId = null,
+        RevisionId? copiedFromRevisionId = null)
     {
         ArgumentNullException.ThrowIfNull(command);
 
@@ -37,7 +39,9 @@ public sealed class InitialRfqFactory(
             defaults.StandardSettlementDate,
             command.SalesAndTradingMessage,
             currentUser.User.UserId,
-            timeProvider.GetUtcNow());
+            timeProvider.GetUtcNow(),
+            copiedFromCaseId,
+            copiedFromRevisionId);
     }
 }
 

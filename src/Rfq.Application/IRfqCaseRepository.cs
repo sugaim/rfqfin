@@ -17,7 +17,14 @@ public interface IRfqCaseRepository
     Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
         string deskId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ExpiredQuoteCandidate>> GetExpiredQuotesAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ExpiredQuoteCandidate>>([]);
 }
+
+public sealed record ExpiredQuoteCandidate(long CaseId, Guid QuoteId, long CurrentVersion);
 
 public interface IWorkingQuoteEnsurer
 {

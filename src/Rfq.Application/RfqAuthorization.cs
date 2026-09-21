@@ -33,6 +33,8 @@ public interface IRfqAuthorization
     void EnsureCanConfirmQuote(CurrentUser user, RfqCase rfqCase);
 
     void EnsureCanPresent(CurrentUser user, RfqCase rfqCase);
+    void EnsureCanWithdraw(CurrentUser user, RfqCase rfqCase);
+    void EnsureCanCancelOrReopen(CurrentUser user, RfqCase rfqCase);
 
     void EnsureCanClose(CurrentUser user, RfqCase rfqCase);
 
@@ -172,6 +174,20 @@ public sealed class RfqAuthorization : IRfqAuthorization
                 "Only the current Contact Owner can Present or Unpresent the RFQ.");
         }
     }
+
+    public void EnsureCanWithdraw(CurrentUser user, RfqCase rfqCase)
+    {
+        EnsureRole(user, UserRole.Trader);
+        EnsureOpen(rfqCase);
+        if (!rfqCase.Owned || rfqCase.AssignedTraderId != user.UserId)
+        {
+            throw new UnauthorizedAccessException(
+                "Only the owning Trader can withdraw a quote.");
+        }
+    }
+
+    public void EnsureCanCancelOrReopen(CurrentUser user, RfqCase rfqCase) =>
+        EnsureContactOwnerIdentity(user, rfqCase, "change the lifecycle of");
 
     public void EnsureCanClose(CurrentUser user, RfqCase rfqCase)
     {

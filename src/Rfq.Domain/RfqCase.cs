@@ -16,7 +16,8 @@ public sealed class RfqCase
         long currentVersion,
         RfqRevision initialRevision,
         RfqLifecycle lifecycle,
-        RfqRevision? pendingDraftRevision)
+        RfqRevision? pendingDraftRevision,
+        CaseId? copiedFromCaseId)
     {
         CaseId = caseId;
         ClientId = clientId;
@@ -32,6 +33,7 @@ public sealed class RfqCase
         InitialRevision = initialRevision;
         Lifecycle = lifecycle;
         PendingDraftRevision = pendingDraftRevision;
+        CopiedFromCaseId = copiedFromCaseId;
     }
 
     public CaseId CaseId { get; }
@@ -45,6 +47,8 @@ public sealed class RfqCase
     public DateTimeOffset CreatedAt { get; }
 
     public UserId CreatedBy { get; }
+
+    public CaseId? CopiedFromCaseId { get; }
 
     public UserId SalesId { get; }
 
@@ -62,6 +66,8 @@ public sealed class RfqCase
             : RfqStatus.Active
         : Lifecycle is ClosedRfq closed
             ? closed.Outcome
+            : Lifecycle is CancelledRfq
+                ? RfqStatus.Cancelled
             : RfqStatus.Draft;
 
     public QuoteStatus? QuoteStatus => (Lifecycle as OpenRfq)?.QuoteStatus;
@@ -74,9 +80,15 @@ public sealed class RfqCase
 
     public RfqLifecycle Lifecycle { get; private set; }
 
-    public RfqRevision InitialRevision { get; }
+    public RfqRevision InitialRevision { get; private set; }
+
+    public RfqRevision CurrentRevision => InitialRevision;
 
     public RfqRevision? PendingDraftRevision { get; private set; }
+
+    public RfqRevision? PreviousRevision { get; private set; }
+
+    public RfqRevision? DiscardedRevision { get; private set; }
 
     public static RfqCase CreateDraft(
         CaseId caseId,
@@ -89,7 +101,9 @@ public sealed class RfqCase
         DateOnly standardSettlementDate,
         string? salesAndTradingMessage,
         UserId createdBy,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        CaseId? copiedFromCaseId = null,
+        RevisionId? copiedFromRevisionId = null)
     {
         ArgumentNullException.ThrowIfNull(clientId);
         ArgumentNullException.ThrowIfNull(securityId);
@@ -105,7 +119,8 @@ public sealed class RfqCase
             standardSettlementDate,
             salesAndTradingMessage,
             utcCreatedAt,
-            createdBy);
+            createdBy,
+            copiedFromRevisionId);
 
         return new RfqCase(
             caseId,
@@ -121,7 +136,8 @@ public sealed class RfqCase
             1,
             initialRevision,
             new DraftRfq(initialRevision.RevisionId),
-            null);
+            null,
+            copiedFromCaseId);
     }
 
     public static RfqCase Restore(
@@ -138,7 +154,8 @@ public sealed class RfqCase
         long currentVersion,
         RfqRevision initialRevision,
         RfqLifecycle lifecycle,
-        RfqRevision? pendingDraftRevision = null)
+        RfqRevision? pendingDraftRevision = null,
+        CaseId? copiedFromCaseId = null)
     {
         return new RfqCase(
             caseId,
@@ -154,7 +171,8 @@ public sealed class RfqCase
             currentVersion,
             initialRevision,
             lifecycle,
-            pendingDraftRevision);
+            pendingDraftRevision,
+            copiedFromCaseId);
     }
 
     public void UpdateInitialDraft(
@@ -414,6 +432,145 @@ public sealed class RfqCase
                 closed.Outcome),
             _ => Lifecycle,
         };
+    }
+
+    public RfqRevision SaveAmendmentDraft(
+        decimal? notional,
+        DateOnly? settlementDate,
+        string? salesAndTradingMessage,
+        UserId editedBy,
+        DateTimeOffset editedAt,
+        long expectedCurrentVersion,
+        long? expectedDraftVersion = null,
+        RevisionId? copiedFromRevisionId = null,
+        RevisionId? quoteSeedRevisionId = null)
+    {
+        var open = EnsureOpen(expectedCurrentVersion);
+        if (PendingDraftRevision is null)
+        {
+            PendingDraftRevision = RfqRevision.CreateAmendment(
+                CaseId,
+                notional,
+                settlementDate,
+                InitialRevision.StandardSettlementDate,
+                salesAndTradingMessage,
+                copiedFromRevisionId ?? InitialRevision.RevisionId,
+                quoteSeedRevisionId ?? InitialRevision.RevisionId,
+                editedAt,
+                editedBy);
+        }
+        else
+        {
+            if (expectedDraftVersion is null)
+            {
+                throw new ArgumentException(
+                    "Expected Draft Revision version is required.",
+                    nameof(expectedDraftVersion));
+            }
+
+            PendingDraftRevision.UpdateDraft(
+                notional,
+                settlementDate,
+                salesAndTradingMessage,
+                expectedDraftVersion.Value);
+        }
+
+        CurrentVersion++;
+        Lifecycle = CopyOpen(open, open.Status);
+        return PendingDraftRevision;
+    }
+
+    public void ConfirmAmendment(
+        DateOnly systemDate,
+        UserId confirmedBy,
+        DateTimeOffset confirmedAt,
+        long expectedCurrentVersion,
+        long expectedDraftVersion)
+    {
+        var open = EnsureOpen(expectedCurrentVersion);
+        var draft = PendingDraftRevision
+            ?? throw new InvalidOperationException("The RFQ Case has no Draft amendment.");
+        ValidateConfirmation(draft.Notional, draft.SettlementDate, systemDate);
+        InitialRevision.Supersede();
+        draft.Confirm(confirmedAt, confirmedBy, expectedDraftVersion);
+        PreviousRevision = InitialRevision;
+        InitialRevision = draft;
+        PendingDraftRevision = null;
+        CurrentVersion++;
+        Lifecycle = new OpenRfq(
+            draft.RevisionId,
+            ContactOwnerId,
+            AssignedTraderId,
+            Domain.QuoteStatus.Requested,
+            Domain.QuoteRequestReason.Revised,
+            Owned,
+            OpenRfqStatus.Active,
+            null);
+    }
+
+    public void DiscardAmendment(long expectedCurrentVersion, long expectedDraftVersion)
+    {
+        var open = EnsureOpen(expectedCurrentVersion);
+        var draft = PendingDraftRevision
+            ?? throw new InvalidOperationException("The RFQ Case has no Draft amendment.");
+        draft.Discard(expectedDraftVersion);
+        DiscardedRevision = draft;
+        PendingDraftRevision = null;
+        CurrentVersion++;
+        Lifecycle = CopyOpen(open, open.Status);
+    }
+
+    public void WithdrawQuote(long expectedVersion)
+    {
+        var open = EnsureOpen(expectedVersion);
+        if (open.Status == OpenRfqStatus.Presented)
+        {
+            throw new InvalidOperationException("A Presented quote cannot be withdrawn.");
+        }
+        if (open.QuoteStatus != Domain.QuoteStatus.Quoted)
+        {
+            throw new InvalidOperationException("Only a Quoted RFQ can be withdrawn.");
+        }
+        CurrentVersion++;
+        Lifecycle = new OpenRfq(open.CurrentRevisionId, ContactOwnerId, AssignedTraderId,
+            Domain.QuoteStatus.Requested, Domain.QuoteRequestReason.Withdrawn, Owned);
+    }
+
+    public void Cancel(long expectedVersion)
+    {
+        _ = EnsureOpen(expectedVersion);
+        Owned = false;
+        CurrentVersion++;
+        Lifecycle = new CancelledRfq(
+            CurrentRevision.RevisionId, ContactOwnerId, AssignedTraderId);
+    }
+
+    public void Reopen(long expectedVersion)
+    {
+        if (Lifecycle is not CancelledRfq)
+        {
+            throw new InvalidOperationException("Only a Cancelled RFQ can be reopened.");
+        }
+        EnsureCurrentVersion(expectedVersion);
+        Owned = false;
+        CurrentVersion++;
+        Lifecycle = new OpenRfq(CurrentRevision.RevisionId, ContactOwnerId, AssignedTraderId,
+            Domain.QuoteStatus.Requested, Domain.QuoteRequestReason.Reopened, false);
+    }
+
+    public bool ExpireQuote(QuoteId quoteId, long expectedVersion)
+    {
+        if (Lifecycle is not OpenRfq open
+            || open.QuoteStatus != Domain.QuoteStatus.Quoted
+            || open.CurrentQuoteId != quoteId)
+        {
+            return false;
+        }
+        EnsureCurrentVersion(expectedVersion);
+        CurrentVersion++;
+        Lifecycle = new OpenRfq(open.CurrentRevisionId, ContactOwnerId, AssignedTraderId,
+            Domain.QuoteStatus.Requested, Domain.QuoteRequestReason.Expired, Owned);
+        return true;
     }
 
     private void OpenInitialRevision()

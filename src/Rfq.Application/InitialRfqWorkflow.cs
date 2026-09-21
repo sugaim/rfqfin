@@ -61,7 +61,8 @@ public sealed class ConfirmInitialDraft(
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IRfqEventSink? eventSink = null)
 {
     public async Task<InitialRfqResult> ExecuteAsync(
         UpdateInitialDraftCommand command,
@@ -95,6 +96,12 @@ public sealed class ConfirmInitialDraft(
             currentUser.User.UserId,
             now,
             cancellationToken);
+        eventSink?.Record(new RfqTransition(
+            RfqTransitionKind.RevisionConfirmed,
+            rfqCase.CaseId.Value,
+            currentUser.User.UserId.Value,
+            now,
+            To: rfqCase.CurrentRevision.RevisionId.Value.ToString()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return InitialRfqResult.From(rfqCase);
     }
@@ -108,7 +115,8 @@ public sealed class ConfirmNewRfq(
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IRfqEventSink? eventSink = null)
 {
     public async Task<InitialRfqResult> ExecuteAsync(
         CreateDraftCommand command,
@@ -131,6 +139,12 @@ public sealed class ConfirmNewRfq(
             currentUser.User.UserId,
             now,
             cancellationToken);
+        eventSink?.Record(new RfqTransition(
+            RfqTransitionKind.RevisionConfirmed,
+            rfqCase.CaseId.Value,
+            currentUser.User.UserId.Value,
+            now,
+            To: rfqCase.CurrentRevision.RevisionId.Value.ToString()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return InitialRfqResult.From(rfqCase);
     }

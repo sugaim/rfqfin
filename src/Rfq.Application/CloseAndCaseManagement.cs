@@ -8,6 +8,13 @@ public enum RfqTransitionKind
     ClosedAway,
     OutcomeCorrected,
     ContactOwnerChanged,
+    RevisionConfirmed,
+    Cancelled,
+    Reopened,
+    PickedUp,
+    Released,
+    AssignedTraderChanged,
+    TakenOver,
 }
 
 public sealed record RfqTransition(

@@ -202,6 +202,7 @@ public sealed class RfqCaseTests
             new DateOnly(2026, 9, 23),
             "pending amendment",
             null,
+            null,
             1,
             DateTimeOffset.UtcNow,
             sales,
@@ -255,6 +256,70 @@ public sealed class RfqCaseTests
     public void SecurityIdRejectsMissingValue(string value)
     {
         Assert.Throws<ArgumentException>(() => SecurityId.Create(value));
+    }
+
+    [Fact]
+    public void AmendmentKeepsLiveQuoteUntilConfirmedThenSupersedes()
+    {
+        var sales = UserId.Create("sales-1");
+        var rfq = CreateValidDraft(sales);
+        rfq.ConfirmInitial(new DateOnly(2026, 9, 21), sales, DateTimeOffset.UtcNow, 1);
+        var originalRevision = rfq.CurrentRevision;
+        var quoteId = QuoteId.New();
+        rfq.ConfirmQuote(quoteId, originalRevision.RevisionId, rfq.CurrentVersion);
+
+        var draft = rfq.SaveAmendmentDraft(125_000_000m,
+            new DateOnly(2026, 9, 25), "revised", sales, DateTimeOffset.UtcNow,
+            rfq.CurrentVersion);
+
+        Assert.Equal(quoteId, rfq.CurrentQuoteId);
+        Assert.Equal(originalRevision, rfq.CurrentRevision);
+        rfq.ConfirmAmendment(new DateOnly(2026, 9, 21), sales,
+            DateTimeOffset.UtcNow, rfq.CurrentVersion, draft.Version);
+        Assert.Equal(RevisionStatus.Superseded, originalRevision.Status);
+        Assert.Equal(RevisionStatus.Confirmed, rfq.CurrentRevision.Status);
+        Assert.Null(rfq.CurrentQuoteId);
+        Assert.Equal(QuoteRequestReason.Revised, rfq.QuoteRequestReason);
+    }
+
+    [Fact]
+    public void DiscardAmendmentPreservesOperationalState()
+    {
+        var sales = UserId.Create("sales-1");
+        var rfq = CreateValidDraft(sales);
+        rfq.ConfirmInitial(new DateOnly(2026, 9, 21), sales, DateTimeOffset.UtcNow, 1);
+        var quoteId = QuoteId.New();
+        rfq.ConfirmQuote(quoteId, rfq.CurrentRevision.RevisionId, rfq.CurrentVersion);
+        var draft = rfq.SaveAmendmentDraft(125_000_000m,
+            new DateOnly(2026, 9, 25), "revised", sales, DateTimeOffset.UtcNow,
+            rfq.CurrentVersion);
+
+        rfq.DiscardAmendment(rfq.CurrentVersion, draft.Version);
+
+        Assert.Equal(RevisionStatus.Discarded, draft.Status);
+        Assert.Equal(quoteId, rfq.CurrentQuoteId);
+        Assert.Equal(QuoteStatus.Quoted, rfq.QuoteStatus);
+    }
+
+    [Fact]
+    public void WithdrawCancelReopenAndExpiryFollowLifecycleRules()
+    {
+        var sales = UserId.Create("sales-1");
+        var rfq = CreateValidDraft(sales);
+        rfq.ConfirmInitial(new DateOnly(2026, 9, 21), sales, DateTimeOffset.UtcNow, 1);
+        var firstQuote = QuoteId.New();
+        rfq.ConfirmQuote(firstQuote, rfq.CurrentRevision.RevisionId, rfq.CurrentVersion);
+        rfq.WithdrawQuote(rfq.CurrentVersion);
+        Assert.Equal(QuoteRequestReason.Withdrawn, rfq.QuoteRequestReason);
+        rfq.Cancel(rfq.CurrentVersion);
+        Assert.Equal(RfqStatus.Cancelled, rfq.Status);
+        rfq.Reopen(rfq.CurrentVersion);
+        Assert.Equal(QuoteRequestReason.Reopened, rfq.QuoteRequestReason);
+        var secondQuote = QuoteId.New();
+        rfq.ConfirmQuote(secondQuote, rfq.CurrentRevision.RevisionId, rfq.CurrentVersion);
+        Assert.True(rfq.ExpireQuote(secondQuote, rfq.CurrentVersion));
+        Assert.False(rfq.ExpireQuote(secondQuote, rfq.CurrentVersion));
+        Assert.Equal(QuoteRequestReason.Expired, rfq.QuoteRequestReason);
     }
 
     private static RfqCase CreateValidDraft(UserId creator) => RfqCase.CreateDraft(

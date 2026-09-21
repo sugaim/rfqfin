@@ -25,7 +25,12 @@ public sealed record SalesRfqListItem(
     string SalesMemo,
     long MemoVersion,
     long Version,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid? DraftRevisionId,
+    long? DraftVersion,
+    DateOnly? DraftSettlementDate,
+    decimal? DraftNotional,
+    string? DraftSalesAndTradingMessage);
 
 public sealed class GetActiveSalesRfqs(
     IRfqCaseRepository rfqCases,

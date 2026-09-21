@@ -16,7 +16,9 @@ public sealed class TraderRfqsController(
     CalculateWorkingQuote calculateWorkingQuote,
     ChangeWorkingQuoteMode changeWorkingQuoteMode,
     UpdateManualWorkingQuote updateManualWorkingQuote,
-    ConfirmQuote confirmQuote) : ControllerBase
+    ConfirmQuote confirmQuote,
+    WithdrawQuote withdrawQuote,
+    BulkWithdrawQuotes bulkWithdrawQuotes) : ControllerBase
 {
     [HttpGet("active")]
     public async Task<ActionResult<IReadOnlyList<TraderRfqListItem>>> GetActive(
@@ -135,7 +137,26 @@ public sealed class TraderRfqsController(
                 request.ExpiryMinutes,
                 request.ExpectedCurrentVersion,
                 request.ExpectedWorkingQuoteVersion,
-                cancellationToken));
+            cancellationToken));
+
+    [HttpPost("{caseId:long}/withdraw")]
+    public Task<ActionResult<LifecycleResult>> Withdraw(
+        long caseId, OwnershipRequest request, CancellationToken cancellationToken) =>
+        ExecuteLifecycleAsync(() => withdrawQuote.ExecuteAsync(
+            caseId, request.ExpectedVersion, cancellationToken));
+
+    [HttpPost("bulk-withdraw")]
+    public Task<ActionResult<IReadOnlyList<LifecycleItemResult>>> BulkWithdraw(
+        BulkLifecycleRequest request, CancellationToken cancellationToken) =>
+        ExecuteLifecycleAsync(() => bulkWithdrawQuotes.ExecuteAsync(
+            request.Items.Select(item => new LifecycleItem(
+                item.CaseId, item.ExpectedCurrentVersion)).ToArray(), cancellationToken));
+
+    private async Task<ActionResult<T>> ExecuteLifecycleAsync<T>(Func<Task<T>> action)
+    {
+        try { return Ok(await action()); }
+        catch (Exception exception) when (IsExpected(exception)) { return ToProblem(exception); }
+    }
 
     private async Task<ActionResult<OwnershipResult>> ExecuteAsync(
         Func<Task<OwnershipResult>> action)
@@ -166,6 +187,7 @@ public sealed class TraderRfqsController(
                 Detail = exception.Message,
             };
             problem.Extensions["code"] = exception.Code;
+            problem.Extensions["category"] = "CalculationFailure";
             problem.Extensions["failureLogId"] = exception.FailureLogId;
             return UnprocessableEntity(problem);
         }
@@ -203,7 +225,16 @@ public sealed class TraderRfqsController(
             InvalidOperationException => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
         };
-        return Problem(statusCode: statusCode, detail: exception.Message);
+        var code = exception switch
+        {
+            UnauthorizedAccessException => "Forbidden",
+            KeyNotFoundException => "NotFound",
+            InvalidOperationException => "Conflict",
+            _ => "Validation",
+        };
+        var problem = new ProblemDetails { Status = statusCode, Title = code, Detail = exception.Message };
+        problem.Extensions["code"] = code;
+        return StatusCode(statusCode, problem);
     }
 }
 
@@ -240,3 +271,10 @@ public sealed record ConfirmQuoteRequest(
     [Range(1, int.MaxValue)] int? ExpiryMinutes,
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
     [Range(1, long.MaxValue)] long ExpectedWorkingQuoteVersion);
+
+public sealed record LifecycleItemRequest(
+    [Range(1, long.MaxValue)] long CaseId,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
+
+public sealed record BulkLifecycleRequest(
+    [Required, MinLength(1)] IReadOnlyList<LifecycleItemRequest> Items);

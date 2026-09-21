@@ -65,7 +65,21 @@ export interface SalesRfq {
   memoVersion: number
   version: number
   createdAt: string
+  draftRevisionId?: string | null
+  draftVersion?: number | null
+  draftSettlementDate?: string | null
+  draftNotional?: number | null
+  draftSalesAndTradingMessage?: string | null
 }
+
+export interface AmendmentResult { caseId: number; currentRevisionId: string; draftRevisionId: string | null; currentVersion: number; draftVersion: number | null; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null }
+export interface AmendmentItemResult { caseId: number; result: string; error: string | null }
+export interface LifecycleResult { caseId: number; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null; currentVersion: number }
+export interface PersistedEvent { eventId: number; occurredAt: string; actorUserId: string | null; caseId: number; kind: string; type: string; payloadJson: string }
+export interface EodSummary { contactOwnerId: string; open: number; hit: number; away: number }
+export interface PastRfq { caseId: number; createdAt: string; clientId: string; clientName: string; securityId: string; securityName: string; categoryId: string; status: string; quoteStatus: string | null; contactOwnerId: string; salesId: string; assignedTraderId: string; notional: number | null; settlementDate: string | null }
+export interface PastRfqResult { items: PastRfq[]; requiresNarrowing: boolean }
+export interface GridConfig { screenId: string; configKey: string; version: number; configJson: string; updatedAt: string }
 
 export interface SecuritySearchResult {
   securityId: string
@@ -254,6 +268,11 @@ export const api = createApi({
     getActiveSalesRfqs: builder.query<SalesRfq[], void>({
       query: () => '/rfqs/active-sales',
     }),
+    getEvents: builder.query<PersistedEvent[], number>({ query: (after) => ({ url: '/events', params: { after } }) }),
+    getEod: builder.query<EodSummary[], string>({ query: (date) => ({ url: '/operations/eod', params: { date } }) }),
+    searchPastRfqs: builder.query<PastRfqResult, void>({ query: () => '/operations/past-rfqs' }),
+    getGridConfig: builder.query<GridConfig, { screenId: string; configKey: string }>({ query: ({ screenId, configKey }) => `/operations/grid-config/${screenId}/${configKey}` }),
+    saveGridConfig: builder.mutation<GridConfig, { screenId: string; configKey: string; version: number; configJson: string }>({ query: ({ screenId, configKey, ...body }) => ({ url: `/operations/grid-config/${screenId}/${configKey}`, method: 'PUT', body }) }),
     createDraft: builder.mutation<InitialRfqResponse, CreateDraftRequest>({
       query: (body) => ({
         url: '/rfqs',
@@ -490,6 +509,22 @@ export const api = createApi({
         body,
       }),
     }),
+    saveAmendment: builder.mutation<AmendmentResult, { caseId: number; notional: number | null; settlementDate: string | null; salesAndTradingMessage: string; expectedCurrentVersion: number; expectedDraftVersion: number | null }>({
+      query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/amendment`, method: 'PUT', body }),
+    }),
+    confirmAmendment: builder.mutation<AmendmentResult, { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }>({
+      query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/amendment/confirm`, method: 'POST', body }),
+    }),
+    discardAmendment: builder.mutation<AmendmentResult, { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }>({
+      query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/amendment/discard`, method: 'POST', body }),
+    }),
+    bulkConfirmAmendments: builder.mutation<AmendmentItemResult[], { items: { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }[] }>({ query: (body) => ({ url: '/rfqs/amendment/bulk-confirm', method: 'POST', body }) }),
+    bulkDiscardAmendments: builder.mutation<AmendmentItemResult[], { items: { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }[] }>({ query: (body) => ({ url: '/rfqs/amendment/bulk-discard', method: 'POST', body }) }),
+    createFromExisting: builder.mutation<InitialRfqResponse, number>({ query: (caseId) => ({ url: `/rfqs/${caseId}/create-from-existing`, method: 'POST' }) }),
+    cancelRfq: builder.mutation<LifecycleResult, { caseId: number; expectedCurrentVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/cancel`, method: 'POST', body }) }),
+    reopenRfq: builder.mutation<LifecycleResult, { caseId: number; expectedCurrentVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/reopen`, method: 'POST', body }) }),
+    withdrawQuote: builder.mutation<LifecycleResult, { caseId: number; expectedVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/trader/rfqs/${caseId}/withdraw`, method: 'POST', body }) }),
+    scratchPrice: builder.mutation<CalculatedQuotePayload, { securityId: string; settlementDate: string; driver: string; value: number; simpleYieldSlide: number }>({ query: (body) => ({ url: '/operations/pricer', method: 'POST', body }) }),
     searchClients: builder.query<ClientSearchResult[], string>({
       query: (q) => ({ url: '/masters/clients/search', params: { q } }),
       keepUnusedDataFor: 0,
@@ -514,6 +549,9 @@ export const api = createApi({
 export const {
   useAssignTraderMutation,
   useBulkCloseRfqsMutation,
+  useBulkConfirmAmendmentsMutation,
+  useBulkDiscardAmendmentsMutation,
+  useCancelRfqMutation,
   useCalculateWorkingQuoteMutation,
   useChangeContactOwnerMutation,
   useChangeWorkingQuoteModeMutation,
@@ -522,8 +560,20 @@ export const {
   useConfirmDraftMutation,
   useConfirmNewRfqMutation,
   useCreateDraftMutation,
+  useCreateFromExistingMutation,
   useCorrectRfqOutcomeMutation,
   useDiscardDraftMutation,
+  useDiscardAmendmentMutation,
+  useConfirmAmendmentMutation,
+  useSaveAmendmentMutation,
+  useReopenRfqMutation,
+  useWithdrawQuoteMutation,
+  useScratchPriceMutation,
+  useGetEodQuery,
+  useGetEventsQuery,
+  useSearchPastRfqsQuery,
+  useGetGridConfigQuery,
+  useSaveGridConfigMutation,
   useGetActiveTraderRfqsQuery,
   useGetActiveSalesRfqsQuery,
   useGetCurrentUserQuery,

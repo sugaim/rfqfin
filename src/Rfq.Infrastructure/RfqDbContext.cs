@@ -36,6 +36,12 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
     internal DbSet<CalculationFailureLogEntity> CalculationFailureLogs =>
         Set<CalculationFailureLogEntity>();
 
+    internal DbSet<EventCursorEntity> EventCursors => Set<EventCursorEntity>();
+    internal DbSet<EventEntity> Events => Set<EventEntity>();
+    internal DbSet<RfqEventEntity> RfqEvents => Set<RfqEventEntity>();
+    internal DbSet<QuoteEventEntity> QuoteEvents => Set<QuoteEventEntity>();
+    internal DbSet<UserGridConfigEntity> UserGridConfigs => Set<UserGridConfigEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasSequence<long>(PostgreSqlCaseIdGenerator.SequenceName);
@@ -74,6 +80,12 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
         rfqCase.Property(entity => entity.SalesId)
             .HasColumnName("sales_id")
             .HasMaxLength(100);
+        rfqCase.Property(entity => entity.CopiedFromCaseId)
+            .HasColumnName("copied_from_case_id");
+        rfqCase.HasOne<RfqCaseEntity>()
+            .WithMany()
+            .HasForeignKey(entity => entity.CopiedFromCaseId)
+            .OnDelete(DeleteBehavior.Restrict);
         rfqCase.HasIndex(entity => new { entity.SalesId, entity.CreatedAt })
             .HasDatabaseName("ix_rfq_cases_sales_id_created_at");
 
@@ -111,6 +123,8 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .HasColumnName("sales_and_trading_message");
         revision.Property(entity => entity.QuoteSeedRevisionId)
             .HasColumnName("quote_seed_revision_id");
+        revision.Property(entity => entity.CopiedFromRevisionId)
+            .HasColumnName("copied_from_revision_id");
         revision.Property(entity => entity.ConfirmedAt)
             .HasColumnName("confirmed_at")
             .HasColumnType("timestamp with time zone");
@@ -128,6 +142,10 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
         revision.HasOne<RfqRevisionEntity>()
             .WithMany()
             .HasForeignKey(entity => entity.QuoteSeedRevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        revision.HasOne<RfqRevisionEntity>()
+            .WithMany()
+            .HasForeignKey(entity => entity.CopiedFromRevisionId)
             .OnDelete(DeleteBehavior.Restrict);
 
         var current = modelBuilder.Entity<CaseCurrentEntity>();
@@ -460,6 +478,52 @@ public sealed class RfqDbContext(DbContextOptions<RfqDbContext> options) : DbCon
             .OnDelete(DeleteBehavior.Cascade);
         calculationFailure.HasIndex(entity => new { entity.CaseId, entity.OccurredAt })
             .HasDatabaseName("ix_calculation_failure_logs_case_id_occurred_at");
+
+        var eventCursor = modelBuilder.Entity<EventCursorEntity>();
+        eventCursor.ToTable("event_cursors");
+        eventCursor.HasKey(entity => entity.CursorKey);
+        eventCursor.Property(entity => entity.CursorKey).HasColumnName("cursor_key").HasMaxLength(30);
+        eventCursor.Property(entity => entity.LastEventId).HasColumnName("last_event_id");
+        eventCursor.HasData(new EventCursorEntity { CursorKey = "global", LastEventId = 0 });
+
+        var eventEntity = modelBuilder.Entity<EventEntity>();
+        eventEntity.ToTable("events");
+        eventEntity.HasKey(entity => entity.EventId);
+        eventEntity.Property(entity => entity.EventId).HasColumnName("event_id").ValueGeneratedNever();
+        eventEntity.Property(entity => entity.OccurredAt).HasColumnName("occurred_at").HasColumnType("timestamp with time zone");
+        eventEntity.Property(entity => entity.ActorUserId).HasColumnName("actor_user_id").HasMaxLength(100);
+
+        var rfqEvent = modelBuilder.Entity<RfqEventEntity>();
+        rfqEvent.ToTable("rfq_events");
+        rfqEvent.HasKey(entity => entity.EventId);
+        rfqEvent.Property(entity => entity.EventId).HasColumnName("event_id").ValueGeneratedNever();
+        rfqEvent.Property(entity => entity.CaseId).HasColumnName("case_id");
+        rfqEvent.Property(entity => entity.Type).HasColumnName("type").HasMaxLength(100);
+        rfqEvent.Property(entity => entity.PayloadJson).HasColumnName("payload").HasColumnType("jsonb");
+        rfqEvent.HasOne(entity => entity.Event).WithOne().HasForeignKey<RfqEventEntity>(entity => entity.EventId).OnDelete(DeleteBehavior.Cascade);
+        rfqEvent.HasOne<RfqCaseEntity>().WithMany().HasForeignKey(entity => entity.CaseId).OnDelete(DeleteBehavior.Cascade);
+
+        var quoteEvent = modelBuilder.Entity<QuoteEventEntity>();
+        quoteEvent.ToTable("quote_events");
+        quoteEvent.HasKey(entity => entity.EventId);
+        quoteEvent.Property(entity => entity.EventId).HasColumnName("event_id").ValueGeneratedNever();
+        quoteEvent.Property(entity => entity.CaseId).HasColumnName("case_id");
+        quoteEvent.Property(entity => entity.QuoteId).HasColumnName("quote_id");
+        quoteEvent.Property(entity => entity.Type).HasColumnName("type").HasMaxLength(100);
+        quoteEvent.Property(entity => entity.PayloadJson).HasColumnName("payload").HasColumnType("jsonb");
+        quoteEvent.HasOne(entity => entity.Event).WithOne().HasForeignKey<QuoteEventEntity>(entity => entity.EventId).OnDelete(DeleteBehavior.Cascade);
+        quoteEvent.HasOne<RfqCaseEntity>().WithMany().HasForeignKey(entity => entity.CaseId).OnDelete(DeleteBehavior.Cascade);
+        quoteEvent.HasOne<ConfirmedQuoteEntity>().WithMany().HasForeignKey(entity => entity.QuoteId).OnDelete(DeleteBehavior.Cascade);
+
+        var gridConfig = modelBuilder.Entity<UserGridConfigEntity>();
+        gridConfig.ToTable("user_grid_configs");
+        gridConfig.HasKey(entity => new { entity.UserId, entity.ScreenId, entity.ConfigKey });
+        gridConfig.Property(entity => entity.UserId).HasColumnName("user_id").HasMaxLength(100);
+        gridConfig.Property(entity => entity.ScreenId).HasColumnName("screen_id").HasMaxLength(100);
+        gridConfig.Property(entity => entity.ConfigKey).HasColumnName("config_key").HasMaxLength(100);
+        gridConfig.Property(entity => entity.Version).HasColumnName("version");
+        gridConfig.Property(entity => entity.ConfigJson).HasColumnName("config_json").HasColumnType("jsonb");
+        gridConfig.Property(entity => entity.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone");
     }
 }
 
@@ -478,6 +542,8 @@ internal sealed class RfqCaseEntity
     public string CreatedBy { get; set; } = string.Empty;
 
     public string SalesId { get; set; } = string.Empty;
+
+    public long? CopiedFromCaseId { get; set; }
 
     public List<RfqRevisionEntity> Revisions { get; set; } = [];
 
@@ -558,6 +624,8 @@ internal sealed class RfqRevisionEntity
 
     public Guid? QuoteSeedRevisionId { get; set; }
 
+    public Guid? CopiedFromRevisionId { get; set; }
+
     public DateTimeOffset? ConfirmedAt { get; set; }
 
     public string? ConfirmedBy { get; set; }
@@ -632,4 +700,46 @@ internal sealed class CalculationFailureLogEntity
     public string ErrorMessage { get; set; } = string.Empty;
 
     public DateTimeOffset OccurredAt { get; set; }
+}
+
+internal sealed class EventCursorEntity
+{
+    public string CursorKey { get; set; } = string.Empty;
+    public long LastEventId { get; set; }
+}
+
+internal sealed class EventEntity
+{
+    public long EventId { get; set; }
+    public DateTimeOffset OccurredAt { get; set; }
+    public string? ActorUserId { get; set; }
+}
+
+internal sealed class RfqEventEntity
+{
+    public long EventId { get; set; }
+    public long CaseId { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string PayloadJson { get; set; } = "{}";
+    public EventEntity Event { get; set; } = null!;
+}
+
+internal sealed class QuoteEventEntity
+{
+    public long EventId { get; set; }
+    public long CaseId { get; set; }
+    public Guid QuoteId { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string PayloadJson { get; set; } = "{}";
+    public EventEntity Event { get; set; } = null!;
+}
+
+internal sealed class UserGridConfigEntity
+{
+    public string UserId { get; set; } = string.Empty;
+    public string ScreenId { get; set; } = string.Empty;
+    public string ConfigKey { get; set; } = string.Empty;
+    public int Version { get; set; }
+    public string ConfigJson { get; set; } = "{}";
+    public DateTimeOffset UpdatedAt { get; set; }
 }

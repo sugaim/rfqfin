@@ -4,6 +4,11 @@ public abstract record RfqLifecycle;
 
 public sealed record DraftRfq(RevisionId CurrentRevisionId) : RfqLifecycle;
 
+public sealed record CancelledRfq(
+    RevisionId CurrentRevisionId,
+    UserId ContactOwnerId,
+    UserId AssignedTraderId) : RfqLifecycle;
+
 public sealed record ClosedRfq : RfqLifecycle
 {
     public ClosedRfq(
@@ -120,6 +125,7 @@ public enum RfqLifecycleKind
 {
     Draft,
     Open,
+    Cancelled,
     Closed,
 }
 

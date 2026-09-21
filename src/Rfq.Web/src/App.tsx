@@ -1,9 +1,15 @@
-import { useMemo, useState, type ReactNode } from 'react'
-import { Alert, AutoComplete, Button, Card, Form, Input, InputNumber, Layout, Menu, Popconfirm, Select, Space, Spin, Tag, Typography, message } from 'antd'
-import type { CellEditRequestEvent, ColDef, RowClickedEvent } from 'ag-grid-community'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Alert, AutoComplete, Button, Card, Drawer, Form, Input, InputNumber, Layout, Menu, Popconfirm, Select, Space, Spin, Tag, Typography, message } from 'antd'
+import type { CellEditRequestEvent, ColDef, GridApi, RowClickedEvent } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
 import {
   useAssignTraderMutation,
+  useBulkConfirmAmendmentsMutation, useBulkDiscardAmendmentsMutation,
+  useCancelRfqMutation, useConfirmAmendmentMutation, useCreateFromExistingMutation,
+  useDiscardAmendmentMutation, useGetEodQuery, useGetEventsQuery, useReopenRfqMutation,
+  useSaveAmendmentMutation, useSearchPastRfqsQuery, useWithdrawQuoteMutation,
+  useScratchPriceMutation,
+  useGetGridConfigQuery, useSaveGridConfigMutation,
   useBulkCloseRfqsMutation, useCalculateWorkingQuoteMutation, useChangeContactOwnerMutation,
   useChangeWorkingQuoteModeMutation, useCloseRfqMutation,
   useConfirmDraftMutation, useConfirmNewRfqMutation, useConfirmQuoteMutation, useCorrectRfqOutcomeMutation, useCreateDraftMutation,
@@ -43,6 +49,8 @@ export interface AppShellProps {
   currentUserId?: string
   onNavigate?: (view: string) => void
   onIdentityChange?: (userId: string) => void
+  pendingUpdates?: number
+  onRefreshUpdates?: () => void
 }
 
 export function AppShell({
@@ -53,6 +61,8 @@ export function AppShell({
   currentUserId = 'sales-dev',
   onNavigate,
   onIdentityChange,
+  pendingUpdates = 0,
+  onRefreshUpdates,
 }: AppShellProps) {
   const healthPresentation = {
     checking: { color: 'processing', text: 'API checking' },
@@ -78,6 +88,7 @@ export function AppShell({
           style={{ width: 130 }}
         />
         {systemDate && <Tag color="blue">System Date: {systemDate}</Tag>}
+        {pendingUpdates > 0 && <Button size="small" type="primary" onClick={onRefreshUpdates}>Updates Available ({pendingUpdates})</Button>}
         <Tag color={healthPresentation.color}>{healthPresentation.text}</Tag>
       </Layout.Header>
       <Layout.Content className="app-content">
@@ -120,6 +131,16 @@ export interface SalesScreenProps {
   onChangeContactOwner: (caseId: number, targetUserId: string, expectedCurrentVersion: number) => Promise<void>
   onUpdateMemo: (caseId: number, memo: string, expectedVersion: number) => Promise<void>
   onReload: () => void | Promise<unknown>
+  onSaveAmendment?: (row: SalesRfq, notional: number | null, settlementDate: string | null, message: string) => Promise<void>
+  onConfirmAmendment?: (row: SalesRfq) => Promise<void>
+  onDiscardAmendment?: (row: SalesRfq) => Promise<void>
+  onCreateFromExisting?: (caseId: number) => Promise<void>
+  onCancel?: (row: SalesRfq) => Promise<void>
+  onReopen?: (row: SalesRfq) => Promise<void>
+  onBulkConfirmAmendments?: (rows: SalesRfq[]) => Promise<void>
+  onBulkDiscardAmendments?: (rows: SalesRfq[]) => Promise<void>
+  gridConfigJson?: string
+  onSaveGridConfig?: (configJson: string) => Promise<void>
 }
 
 export function SalesScreen(props: SalesScreenProps) {
@@ -128,6 +149,10 @@ export function SalesScreen(props: SalesScreenProps) {
     onClientSearch, onSecuritySearch, onResolveDefaults, onCreate, onUpdate,
     onConfirmNew, onConfirmDraft, onDiscard, onPresent, onUnpresent, onClose,
     onBulkClose, onCorrectOutcome, onChangeContactOwner, onUpdateMemo, onReload,
+    onSaveAmendment, onConfirmAmendment, onDiscardAmendment, onCreateFromExisting,
+    onCancel, onReopen,
+    onBulkConfirmAmendments, onBulkDiscardAmendments,
+    gridConfigJson, onSaveGridConfig,
   } = props
   const [form] = Form.useForm<RfqFormValues>()
   const [editingDraft, setEditingDraft] = useState<SalesRfq | null>(null)
@@ -138,6 +163,7 @@ export function SalesScreen(props: SalesScreenProps) {
   const [actionError, setActionError] = useState<string | null>(null)
   const [defaultsError, setDefaultsError] = useState(false)
   const [isResolvingDefaults, setIsResolvingDefaults] = useState(false)
+  const [salesGridApi, setSalesGridApi] = useState<GridApi<SalesRfq> | null>(null)
   const columns = useMemo<ColDef<SalesRfq>[]>(() => [
     { field: 'caseId', headerName: 'Case ID', minWidth: 110 },
     { field: 'clientId', headerName: 'Client ID', minWidth: 130 },
@@ -150,13 +176,28 @@ export function SalesScreen(props: SalesScreenProps) {
       field: 'notional',
       headerName: 'Notional (MM)',
       minWidth: 140,
+      valueGetter: ({ data }) => data?.draftNotional ?? data?.notional,
       valueFormatter: ({ value }) =>
         value === null || value === undefined
           ? ''
           : (Number(value) / million).toLocaleString(),
+      editable: ({ data }) => data?.rfqStatus === 'Active' || data?.rfqStatus === 'Presented',
+      cellEditor: 'agNumberCellEditor',
+      cellClass: ({ data }) => data?.draftNotional != null ? 'amendment-changed-cell' : undefined,
     },
     { field: 'assignedTraderId', headerName: 'Trader', minWidth: 130 },
-    { field: 'settlementDate', headerName: 'Settlement', minWidth: 130 },
+    {
+      field: 'settlementDate', headerName: 'Settlement', minWidth: 130,
+      valueGetter: ({ data }) => data?.draftSettlementDate ?? data?.settlementDate,
+      editable: ({ data }) => data?.rfqStatus === 'Active' || data?.rfqStatus === 'Presented',
+      cellClass: ({ data }) => data?.draftSettlementDate != null ? 'amendment-changed-cell' : undefined,
+    },
+    {
+      field: 'salesAndTradingMessage', headerName: 'Message', minWidth: 180,
+      valueGetter: ({ data }) => data?.draftSalesAndTradingMessage ?? data?.salesAndTradingMessage,
+      editable: ({ data }) => data?.rfqStatus === 'Active' || data?.rfqStatus === 'Presented',
+      cellClass: ({ data }) => data?.draftSalesAndTradingMessage != null ? 'amendment-changed-cell' : undefined,
+    },
     { field: 'rfqStatus', headerName: 'RFQ Status', minWidth: 130 },
     { field: 'revisionStatus', headerName: 'Revision', minWidth: 120 },
     { field: 'quoteStatus', headerName: 'Quote Status', minWidth: 130 },
@@ -188,6 +229,13 @@ export function SalesScreen(props: SalesScreenProps) {
       setIsResolvingDefaults(false)
     }
   }
+
+  useEffect(() => {
+    if (!salesGridApi || !gridConfigJson) return
+    try {
+      salesGridApi.applyColumnState({ state: JSON.parse(gridConfigJson), applyOrder: true })
+    } catch { /* ignore obsolete/invalid local layout */ }
+  }, [salesGridApi, gridConfigJson])
 
   const toCreateRequest = (values: RfqFormValues): CreateDraftRequest => ({
     clientId: values.clientId,
@@ -224,6 +272,8 @@ export function SalesScreen(props: SalesScreenProps) {
       await finishAction()
     } catch {
       setActionError('The RFQ action could not be completed. Reload and try again.')
+      void message.error('Conflict or validation error. The latest RFQ has been reloaded.')
+      await onReload()
     }
   }
 
@@ -320,6 +370,18 @@ export function SalesScreen(props: SalesScreenProps) {
     } catch {
       setActionError('The bulk close could not be completed. Reload and try again.')
     }
+  }
+
+  const editAmendment = async (event: CellEditRequestEvent<SalesRfq>) => {
+    if (!event.data || !onSaveAmendment) return
+    const field = event.colDef.field
+    const row = event.data
+    await runAction(() => onSaveAmendment(
+      row,
+      field === 'notional' ? Number(event.newValue) * million : row.draftNotional ?? row.notional,
+      field === 'settlementDate' ? String(event.newValue) : row.draftSettlementDate ?? row.settlementDate,
+      field === 'salesAndTradingMessage' ? String(event.newValue ?? '') : row.draftSalesAndTradingMessage ?? row.salesAndTradingMessage,
+    ))
   }
 
   return (
@@ -433,6 +495,14 @@ export function SalesScreen(props: SalesScreenProps) {
               <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Away</Button>
             </Popconfirm>
             <Button onClick={() => void onReload()}>Reload</Button>
+            <Button disabled={!salesGridApi || !onSaveGridConfig} onClick={() => salesGridApi && onSaveGridConfig && void onSaveGridConfig(JSON.stringify(salesGridApi.getColumnState()))}>Save Layout</Button>
+            <Button disabled={!selectedRfq || !onCreateFromExisting} onClick={() => selectedRfq && void runAction(() => onCreateFromExisting!(selectedRfq.caseId))}>Create New from Existing</Button>
+            <Button disabled={!selectedRfq?.draftRevisionId || !onConfirmAmendment} onClick={() => selectedRfq && void runAction(() => onConfirmAmendment!(selectedRfq))}>Confirm Amendment</Button>
+            <Button disabled={!selectedRfq?.draftRevisionId || !onDiscardAmendment} onClick={() => selectedRfq && void runAction(() => onDiscardAmendment!(selectedRfq))}>Discard Amendment</Button>
+            <Button disabled={!onBulkConfirmAmendments || !selectedRows.some((row) => row.draftRevisionId)} onClick={() => void runAction(() => onBulkConfirmAmendments!(selectedRows.filter((row) => row.draftRevisionId)))}>Confirm Selected</Button>
+            <Button disabled={!onBulkDiscardAmendments || !selectedRows.some((row) => row.draftRevisionId)} onClick={() => void runAction(() => onBulkDiscardAmendments!(selectedRows.filter((row) => row.draftRevisionId)))}>Discard Selected</Button>
+            <Button danger disabled={!selectedRfq || !onCancel || !['Active','Presented'].includes(selectedRfq.rfqStatus)} onClick={() => selectedRfq && void runAction(() => onCancel!(selectedRfq))}>Cancel</Button>
+            <Button disabled={!selectedRfq || !onReopen || selectedRfq.rfqStatus !== 'Cancelled'} onClick={() => selectedRfq && void runAction(() => onReopen!(selectedRfq))}>Reopen</Button>
           </Space>
         )}
       >
@@ -441,10 +511,13 @@ export function SalesScreen(props: SalesScreenProps) {
           <div className="rfq-grid" data-testid="rfq-grid">
             <AgGridReact<SalesRfq>
               rowData={rfqs}
+              onGridReady={({ api: gridApi }) => setSalesGridApi(gridApi)}
               columnDefs={columns}
               getRowId={({ data }) => String(data.caseId)}
               onRowClicked={editSelectedDraft}
               onSelectionChanged={({ api: gridApi }) => setSelectedRows(gridApi.getSelectedRows())}
+              readOnlyEdit
+              onCellEditRequest={(event) => void editAmendment(event)}
               rowSelection={{ mode: 'multiRow' }}
               rowClassRules={{ 'editable-draft-row': ({ data }) => data?.revisionStatus === 'Draft' }}
               defaultColDef={{ sortable: true, filter: true, resizable: true }}
@@ -541,6 +614,8 @@ export interface TraderScreenProps {
   onCorrectOutcome: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
   onChangeContactOwner: (caseId: number, targetUserId: string, expectedCurrentVersion: number) => Promise<void>
   onUpdateMemo: (caseId: number, memo: string, expectedVersion: number) => Promise<void>
+  onWithdraw?: (row: TraderRfq) => Promise<void>
+  onScratchPrice?: (input: { securityId: string; settlementDate: string; driver: string; value: number; simpleYieldSlide: number }) => Promise<unknown>
   onReload: () => void | Promise<unknown>
 }
 
@@ -566,6 +641,8 @@ export function TraderScreen({
   onCorrectOutcome,
   onChangeContactOwner,
   onUpdateMemo,
+  onWithdraw,
+  onScratchPrice,
   onReload,
 }: TraderScreenProps) {
   const [selected, setSelected] = useState<TraderRfq | null>(null)
@@ -576,6 +653,11 @@ export function TraderScreen({
   const [actionError, setActionError] = useState(false)
   const [calculationStatus, setCalculationStatus] = useState<Record<number, string>>({})
   const [expirySelections, setExpirySelections] = useState<Record<number, string>>({})
+  const [pricerOpen, setPricerOpen] = useState(false)
+  const [scratchSecurity, setScratchSecurity] = useState('')
+  const [scratchSettlement, setScratchSettlement] = useState('')
+  const [scratchValue, setScratchValue] = useState<number>(100)
+  const [scratchResult, setScratchResult] = useState<unknown>()
   const canEditQuote = (row?: TraderRfq) => Boolean(
     row
     && row.owned
@@ -694,6 +776,8 @@ export function TraderScreen({
       await onReload()
     } catch {
       setActionError(true)
+      void message.error('Conflict or validation error. The latest RFQ has been reloaded.')
+      await onReload()
     }
   }
 
@@ -818,6 +902,12 @@ export function TraderScreen({
       {isError && <Alert type="error" showIcon message="Trader RFQs could not be loaded." className="grid-alert" />}
       {actionError && <Alert type="error" showIcon message="Ownership changed or the action is not permitted. Reload and try again." className="grid-alert" />}
       <Space wrap className="ownership-actions">
+        <Button onClick={() => {
+          setScratchSecurity(selected?.securityId ?? '')
+          setScratchSettlement(selected?.settlementDate ?? '')
+          setScratchValue(selected?.calculated?.price ?? 100)
+          setPricerOpen(true)
+        }}>Pricer</Button>
         {pickUpNeedsConfirmation ? (
           <Popconfirm
             title={pickUpTargets.length > 1
@@ -909,6 +999,10 @@ export function TraderScreen({
             Confirm Quote
           </Button>
         </Popconfirm>
+        <Button
+          disabled={!selected || !onWithdraw || selected.rfqStatus === 'Presented' || selected.quoteStatus !== 'Quoted' || !selected.owned || selected.assignedTraderId !== currentUserId || isMutating}
+          onClick={() => selected && void runAction(() => onWithdraw!(selected))}
+        >Withdraw</Button>
         <Popconfirm
           title={selected ? `Close Case ${selected.caseId} as Hit?` : 'Close as Hit?'}
           onConfirm={() => selected
@@ -1025,6 +1119,16 @@ export function TraderScreen({
           </Button>
         </Card>
       )}
+      <Drawer title="Independent Pricer" open={pricerOpen} onClose={() => setPricerOpen(false)}>
+        <Typography.Paragraph type="secondary">Scratch values are independent and are never applied back to the RFQ.</Typography.Paragraph>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Input aria-label="Pricer Security" placeholder="Security ID" value={scratchSecurity} onChange={(event) => setScratchSecurity(event.target.value)} />
+          <Input aria-label="Pricer Settlement" type="date" value={scratchSettlement} onChange={(event) => setScratchSettlement(event.target.value)} />
+          <InputNumber aria-label="Pricer Value" value={scratchValue} onChange={(value) => setScratchValue(Number(value ?? 0))} style={{ width: '100%' }} />
+          <Button type="primary" disabled={!onScratchPrice || !scratchSecurity || !scratchSettlement} onClick={() => onScratchPrice && void onScratchPrice({ securityId: scratchSecurity, settlementDate: scratchSettlement, driver: 'Price', value: scratchValue, simpleYieldSlide: 0 }).then(setScratchResult)}>Calculate</Button>
+          {scratchResult != null && <pre>{JSON.stringify(scratchResult, null, 2)}</pre>}
+        </Space>
+      </Drawer>
     </Card>
   )
 }
@@ -1034,12 +1138,17 @@ export function App() {
   const [activeView, setActiveView] = useState(
     configuredIdentity.startsWith('trader-') ? 'trader' : 'sales',
   )
+  const [refreshEventId, setRefreshEventId] = useState(0)
   const healthQuery = useGetHealthQuery()
   const systemDateQuery = useGetSystemDateQuery()
   const currentUserQuery = useGetCurrentUserQuery()
   const rfqsQuery = useGetActiveSalesRfqsQuery(undefined, { skip: activeView !== 'sales' })
   const traderRfqsQuery = useGetActiveTraderRfqsQuery(undefined, { skip: activeView !== 'trader' })
   const usersQuery = useGetUsersQuery()
+  const eventsQuery = useGetEventsQuery(refreshEventId)
+  const eodQuery = useGetEodQuery(systemDateQuery.data?.date ?? '2026-09-21', { skip: activeView !== 'eod' })
+  const pastQuery = useSearchPastRfqsQuery(undefined, { skip: activeView !== 'eod' })
+  const gridConfigQuery = useGetGridConfigQuery({ screenId: 'sales', configKey: 'main' }, { skip: activeView !== 'sales' })
   const [createDraft, createState] = useCreateDraftMutation()
   const [updateDraft, updateState] = useUpdateDraftMutation()
   const [confirmNewRfq, confirmNewState] = useConfirmNewRfqMutation()
@@ -1061,6 +1170,17 @@ export function App() {
   const [changeContactOwner, changeContactOwnerState] = useChangeContactOwnerMutation()
   const [updateSalesMemo, updateSalesMemoState] = useUpdateSalesMemoMutation()
   const [updateTraderMemo, updateTraderMemoState] = useUpdateTraderMemoMutation()
+  const [saveAmendment, saveAmendmentState] = useSaveAmendmentMutation()
+  const [confirmAmendment, confirmAmendmentState] = useConfirmAmendmentMutation()
+  const [discardAmendment, discardAmendmentState] = useDiscardAmendmentMutation()
+  const [createFromExisting, createFromExistingState] = useCreateFromExistingMutation()
+  const [cancelRfq, cancelState] = useCancelRfqMutation()
+  const [reopenRfq, reopenState] = useReopenRfqMutation()
+  const [withdrawQuote, withdrawState] = useWithdrawQuoteMutation()
+  const [bulkConfirmAmendments, bulkConfirmAmendmentsState] = useBulkConfirmAmendmentsMutation()
+  const [bulkDiscardAmendments, bulkDiscardAmendmentsState] = useBulkDiscardAmendmentsMutation()
+  const [scratchPrice] = useScratchPriceMutation()
+  const [saveGridConfig] = useSaveGridConfigMutation()
   const [searchClients] = useLazySearchClientsQuery()
   const [searchSecurities] = useLazySearchSecuritiesQuery()
   const [resolveDefaults] = useLazyResolveRfqDefaultsQuery()
@@ -1083,6 +1203,9 @@ export function App() {
     correctOutcomeState,
     changeContactOwnerState,
     updateSalesMemoState,
+    saveAmendmentState, confirmAmendmentState, discardAmendmentState,
+    createFromExistingState, cancelState, reopenState,
+    bulkConfirmAmendmentsState, bulkDiscardAmendmentsState,
   ].some((state) => state.isLoading)
   const isOwnershipMutating = [
     pickUpState,
@@ -1098,6 +1221,7 @@ export function App() {
     correctOutcomeState,
     changeContactOwnerState,
     updateTraderMemoState,
+    withdrawState,
   ].some((state) => state.isLoading)
   const users = (usersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))
   const traders = (usersQuery.data ?? [])
@@ -1129,6 +1253,20 @@ export function App() {
     window.location.reload()
   }
 
+  const refreshUpdates = async () => {
+    if (activeView === 'sales') await rfqsQuery.refetch()
+    if (activeView === 'trader') await traderRfqsQuery.refetch()
+    const latest = Math.max(0, ...(eventsQuery.data ?? []).map((event) => event.eventId))
+    setRefreshEventId(latest)
+  }
+
+  useEffect(() => {
+    if (typeof EventSource === 'undefined') return undefined
+    const source = new EventSource(`/api/events/stream?after=${refreshEventId}`)
+    source.addEventListener('changed', () => { void eventsQuery.refetch() })
+    return () => source.close()
+  }, [refreshEventId, eventsQuery.refetch])
+
   return (
     <AppShell
       health={health}
@@ -1137,6 +1275,8 @@ export function App() {
       currentUserId={currentUserQuery.data?.userId ?? configuredIdentity}
       onNavigate={setActiveView}
       onIdentityChange={changeIdentity}
+      pendingUpdates={eventsQuery.data?.length ?? 0}
+      onRefreshUpdates={() => void refreshUpdates()}
     >
       {activeView === 'sales' && (
         <SalesScreen
@@ -1167,6 +1307,29 @@ export function App() {
           onChangeContactOwner={handOffContactOwner}
           onUpdateMemo={(caseId, memo, expectedVersion) =>
             updateSalesMemo({ caseId, memo, expectedVersion }).unwrap().then(() => undefined)}
+          onSaveAmendment={(row, notional, settlementDate, salesAndTradingMessage) =>
+            saveAmendment({
+              caseId: row.caseId, notional, settlementDate, salesAndTradingMessage,
+              expectedCurrentVersion: row.currentVersion,
+              expectedDraftVersion: row.draftVersion ?? null,
+            }).unwrap().then(() => undefined)}
+          onConfirmAmendment={(row) => confirmAmendment({
+            caseId: row.caseId,
+            expectedCurrentVersion: row.currentVersion,
+            expectedDraftVersion: row.draftVersion!,
+          }).unwrap().then(() => undefined)}
+          onDiscardAmendment={(row) => discardAmendment({
+            caseId: row.caseId,
+            expectedCurrentVersion: row.currentVersion,
+            expectedDraftVersion: row.draftVersion!,
+          }).unwrap().then(() => undefined)}
+          onCreateFromExisting={(caseId) => createFromExisting(caseId).unwrap().then(() => undefined)}
+          onCancel={(row) => cancelRfq({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion }).unwrap().then(() => undefined)}
+          onReopen={(row) => reopenRfq({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion }).unwrap().then(() => undefined)}
+          onBulkConfirmAmendments={(rows) => bulkConfirmAmendments({ items: rows.map((row) => ({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! })) }).unwrap().then((results) => { void message.info(results.map((item) => `Case ${item.caseId}: ${item.result}${item.error ? ` (${item.error})` : ''}`).join('; ')) })}
+          onBulkDiscardAmendments={(rows) => bulkDiscardAmendments({ items: rows.map((row) => ({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! })) }).unwrap().then((results) => { void message.info(results.map((item) => `Case ${item.caseId}: ${item.result}${item.error ? ` (${item.error})` : ''}`).join('; ')) })}
+          gridConfigJson={gridConfigQuery.data?.configJson}
+          onSaveGridConfig={(configJson) => saveGridConfig({ screenId: 'sales', configKey: 'main', version: 1, configJson }).unwrap().then(() => undefined)}
           onReload={rfqsQuery.refetch}
         />
       )}
@@ -1225,10 +1388,39 @@ export function App() {
           onChangeContactOwner={handOffContactOwner}
           onUpdateMemo={(caseId, memo, expectedVersion) =>
             updateTraderMemo({ caseId, memo, expectedVersion }).unwrap().then(() => undefined)}
+          onWithdraw={(row) => withdrawQuote({ caseId: row.caseId, expectedVersion: row.currentVersion }).unwrap().then(() => undefined)}
+          onScratchPrice={(input) => scratchPrice(input).unwrap()}
           onReload={traderRfqsQuery.refetch}
         />
       )}
-      {activeView === 'eod' && <Alert type="info" message="EOD is implemented in a later step." />}
+      {activeView === 'eod' && (
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Card title="EOD Summary">
+            {(eodQuery.data ?? []).map((item) => (
+              <Space key={item.contactOwnerId} style={{ marginRight: 24 }}>
+                <Typography.Text strong>{item.contactOwnerId}</Typography.Text>
+                <Tag>Open {item.open}</Tag><Tag color="green">Hit {item.hit}</Tag><Tag color="orange">Away {item.away}</Tag>
+              </Space>
+            ))}
+          </Card>
+          <Card title="Past RFQ">
+            {pastQuery.data?.requiresNarrowing && <Alert type="warning" message="More than 20,000 results. Narrow the search." />}
+            <div className="rfq-grid"><AgGridReact
+              rowData={pastQuery.data?.items ?? []}
+              columnDefs={[
+                { field: 'caseId' }, { field: 'createdAt' }, { field: 'clientName' },
+                { field: 'securityName' }, { field: 'status' }, { field: 'quoteStatus' },
+                { field: 'contactOwnerId' }, { field: 'assignedTraderId' },
+              ]}
+              defaultColDef={{ sortable: true, filter: true, resizable: true }}
+            /></div>
+          </Card>
+          <Card title="Changes">
+            <Typography.Text>Pending Updates: {eventsQuery.data?.length ?? 0}</Typography.Text>
+            {(eventsQuery.data ?? []).slice(-10).map((event) => <div key={event.eventId}>#{event.eventId} Case {event.caseId}: {event.type}</div>)}
+          </Card>
+        </Space>
+      )}
     </AppShell>
   )
 }

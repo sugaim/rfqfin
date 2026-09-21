@@ -56,21 +56,37 @@ public sealed class ConfirmedQuoteRepository(RfqDbContext dbContext)
         value is null ? null : JsonSerializer.Deserialize<T>(value);
 }
 
-public sealed class DeferredQuoteEventSink : IQuoteEventSink
+public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
 {
+    private readonly List<PendingEvent> pending = [];
+
+    internal IReadOnlyList<PendingEvent> Pending => pending;
+
     public void Record(QuoteTransition transition)
     {
-        // Step 12 replaces this seam with transactional event persistence.
+        pending.Add(new("Quote", transition.CaseId, transition.QuoteId,
+            transition.Kind.ToString(), transition.PerformedBy, transition.OccurredAt,
+            JsonSerializer.Serialize(transition)));
     }
-}
 
-public sealed class DeferredRfqEventSink : IRfqEventSink
-{
     public void Record(RfqTransition transition)
     {
-        // Step 12 replaces this seam with transactional event persistence.
+        pending.Add(new("Rfq", transition.CaseId, transition.QuoteId,
+            transition.Kind.ToString(), transition.PerformedBy, transition.OccurredAt,
+            JsonSerializer.Serialize(transition)));
     }
+
+    internal void Clear() => pending.Clear();
 }
+
+internal sealed record PendingEvent(
+    string Kind,
+    long CaseId,
+    Guid? QuoteId,
+    string Type,
+    string? ActorUserId,
+    DateTimeOffset OccurredAt,
+    string PayloadJson);
 
 public sealed class CaseMemoRepository(RfqDbContext dbContext) : ICaseMemoRepository
 {

@@ -33,6 +33,18 @@ public static class DependencyInjection
         services.AddScoped<ChangeContactOwner>();
         services.AddScoped<UpdateSalesMemo>();
         services.AddScoped<UpdateTraderMemo>();
+        services.AddScoped<SaveAmendment>();
+        services.AddScoped<ConfirmAmendment>();
+        services.AddScoped<DiscardAmendment>();
+        services.AddScoped<BulkConfirmAmendments>();
+        services.AddScoped<BulkDiscardAmendments>();
+        services.AddScoped<CreateFromExisting>();
+        services.AddScoped<WithdrawQuote>();
+        services.AddScoped<BulkWithdrawQuotes>();
+        services.AddScoped<CancelRfq>();
+        services.AddScoped<ReopenRfq>();
+        services.AddScoped<ExpireQuote>();
+        services.AddScoped<ScratchPricer>();
 
         return services;
     }

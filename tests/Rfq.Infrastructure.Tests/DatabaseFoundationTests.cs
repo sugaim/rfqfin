@@ -41,7 +41,7 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
         {
             var secondSeeder = new DevelopmentDataSeeder(secondContext, TimeProvider.System);
             await secondSeeder.SeedAsync();
-            Assert.Equal(3, await secondContext.SeedMarkers.CountAsync());
+            Assert.Equal(4, await secondContext.SeedMarkers.CountAsync());
             Assert.Equal(
                 4,
                 (await new PostgreSqlClientSearch(secondContext).SearchAsync("C")).Count);
