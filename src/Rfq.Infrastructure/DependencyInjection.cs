@@ -35,7 +35,10 @@ public static class DependencyInjection
         services.AddScoped<ISystemDateProvider, EfCoreSystemDateProvider>();
         services.AddScoped<IBusinessDateResolver, EfCoreBusinessDateResolver>();
         services.AddScoped<IEventFeed, EfCoreEventFeed>();
-        services.AddScoped<IOperationalQueries, EfCoreOperationalQueries>();
+        services.AddScoped<IPastRfqQueries, EfCorePastRfqQueries>();
+        services.AddScoped<IRfqHistoryQueries, EfCoreRfqHistoryQueries>();
+        services.AddScoped<IEodQueries, EfCoreEodQueries>();
+        services.AddScoped<IGridConfigStore, EfCoreGridConfigStore>();
         services.AddSingleton<IStandardSettlementResolver, MockStandardSettlementResolver>();
         services.AddScoped<IUnitOfWork, PostgreSqlUnitOfWork>();
         services.AddScoped<DevelopmentDataSeeder>();

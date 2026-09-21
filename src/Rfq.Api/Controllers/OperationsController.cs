@@ -7,31 +7,34 @@ namespace Rfq.Api.Controllers;
 [ApiController]
 [Route("api/operations")]
 public sealed class OperationsController(
-    IOperationalQueries queries,
+    IPastRfqQueries pastRfqs,
+    IRfqHistoryQueries histories,
+    IEodQueries eod,
+    IGridConfigStore gridConfigs,
     ScratchPricer pricer) : ControllerBase
 {
     [HttpGet("past-rfqs")]
     public async Task<PastRfqResponse> Search([FromQuery] PastRfqSearchRequest search,
         CancellationToken cancellationToken)
     {
-        var result = await queries.SearchAsync(search.ToApplication(), cancellationToken);
+        var result = await pastRfqs.SearchAsync(search.ToApplication(), cancellationToken);
         return new PastRfqResponse(result.Items.Select(PastRfqItemResponse.From).ToArray(),
             result.RequiresNarrowing);
     }
 
     [HttpGet("rfqs/{caseId:long}/revisions")]
     public async Task<IReadOnlyList<RevisionHistoryResponse>> Revisions(long caseId,
-        CancellationToken cancellationToken) => (await queries.GetRevisionHistoryAsync(
+        CancellationToken cancellationToken) => (await histories.GetRevisionHistoryAsync(
             new CaseId(caseId), cancellationToken)).Select(RevisionHistoryResponse.From).ToArray();
 
     [HttpGet("rfqs/{caseId:long}/quotes")]
     public async Task<IReadOnlyList<QuoteHistoryResponse>> Quotes(long caseId,
-        CancellationToken cancellationToken) => (await queries.GetQuoteHistoryAsync(
+        CancellationToken cancellationToken) => (await histories.GetQuoteHistoryAsync(
             new CaseId(caseId), cancellationToken)).Select(QuoteHistoryResponse.From).ToArray();
 
     [HttpGet("eod")]
     public async Task<IReadOnlyList<EodSummaryResponse>> Eod([FromQuery] DateOnly date,
-        CancellationToken cancellationToken) => (await queries.GetEodAsync(date, cancellationToken))
+        CancellationToken cancellationToken) => (await eod.GetEodAsync(date, cancellationToken))
             .Select(item => new EodSummaryResponse(
                 item.ContactOwnerId.Value, item.Open, item.Hit, item.Away)).ToArray();
 
@@ -39,14 +42,14 @@ public sealed class OperationsController(
     public async Task<ActionResult<GridConfig>> GetGridConfig(string screenId, string configKey,
         CancellationToken cancellationToken)
     {
-        var value = await queries.GetGridConfigAsync(screenId, configKey, cancellationToken);
+        var value = await gridConfigs.GetAsync(screenId, configKey, cancellationToken);
         return value is null ? NotFound() : Ok(value);
     }
 
     [HttpPut("grid-config/{screenId}/{configKey}")]
     public Task<GridConfig> SaveGridConfig(string screenId, string configKey,
         GridConfigRequest request, CancellationToken cancellationToken) =>
-        queries.SaveGridConfigAsync(screenId, configKey, request.Version,
+        gridConfigs.SaveAsync(screenId, configKey, request.Version,
             request.ConfigJson, cancellationToken);
 
     [HttpPost("pricer")]

@@ -15,7 +15,10 @@ Renamed adapters that use only `DbContext`, LINQ, and normal EF Core APIs:
 - `EfCoreBusinessDateResolver`
 - `EfCoreSystemDateProvider`
 - `EfCoreEventFeed`
-- `EfCoreOperationalQueries`
+- `EfCorePastRfqQueries`
+- `EfCoreRfqHistoryQueries`
+- `EfCoreEodQueries`
+- `EfCoreGridConfigStore`
 
 Provider-neutral entity configurations use the same `EfCore...` naming rule.
 

@@ -36,8 +36,9 @@ existing database schema, HTTP behavior, and Domain model.
 - Retained the correctness-critical `FOR UPDATE`, sequence `nextval`, PostgreSQL search
   operators, provider types, and migrations in localized infrastructure code.
 - Kept raw SQL static; normal business reads continue to use EF Core/LINQ.
-- Centralized all Application-port registrations, including `IEventFeed` and
-  `IOperationalQueries`, in `AddRfqInfrastructure()`; `ICurrentUser` remains in the API.
+- Centralized all Application-port registrations, including `IEventFeed`, past-RFQ,
+  history, EOD, and GridConfig ports, in `AddRfqInfrastructure()`; `ICurrentUser` remains
+  in the API.
 
 ## Schema impact
 

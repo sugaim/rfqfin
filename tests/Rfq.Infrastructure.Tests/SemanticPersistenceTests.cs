@@ -207,8 +207,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         }
 
         await using var read = fixture.CreateContext();
-        var queries = new EfCoreOperationalQueries(
-            read, CurrentSales(), TimeProvider.System);
+        var queries = new EfCorePastRfqQueries(read, CurrentSales());
         var result = await queries.SearchAsync(new PastRfqSearch(
             From: new DateOnly(2026, 9, 21),
             To: new DateOnly(2026, 9, 21)));
@@ -273,8 +272,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         }
 
         await using var read = fixture.CreateContext();
-        var queries = new EfCoreOperationalQueries(
-            read, CurrentSales(), TimeProvider.System);
+        var queries = new EfCoreEodQueries(read, CurrentSales());
         var item = Assert.Single(await queries.GetEodAsync(new DateOnly(2026, 9, 21)));
 
         Assert.Equal(UserId.Create("sales-dev"), item.ContactOwnerId);
