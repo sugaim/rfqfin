@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Rfq.Infrastructure;
@@ -11,9 +12,11 @@ using Rfq.Infrastructure;
 namespace Rfq.Infrastructure.Migrations
 {
     [DbContext(typeof(RfqDbContext))]
-    partial class RfqDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260921002942_AddMasterSearchAndDefaults")]
+    partial class AddMasterSearchAndDefaults
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -366,22 +369,6 @@ namespace Rfq.Infrastructure.Migrations
                     b.ToTable("seed_markers", (string)null);
                 });
 
-            modelBuilder.Entity("Rfq.Infrastructure.SystemDateEntity", b =>
-                {
-                    b.Property<string>("Key")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("key");
-
-                    b.Property<DateOnly>("BusinessDate")
-                        .HasColumnType("date")
-                        .HasColumnName("business_date");
-
-                    b.HasKey("Key");
-
-                    b.ToTable("system_dates", (string)null);
-                });
-
             modelBuilder.Entity("Rfq.Infrastructure.CaseCurrentEntity", b =>
                 {
                     b.HasOne("Rfq.Infrastructure.RfqCaseEntity", "RfqCase")
@@ -414,6 +401,7 @@ namespace Rfq.Infrastructure.Migrations
                         .HasForeignKey("DefaultTraderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
                 });
 
             modelBuilder.Entity("Rfq.Infrastructure.MasterUserEntity", b =>

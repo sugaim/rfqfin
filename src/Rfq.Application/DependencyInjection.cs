@@ -8,6 +8,7 @@ public static class DependencyInjection
     {
         services.AddScoped<CreateDraft>();
         services.AddScoped<GetActiveSalesRfqs>();
+        services.AddScoped<ResolveRfqDefaults>();
 
         return services;
     }

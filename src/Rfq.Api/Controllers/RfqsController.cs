@@ -20,18 +20,28 @@ public sealed class RfqsController(
         try
         {
             var result = await createDraft.ExecuteAsync(
-                new CreateDraftCommand(request.ClientId, request.SecurityId),
+                new CreateDraftCommand(
+                    request.ClientId,
+                    request.SecurityId,
+                    request.SettlementDate,
+                    request.AssignedTraderId),
                 cancellationToken);
 
             var response = new CreateDraftResponse(
                 result.CaseId,
                 result.RevisionId,
                 result.RfqStatus,
+                result.CategoryId,
+                result.ContactOwnerId,
+                result.AssignedTraderId,
+                result.SettlementDate,
+                result.StandardSettlementDate,
                 result.CreatedAt);
 
             return Created("/api/rfqs/active-sales", response);
         }
-        catch (ArgumentException exception)
+        catch (Exception exception) when (
+            exception is ArgumentException or KeyNotFoundException or InvalidOperationException)
         {
             ModelState.AddModelError("request", exception.Message);
             return ValidationProblem(ModelState);
@@ -47,29 +57,52 @@ public sealed class RfqsController(
         return Ok(items.Select(item => new SalesRfqResponse(
             item.CaseId,
             item.ClientId,
+            item.ClientName,
             item.SecurityId,
+            item.SecurityJapaneseName,
+            item.SecurityBbgDisplay,
+            item.CategoryId,
             item.RfqStatus,
             item.CurrentRevisionId,
             item.RevisionStatus,
+            item.ContactOwnerId,
+            item.AssignedTraderId,
+            item.SettlementDate,
+            item.StandardSettlementDate,
             item.CreatedAt)));
     }
 }
 
 public sealed record CreateDraftRequest(
     [Required, MinLength(1)] string ClientId,
-    [Required, MinLength(1)] string SecurityId);
+    [Required, MinLength(1)] string SecurityId,
+    DateOnly SettlementDate,
+    string? AssignedTraderId);
 
 public sealed record CreateDraftResponse(
     long CaseId,
     Guid RevisionId,
     string RfqStatus,
+    string CategoryId,
+    string ContactOwnerId,
+    string AssignedTraderId,
+    DateOnly SettlementDate,
+    DateOnly StandardSettlementDate,
     DateTimeOffset CreatedAt);
 
 public sealed record SalesRfqResponse(
     long CaseId,
     string ClientId,
+    string ClientName,
     string SecurityId,
+    string SecurityJapaneseName,
+    string SecurityBbgDisplay,
+    string CategoryId,
     string RfqStatus,
     Guid CurrentRevisionId,
     string RevisionStatus,
+    string ContactOwnerId,
+    string AssignedTraderId,
+    DateOnly SettlementDate,
+    DateOnly StandardSettlementDate,
     DateTimeOffset CreatedAt);

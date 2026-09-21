@@ -27,6 +27,8 @@ public sealed class RfqApiFixture : IAsyncLifetime
         await using var scope = Factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<RfqDbContext>();
         await dbContext.Database.MigrateAsync();
+        var seeder = scope.ServiceProvider.GetRequiredService<DevelopmentDataSeeder>();
+        await seeder.SeedAsync();
     }
 
     public async Task DisposeAsync()

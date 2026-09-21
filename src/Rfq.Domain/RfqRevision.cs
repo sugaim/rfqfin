@@ -5,11 +5,15 @@ public sealed class RfqRevision
     private RfqRevision(
         RevisionId revisionId,
         CaseId caseId,
+        DateOnly settlementDate,
+        DateOnly standardSettlementDate,
         DateTimeOffset createdAt,
         UserId createdBy)
     {
         RevisionId = revisionId;
         CaseId = caseId;
+        SettlementDate = settlementDate;
+        StandardSettlementDate = standardSettlementDate;
         CreatedAt = createdAt;
         CreatedBy = createdBy;
     }
@@ -20,6 +24,10 @@ public sealed class RfqRevision
 
     public RevisionStatus Status => RevisionStatus.Draft;
 
+    public DateOnly SettlementDate { get; }
+
+    public DateOnly StandardSettlementDate { get; }
+
     public long Version => 1;
 
     public DateTimeOffset CreatedAt { get; }
@@ -28,9 +36,17 @@ public sealed class RfqRevision
 
     internal static RfqRevision CreateInitialDraft(
         CaseId caseId,
+        DateOnly settlementDate,
+        DateOnly standardSettlementDate,
         DateTimeOffset createdAt,
         UserId createdBy)
     {
-        return new RfqRevision(RevisionId.New(), caseId, createdAt, createdBy);
+        return new RfqRevision(
+            RevisionId.New(),
+            caseId,
+            settlementDate,
+            standardSettlementDate,
+            createdAt,
+            createdBy);
     }
 }

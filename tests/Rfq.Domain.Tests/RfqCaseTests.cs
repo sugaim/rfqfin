@@ -14,6 +14,10 @@ public sealed class RfqCaseTests
             new CaseId(123),
             ClientId.Create("client-1"),
             SecurityId.Create("security-1"),
+            CategoryId.Create("JGB"),
+            UserId.Create("trader-1"),
+            new DateOnly(2026, 9, 24),
+            new DateOnly(2026, 9, 24),
             creator,
             createdAt);
 
@@ -25,6 +29,10 @@ public sealed class RfqCaseTests
         Assert.Equal(RfqStatus.Draft, rfqCase.Status);
         Assert.Equal(creator, rfqCase.CreatedBy);
         Assert.Equal(creator, rfqCase.SalesId);
+        Assert.Equal(creator, rfqCase.ContactOwnerId);
+        Assert.Equal("trader-1", rfqCase.AssignedTraderId.Value);
+        Assert.Equal("JGB", rfqCase.CategorySnapshot.Value);
+        Assert.Equal(new DateOnly(2026, 9, 24), rfqCase.InitialRevision.SettlementDate);
         Assert.Equal(TimeSpan.Zero, rfqCase.CreatedAt.Offset);
     }
 

@@ -55,6 +55,22 @@ public sealed record SecurityId
     }
 }
 
+public sealed record CategoryId
+{
+    private CategoryId(string value)
+    {
+        Value = value;
+    }
+
+    public string Value { get; }
+
+    public static CategoryId Create(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        return new CategoryId(value.Trim());
+    }
+}
+
 public sealed record UserId
 {
     private UserId(string value)

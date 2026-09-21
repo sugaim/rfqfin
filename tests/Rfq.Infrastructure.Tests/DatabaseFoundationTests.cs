@@ -40,7 +40,15 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
         {
             var secondSeeder = new DevelopmentDataSeeder(secondContext, TimeProvider.System);
             await secondSeeder.SeedAsync();
-            Assert.Equal(1, await secondContext.SeedMarkers.CountAsync());
+            Assert.Equal(3, await secondContext.SeedMarkers.CountAsync());
+            Assert.Equal(
+                4,
+                (await new PostgreSqlClientSearch(secondContext).SearchAsync("C")).Count);
+            Assert.Single(
+                await new PostgreSqlSecuritySearch(secondContext).SearchAsync("375-1"));
+            Assert.Equal(
+                new DateOnly(2026, 9, 21),
+                await new PostgreSqlSystemDateProvider(secondContext).GetTodayAsync());
         }
     }
 
@@ -78,6 +86,10 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
                 new CaseId(caseId),
                 ClientId.Create("client-roundtrip"),
                 SecurityId.Create("security-roundtrip"),
+                CategoryId.Create("JGB"),
+                UserId.Create("trader-roundtrip"),
+                new DateOnly(2026, 9, 24),
+                new DateOnly(2026, 9, 23),
                 salesUserId,
                 createdAt));
 
@@ -92,11 +104,53 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
             var row = Assert.Single(rows);
             Assert.Equal(caseId, row.CaseId);
             Assert.Equal("client-roundtrip", row.ClientId);
+            Assert.Equal("client-roundtrip", row.ClientName);
             Assert.Equal("security-roundtrip", row.SecurityId);
+            Assert.Equal("security-roundtrip", row.SecurityJapaneseName);
             Assert.Equal("Draft", row.RfqStatus);
             Assert.Equal("Draft", row.RevisionStatus);
+            Assert.Equal("JGB", row.CategoryId);
+            Assert.Equal("trader-roundtrip", row.AssignedTraderId);
+            Assert.Equal(new DateOnly(2026, 9, 24), row.SettlementDate);
             Assert.Equal(createdAt, row.CreatedAt);
         }
+    }
+
+    [Theory]
+    [InlineData("375-1", "sec-jgb-375")]
+    [InlineData("jgb 0.500 3/20/30 #375", "sec-jgb-375")]
+    [InlineData("JP11037", "sec-jgb-375")]
+    public async Task SecuritySearchUsesAllSupportedGrammarsAndDeduplicates(
+        string query,
+        string expectedSecurityId)
+    {
+        await RecreateDatabaseAsync();
+        await using var context = fixture.CreateContext();
+        await new DevelopmentDataSeeder(context, TimeProvider.System).SeedAsync();
+
+        var results = await new PostgreSqlSecuritySearch(context).SearchAsync(query);
+
+        Assert.Equal(expectedSecurityId, results[0].SecurityId);
+        Assert.Equal(results.Count, results.Select(result => result.SecurityId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task MasterDataQueriesReturnClientAndDeterministicDefaults()
+    {
+        await RecreateDatabaseAsync();
+        await using var context = fixture.CreateContext();
+        await new DevelopmentDataSeeder(context, TimeProvider.System).SeedAsync();
+
+        var clients = await new PostgreSqlClientSearch(context).SearchAsync("青空");
+        var traderId = await new PostgreSqlCategoryRouting(context)
+            .GetDefaultAssignedTraderAsync(CategoryId.Create("JGB"));
+        var settlementDate = new MockStandardSettlementResolver().Resolve(
+            SecurityId.Create("sec-jgb-375"),
+            new DateOnly(2026, 9, 18));
+
+        Assert.Equal("client-001", Assert.Single(clients).ClientId);
+        Assert.Equal("trader-a", traderId?.Value);
+        Assert.Equal(new DateOnly(2026, 9, 22), settlementDate);
     }
 
     [Fact]
@@ -164,6 +218,10 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
                 Assert.Equal(1, first.CaseId);
                 Assert.Equal("client-old-1", first.ClientId);
                 Assert.Equal(firstRevisionId, first.CurrentRevisionId);
+                Assert.Equal("OTHER", first.CategoryId);
+                Assert.Equal("sales-upgrade", first.ContactOwnerId);
+                Assert.Equal("trader-a", first.AssignedTraderId);
+                Assert.Equal(new DateOnly(2026, 9, 22), first.SettlementDate);
             },
             second =>
             {
