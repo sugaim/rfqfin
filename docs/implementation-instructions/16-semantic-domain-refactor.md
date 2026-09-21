@@ -775,6 +775,12 @@ This is the target structure. New/materially rewritten Domain files in this comm
 src/Rfq.Domain/
   Rfqs/
     RfqCase.cs
+    CaseMemos/
+      CaseMemo.cs
+    Revisions/
+      RfqRevision.cs
+      RevisionTerms.cs
+      RevisionStatus.cs
     Lifecycle/
       RfqLifecycle.cs
       DraftRfq.cs
@@ -797,14 +803,6 @@ src/Rfq.Domain/
     QuoteExpiry.cs
     WorkingQuoteFactory.cs
     ...quote payload/value types...
-
-  Revisions/
-    RfqRevision.cs
-    RevisionTerms.cs
-    RevisionStatus.cs
-
-  Memos/
-    CaseMemo.cs
 
   Transitions/
     RfqLifecycleTransitions.cs
