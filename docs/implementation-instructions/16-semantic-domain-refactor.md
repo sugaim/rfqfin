@@ -771,6 +771,11 @@ Calculation failure must still leave WorkingQuote unchanged and append the failu
 
 This is the target structure. New/materially rewritten Domain files in this commit should be placed here. Broad relocation of untouched Application/Infrastructure code is deferred to commit 2.
 
+Commit 2 applies this target organization to Domain and Application. Its mechanical
+completion rule is one top-level type per file, with the file name matching the type
+name. Existing `Rfq.Domain` and `Rfq.Application` namespaces remain stable; feature
+folders do not imply a namespace migration.
+
 ```text
 src/Rfq.Domain/
   Rfqs/
@@ -876,7 +881,10 @@ src/Rfq.Application/
   GridConfig/
 ```
 
-Do **not** perform a bulk Application file-move-only refactor in this commit. Commit 2 will finish mechanical organization and one-type-per-file cleanup. New files may use the target location when it does not obscure the semantic diff.
+Do **not** perform a bulk Application file-move-only refactor in commit 1. Commit 2
+finishes the Application organization shown above and the one-type-per-file cleanup.
+New commit-1 files may use the target location when it does not obscure the semantic
+diff.
 
 ---
 

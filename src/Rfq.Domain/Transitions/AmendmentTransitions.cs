@@ -1,10 +1,5 @@
 namespace Rfq.Domain;
 
-public sealed record AmendmentSaveResult(RfqCase Rfq, RfqRevision DraftRevision);
-public sealed record AmendmentConfirmResult(
-    RfqCase Rfq, RfqRevision SupersededRevision, RfqRevision ConfirmedRevision);
-public sealed record AmendmentDiscardResult(RfqCase Rfq, RfqRevision DiscardedRevision);
-
 public static class AmendmentTransitions
 {
     public static AmendmentSaveResult SaveDraft(

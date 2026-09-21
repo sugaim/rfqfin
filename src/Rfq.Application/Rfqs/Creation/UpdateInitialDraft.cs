@@ -1,0 +1,47 @@
+using Rfq.Domain;
+
+namespace Rfq.Application;
+
+public sealed class UpdateInitialDraft(
+    IRfqCaseRepository rfqCases,
+    AssignedTraderValidator assignedTraderValidator,
+    IRfqAuthorization authorization,
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
+{
+    public async Task<InitialRfqResult> ExecuteAsync(
+        UpdateInitialDraftCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var rfqCase = await GetCaseAsync(
+            rfqCases,
+            command.CaseId,
+            cancellationToken);
+        authorization.EnsureCanEditRevision(currentUser.User, rfqCase);
+        var assignedTraderId = await assignedTraderValidator.ResolveAsync(
+            command.AssignedTraderId,
+            rfqCase.AssignedTraderId.Value,
+            cancellationToken);
+        rfqCase = InitialDraftTransitions.Update(
+            rfqCase,
+            new RevisionTerms(command.Notional, command.SettlementDate,
+                rfqCase.CurrentRevision.StandardSettlementDate,
+                command.SalesAndTradingMessage),
+            assignedTraderId,
+            new StateVersion(command.ExpectedVersion));
+
+        rfqCases.Update(rfqCase);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return InitialRfqResult.From(rfqCase);
+    }
+
+    internal static async Task<RfqCase> GetCaseAsync(
+        IRfqCaseRepository rfqCases,
+        long caseId,
+        CancellationToken cancellationToken)
+    {
+        var rfqCase = await rfqCases.GetAsync(new CaseId(caseId), cancellationToken)
+            ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
+        return rfqCase;
+    }
+}

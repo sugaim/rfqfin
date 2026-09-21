@@ -10,7 +10,8 @@ trim_trailing_whitespace = true
 
 [*.cs]
 indent_size = 4
-dotnet_style_namespace_match_folder = true:suggestion
+# Domain and Application use stable layer namespaces while folders express features.
+dotnet_style_namespace_match_folder = false:silent
 csharp_style_namespace_declarations = file_scoped:error
 
 [*.{csproj,props,targets}]
