@@ -24,8 +24,8 @@ public sealed class EfCoreEodQueries(
                     || item.Current.RfqStatus == RfqStatus.Presented))
             .Select(item => item.Current.ContactOwnerId)
             .ToListAsync(cancellationToken);
-        var closedHitType = RfqTransitionKind.ClosedHit.ToString();
-        var closedAwayType = RfqTransitionKind.ClosedAway.ToString();
+        var closedHitType = EventPersistenceTypeCodes.Rfq.ClosedHit;
+        var closedAwayType = EventPersistenceTypeCodes.Rfq.ClosedAway;
         var closeRows = await (
             from rfqEvent in dbContext.RfqEvents.AsNoTracking()
             join eventEntity in dbContext.Events.AsNoTracking()

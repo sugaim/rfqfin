@@ -2,7 +2,7 @@ namespace Rfq.Application;
 
 public interface IEventFeed
 {
-    Task<IReadOnlyList<PersistedEvent>> GetAfterAsync(
+    Task<IReadOnlyList<EventFeedItem>> GetAfterAsync(
         long eventId,
         CancellationToken cancellationToken = default);
 

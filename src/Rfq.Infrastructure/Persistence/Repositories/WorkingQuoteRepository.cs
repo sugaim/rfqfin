@@ -109,8 +109,10 @@ internal static class WorkingQuoteMapper
     public static WorkingQuote ToDomain(WorkingQuoteEntity entity) => WorkingQuote.Restore(
         new RevisionId(entity.RevisionId),
         entity.Mode,
-        Deserialize<CalculatedQuotePayload>(entity.CalculatedPayloadJson),
-        Deserialize<ManualQuotePayload>(entity.ManualPayloadJson),
+        entity.CalculatedPayloadJson is null ? null
+            : QuotePayloadPersistence.DeserializeCalculated(entity.CalculatedPayloadJson),
+        entity.ManualPayloadJson is null ? null
+            : QuotePayloadPersistence.DeserializeManual(entity.ManualPayloadJson),
         new StateVersion(entity.Version),
         entity.CreatedAt,
         UserId.Create(entity.CreatedBy),
@@ -129,16 +131,13 @@ internal static class WorkingQuoteMapper
     public static void Apply(WorkingQuote quote, WorkingQuoteEntity entity)
     {
         entity.Mode = quote.Mode;
-        entity.CalculatedPayloadJson = Serialize(quote.Calculated);
-        entity.ManualPayloadJson = Serialize(quote.Manual);
+        entity.CalculatedPayloadJson = quote.Calculated is null
+            ? null : QuotePayloadPersistence.Serialize(quote.Calculated);
+        entity.ManualPayloadJson = quote.Manual is null
+            ? null : QuotePayloadPersistence.Serialize(quote.Manual);
         entity.Version = quote.Version.Value;
         entity.UpdatedAt = quote.UpdatedAt;
         entity.UpdatedBy = quote.UpdatedBy.Value;
     }
 
-    private static string? Serialize<T>(T? value) where T : class =>
-        value is null ? null : JsonSerializer.Serialize(value);
-
-    private static T? Deserialize<T>(string? value) where T : class =>
-        value is null ? null : JsonSerializer.Deserialize<T>(value);
 }

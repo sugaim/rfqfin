@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
@@ -66,7 +65,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
             ("sec-toyota-2", "CORP", "trader-b"),
             ("sec-other-1", "OTHER", "trader-a"),
         };
-        var payload = JsonSerializer.Serialize(new CalculatedQuotePayload(
+        var payload = QuotePayloadPersistence.Serialize(new CalculatedQuotePayload(
             CalculationDriver.Price, 100m, 100m, .8m, .81m, 0m, .81m, .82m, 10m, 13m));
         for (var index = 0; index < count; index++)
         {

@@ -8,7 +8,7 @@ public sealed class EfCoreEventFeed(
     RfqDbContext dbContext,
     ICurrentUser currentUser) : IEventFeed
 {
-    public async Task<IReadOnlyList<PersistedEvent>> GetAfterAsync(
+    public async Task<IReadOnlyList<EventFeedItem>> GetAfterAsync(
         long eventId,
         CancellationToken cancellationToken = default)
     {
@@ -52,20 +52,20 @@ public sealed class EfCoreEventFeed(
                               child.PayloadJson);
         var rfqRows = await rfqEvents.Take(1000).ToListAsync(cancellationToken);
         var quoteRows = await quoteEvents.Take(1000).ToListAsync(cancellationToken);
-        var rfqItems = rfqRows.Select(row => (PersistedEvent)new PersistedRfqEvent(
+        var rfqItems = rfqRows.Select(row => (EventFeedItem)EventPersistenceContract.DeserializeRfq(
             row.EventId,
             row.OccurredAt,
             ToUserId(row.ActorUserId),
             new CaseId(row.CaseId),
-            PersistedEventTypeParser.ParseRfq(row.Type),
+            row.Type,
             row.PayloadJson));
-        var quoteItems = quoteRows.Select(row => (PersistedEvent)new PersistedQuoteEvent(
+        var quoteItems = quoteRows.Select(row => (EventFeedItem)EventPersistenceContract.DeserializeQuote(
             row.EventId,
             row.OccurredAt,
             ToUserId(row.ActorUserId),
             new CaseId(row.CaseId),
             new QuoteId(row.QuoteId),
-            PersistedEventTypeParser.ParseQuote(row.Type),
+            row.Type,
             row.PayloadJson));
         return rfqItems.Concat(quoteItems)
             .OrderBy(item => item.EventId)
@@ -97,26 +97,4 @@ public sealed class EfCoreEventFeed(
         Guid QuoteId,
         string Type,
         string PayloadJson);
-}
-
-internal static class PersistedEventTypeParser
-{
-    public static RfqTransitionKind ParseRfq(string value) =>
-        Parse<RfqTransitionKind>(value, "RFQ");
-
-    public static QuoteTransitionKind ParseQuote(string value) =>
-        Parse<QuoteTransitionKind>(value, "Quote");
-
-    private static TKind Parse<TKind>(string value, string eventKind)
-        where TKind : struct, Enum
-    {
-        if (Enum.TryParse<TKind>(value, ignoreCase: false, out var parsed)
-            && Enum.IsDefined(parsed))
-        {
-            return parsed;
-        }
-
-        throw new DomainInvariantException(
-            $"Persisted {eventKind} event type '{value}' is invalid.");
-    }
 }

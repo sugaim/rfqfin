@@ -26,6 +26,7 @@ public sealed class PostgreSqlUnitOfWork(
                 .SingleAsync(cancellationToken);
             foreach (var pending in eventSink.Pending)
             {
+                var persistence = EventPersistenceContract.Serialize(pending);
                 cursor.LastEventId++;
                 var parent = new EventEntity
                 {
@@ -41,8 +42,8 @@ public sealed class PostgreSqlUnitOfWork(
                         {
                             EventId = parent.EventId,
                             CaseId = rfqEvent.CaseId.Value,
-                            Type = rfqEvent.Type.ToString(),
-                            PayloadJson = rfqEvent.PayloadJson,
+                            Type = persistence.TypeCode,
+                            PayloadJson = persistence.PayloadJson,
                         });
                         break;
                     case PendingQuoteEvent quoteEvent:
@@ -50,8 +51,8 @@ public sealed class PostgreSqlUnitOfWork(
                         {
                             EventId = parent.EventId,
                             QuoteId = quoteEvent.QuoteId.Value,
-                            Type = quoteEvent.Type.ToString(),
-                            PayloadJson = quoteEvent.PayloadJson,
+                            Type = persistence.TypeCode,
+                            PayloadJson = persistence.PayloadJson,
                         });
                         break;
                     default:

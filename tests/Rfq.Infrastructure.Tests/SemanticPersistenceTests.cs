@@ -56,9 +56,9 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
             new CurrentUser(UserId.Create(salesId), new HashSet<UserRole> { UserRole.Sales },
                 DeskId.Create("jpy-credit"))));
         var item = Assert.Single(await feed.GetAfterAsync(0));
-        Assert.Equal(new CaseId(caseId), item.CaseId);
-        Assert.Equal(PersistedEventKind.Quote, item.Kind);
-        Assert.Equal(new QuoteId(quoteId), Assert.IsType<PersistedQuoteEvent>(item).QuoteId);
+        var quoteEvent = Assert.IsType<QuoteConfirmedEvent>(item);
+        Assert.Equal(new CaseId(caseId), quoteEvent.CaseId);
+        Assert.Equal(new QuoteId(quoteId), quoteEvent.QuoteId);
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         var sink = new PersistedEventSink();
         sink.Record(new RfqTransition(
             RfqTransitionKind.ContactOwnerChanged, new CaseId(caseId), UserId.Create("sales-dev"),
-            DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow, From: "sales-dev", To: "sales-a"));
         var secondSave = new PostgreSqlUnitOfWork(second, sink).SaveChangesAsync();
         await Task.Delay(200);
         Assert.False(secondSave.IsCompleted);
@@ -298,7 +298,12 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         {
             EventId = eventId,
             CaseId = caseId,
-            Type = type.ToString(),
+            Type = type switch
+            {
+                RfqTransitionKind.ClosedHit => EventPersistenceTypeCodes.Rfq.ClosedHit,
+                RfqTransitionKind.ClosedAway => EventPersistenceTypeCodes.Rfq.ClosedAway,
+                _ => throw new ArgumentOutOfRangeException(nameof(type)),
+            },
             PayloadJson = "{}",
         });
     }
