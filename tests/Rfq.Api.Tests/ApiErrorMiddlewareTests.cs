@@ -75,6 +75,21 @@ public sealed class ApiErrorMiddlewareTests
         Assert.Equal("An unexpected error occurred.", response.Detail);
     }
 
+    [Fact]
+    public async Task Unmapped_error_kind_is_unexpected_and_reported()
+    {
+        var exception = new UnmappedExpectedException();
+        var reporter = new IncidentReporter();
+
+        var response = await InvokeAsync(exception, reporter);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, response.Status);
+        Assert.Equal("InternalServerError", response.Code);
+        Assert.Equal("An unexpected error occurred.", response.Detail);
+        Assert.DoesNotContain(exception.Message, response.Json, StringComparison.Ordinal);
+        Assert.Same(exception, Assert.Single(reporter.Incidents).Exception);
+    }
+
     private static async Task<ErrorResponse> InvokeAsync(
         Exception exception,
         IIncidentReporter reporter)
@@ -114,6 +129,9 @@ public sealed class ApiErrorMiddlewareTests
                 : Task.CompletedTask;
         }
     }
+
+    private sealed class UnmappedExpectedException()
+        : ExpectedRfqException((RfqErrorKind)int.MaxValue, "unmapped expected error");
 
     private sealed record ErrorResponse(
         int Status,

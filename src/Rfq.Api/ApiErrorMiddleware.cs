@@ -54,17 +54,29 @@ public sealed class ApiErrorMiddleware(
 
     private static bool TryMap(RfqErrorKind kind, out (int Status, string Code) mapped)
     {
-        mapped = kind switch
+        switch (kind)
         {
-            RfqErrorKind.Validation => (StatusCodes.Status400BadRequest, "Validation"),
-            RfqErrorKind.InvalidState => (StatusCodes.Status409Conflict, "InvalidState"),
-            RfqErrorKind.VersionConflict => (StatusCodes.Status409Conflict, "VersionConflict"),
-            RfqErrorKind.NotFound => (StatusCodes.Status404NotFound, "NotFound"),
-            RfqErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
-            RfqErrorKind.CalculationFailure =>
-                (StatusCodes.Status422UnprocessableEntity, "CalculationFailure"),
-            _ => default,
-        };
-        return Enum.IsDefined(kind);
+            case RfqErrorKind.Validation:
+                mapped = (StatusCodes.Status400BadRequest, "Validation");
+                return true;
+            case RfqErrorKind.InvalidState:
+                mapped = (StatusCodes.Status409Conflict, "InvalidState");
+                return true;
+            case RfqErrorKind.VersionConflict:
+                mapped = (StatusCodes.Status409Conflict, "VersionConflict");
+                return true;
+            case RfqErrorKind.NotFound:
+                mapped = (StatusCodes.Status404NotFound, "NotFound");
+                return true;
+            case RfqErrorKind.Forbidden:
+                mapped = (StatusCodes.Status403Forbidden, "Forbidden");
+                return true;
+            case RfqErrorKind.CalculationFailure:
+                mapped = (StatusCodes.Status422UnprocessableEntity, "CalculationFailure");
+                return true;
+            default:
+                mapped = default;
+                return false;
+        }
     }
 }
