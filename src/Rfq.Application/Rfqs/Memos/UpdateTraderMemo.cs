@@ -17,7 +17,7 @@ public sealed class UpdateTraderMemo(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanUpdateTraderMemo(currentUser.User);
-        var rfqCase = await CloseRfq.LoadAsync(rfqCases, caseId, cancellationToken);
+        var rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         await UpdateSalesMemo.EnsureDeskAccessAsync(
             users,
             currentUser.User,

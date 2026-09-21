@@ -1,6 +1,6 @@
 namespace Rfq.Domain;
 
-public sealed class QuoteConfirmation
+public sealed record QuoteConfirmation
 {
     public QuoteConfirmation(UserId confirmedBy, DateTimeOffset confirmedAt, QuoteExpiry expiry)
     {
@@ -13,11 +13,11 @@ public sealed class QuoteConfirmation
     public QuoteExpiry Expiry { get; }
 }
 
-public abstract class QuoteExpiry
+public abstract record QuoteExpiry
 {
     private QuoteExpiry() { }
-    public sealed class None : QuoteExpiry;
-    public sealed class After : QuoteExpiry
+    public sealed record None : QuoteExpiry;
+    public sealed record After : QuoteExpiry
     {
         public After(TimeSpan duration)
         {

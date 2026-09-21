@@ -19,12 +19,14 @@ internal static class OwnershipUseCase
     {
         rfqCases.Update(rfqCase);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new OwnershipResult(
+        return ToResult(rfqCase);
+    }
+
+    public static OwnershipResult ToResult(RfqCase rfqCase) => new(
             rfqCase.CaseId,
             rfqCase.AssignedTraderId,
             rfqCase.Ownership is Owned,
             rfqCase.Version);
-    }
 }
 
 public sealed record OwnershipResult(

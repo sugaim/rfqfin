@@ -71,4 +71,10 @@ public sealed class PostgreSqlUnitOfWork(
                 exception);
         }
     }
+
+    public void DiscardChanges()
+    {
+        dbContext.ChangeTracker.Clear();
+        eventSink.Clear();
+    }
 }

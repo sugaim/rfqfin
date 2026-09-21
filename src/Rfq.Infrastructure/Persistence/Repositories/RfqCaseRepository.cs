@@ -88,11 +88,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             RfqLifecycleKind.Draft => new DraftRfq(revision.RevisionId),
             RfqLifecycleKind.Open => RestoreOpen(entity.Current, revision.RevisionId),
             RfqLifecycleKind.Cancelled => new CancelledRfq(revision.RevisionId),
-            RfqLifecycleKind.Closed => new ClosedRfq(
-                revision.RevisionId,
-                new QuoteId(entity.Current.ClosedQuoteId
-                    ?? throw new DomainInvariantException("Closed RFQ is missing ClosedQuoteId.")),
-                entity.Current.RfqStatus),
+            RfqLifecycleKind.Closed => RestoreClosed(entity.Current, revision.RevisionId),
             _ => throw new DomainInvariantException("Unsupported RFQ lifecycle."),
         };
 
@@ -177,6 +173,18 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         ClosedRfq => RfqLifecycleKind.Closed,
         _ => throw new InvalidOperationException("Unsupported RFQ lifecycle."),
     };
+
+    private static ClosedRfq RestoreClosed(CaseCurrentEntity current, RevisionId revisionId)
+    {
+        var quoteId = new QuoteId(current.ClosedQuoteId
+            ?? throw new DomainInvariantException("Closed RFQ is missing ClosedQuoteId."));
+        return current.RfqStatus switch
+        {
+            RfqStatus.Hit => new HitRfq(revisionId, quoteId),
+            RfqStatus.Away => new AwayRfq(revisionId, quoteId),
+            _ => throw new DomainInvariantException("Closed RFQ has an invalid RFQ status."),
+        };
+    }
 
     private static OpenRfq RestoreOpen(CaseCurrentEntity current, RevisionId revisionId)
     {

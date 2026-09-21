@@ -370,16 +370,16 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         var awayCase = await CreateQuotedCaseAsync(sales, trader, "client-002");
 
         var hitResponse = await sales.PostAsJsonAsync(
-            $"/api/rfqs/{hitCase.CaseId}/close",
-            new { Outcome = "Hit", ExpectedCurrentVersion = hitCase.CurrentVersion });
+            $"/api/rfqs/{hitCase.CaseId}/close/hit",
+            new { ExpectedCurrentVersion = hitCase.CurrentVersion });
         var hit = await AssertCaseClosedAsync(hitResponse);
         Assert.Equal("Hit", hit.RfqStatus);
         Assert.Equal(hitCase.QuoteId, hit.ClosedQuoteId);
         Assert.False(hit.Owned);
 
         var awayResponse = await sales.PostAsJsonAsync(
-            $"/api/rfqs/{awayCase.CaseId}/close",
-            new { Outcome = "Away", ExpectedCurrentVersion = awayCase.CurrentVersion });
+            $"/api/rfqs/{awayCase.CaseId}/close/away",
+            new { ExpectedCurrentVersion = awayCase.CurrentVersion });
         var away = await AssertCaseClosedAsync(awayResponse);
         Assert.Equal("Away", away.RfqStatus);
 
@@ -406,10 +406,9 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal("desk follow-up", traderMemo.Memo);
 
         var correctionResponse = await sales.PostAsJsonAsync(
-            $"/api/rfqs/{hit.CaseId}/correct-outcome",
+            $"/api/rfqs/{hit.CaseId}/outcome/correct-to-away",
             new
             {
-                Outcome = "Away",
                 Reason = "customer clarification",
                 ExpectedCurrentVersion = hit.CurrentVersion,
             });

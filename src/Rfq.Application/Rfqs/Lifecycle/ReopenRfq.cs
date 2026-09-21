@@ -13,7 +13,7 @@ public sealed class ReopenRfq(
     public async Task<LifecycleResult> ExecuteAsync(CaseId caseId, StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfq = await CloseRfq.LoadAsync(cases, caseId, cancellationToken);
+        var rfq = await ClosedRfqUseCase.LoadAsync(cases, caseId, cancellationToken);
         authorization.EnsureCanCancelOrReopen(currentUser.User, rfq);
         rfq = RfqLifecycleTransitions.Reopen(rfq, expectedVersion);
         cases.Update(rfq);

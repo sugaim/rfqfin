@@ -40,11 +40,54 @@ public sealed class WorkingQuote
 
 public enum WorkingQuoteMode { Calculated, Manual }
 
-public sealed record CalculatedQuotePayload(
-    CalculationDriver Driver, decimal DriverValue, decimal Price,
-    decimal BbgYield, decimal BaseSimpleYield, decimal SimpleYieldSlide,
-    decimal FinalSimpleYield, decimal InternalYield, decimal GSpread, decimal Asw);
+public sealed record CalculatedQuotePayload
+{
+    public CalculatedQuotePayload(
+        CalculationDriver driver,
+        decimal driverValue,
+        decimal price,
+        decimal bbgYield,
+        decimal baseSimpleYield,
+        decimal simpleYieldSlide,
+        decimal finalSimpleYield,
+        decimal internalYield,
+        decimal gSpread,
+        decimal asw)
+    {
+        Driver = driver;
+        DriverValue = driverValue;
+        Price = price;
+        BbgYield = bbgYield;
+        BaseSimpleYield = baseSimpleYield;
+        SimpleYieldSlide = simpleYieldSlide;
+        FinalSimpleYield = finalSimpleYield;
+        InternalYield = internalYield;
+        GSpread = gSpread;
+        Asw = asw;
+    }
 
-public sealed record ManualQuotePayload(decimal? Price, decimal? FinalSimpleYield);
+    public CalculationDriver Driver { get; }
+    public decimal DriverValue { get; }
+    public decimal Price { get; }
+    public decimal BbgYield { get; }
+    public decimal BaseSimpleYield { get; }
+    public decimal SimpleYieldSlide { get; }
+    public decimal FinalSimpleYield { get; }
+    public decimal InternalYield { get; }
+    public decimal GSpread { get; }
+    public decimal Asw { get; }
+}
+
+public sealed record ManualQuotePayload
+{
+    public ManualQuotePayload(decimal? price, decimal? finalSimpleYield)
+    {
+        Price = price;
+        FinalSimpleYield = finalSimpleYield;
+    }
+
+    public decimal? Price { get; }
+    public decimal? FinalSimpleYield { get; }
+}
 
 public enum CalculationDriver { Price, BbgYield, SimpleYield, GSpread }

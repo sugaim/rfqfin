@@ -11,7 +11,7 @@ public sealed class AssignTrader(
     IRfqEventSink events,
     TimeProvider timeProvider)
 {
-    public async Task<OwnershipResult> ExecuteAsync(
+    public async Task<AssignTraderResult> ExecuteAsync(
         CaseId caseId,
         UserId targetTraderId,
         StateVersion expectedVersion,
@@ -22,11 +22,22 @@ public sealed class AssignTrader(
         var target = await assignedTraderValidator.ResolveAsync(
             targetTraderId,
             cancellationToken);
+        if (rfqCase.Version != expectedVersion)
+            throw new StateVersionMismatchException("The RFQ Case was changed by another user.");
+        if (rfqCase.AssignedTraderId == target)
+        {
+            return new AssignTraderResult(AssignTraderOutcome.AlreadyAssigned,
+                OwnershipUseCase.ToResult(rfqCase));
+        }
         var previous = rfqCase.AssignedTraderId.Value;
         rfqCase = RfqOwnershipTransitions.Assign(
             rfqCase, target, expectedVersion);
         PickUpRfq.Record(events, timeProvider, RfqTransitionKind.AssignedTraderChanged,
             rfqCase, currentUser.User.UserId, previous);
-        return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
+        return new AssignTraderResult(AssignTraderOutcome.Assigned,
+            await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken));
     }
 }
+
+public enum AssignTraderOutcome { Assigned, AlreadyAssigned }
+public sealed record AssignTraderResult(AssignTraderOutcome Outcome, OwnershipResult Rfq);

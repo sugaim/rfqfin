@@ -214,6 +214,49 @@ public sealed class SemanticApplicationTests
         Assert.Equal(source.CurrentRevision.SettlementDate, cases.Added!.CurrentRevision.SettlementDate);
     }
 
+    [Fact]
+    public async Task Bulk_withdraw_skips_an_already_requested_quote()
+    {
+        var rfq = Open();
+        rfq = RfqOwnershipTransitions.PickUp(rfq, Trader, rfq.Version);
+        var unitOfWork = new UnitOfWork();
+        var single = new WithdrawQuote(new CaseRepository(rfq), new RfqAuthorization(),
+            Current(Trader, UserRole.Trader), new QuoteEvents(), unitOfWork,
+            TimeProvider.System);
+        var bulk = new BulkWithdrawQuotes(single, unitOfWork);
+
+        var result = Assert.Single(await bulk.ExecuteAsync(
+            [new LifecycleItem(rfq.CaseId, rfq.Version)]));
+
+        Assert.Equal(BulkItemStatus.Skipped, result.Status);
+        Assert.Equal(0, unitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task Bulk_close_away_skips_away_but_fails_hit()
+    {
+        var (quoted, _) = Quoted();
+        var away = RfqLifecycleTransitions.CloseAway(quoted, quoted.Version).Rfq;
+        var awayUnit = new UnitOfWork();
+        var awayBulk = new BulkCloseAwayRfqs(new CloseAwayRfq(
+            new CaseRepository(away), new RfqAuthorization(), Current(Sales, UserRole.Sales),
+            new RfqEvents(), awayUnit, TimeProvider.System), awayUnit);
+        var skipped = Assert.Single(await awayBulk.ExecuteAsync(
+            [new LifecycleItem(away.CaseId, away.Version)]));
+        Assert.Equal(BulkItemStatus.Skipped, skipped.Status);
+
+        var hit = RfqLifecycleTransitions.CloseHit(quoted, quoted.Version).Rfq;
+        var hitUnit = new UnitOfWork();
+        var hitBulk = new BulkCloseAwayRfqs(new CloseAwayRfq(
+            new CaseRepository(hit), new RfqAuthorization(), Current(Sales, UserRole.Sales),
+            new RfqEvents(), hitUnit, TimeProvider.System), hitUnit);
+        var failed = Assert.Single(await hitBulk.ExecuteAsync(
+            [new LifecycleItem(hit.CaseId, hit.Version)]));
+        Assert.Equal(BulkItemStatus.Failed, failed.Status);
+        Assert.Equal(BulkFailureCode.InvalidState, failed.Code);
+        Assert.Equal(1, hitUnit.Discards);
+    }
+
     private static InitialRfqFactory Factory(ICurrentUser current) => new(
         new CaseIds(), new Clients(),
         new ResolveRfqCreationContext(new Securities(), new Routing(), new Users(),
@@ -240,6 +283,17 @@ public sealed class SemanticApplicationTests
 
     private static CalculatedQuotePayload Payload() => new(
         CalculationDriver.Price, 100m, 100m, 1m, 1m, 0m, 1m, 1m, 10m, 10m);
+
+    private static (RfqCase Rfq, ConfirmedQuote Quote) Quoted()
+    {
+        var rfq = Open();
+        var working = WorkingQuoteFactory.CreateInitialFor(rfq, Trader, Now);
+        working = WorkingQuoteTransitions.ApplyCalculated(
+            working, Payload(), working.Version, Trader, Now);
+        var result = QuoteTransitions.Confirm(rfq, working, QuoteId.New(),
+            new QuoteConfirmation(Trader, Now, new QuoteExpiry.None()));
+        return (result.Rfq, result.ConfirmedQuote);
+    }
 
     private static ICurrentUser Current(UserId id, UserRole role) =>
         new CurrentUserService(new CurrentUser(
@@ -331,7 +385,9 @@ public sealed class SemanticApplicationTests
     private sealed class UnitOfWork : IUnitOfWork
     {
         public int Saves { get; private set; }
+        public int Discards { get; private set; }
         public Task SaveChangesAsync(CancellationToken token = default) { Saves++; return Task.CompletedTask; }
+        public void DiscardChanges() { Discards++; }
     }
     private sealed class QuoteEvents : IQuoteEventSink { public void Record(QuoteTransition transition) { } }
     private sealed class RfqEvents : IRfqEventSink { public void Record(RfqTransition transition) { } }

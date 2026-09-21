@@ -47,7 +47,8 @@ public sealed class RfqCase
         ActiveRfq => RfqStatus.Active,
         PresentedRfq => RfqStatus.Presented,
         CancelledRfq => RfqStatus.Cancelled,
-        ClosedRfq closed => closed.Outcome,
+        HitRfq => RfqStatus.Hit,
+        AwayRfq => RfqStatus.Away,
         _ => throw new DomainInvariantException("Unknown RFQ lifecycle.")
     };
 

@@ -93,6 +93,53 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
     }
 
     [Fact]
+    public async Task Discard_after_concurrency_failure_isolates_the_next_item_and_event()
+    {
+        await RecreateAndSeed();
+        var caseId = await AddCase();
+        await using var first = fixture.CreateContext();
+        await using var second = fixture.CreateContext();
+        var firstRepo = new RfqCaseRepository(first);
+        var secondRepo = new RfqCaseRepository(second);
+        var winner = (await firstRepo.GetAsync(caseId))!;
+        var stale = (await secondRepo.GetAsync(caseId))!;
+        winner = InitialDraftTransitions.Update(winner,
+            Terms(winner, "winner"), winner.AssignedTraderId, winner.Version);
+        stale = InitialDraftTransitions.Update(stale,
+            Terms(stale, "stale"), stale.AssignedTraderId, stale.Version);
+        firstRepo.Update(winner);
+        secondRepo.Update(stale);
+        var sink = new PersistedEventSink();
+        sink.Record(new RfqTransition(RfqTransitionKind.Cancelled, caseId,
+            UserId.Create("sales-dev"), DateTimeOffset.UtcNow));
+        var unitOfWork = new PostgreSqlUnitOfWork(second, sink);
+        await new PostgreSqlUnitOfWork(first).SaveChangesAsync();
+
+        await Assert.ThrowsAsync<StateVersionMismatchException>(
+            () => unitOfWork.SaveChangesAsync());
+        unitOfWork.DiscardChanges();
+
+        var fresh = (await secondRepo.GetAsync(caseId))!;
+        fresh = InitialDraftTransitions.Update(fresh,
+            Terms(fresh, "next"), fresh.AssignedTraderId, fresh.Version);
+        secondRepo.Update(fresh);
+        sink.Record(new RfqTransition(RfqTransitionKind.Reopened, caseId,
+            UserId.Create("sales-dev"), DateTimeOffset.UtcNow));
+        await unitOfWork.SaveChangesAsync();
+
+        await using var verify = fixture.CreateContext();
+        var persisted = (await new RfqCaseRepository(verify).GetAsync(caseId))!;
+        Assert.Equal("next", persisted.CurrentRevision.SalesAndTradingMessage);
+        var eventTypes = await verify.RfqEvents.Select(value => value.Type).ToArrayAsync();
+        Assert.Contains(EventPersistenceTypeCodes.Rfq.Reopened, eventTypes);
+        Assert.DoesNotContain(EventPersistenceTypeCodes.Rfq.Cancelled, eventTypes);
+
+        static RevisionTerms Terms(RfqCase value, string message) => new(
+            value.CurrentRevision.Notional, value.CurrentRevision.SettlementDate,
+            value.CurrentRevision.StandardSettlementDate, message);
+    }
+
+    [Fact]
     public async Task Cursor_lock_prevents_delayed_transaction_from_causing_event_loss()
     {
         await RecreateAndSeed();

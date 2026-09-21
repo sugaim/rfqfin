@@ -11,6 +11,7 @@ public sealed class RfqQuotesController(
     ConfirmQuote confirm,
     WithdrawQuote withdraw,
     IRfqQuoteQueries quotes,
+    BulkConfirmQuotes bulkConfirm,
     BulkWithdrawQuotes bulkWithdraw) : ControllerBase
 {
     [HttpPost("quote/confirm")]
@@ -23,8 +24,8 @@ public sealed class RfqQuotesController(
     [HttpPost("quote/withdraw")]
     public async Task<LifecycleResponse> Withdraw(long caseId, VersionRequest request,
         CancellationToken cancellationToken) => RfqQuotesApiMapper.ToApi(
-        await withdraw.ExecuteAsync(new CaseId(caseId), new StateVersion(request.ExpectedVersion),
-            cancellationToken));
+        (await withdraw.ExecuteAsync(new CaseId(caseId), new StateVersion(request.ExpectedVersion),
+            cancellationToken)).Rfq);
 
     [HttpGet("quotes")]
     public async Task<IReadOnlyList<QuoteHistoryResponse>> Get(long caseId,
@@ -32,11 +33,20 @@ public sealed class RfqQuotesController(
             new CaseId(caseId), cancellationToken)).Select(RfqQuotesApiMapper.ToApi).ToArray();
 
     [HttpPost("/api/rfqs/quotes/bulk-withdraw")]
-    public async Task<IReadOnlyList<LifecycleItemResponse>> BulkWithdraw(
+    public async Task<IReadOnlyList<BulkItemResponse>> BulkWithdraw(
         BulkLifecycleRequest request, CancellationToken cancellationToken) =>
         (await bulkWithdraw.ExecuteAsync(request.Items.Select(item => new LifecycleItem(
             new CaseId(item.CaseId), new StateVersion(item.ExpectedCurrentVersion))).ToArray(),
-            cancellationToken)).Select(RfqQuotesApiMapper.ToApi).ToArray();
+            cancellationToken)).Select(BulkApiMapper.ToApi).ToArray();
+
+    [HttpPost("/api/rfqs/quotes/bulk-confirm")]
+    public async Task<IReadOnlyList<BulkItemResponse>> BulkConfirm(
+        BulkConfirmQuoteRequest request, CancellationToken cancellationToken) =>
+        (await bulkConfirm.ExecuteAsync(request.Items.Select(item => new ConfirmQuoteItem(
+            new CaseId(item.CaseId), QuoteApiMapper.ToDomain(item.Expiry),
+            new StateVersion(item.ExpectedCurrentVersion),
+            new StateVersion(item.ExpectedWorkingQuoteVersion))).ToArray(), cancellationToken))
+        .Select(BulkApiMapper.ToApi).ToArray();
 }
 
 public sealed record ConfirmQuoteRequest([Required] QuoteExpiryRequest Expiry,
@@ -47,6 +57,13 @@ public sealed record LifecycleItemRequest([Range(1, long.MaxValue)] long CaseId,
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
 public sealed record BulkLifecycleRequest(
     [Required, MinLength(1)] IReadOnlyList<LifecycleItemRequest> Items);
+public sealed record ConfirmQuoteItemRequest(
+    [Range(1, long.MaxValue)] long CaseId,
+    [Required] QuoteExpiryRequest Expiry,
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
+    [Range(1, long.MaxValue)] long ExpectedWorkingQuoteVersion);
+public sealed record BulkConfirmQuoteRequest(
+    [Required, MinLength(1)] IReadOnlyList<ConfirmQuoteItemRequest> Items);
 public enum RfqStatusValue { Draft, Active, Presented, Cancelled, Hit, Away }
 public enum QuoteStatusValue { Requested, Quoted }
 public enum QuoteRequestReasonValue { Initial, Revised, Reopened, Expired, Withdrawn }
@@ -61,7 +78,6 @@ public sealed record LifecycleResponse(long CaseId, RfqStatusValue RfqStatus,
 public sealed record QuoteHistoryResponse(Guid QuoteId, Guid RevisionId, QuoteMode Mode,
     DateTimeOffset ConfirmedAt, DateTimeOffset? ExpiresAt,
     QuoteRequestReasonValue RequestReason);
-public sealed record LifecycleItemResponse(long CaseId, string Result, string? Error);
 
 public static class RfqQuotesApiMapper
 {
@@ -78,8 +94,6 @@ public static class RfqQuotesApiMapper
     public static QuoteHistoryResponse ToApi(QuoteHistoryItem value) => new(
         value.QuoteId.Value, value.RevisionId.Value, QuoteApiMapper.ToApi(value.Mode),
         value.ConfirmedAt, value.ExpiresAt, Map<QuoteRequestReasonValue>(value.RequestReason));
-    public static LifecycleItemResponse ToApi(LifecycleItemResult value) =>
-        new(value.CaseId.Value, value.Result, value.Error);
     private static T Map<T>(Enum value) where T : struct, Enum => Enum.Parse<T>(value.ToString());
     private static T? MapNullable<T>(Enum? value) where T : struct, Enum =>
         value is null ? null : Map<T>(value);

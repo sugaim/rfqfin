@@ -30,16 +30,16 @@ public sealed class RfqAmendmentsController(
             AmendmentApiMapper.ToItem(caseId, request), token));
 
     [HttpPost("amendment/bulk-confirm")]
-    public async Task<IReadOnlyList<AmendmentItemResponse>> BulkConfirm(BulkAmendmentRequest request,
+    public async Task<IReadOnlyList<BulkItemResponse>> BulkConfirm(BulkAmendmentRequest request,
         CancellationToken token) => (await bulkConfirm.ExecuteAsync(
             request.Items.Select(AmendmentApiMapper.ToItem).ToArray(), token))
-            .Select(AmendmentApiMapper.ToApi).ToArray();
+            .Select(BulkApiMapper.ToApi).ToArray();
 
     [HttpPost("amendment/bulk-discard")]
-    public async Task<IReadOnlyList<AmendmentItemResponse>> BulkDiscard(BulkAmendmentRequest request,
+    public async Task<IReadOnlyList<BulkItemResponse>> BulkDiscard(BulkAmendmentRequest request,
         CancellationToken token) => (await bulkDiscard.ExecuteAsync(
             request.Items.Select(AmendmentApiMapper.ToItem).ToArray(), token))
-            .Select(AmendmentApiMapper.ToApi).ToArray();
+            .Select(BulkApiMapper.ToApi).ToArray();
 }
 
 public sealed record SaveAmendmentRequest(decimal? Notional, DateOnly? SettlementDate,
@@ -61,7 +61,6 @@ public sealed record AmendmentResponse(long CaseId, Guid CurrentRevisionId,
     Guid? DraftRevisionId, long CurrentVersion, long? DraftVersion,
     RfqStatusValue RfqStatus, QuoteStatusValue? QuoteStatus,
     QuoteRequestReasonValue? QuoteRequestReason);
-public sealed record AmendmentItemResponse(long CaseId, string Result, string? Error);
 
 public static class AmendmentApiMapper
 {
@@ -76,8 +75,6 @@ public static class AmendmentApiMapper
         value.CurrentVersion.Value, value.DraftVersion?.Value,
         Map<RfqStatusValue>(value.RfqStatus), MapNullable<QuoteStatusValue>(value.QuoteStatus),
         MapNullable<QuoteRequestReasonValue>(value.QuoteRequestReason));
-    public static AmendmentItemResponse ToApi(AmendmentItemResult value) =>
-        new(value.CaseId.Value, value.Result, value.Error);
     private static T Map<T>(Enum value) where T : struct, Enum => Enum.Parse<T>(value.ToString());
     private static T? MapNullable<T>(Enum? value) where T : struct, Enum =>
         value is null ? null : Map<T>(value);

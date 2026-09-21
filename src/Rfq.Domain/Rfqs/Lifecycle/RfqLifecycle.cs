@@ -1,29 +1,42 @@
 namespace Rfq.Domain;
 
-public abstract class RfqLifecycle
+public abstract record RfqLifecycle
 {
     protected RfqLifecycle(RevisionId currentRevisionId) => CurrentRevisionId = currentRevisionId;
     public RevisionId CurrentRevisionId { get; }
 }
 
-public sealed class DraftRfq(RevisionId currentRevisionId) : RfqLifecycle(currentRevisionId);
-
-public sealed class CancelledRfq(RevisionId currentRevisionId) : RfqLifecycle(currentRevisionId);
-
-public sealed class ClosedRfq : RfqLifecycle
+public sealed record DraftRfq : RfqLifecycle
 {
-    public ClosedRfq(RevisionId currentRevisionId, QuoteId closedQuoteId, RfqStatus outcome)
+    public DraftRfq(RevisionId currentRevisionId) : base(currentRevisionId) { }
+}
+
+public sealed record CancelledRfq : RfqLifecycle
+{
+    public CancelledRfq(RevisionId currentRevisionId) : base(currentRevisionId) { }
+}
+
+public abstract record ClosedRfq : RfqLifecycle
+{
+    protected ClosedRfq(RevisionId currentRevisionId, QuoteId closedQuoteId)
         : base(currentRevisionId)
     {
-        if (outcome is not RfqStatus.Hit and not RfqStatus.Away)
-        {
-            throw new DomainValidationException("Closed RFQ outcome must be Hit or Away.");
-        }
-
+        if (closedQuoteId.Value == Guid.Empty)
+            throw new DomainValidationException("Closed Quote ID is required.");
         ClosedQuoteId = closedQuoteId;
-        Outcome = outcome;
     }
 
     public QuoteId ClosedQuoteId { get; }
-    public RfqStatus Outcome { get; }
+}
+
+public sealed record HitRfq : ClosedRfq
+{
+    public HitRfq(RevisionId currentRevisionId, QuoteId closedQuoteId)
+        : base(currentRevisionId, closedQuoteId) { }
+}
+
+public sealed record AwayRfq : ClosedRfq
+{
+    public AwayRfq(RevisionId currentRevisionId, QuoteId closedQuoteId)
+        : base(currentRevisionId, closedQuoteId) { }
 }

@@ -19,6 +19,21 @@ public sealed class SemanticDomainTests
     }
 
     [Fact]
+    public void Immutable_domain_values_keep_validation_and_record_semantics()
+    {
+        Assert.Throws<DomainValidationException>(() => new QuoteExpiry.After(TimeSpan.Zero));
+        var terms = new RevisionTerms(1_000_000, Today, Today, "  note  ");
+        Assert.Equal("note", terms.SalesAndTradingMessage);
+        Assert.Equal(terms, new RevisionTerms(1_000_000, Today, Today, "note"));
+        Assert.Equal(Payload(), Payload());
+        Assert.Equal(new ManualQuotePayload(100m, 1m), new ManualQuotePayload(100m, 1m));
+        var confirmation = new QuoteConfirmation(Trader,
+            new DateTimeOffset(2026, 9, 21, 10, 0, 0, TimeSpan.FromHours(9)),
+            new QuoteExpiry.None());
+        Assert.Equal(TimeSpan.Zero, confirmation.ConfirmedAt.Offset);
+    }
+
+    [Fact]
     public void DeskId_normalizes_and_rejects_empty_values()
     {
         Assert.Equal("jpy-credit", DeskId.Create("  jpy-credit  ").Value);
@@ -67,6 +82,46 @@ public sealed class SemanticDomainTests
         Assert.Null(cancelled.Ownership);
         var reopened = RfqLifecycleTransitions.Reopen(cancelled, cancelled.Version);
         Assert.IsType<Unowned>(reopened.Ownership);
+        Assert.Equal(QuoteRequestReason.Reopened, reopened.QuoteRequestReason);
+    }
+
+    [Fact]
+    public void Close_and_outcome_correction_use_typed_lifecycle_states()
+    {
+        var (quoted, quote) = ConfirmQuote();
+        var hit = RfqLifecycleTransitions.CloseHit(quoted, quoted.Version).Rfq;
+        Assert.IsType<HitRfq>(hit.Lifecycle);
+        Assert.Equal(quote.QuoteId, hit.ClosedQuoteId);
+        var away = RfqLifecycleTransitions.CorrectToAway(hit, hit.Version);
+        Assert.IsType<AwayRfq>(away.Lifecycle);
+        var corrected = RfqLifecycleTransitions.CorrectToHit(away, away.Version);
+        Assert.IsType<HitRfq>(corrected.Lifecycle);
+    }
+
+    [Fact]
+    public void Close_away_creates_an_away_state()
+    {
+        var (quoted, quote) = ConfirmQuote();
+        var away = RfqLifecycleTransitions.CloseAway(quoted, quoted.Version).Rfq;
+        Assert.IsType<AwayRfq>(away.Lifecycle);
+        Assert.Equal(quote.QuoteId, away.ClosedQuoteId);
+    }
+
+    [Fact]
+    public void Cancel_and_reopen_preserve_pending_amendment_without_reviving_quote()
+    {
+        var (quoted, _) = ConfirmQuote();
+        var saved = AmendmentTransitions.SaveDraft(
+            quoted, RevisionId.New(), quoted.CurrentRevision.Terms,
+            Sales, Now, quoted.Version);
+        var cancelled = RfqLifecycleTransitions.Cancel(saved.Rfq, saved.Rfq.Version);
+        Assert.IsType<CancelledRfq>(cancelled.Lifecycle);
+        Assert.Equal(saved.DraftRevision.RevisionId, cancelled.PendingDraftRevision?.RevisionId);
+        Assert.Null(cancelled.CurrentQuoteId);
+
+        var reopened = RfqLifecycleTransitions.Reopen(cancelled, cancelled.Version);
+        Assert.Equal(saved.DraftRevision.RevisionId, reopened.PendingDraftRevision?.RevisionId);
+        Assert.Null(reopened.CurrentQuoteId);
         Assert.Equal(QuoteRequestReason.Reopened, reopened.QuoteRequestReason);
     }
 
@@ -191,8 +246,8 @@ public sealed class SemanticDomainTests
         var open = Open();
         var cancelled = RfqLifecycleTransitions.Cancel(open, open.Version);
         var (quoted, _) = ConfirmQuote();
-        var closed = RfqLifecycleTransitions.Close(
-            quoted, RfqStatus.Hit, quoted.Version).Rfq;
+        var closed = RfqLifecycleTransitions.CloseHit(
+            quoted, quoted.Version).Rfq;
 
         foreach (var rfq in new[] { draft, cancelled, closed })
         {
@@ -234,13 +289,13 @@ public sealed class SemanticDomainTests
     {
         var open = Open();
         Assert.Throws<DomainRuleViolationException>(
-            () => RfqLifecycleTransitions.Close(open, RfqStatus.Hit, open.Version));
+            () => RfqLifecycleTransitions.CloseHit(open, open.Version));
         var (quoted, _) = ConfirmQuote();
         var save = AmendmentTransitions.SaveDraft(
             quoted, RevisionId.New(), quoted.CurrentRevision.Terms,
             Sales, Now, quoted.Version);
-        var closed = RfqLifecycleTransitions.Close(
-            save.Rfq, RfqStatus.Hit, save.Rfq.Version);
+        var closed = RfqLifecycleTransitions.CloseHit(
+            save.Rfq, save.Rfq.Version);
         Assert.Equal(RevisionStatus.Discarded, closed.DiscardedRevision!.Status);
         Assert.Equal(RfqStatus.Hit, closed.Rfq.Status);
     }

@@ -16,7 +16,7 @@ public sealed class ConfirmAmendment(
         AmendmentItem command,
         CancellationToken cancellationToken = default)
     {
-        var rfq = await CloseRfq.LoadAsync(cases, command.CaseId, cancellationToken);
+        var rfq = await ClosedRfqUseCase.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanConfirmRevision(currentUser.User, rfq);
         var now = timeProvider.GetUtcNow();
         var transition = AmendmentTransitions.Confirm(

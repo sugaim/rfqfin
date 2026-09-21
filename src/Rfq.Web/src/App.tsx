@@ -10,9 +10,10 @@ import {
   useSaveAmendmentMutation, useSearchRfqsQuery, useWithdrawQuoteMutation,
   useScratchPriceMutation,
   useGetGridConfigQuery, useSaveGridConfigMutation,
-  useBulkCloseRfqsMutation, useCalculateWorkingQuoteMutation, useChangeContactOwnerMutation,
-  useChangeWorkingQuoteModeMutation, useCloseRfqMutation,
-  useConfirmDraftMutation, useConfirmNewRfqMutation, useConfirmQuoteMutation, useCorrectRfqOutcomeMutation, useCreateDraftMutation,
+  useBulkCloseAwayRfqsMutation, useCalculateWorkingQuoteMutation, useChangeContactOwnerMutation,
+  useChangeWorkingQuoteModeMutation, useCloseHitRfqMutation, useCloseAwayRfqMutation,
+  useConfirmDraftMutation, useConfirmNewRfqMutation, useConfirmQuoteMutation,
+  useCorrectOutcomeToHitMutation, useCorrectOutcomeToAwayMutation, useCreateDraftMutation,
   useDiscardDraftMutation, useGetActiveSalesRfqsQuery, useGetActiveTraderRfqsQuery,
   useGetMeQuery, useGetHealthQuery,
   useGetBusinessDateQuery, useGetQuoteExpiryQuery,
@@ -22,7 +23,7 @@ import {
   usePresentQuoteMutation, useReleaseRfqMutation, useTakeOverRfqMutation,
   useUnpresentQuoteMutation, useUpdateDraftMutation, useUpdateManualWorkingQuoteMutation,
   useUpdateSalesMemoMutation, useUpdateTraderMemoMutation,
-  type BulkCloseItemResult,
+  type BulkItemResult,
   type ClientSearchResult, type CreateDraftRequest, type RfqCreationContext,
   type SalesRfq, type SecuritySearchResult, type TraderRfq, type UpdateDraftRequest,
 } from './services/api'
@@ -128,7 +129,7 @@ export interface SalesScreenProps {
   onPresent: (caseId: number, expectedCurrentVersion: number) => Promise<void>
   onUnpresent: (caseId: number, expectedCurrentVersion: number) => Promise<void>
   onClose: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
-  onBulkClose: (items: CloseItem[], outcome: RfqOutcome) => Promise<BulkCloseItemResult[]>
+  onBulkClose: (items: CloseItem[]) => Promise<BulkItemResult[]>
   onCorrectOutcome: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
   onChangeContactOwner: (caseId: number, targetUserId: string, expectedCurrentVersion: number) => Promise<void>
   onUpdateMemo: (caseId: number, memo: string, expectedVersion: number) => Promise<void>
@@ -359,7 +360,7 @@ export function SalesScreen(props: SalesScreenProps) {
     && isContactOwner
     && (selectedRfq.rfqStatus === 'Hit' || selectedRfq.rfqStatus === 'Away'),
   )
-  const bulkClose = async (outcome: RfqOutcome) => {
+  const bulkCloseAway = async () => {
     setActionError(null)
     try {
       const results = await onBulkClose(
@@ -367,11 +368,10 @@ export function SalesScreen(props: SalesScreenProps) {
           caseId: row.caseId,
           expectedCurrentVersion: row.currentVersion,
         })),
-        outcome,
       )
       const details = results.map((result) =>
-        `Case ${result.caseId}: ${result.result}${result.error ? ` (${result.error})` : ''}`)
-      void message.info(`Bulk ${outcome} — ${details.join('; ')}`)
+        `Case ${result.caseId}: ${result.status}${result.message ? ` (${result.message})` : ''}`)
+      void message.info(`Bulk Away — ${details.join('; ')}`)
       await finishAction()
     } catch {
       setActionError('The bulk close could not be completed. Reload and try again.')
@@ -489,14 +489,8 @@ export function SalesScreen(props: SalesScreenProps) {
               <Button disabled={!canCorrectOutcome || isMutating}>Correct Outcome</Button>
             </Popconfirm>
             <Popconfirm
-              title={`Bulk close ${selectedRows.length} selected RFQs as Hit?`}
-              onConfirm={() => void bulkClose('Hit')}
-            >
-              <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Hit</Button>
-            </Popconfirm>
-            <Popconfirm
               title={`Bulk close ${selectedRows.length} selected RFQs as Away?`}
-              onConfirm={() => void bulkClose('Away')}
+              onConfirm={() => void bulkCloseAway()}
             >
               <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Away</Button>
             </Popconfirm>
@@ -616,7 +610,7 @@ export interface TraderScreenProps {
   ) => Promise<void>
   onConfirmQuote: (row: TraderRfq, expiryMinutes: number | null) => Promise<void>
   onClose: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
-  onBulkClose: (items: CloseItem[], outcome: RfqOutcome) => Promise<BulkCloseItemResult[]>
+  onBulkClose: (items: CloseItem[]) => Promise<BulkItemResult[]>
   onCorrectOutcome: (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) => Promise<void>
   onChangeContactOwner: (caseId: number, targetUserId: string, expectedCurrentVersion: number) => Promise<void>
   onUpdateMemo: (caseId: number, memo: string, expectedVersion: number) => Promise<void>
@@ -878,7 +872,7 @@ export function TraderScreen({
   const canCorrectOutcome = Boolean(
     isContactOwner && selected && (selected.rfqStatus === 'Hit' || selected.rfqStatus === 'Away'),
   )
-  const bulkClose = async (outcome: RfqOutcome) => {
+  const bulkCloseAway = async () => {
     setActionError(false)
     try {
       const results = await onBulkClose(
@@ -886,11 +880,10 @@ export function TraderScreen({
           caseId: row.caseId,
           expectedCurrentVersion: row.currentVersion,
         })),
-        outcome,
       )
       const details = results.map((result) =>
-        `Case ${result.caseId}: ${result.result}${result.error ? ` (${result.error})` : ''}`)
-      void message.info(`Bulk ${outcome} — ${details.join('; ')}`)
+        `Case ${result.caseId}: ${result.status}${result.message ? ` (${result.message})` : ''}`)
+      void message.info(`Bulk Away — ${details.join('; ')}`)
       setSelected(null)
       setSelectedRows([])
       await onReload()
@@ -1037,14 +1030,8 @@ export function TraderScreen({
           <Button disabled={!canCorrectOutcome || isMutating}>Correct Outcome</Button>
         </Popconfirm>
         <Popconfirm
-          title={`Bulk close ${selectedRows.length} selected RFQs as Hit?`}
-          onConfirm={() => void bulkClose('Hit')}
-        >
-          <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Hit</Button>
-        </Popconfirm>
-        <Popconfirm
           title={`Bulk close ${selectedRows.length} selected RFQs as Away?`}
-          onConfirm={() => void bulkClose('Away')}
+          onConfirm={() => void bulkCloseAway()}
         >
           <Button disabled={selectedRows.length === 0 || isMutating}>Bulk Away</Button>
         </Popconfirm>
@@ -1172,9 +1159,11 @@ export function App() {
   const [confirmQuote, confirmQuoteState] = useConfirmQuoteMutation()
   const [presentQuote, presentState] = usePresentQuoteMutation()
   const [unpresentQuote, unpresentState] = useUnpresentQuoteMutation()
-  const [closeRfq, closeState] = useCloseRfqMutation()
-  const [bulkCloseRfqs, bulkCloseState] = useBulkCloseRfqsMutation()
-  const [correctRfqOutcome, correctOutcomeState] = useCorrectRfqOutcomeMutation()
+  const [closeHitRfq, closeHitState] = useCloseHitRfqMutation()
+  const [closeAwayRfq, closeAwayState] = useCloseAwayRfqMutation()
+  const [bulkCloseAwayRfqs, bulkCloseState] = useBulkCloseAwayRfqsMutation()
+  const [correctOutcomeToHit, correctToHitState] = useCorrectOutcomeToHitMutation()
+  const [correctOutcomeToAway, correctToAwayState] = useCorrectOutcomeToAwayMutation()
   const [changeContactOwner, changeContactOwnerState] = useChangeContactOwnerMutation()
   const [updateSalesMemo, updateSalesMemoState] = useUpdateSalesMemoMutation()
   const [updateTraderMemo, updateTraderMemoState] = useUpdateTraderMemoMutation()
@@ -1206,9 +1195,11 @@ export function App() {
     discardState,
     presentState,
     unpresentState,
-    closeState,
+    closeHitState,
+    closeAwayState,
     bulkCloseState,
-    correctOutcomeState,
+    correctToHitState,
+    correctToAwayState,
     changeContactOwnerState,
     updateSalesMemoState,
     saveAmendmentState, confirmAmendmentState, discardAmendmentState,
@@ -1224,9 +1215,11 @@ export function App() {
     changeModeState,
     updateManualState,
     confirmQuoteState,
-    closeState,
+    closeHitState,
+    closeAwayState,
     bulkCloseState,
-    correctOutcomeState,
+    correctToHitState,
+    correctToAwayState,
     changeContactOwnerState,
     updateTraderMemoState,
     withdrawState,
@@ -1235,14 +1228,16 @@ export function App() {
   const traders = (tradersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))
 
   const closeCase = (caseId: number, outcome: RfqOutcome, expectedCurrentVersion: number) =>
-    closeRfq({ caseId, outcome, expectedCurrentVersion }).unwrap().then(() => undefined)
-  const bulkCloseCases = (items: CloseItem[], outcome: RfqOutcome) =>
-    bulkCloseRfqs({ items, outcome }).unwrap()
+    (outcome === 'Hit' ? closeHitRfq : closeAwayRfq)(
+      { caseId, expectedCurrentVersion }).unwrap().then(() => undefined)
+  const bulkCloseCases = (items: CloseItem[]) =>
+    bulkCloseAwayRfqs({ items }).unwrap()
   const correctOutcome = (
     caseId: number,
     outcome: RfqOutcome,
     expectedCurrentVersion: number,
-  ) => correctRfqOutcome({ caseId, outcome, expectedCurrentVersion }).unwrap().then(() => undefined)
+  ) => (outcome === 'Hit' ? correctOutcomeToHit : correctOutcomeToAway)(
+    { caseId, expectedCurrentVersion }).unwrap().then(() => undefined)
   const handOffContactOwner = (
     caseId: number,
     targetUserId: string,
@@ -1332,8 +1327,8 @@ export function App() {
           onCreateFromExisting={(caseId) => createFromExisting(caseId).unwrap().then(() => undefined)}
           onCancel={(row) => cancelRfq({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion }).unwrap().then(() => undefined)}
           onReopen={(row) => reopenRfq({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion }).unwrap().then(() => undefined)}
-          onBulkConfirmAmendments={(rows) => bulkConfirmAmendments({ items: rows.map((row) => ({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! })) }).unwrap().then((results) => { void message.info(results.map((item) => `Case ${item.caseId}: ${item.result}${item.error ? ` (${item.error})` : ''}`).join('; ')) })}
-          onBulkDiscardAmendments={(rows) => bulkDiscardAmendments({ items: rows.map((row) => ({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! })) }).unwrap().then((results) => { void message.info(results.map((item) => `Case ${item.caseId}: ${item.result}${item.error ? ` (${item.error})` : ''}`).join('; ')) })}
+          onBulkConfirmAmendments={(rows) => bulkConfirmAmendments({ items: rows.map((row) => ({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! })) }).unwrap().then((results) => { void message.info(results.map((item) => `Case ${item.caseId}: ${item.status}${item.message ? ` (${item.message})` : ''}`).join('; ')) })}
+          onBulkDiscardAmendments={(rows) => bulkDiscardAmendments({ items: rows.map((row) => ({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! })) }).unwrap().then((results) => { void message.info(results.map((item) => `Case ${item.caseId}: ${item.status}${item.message ? ` (${item.message})` : ''}`).join('; ')) })}
           gridConfigJson={gridConfigQuery.data ? JSON.stringify(gridConfigQuery.data.config) : undefined}
           onSaveGridConfig={(configJson) => saveGridConfig({ screenId: 'sales', configKey: 'main', version: 1, config: JSON.parse(configJson) }).unwrap().then(() => undefined)}
           onReload={rfqsQuery.refetch}

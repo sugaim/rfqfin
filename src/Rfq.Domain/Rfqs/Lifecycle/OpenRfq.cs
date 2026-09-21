@@ -1,6 +1,6 @@
 namespace Rfq.Domain;
 
-public abstract class OpenRfq : RfqLifecycle
+public abstract record OpenRfq : RfqLifecycle
 {
     protected OpenRfq(RevisionId currentRevisionId, Ownership ownership)
         : base(currentRevisionId) => Ownership = ownership
@@ -9,7 +9,7 @@ public abstract class OpenRfq : RfqLifecycle
     public Ownership Ownership { get; }
 }
 
-public sealed class ActiveRfq : OpenRfq
+public sealed record ActiveRfq : OpenRfq
 {
     public ActiveRfq(
         RevisionId currentRevisionId,
@@ -21,7 +21,7 @@ public sealed class ActiveRfq : OpenRfq
     public ActiveQuoteState QuoteState { get; }
 }
 
-public sealed class PresentedRfq : OpenRfq
+public sealed record PresentedRfq : OpenRfq
 {
     public PresentedRfq(
         RevisionId currentRevisionId,

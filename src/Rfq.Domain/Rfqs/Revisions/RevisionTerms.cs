@@ -1,6 +1,6 @@
 namespace Rfq.Domain;
 
-public sealed class RevisionTerms
+public sealed record RevisionTerms
 {
     public RevisionTerms(
         decimal? notional,

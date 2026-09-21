@@ -13,7 +13,9 @@ public sealed class RfqDraftsController(
     UpdateInitialDraft updateDraft,
     ConfirmInitialDraft confirmDraft,
     DiscardInitialDraft discardDraft,
-    CreateFromExisting createFromExisting) : ControllerBase
+    CreateFromExisting createFromExisting,
+    BulkConfirmInitialDrafts bulkConfirm,
+    BulkDiscardInitialDrafts bulkDiscard) : ControllerBase
 {
     [HttpPost("drafts")]
     public async Task<ActionResult<InitialRfqResponse>> Create(CreateDraftRequest request,
@@ -57,6 +59,19 @@ public sealed class RfqDraftsController(
         var result = await createFromExisting.ExecuteAsync(new CaseId(caseId), cancellationToken);
         return Created($"/api/rfqs/{result.CaseId.Value}/draft", RfqDraftsApiMapper.ToApi(result));
     }
+
+    [HttpPost("drafts/bulk-confirm")]
+    public async Task<IReadOnlyList<BulkItemResponse>> BulkConfirm(
+        BulkConfirmDraftRequest request, CancellationToken cancellationToken) =>
+        (await bulkConfirm.ExecuteAsync(request.Items.Select(RfqDraftsApiMapper.ToCommand).ToArray(),
+            cancellationToken)).Select(BulkApiMapper.ToApi).ToArray();
+
+    [HttpPost("drafts/bulk-discard")]
+    public async Task<IReadOnlyList<BulkItemResponse>> BulkDiscard(
+        BulkDiscardDraftRequest request, CancellationToken cancellationToken) =>
+        (await bulkDiscard.ExecuteAsync(request.Items.Select(item => new DiscardInitialDraftItem(
+            new CaseId(item.CaseId), new StateVersion(item.ExpectedVersion))).ToArray(),
+            cancellationToken)).Select(BulkApiMapper.ToApi).ToArray();
 }
 
 public sealed record CreateDraftRequest(
@@ -77,6 +92,21 @@ public sealed record UpdateDraftRequest(
     [Range(1, long.MaxValue)] long ExpectedVersion);
 
 public sealed record VersionRequest([Range(1, long.MaxValue)] long ExpectedVersion);
+public sealed record ConfirmDraftItemRequest(
+    [Range(1, long.MaxValue)] long CaseId,
+    decimal? Notional,
+    [Required] DateOnly? SettlementDate,
+    [Required] DateOnly? StandardSettlementDate,
+    [Required(AllowEmptyStrings = true)] string SalesAndTradingMessage,
+    [Required, MinLength(1)] string AssignedTraderId,
+    [Range(1, long.MaxValue)] long ExpectedVersion);
+public sealed record BulkConfirmDraftRequest(
+    [Required, MinLength(1)] IReadOnlyList<ConfirmDraftItemRequest> Items);
+public sealed record DiscardDraftItemRequest(
+    [Range(1, long.MaxValue)] long CaseId,
+    [Range(1, long.MaxValue)] long ExpectedVersion);
+public sealed record BulkDiscardDraftRequest(
+    [Required, MinLength(1)] IReadOnlyList<DiscardDraftItemRequest> Items);
 
 public enum RfqStatusValue { Draft, Active, Presented, Cancelled, Hit, Away }
 public enum RevisionStatusValue { Draft, Confirmed, Superseded, Discarded }
@@ -100,6 +130,11 @@ public static class RfqDraftsApiMapper
 
     public static UpdateInitialDraftCommand ToCommand(long caseId, UpdateDraftRequest request) => new(
         new CaseId(caseId), request.Notional, request.SettlementDate!.Value,
+        request.StandardSettlementDate!.Value, request.SalesAndTradingMessage,
+        UserId.Create(request.AssignedTraderId), new StateVersion(request.ExpectedVersion));
+
+    public static UpdateInitialDraftCommand ToCommand(ConfirmDraftItemRequest request) => new(
+        new CaseId(request.CaseId), request.Notional, request.SettlementDate!.Value,
         request.StandardSettlementDate!.Value, request.SalesAndTradingMessage,
         UserId.Create(request.AssignedTraderId), new StateVersion(request.ExpectedVersion));
 

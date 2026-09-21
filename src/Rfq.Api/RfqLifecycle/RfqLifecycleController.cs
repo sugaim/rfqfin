@@ -8,9 +8,12 @@ namespace Rfq.Api.RfqLifecycle;
 [ApiController]
 [Route("api/rfqs")]
 public sealed class RfqLifecycleController(
-    PresentQuote present, UnpresentQuote unpresent, CloseRfq close,
-    CorrectRfqOutcome correct, CancelRfq cancel, ReopenRfq reopen,
-    BulkCloseRfqs bulkClose) : ControllerBase
+    PresentQuote present, UnpresentQuote unpresent,
+    CloseHitRfq closeHit, CloseAwayRfq closeAway,
+    CorrectOutcomeToHit correctToHit, CorrectOutcomeToAway correctToAway,
+    CancelRfq cancel, ReopenRfq reopen,
+    BulkPresentQuotes bulkPresent, BulkUnpresentQuotes bulkUnpresent,
+    BulkCloseAwayRfqs bulkCloseAway, BulkCancelRfqs bulkCancel) : ControllerBase
 {
     [HttpPost("{caseId:long}/present")]
     public async Task<PresentationResponse> Present(long caseId, LifecycleRequest request,
@@ -22,16 +25,27 @@ public sealed class RfqLifecycleController(
         CancellationToken token) => LifecycleApiMapper.ToApi(await unpresent.ExecuteAsync(
             new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), token));
 
-    [HttpPost("{caseId:long}/close")]
-    public async Task<CloseResponse> Close(long caseId, CloseRequest request,
-        CancellationToken token) => LifecycleApiMapper.ToApi(await close.ExecuteAsync(
-            new CaseId(caseId), LifecycleApiMapper.ToDomain(request.Outcome),
+    [HttpPost("{caseId:long}/close/hit")]
+    public async Task<CloseResponse> CloseHit(long caseId, LifecycleRequest request,
+        CancellationToken token) => LifecycleApiMapper.ToApi(await closeHit.ExecuteAsync(
+            new CaseId(caseId),
             new StateVersion(request.ExpectedCurrentVersion), token));
 
-    [HttpPost("{caseId:long}/correct-outcome")]
-    public async Task<CloseResponse> Correct(long caseId, CorrectOutcomeRequest request,
-        CancellationToken token) => LifecycleApiMapper.ToApi(await correct.ExecuteAsync(
-            new CaseId(caseId), LifecycleApiMapper.ToDomain(request.Outcome), request.Reason,
+    [HttpPost("{caseId:long}/close/away")]
+    public async Task<CloseResponse> CloseAway(long caseId, LifecycleRequest request,
+        CancellationToken token) => LifecycleApiMapper.ToApi((await closeAway.ExecuteAsync(
+            new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), token)).Rfq);
+
+    [HttpPost("{caseId:long}/outcome/correct-to-hit")]
+    public async Task<CloseResponse> CorrectToHit(long caseId, CorrectOutcomeRequest request,
+        CancellationToken token) => LifecycleApiMapper.ToApi(await correctToHit.ExecuteAsync(
+            new CaseId(caseId), request.Reason,
+            new StateVersion(request.ExpectedCurrentVersion), token));
+
+    [HttpPost("{caseId:long}/outcome/correct-to-away")]
+    public async Task<CloseResponse> CorrectToAway(long caseId, CorrectOutcomeRequest request,
+        CancellationToken token) => LifecycleApiMapper.ToApi(await correctToAway.ExecuteAsync(
+            new CaseId(caseId), request.Reason,
             new StateVersion(request.ExpectedCurrentVersion), token));
 
     [HttpPost("{caseId:long}/cancel")]
@@ -44,28 +58,40 @@ public sealed class RfqLifecycleController(
         CancellationToken token) => LifecycleApiMapper.ToApi(await reopen.ExecuteAsync(
             new CaseId(caseId), new StateVersion(request.ExpectedCurrentVersion), token));
 
-    [HttpPost("bulk-close")]
-    public async Task<IReadOnlyList<BulkCloseResponse>> BulkClose(BulkCloseRequest request,
-        CancellationToken token) => (await bulkClose.ExecuteAsync(request.Items.Select(item =>
-            new BulkCloseItem(new CaseId(item.CaseId),
-                new StateVersion(item.ExpectedCurrentVersion))).ToArray(),
-            LifecycleApiMapper.ToDomain(request.Outcome), token))
-            .Select(LifecycleApiMapper.ToApi).ToArray();
+    [HttpPost("bulk-present")]
+    public Task<IReadOnlyList<BulkItemResponse>> BulkPresent(BulkLifecycleRequest request,
+        CancellationToken token) => ExecuteBulk(request, bulkPresent.ExecuteAsync, token);
+
+    [HttpPost("bulk-unpresent")]
+    public Task<IReadOnlyList<BulkItemResponse>> BulkUnpresent(BulkLifecycleRequest request,
+        CancellationToken token) => ExecuteBulk(request, bulkUnpresent.ExecuteAsync, token);
+
+    [HttpPost("bulk-close-away")]
+    public Task<IReadOnlyList<BulkItemResponse>> BulkCloseAway(BulkLifecycleRequest request,
+        CancellationToken token) => ExecuteBulk(request, bulkCloseAway.ExecuteAsync, token);
+
+    [HttpPost("bulk-cancel")]
+    public Task<IReadOnlyList<BulkItemResponse>> BulkCancel(BulkLifecycleRequest request,
+        CancellationToken token) => ExecuteBulk(request, bulkCancel.ExecuteAsync, token);
+
+    private static async Task<IReadOnlyList<BulkItemResponse>> ExecuteBulk(
+        BulkLifecycleRequest request,
+        Func<IReadOnlyList<LifecycleItem>, CancellationToken, Task<IReadOnlyList<BulkItemResult>>> action,
+        CancellationToken token) => (await action(request.Items.Select(item => new LifecycleItem(
+            new CaseId(item.CaseId), new StateVersion(item.ExpectedCurrentVersion))).ToArray(), token))
+            .Select(BulkApiMapper.ToApi).ToArray();
 }
 
-public enum RfqOutcome { Hit, Away }
 public enum RfqStatusValue { Draft, Active, Presented, Cancelled, Hit, Away }
 public enum QuoteStatusValue { Requested, Quoted }
 public enum QuoteRequestReasonValue { Initial, Revised, Reopened, Expired, Withdrawn }
 public sealed record LifecycleRequest([Range(1, long.MaxValue)] long ExpectedCurrentVersion);
-public sealed record CloseRequest([Required] RfqOutcome Outcome,
+public sealed record CorrectOutcomeRequest(string? Reason,
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
-public sealed record CorrectOutcomeRequest([Required] RfqOutcome Outcome, string? Reason,
+public sealed record BulkLifecycleItemRequest([Range(1, long.MaxValue)] long CaseId,
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
-public sealed record BulkCloseItemRequest([Range(1, long.MaxValue)] long CaseId,
-    [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
-public sealed record BulkCloseRequest([Required] RfqOutcome Outcome,
-    [Required, MinLength(1)] IReadOnlyList<BulkCloseItemRequest> Items);
+public sealed record BulkLifecycleRequest(
+    [Required, MinLength(1)] IReadOnlyList<BulkLifecycleItemRequest> Items);
 public sealed record PresentationResponse(long CaseId, Guid QuoteId,
     RfqStatusValue RfqStatus, QuoteStatusValue QuoteStatus, long CurrentVersion);
 public sealed record CloseResponse(long CaseId, RfqStatusValue RfqStatus,
@@ -73,17 +99,9 @@ public sealed record CloseResponse(long CaseId, RfqStatusValue RfqStatus,
 public sealed record LifecycleResponse(long CaseId, RfqStatusValue RfqStatus,
     QuoteStatusValue? QuoteStatus, QuoteRequestReasonValue? QuoteRequestReason,
     long CurrentVersion);
-public sealed record BulkCloseResponse(long CaseId, string Result,
-    RfqStatusValue? RfqStatus, string? Error);
 
 public static class LifecycleApiMapper
 {
-    public static RfqStatus ToDomain(RfqOutcome value) => value switch
-    {
-        RfqOutcome.Hit => RfqStatus.Hit,
-        RfqOutcome.Away => RfqStatus.Away,
-        _ => throw new ArgumentException("Unknown RFQ outcome.", nameof(value)),
-    };
     public static PresentationResponse ToApi(PresentationResult value) => new(
         value.CaseId.Value, value.QuoteId.Value, Map<RfqStatusValue>(value.RfqStatus),
         Map<QuoteStatusValue>(value.QuoteStatus), value.CurrentVersion.Value);
@@ -93,9 +111,6 @@ public static class LifecycleApiMapper
     public static LifecycleResponse ToApi(LifecycleResult value) => new(value.CaseId.Value,
         Map<RfqStatusValue>(value.RfqStatus), MapNullable<QuoteStatusValue>(value.QuoteStatus),
         MapNullable<QuoteRequestReasonValue>(value.QuoteRequestReason), value.CurrentVersion.Value);
-    public static BulkCloseResponse ToApi(BulkCloseItemResult value) => new(value.CaseId.Value,
-        value.Result, value.RfqStatus is null ? null : Map<RfqStatusValue>(value.RfqStatus.Value),
-        value.Error);
     private static T Map<T>(Enum value) where T : struct, Enum => Enum.Parse<T>(value.ToString());
     private static T? MapNullable<T>(Enum? value) where T : struct, Enum =>
         value is null ? null : Map<T>(value);

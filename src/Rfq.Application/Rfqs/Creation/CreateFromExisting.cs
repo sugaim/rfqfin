@@ -17,7 +17,7 @@ public sealed class CreateFromExisting(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanCreateRevision(currentUser.User);
-        var source = await CloseRfq.LoadAsync(cases, sourceCaseId, cancellationToken);
+        var source = await ClosedRfqUseCase.LoadAsync(cases, sourceCaseId, cancellationToken);
         var today = await businessDate.GetCurrentAsync(cancellationToken);
         var sourceBusinessDate = await deskLocalDateResolver.ResolveAsync(
             source.CreatedAt, currentUser.User.DeskId, cancellationToken);

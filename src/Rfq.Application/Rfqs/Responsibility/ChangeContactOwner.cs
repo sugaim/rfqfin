@@ -23,7 +23,7 @@ public sealed class ChangeContactOwner(
             throw new ArgumentException("Contact Owner handoff requires confirmation.", nameof(confirmed));
         }
 
-        var rfqCase = await CloseRfq.LoadAsync(rfqCases, caseId, cancellationToken);
+        var rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanChangeContactOwner(currentUser.User, rfqCase);
         var target = await users.ResolveAsync(targetUserId, cancellationToken)
             ?? throw new ArgumentException($"User '{targetUserId}' was not found.", nameof(targetUserId));

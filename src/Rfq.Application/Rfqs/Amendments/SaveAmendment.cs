@@ -13,7 +13,7 @@ public sealed class SaveAmendment(
         SaveAmendmentCommand command,
         CancellationToken cancellationToken = default)
     {
-        var rfq = await CloseRfq.LoadAsync(cases, command.CaseId, cancellationToken);
+        var rfq = await ClosedRfqUseCase.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanEditRevision(currentUser.User, rfq);
         var transition = AmendmentTransitions.SaveDraft(
             rfq,

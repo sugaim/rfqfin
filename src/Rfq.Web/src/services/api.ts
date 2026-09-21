@@ -75,7 +75,7 @@ export interface SalesRfq {
 }
 
 export interface AmendmentResult { caseId: number; currentRevisionId: string; draftRevisionId: string | null; currentVersion: number; draftVersion: number | null; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null }
-export interface AmendmentItemResult { caseId: number; result: string; error: string | null }
+export interface BulkItemResult { caseId: number; status: 'Succeeded' | 'Skipped' | 'Failed'; code: string | null; message: string | null }
 export interface LifecycleResult { caseId: number; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null; currentVersion: number }
 export interface PersistedEvent { type: string; eventId: number; occurredAt: string; actorUserId: string | null; caseId: number; quoteId?: string; [key: string]: unknown }
 export interface EodSummary { contactOwnerId: string; open: number; hit: number; away: number }
@@ -222,13 +222,6 @@ export interface CloseRfqResult {
   closedQuoteId: string
   owned: boolean
   currentVersion: number
-}
-
-export interface BulkCloseItemResult {
-  caseId: number
-  result: 'Closed' | 'Skipped' | 'Failed'
-  rfqStatus: string | null
-  error: string | null
 }
 
 export interface ContactOwnerResult {
@@ -440,40 +433,40 @@ export const api = createApi({
         body,
       }),
     }),
-    closeRfq: builder.mutation<
+    closeHitRfq: builder.mutation<
       CloseRfqResult,
-      { caseId: number; outcome: 'Hit' | 'Away'; expectedCurrentVersion: number }
+      { caseId: number; expectedCurrentVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/close`,
+        url: `/rfqs/${caseId}/close/hit`,
         method: 'POST',
         body,
       }),
     }),
-    bulkCloseRfqs: builder.mutation<
-      BulkCloseItemResult[],
-      {
-        outcome: 'Hit' | 'Away'
-        items: { caseId: number; expectedCurrentVersion: number }[]
-      }
-    >({
-      query: (body) => ({ url: '/rfqs/bulk-close', method: 'POST', body }),
-    }),
-    correctRfqOutcome: builder.mutation<
+    closeAwayRfq: builder.mutation<
       CloseRfqResult,
-      {
-        caseId: number
-        outcome: 'Hit' | 'Away'
-        reason?: string
-        expectedCurrentVersion: number
-      }
+      { caseId: number; expectedCurrentVersion: number }
+    >({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/close/away`, method: 'POST', body }) }),
+    bulkCloseAwayRfqs: builder.mutation<
+      BulkItemResult[],
+      { items: { caseId: number; expectedCurrentVersion: number }[] }
+    >({
+      query: (body) => ({ url: '/rfqs/bulk-close-away', method: 'POST', body }),
+    }),
+    correctOutcomeToHit: builder.mutation<
+      CloseRfqResult,
+      { caseId: number; reason?: string; expectedCurrentVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/correct-outcome`,
+        url: `/rfqs/${caseId}/outcome/correct-to-hit`,
         method: 'POST',
         body,
       }),
     }),
+    correctOutcomeToAway: builder.mutation<
+      CloseRfqResult,
+      { caseId: number; reason?: string; expectedCurrentVersion: number }
+    >({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/outcome/correct-to-away`, method: 'POST', body }) }),
     changeContactOwner: builder.mutation<
       ContactOwnerResult,
       {
@@ -518,8 +511,8 @@ export const api = createApi({
     discardAmendment: builder.mutation<AmendmentResult, { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }>({
       query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/amendment/discard`, method: 'POST', body }),
     }),
-    bulkConfirmAmendments: builder.mutation<AmendmentItemResult[], { items: { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }[] }>({ query: (body) => ({ url: '/rfqs/amendment/bulk-confirm', method: 'POST', body }) }),
-    bulkDiscardAmendments: builder.mutation<AmendmentItemResult[], { items: { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }[] }>({ query: (body) => ({ url: '/rfqs/amendment/bulk-discard', method: 'POST', body }) }),
+    bulkConfirmAmendments: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }[] }>({ query: (body) => ({ url: '/rfqs/amendment/bulk-confirm', method: 'POST', body }) }),
+    bulkDiscardAmendments: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }[] }>({ query: (body) => ({ url: '/rfqs/amendment/bulk-discard', method: 'POST', body }) }),
     createFromExisting: builder.mutation<InitialRfqResponse, number>({ query: (caseId) => ({ url: `/rfqs/${caseId}/create-from-existing`, method: 'POST' }) }),
     cancelRfq: builder.mutation<LifecycleResult, { caseId: number; expectedCurrentVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/cancel`, method: 'POST', body }) }),
     reopenRfq: builder.mutation<LifecycleResult, { caseId: number; expectedCurrentVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/reopen`, method: 'POST', body }) }),
@@ -547,20 +540,22 @@ export const api = createApi({
 
 export const {
   useAssignTraderMutation,
-  useBulkCloseRfqsMutation,
+  useBulkCloseAwayRfqsMutation,
   useBulkConfirmAmendmentsMutation,
   useBulkDiscardAmendmentsMutation,
   useCancelRfqMutation,
   useCalculateWorkingQuoteMutation,
   useChangeContactOwnerMutation,
   useChangeWorkingQuoteModeMutation,
-  useCloseRfqMutation,
+  useCloseHitRfqMutation,
+  useCloseAwayRfqMutation,
   useConfirmQuoteMutation,
   useConfirmDraftMutation,
   useConfirmNewRfqMutation,
   useCreateDraftMutation,
   useCreateFromExistingMutation,
-  useCorrectRfqOutcomeMutation,
+  useCorrectOutcomeToHitMutation,
+  useCorrectOutcomeToAwayMutation,
   useDiscardDraftMutation,
   useDiscardAmendmentMutation,
   useConfirmAmendmentMutation,

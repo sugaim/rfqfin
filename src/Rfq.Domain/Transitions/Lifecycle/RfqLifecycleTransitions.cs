@@ -55,12 +55,38 @@ public static class RfqLifecycleTransitions
             new QuoteRequested(QuoteRequestReason.Reopened)));
     }
 
-    public static CloseTransitionResult Close(
-        RfqCase rfq, RfqStatus outcome, StateVersion expectedVersion)
+    public static CloseTransitionResult CloseHit(
+        RfqCase rfq, StateVersion expectedVersion) =>
+        Close(rfq, expectedVersion, (revisionId, quoteId) => new HitRfq(revisionId, quoteId));
+
+    public static CloseTransitionResult CloseAway(
+        RfqCase rfq, StateVersion expectedVersion) =>
+        Close(rfq, expectedVersion, (revisionId, quoteId) => new AwayRfq(revisionId, quoteId));
+
+    public static RfqCase CorrectToHit(RfqCase rfq, StateVersion expectedVersion)
     {
         rfq.EnsureVersion(expectedVersion);
-        if (outcome is not RfqStatus.Hit and not RfqStatus.Away)
-            throw new DomainValidationException("Close outcome must be Hit or Away.");
+        if (rfq.Lifecycle is not AwayRfq away)
+            throw new DomainRuleViolationException("Only an Away RFQ can be corrected to Hit.");
+        return rfq.Next(lifecycle: new HitRfq(
+            away.CurrentRevisionId, away.ClosedQuoteId));
+    }
+
+    public static RfqCase CorrectToAway(RfqCase rfq, StateVersion expectedVersion)
+    {
+        rfq.EnsureVersion(expectedVersion);
+        if (rfq.Lifecycle is not HitRfq hit)
+            throw new DomainRuleViolationException("Only a Hit RFQ can be corrected to Away.");
+        return rfq.Next(lifecycle: new AwayRfq(
+            hit.CurrentRevisionId, hit.ClosedQuoteId));
+    }
+
+    private static CloseTransitionResult Close(
+        RfqCase rfq,
+        StateVersion expectedVersion,
+        Func<RevisionId, QuoteId, ClosedRfq> createClosed)
+    {
+        rfq.EnsureVersion(expectedVersion);
         var quoteId = rfq.Lifecycle switch
         {
             ActiveRfq { QuoteState: QuoteConfirmed confirmed } => confirmed.QuoteId,
@@ -70,22 +96,8 @@ public static class RfqLifecycleTransitions
         };
         var discarded = rfq.PendingDraftRevision?.Discard(rfq.PendingDraftRevision.Version);
         var next = rfq.Next(
-            lifecycle: new ClosedRfq(rfq.CurrentRevision.RevisionId, quoteId, outcome),
+            lifecycle: createClosed(rfq.CurrentRevision.RevisionId, quoteId),
             clearPendingDraft: true);
         return new CloseTransitionResult(next, discarded);
-    }
-
-    public static RfqCase CorrectOutcome(
-        RfqCase rfq, RfqStatus outcome, StateVersion expectedVersion)
-    {
-        rfq.EnsureVersion(expectedVersion);
-        if (rfq.Lifecycle is not ClosedRfq closed)
-            throw new DomainRuleViolationException("Only a Closed RFQ outcome can be corrected.");
-        if (outcome is not RfqStatus.Hit and not RfqStatus.Away)
-            throw new DomainValidationException("Corrected outcome must be Hit or Away.");
-        if (closed.Outcome == outcome)
-            throw new DomainRuleViolationException("Outcome correction must change Hit to Away or Away to Hit.");
-        return rfq.Next(lifecycle: new ClosedRfq(
-            closed.CurrentRevisionId, closed.ClosedQuoteId, outcome));
     }
 }
