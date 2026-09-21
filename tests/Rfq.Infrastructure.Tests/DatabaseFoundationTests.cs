@@ -276,6 +276,61 @@ public sealed class DatabaseFoundationTests(PostgreSqlFixture fixture)
         Assert.Contains("ux_rfq_revisions_one_draft_per_case", exception.Message);
     }
 
+    [Fact]
+    public async Task ConcurrentOwnershipChangeRejectsSecondTrader()
+    {
+        await RecreateDatabaseAsync();
+        var sales = UserId.Create("sales-concurrency");
+        long caseId;
+
+        await using (var seedContext = fixture.CreateContext())
+        {
+            caseId = (await new PostgreSqlCaseIdGenerator(seedContext).NextAsync()).Value;
+            var rfqCase = RfqCase.CreateDraft(
+                new CaseId(caseId),
+                ClientId.Create("client-concurrency"),
+                SecurityId.Create("security-concurrency"),
+                CategoryId.Create("JGB"),
+                UserId.Create("trader-a"),
+                100_000_000m,
+                new DateOnly(2026, 9, 24),
+                new DateOnly(2026, 9, 23),
+                null,
+                sales,
+                DateTimeOffset.UtcNow);
+            rfqCase.ConfirmInitial(
+                new DateOnly(2026, 9, 21),
+                sales,
+                DateTimeOffset.UtcNow,
+                rfqCase.InitialRevision.Version);
+            new RfqCaseRepository(seedContext).Add(rfqCase);
+            await new WorkingQuoteEnsurer(seedContext).EnsureAsync(
+                rfqCase.InitialRevision.RevisionId,
+                sales,
+                DateTimeOffset.UtcNow);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var firstContext = fixture.CreateContext();
+        await using var secondContext = fixture.CreateContext();
+        var firstRepository = new RfqCaseRepository(firstContext);
+        var secondRepository = new RfqCaseRepository(secondContext);
+        var first = Assert.IsType<RfqCase>(
+            await firstRepository.GetAsync(new CaseId(caseId)));
+        var second = Assert.IsType<RfqCase>(
+            await secondRepository.GetAsync(new CaseId(caseId)));
+
+        first.PickUp(UserId.Create("trader-a"), first.CurrentVersion);
+        second.PickUp(UserId.Create("trader-b"), second.CurrentVersion);
+        firstRepository.Update(first);
+        secondRepository.Update(second);
+        await new EfUnitOfWork(firstContext).SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new EfUnitOfWork(secondContext).SaveChangesAsync());
+        Assert.Contains("changed by another user", exception.Message);
+    }
+
     [Theory]
     [InlineData("375-1", "sec-jgb-375")]
     [InlineData("jgb 0.500 3/20/30 #375", "sec-jgb-375")]

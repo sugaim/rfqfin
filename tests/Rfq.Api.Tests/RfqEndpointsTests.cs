@@ -111,6 +111,106 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     }
 
     [Fact]
+    public async Task TraderOwnershipWorkflowSupportsRoutingPermissionsAndConcurrency()
+    {
+        using var sales = CreateClient("sales-dev");
+        var createResponse = await sales.PostAsJsonAsync(
+            "/api/rfqs/confirm",
+            new
+            {
+                ClientId = "client-001",
+                SecurityId = "sec-jgb-375",
+                Notional = 100_000_000m,
+                SettlementDate = "2026-09-24",
+                AssignedTraderId = "trader-a",
+            });
+        var created = await AssertCreatedAsync(createResponse);
+
+        using var traderA = CreateClient("trader-a");
+        var rows = await traderA.GetFromJsonAsync<List<TraderRfqBody>>(
+            "/api/trader/rfqs/active");
+        var row = Assert.Single(rows!, item => item.CaseId == created.CaseId);
+        Assert.False(row.Owned);
+        Assert.Equal("trader-a", row.AssignedTraderId);
+
+        var pickUp = await traderA.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/pick-up",
+            new { row.ExpectedVersion, Confirmed = false });
+        var pickedUp = await AssertOwnershipOkAsync(pickUp);
+        Assert.True(pickedUp.Owned);
+        Assert.Equal("trader-a", pickedUp.AssignedTraderId);
+
+        var release = await traderA.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/release",
+            new { ExpectedVersion = pickedUp.CurrentVersion });
+        var released = await AssertOwnershipOkAsync(release);
+        Assert.False(released.Owned);
+
+        var assign = await traderA.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/assign",
+            new { TargetTraderId = "trader-b", ExpectedVersion = released.CurrentVersion });
+        var assigned = await AssertOwnershipOkAsync(assign);
+        Assert.Equal("trader-b", assigned.AssignedTraderId);
+        Assert.False(assigned.Owned);
+
+        var missingConfirmation = await traderA.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/pick-up",
+            new { ExpectedVersion = assigned.CurrentVersion, Confirmed = false });
+        Assert.Equal(HttpStatusCode.BadRequest, missingConfirmation.StatusCode);
+
+        using var traderB = CreateClient("trader-b");
+        var ownerBResponse = await traderB.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/pick-up",
+            new { ExpectedVersion = assigned.CurrentVersion, Confirmed = false });
+        var ownerB = await AssertOwnershipOkAsync(ownerBResponse);
+        Assert.True(ownerB.Owned);
+
+        var forbiddenRelease = await traderA.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/release",
+            new { ExpectedVersion = ownerB.CurrentVersion });
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenRelease.StatusCode);
+
+        var takeOverResponse = await traderA.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/take-over",
+            new { ExpectedVersion = ownerB.CurrentVersion, Confirmed = true });
+        var takenOver = await AssertOwnershipOkAsync(takeOverResponse);
+        Assert.True(takenOver.Owned);
+        Assert.Equal("trader-a", takenOver.AssignedTraderId);
+
+        var staleTakeOver = await traderB.PostAsJsonAsync(
+            $"/api/trader/rfqs/{created.CaseId}/take-over",
+            new { ExpectedVersion = ownerB.CurrentVersion, Confirmed = true });
+        Assert.Equal(HttpStatusCode.Conflict, staleTakeOver.StatusCode);
+
+        var forbiddenCreate = await traderA.PostAsJsonAsync(
+            "/api/rfqs",
+            new { ClientId = "client-001", SecurityId = "sec-jgb-375" });
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenCreate.StatusCode);
+    }
+
+    [Fact]
+    public async Task RevisionChangesRequireContactOwnerThroughCentralAuthorization()
+    {
+        using var owner = CreateClient("sales-dev");
+        var createResponse = await owner.PostAsJsonAsync(
+            "/api/rfqs",
+            new { ClientId = "client-004", SecurityId = "sec-other-1" });
+        var draft = await AssertCreatedAsync(createResponse);
+
+        using var otherSales = CreateClient("sales-a");
+        var response = await otherSales.PutAsJsonAsync(
+            $"/api/rfqs/{draft.CaseId}/draft",
+            new
+            {
+                Notional = 1_000_000m,
+                SettlementDate = "2026-09-24",
+                ExpectedVersion = draft.Version,
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task MasterSearchAndDefaultsEndpointsReturnSeededData()
     {
         using var client = fixture.Factory.CreateClient();
@@ -146,6 +246,24 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
             await response.Content.ReadFromJsonAsync<InitialRfqBody>());
     }
 
+    private HttpClient CreateClient(string userId)
+    {
+        var client = fixture.Factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Development-User", userId);
+        return client;
+    }
+
+    private static async Task<OwnershipBody> AssertOwnershipOkAsync(
+        HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == HttpStatusCode.OK,
+            $"Expected 200 OK but received {(int)response.StatusCode}: {responseBody}");
+        return Assert.IsType<OwnershipBody>(
+            await response.Content.ReadFromJsonAsync<OwnershipBody>());
+    }
+
     private sealed record InitialRfqBody(
         long CaseId,
         Guid RevisionId,
@@ -172,6 +290,21 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         string RevisionStatus,
         string? QuoteStatus,
         string? QuoteRequestReason);
+
+    private sealed record TraderRfqBody(
+        long CaseId,
+        string AssignedTraderId,
+        bool Owned,
+        long CurrentVersion)
+    {
+        public long ExpectedVersion => CurrentVersion;
+    }
+
+    private sealed record OwnershipBody(
+        long CaseId,
+        string AssignedTraderId,
+        bool Owned,
+        long CurrentVersion);
 
     private sealed record SecurityBody(string SecurityId);
     private sealed record ClientBody(string ClientId);

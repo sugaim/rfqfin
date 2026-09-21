@@ -3,10 +3,35 @@ using Rfq.Domain;
 
 namespace Rfq.Api;
 
-public sealed class DevelopmentCurrentUser : ICurrentUser
+public sealed class DevelopmentCurrentUser(
+    IHttpContextAccessor httpContextAccessor,
+    IConfiguration configuration) : ICurrentUser
 {
-    public CurrentUser User { get; } = new(
-        UserId.Create("sales-dev"),
-        new HashSet<UserRole> { UserRole.Sales },
+    public const string HeaderName = "X-Development-User";
+
+    public CurrentUser User
+    {
+        get
+        {
+            var requestedUser = httpContextAccessor.HttpContext?.Request.Headers[HeaderName]
+                .FirstOrDefault();
+            var userId = string.IsNullOrWhiteSpace(requestedUser)
+                ? configuration["DevelopmentIdentity:DefaultUserId"] ?? "sales-dev"
+                : requestedUser;
+            return userId switch
+            {
+                "sales-dev" => Create("sales-dev", UserRole.Sales),
+                "sales-a" => Create("sales-a", UserRole.Sales),
+                "trader-a" => Create("trader-a", UserRole.Trader),
+                "trader-b" => Create("trader-b", UserRole.Trader),
+                _ => throw new UnauthorizedAccessException(
+                    $"Unknown development identity '{userId}'."),
+            };
+        }
+    }
+
+    private static CurrentUser Create(string userId, UserRole role) => new(
+        UserId.Create(userId),
+        new HashSet<UserRole> { role },
         "jpy-credit");
 }

@@ -116,6 +116,7 @@ public sealed class CreateDraftTests
                 new StubSettlementResolver(),
                 currentUser);
             var traderValidator = new AssignedTraderValidator(users, currentUser);
+            var authorization = new RfqAuthorization();
             var factory = new InitialRfqFactory(
                 new StubCaseIdGenerator(101),
                 new StubClientSearch(),
@@ -124,12 +125,18 @@ public sealed class CreateDraftTests
                 currentUser,
                 timeProvider);
 
-            CreateDraft = new CreateDraft(factory, Repository, UnitOfWork);
+            CreateDraft = new CreateDraft(
+                factory,
+                Repository,
+                authorization,
+                currentUser,
+                UnitOfWork);
             ConfirmInitialDraft = new ConfirmInitialDraft(
                 Repository,
                 traderValidator,
                 WorkingQuotes,
                 systemDate,
+                authorization,
                 currentUser,
                 UnitOfWork,
                 timeProvider);
@@ -138,11 +145,13 @@ public sealed class CreateDraftTests
                 Repository,
                 WorkingQuotes,
                 systemDate,
+                authorization,
                 currentUser,
                 UnitOfWork,
                 timeProvider);
             DiscardInitialDraft = new DiscardInitialDraft(
                 Repository,
+                authorization,
                 currentUser,
                 UnitOfWork);
         }
@@ -187,6 +196,11 @@ public sealed class CreateDraftTests
             UserId salesUserId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SalesRfqListItem>>([]);
+
+        public Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
+            string deskId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TraderRfqListItem>>([]);
     }
 
     private sealed class RecordingWorkingQuoteEnsurer : IWorkingQuoteEnsurer

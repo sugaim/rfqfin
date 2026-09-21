@@ -101,15 +101,58 @@ export interface SystemDateResponse {
   date: string
 }
 
+export interface CurrentUserResponse {
+  userId: string
+  roles: string[]
+  deskId: string
+}
+
+export interface TraderRfq {
+  caseId: number
+  clientId: string
+  clientName: string
+  securityId: string
+  securityJapaneseName: string
+  securityBbgDisplay: string
+  categoryId: string
+  rfqStatus: string
+  quoteStatus: string | null
+  quoteRequestReason: string | null
+  contactOwnerId: string
+  assignedTraderId: string
+  owned: boolean
+  currentVersion: number
+  settlementDate: string | null
+  notional: number | null
+  createdAt: string
+}
+
+export interface OwnershipResult {
+  caseId: number
+  assignedTraderId: string
+  owned: boolean
+  currentVersion: number
+}
+
 export const api = createApi({
   reducerPath: 'api',
-  baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
+  baseQuery: fetchBaseQuery({
+    baseUrl: '/api',
+    prepareHeaders: (headers) => {
+      const identity = window.localStorage.getItem('rfq-development-user')
+      if (identity) headers.set('X-Development-User', identity)
+      return headers
+    },
+  }),
   endpoints: (builder) => ({
     getHealth: builder.query<HealthResponse, void>({
       query: () => '/health',
     }),
     getSystemDate: builder.query<SystemDateResponse, void>({
       query: () => '/system-date',
+    }),
+    getCurrentUser: builder.query<CurrentUserResponse, void>({
+      query: () => '/current-user',
     }),
     getActiveSalesRfqs: builder.query<SalesRfq[], void>({
       query: () => '/rfqs/active-sales',
@@ -155,6 +198,49 @@ export const api = createApi({
         body: { expectedVersion },
       }),
     }),
+    getActiveTraderRfqs: builder.query<TraderRfq[], void>({
+      query: () => '/trader/rfqs/active',
+    }),
+    pickUpRfq: builder.mutation<
+      OwnershipResult,
+      { caseId: number; expectedVersion: number; confirmed: boolean }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/trader/rfqs/${caseId}/pick-up`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    releaseRfq: builder.mutation<
+      OwnershipResult,
+      { caseId: number; expectedVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/trader/rfqs/${caseId}/release`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    assignTrader: builder.mutation<
+      OwnershipResult,
+      { caseId: number; targetTraderId: string; expectedVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/trader/rfqs/${caseId}/assign`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    takeOverRfq: builder.mutation<
+      OwnershipResult,
+      { caseId: number; expectedVersion: number; confirmed: boolean }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/trader/rfqs/${caseId}/take-over`,
+        method: 'POST',
+        body,
+      }),
+    }),
     searchClients: builder.query<ClientSearchResult[], string>({
       query: (q) => ({ url: '/masters/clients/search', params: { q } }),
       keepUnusedDataFor: 0,
@@ -177,16 +263,22 @@ export const api = createApi({
 })
 
 export const {
+  useAssignTraderMutation,
   useConfirmDraftMutation,
   useConfirmNewRfqMutation,
   useCreateDraftMutation,
   useDiscardDraftMutation,
+  useGetActiveTraderRfqsQuery,
   useGetActiveSalesRfqsQuery,
+  useGetCurrentUserQuery,
   useGetHealthQuery,
   useGetSystemDateQuery,
   useGetUsersQuery,
   useLazyResolveRfqDefaultsQuery,
   useLazySearchClientsQuery,
   useLazySearchSecuritiesQuery,
+  usePickUpRfqMutation,
+  useReleaseRfqMutation,
+  useTakeOverRfqMutation,
   useUpdateDraftMutation,
 } = api

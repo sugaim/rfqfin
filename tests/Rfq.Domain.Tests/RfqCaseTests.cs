@@ -102,6 +102,52 @@ public sealed class RfqCaseTests
             false));
     }
 
+    [Fact]
+    public void OwnershipOperationsPreserveAssignedOwnerInvariant()
+    {
+        var traderOne = UserId.Create("trader-1");
+        var traderTwo = UserId.Create("trader-2");
+        var rfqCase = CreateValidDraft(UserId.Create("sales-1"));
+        rfqCase.ConfirmInitial(
+            new DateOnly(2026, 9, 21),
+            UserId.Create("sales-1"),
+            DateTimeOffset.UtcNow,
+            rfqCase.InitialRevision.Version);
+
+        rfqCase.PickUp(traderOne, 2);
+        Assert.True(rfqCase.Owned);
+        Assert.Equal(traderOne, rfqCase.AssignedTraderId);
+
+        rfqCase.Release(traderOne, 3);
+        Assert.False(rfqCase.Owned);
+        Assert.Equal(traderOne, rfqCase.AssignedTraderId);
+
+        rfqCase.AssignTo(traderTwo, 4);
+        Assert.False(rfqCase.Owned);
+        Assert.Equal(traderTwo, rfqCase.AssignedTraderId);
+
+        rfqCase.PickUp(traderTwo, 5);
+        rfqCase.TakeOver(traderOne, 6);
+        Assert.True(rfqCase.Owned);
+        Assert.Equal(traderOne, rfqCase.AssignedTraderId);
+        Assert.Equal(7, rfqCase.CurrentVersion);
+        Assert.Equal(traderOne, Assert.IsType<OpenRfq>(rfqCase.Lifecycle).AssignedTraderId);
+    }
+
+    [Fact]
+    public void OwnershipChangeRejectsStaleCurrentVersion()
+    {
+        var rfqCase = CreateValidDraft(UserId.Create("sales-1"));
+        rfqCase.ConfirmInitial(
+            new DateOnly(2026, 9, 21),
+            UserId.Create("sales-1"),
+            DateTimeOffset.UtcNow,
+            rfqCase.InitialRevision.Version);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            rfqCase.PickUp(UserId.Create("trader-1"), 1));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

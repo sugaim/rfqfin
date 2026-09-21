@@ -13,6 +13,7 @@ public sealed class RfqCase
         UserId contactOwnerId,
         UserId assignedTraderId,
         bool owned,
+        long currentVersion,
         RfqRevision initialRevision,
         RfqLifecycle lifecycle)
     {
@@ -26,6 +27,7 @@ public sealed class RfqCase
         ContactOwnerId = contactOwnerId;
         AssignedTraderId = assignedTraderId;
         Owned = owned;
+        CurrentVersion = currentVersion;
         InitialRevision = initialRevision;
         Lifecycle = lifecycle;
     }
@@ -49,6 +51,8 @@ public sealed class RfqCase
     public UserId AssignedTraderId { get; private set; }
 
     public bool Owned { get; private set; }
+
+    public long CurrentVersion { get; private set; }
 
     public RfqStatus Status => Lifecycle is OpenRfq ? RfqStatus.Active : RfqStatus.Draft;
 
@@ -100,6 +104,7 @@ public sealed class RfqCase
             createdBy,
             assignedTraderId,
             false,
+            1,
             initialRevision,
             new DraftRfq(initialRevision.RevisionId));
     }
@@ -115,6 +120,7 @@ public sealed class RfqCase
         UserId contactOwnerId,
         UserId assignedTraderId,
         bool owned,
+        long currentVersion,
         RfqRevision initialRevision,
         RfqLifecycle lifecycle)
     {
@@ -129,6 +135,7 @@ public sealed class RfqCase
             contactOwnerId,
             assignedTraderId,
             owned,
+            currentVersion,
             initialRevision,
             lifecycle);
     }
@@ -147,6 +154,7 @@ public sealed class RfqCase
             salesAndTradingMessage,
             expectedVersion);
         AssignedTraderId = assignedTraderId;
+        CurrentVersion++;
     }
 
     public void ConfirmInitial(
@@ -162,6 +170,7 @@ public sealed class RfqCase
             systemDate);
         InitialRevision.Confirm(confirmedAt, confirmedBy, expectedVersion);
         OpenInitialRevision();
+        CurrentVersion++;
     }
 
     public void UpdateAndConfirmInitial(
@@ -185,12 +194,63 @@ public sealed class RfqCase
             expectedVersion);
         AssignedTraderId = assignedTraderId;
         OpenInitialRevision();
+        CurrentVersion++;
     }
 
     public void DiscardInitialDraft(long expectedVersion)
     {
         EnsureInitialDraftLifecycle();
         InitialRevision.Discard(expectedVersion);
+        CurrentVersion++;
+    }
+
+    public void PickUp(UserId traderId, long expectedVersion)
+    {
+        EnsureOpenCurrent(expectedVersion);
+        if (Owned)
+        {
+            throw new InvalidOperationException("Owned RFQs cannot be picked up.");
+        }
+
+        SetOwnership(traderId, true);
+    }
+
+    public void Release(UserId traderId, long expectedVersion)
+    {
+        EnsureOpenCurrent(expectedVersion);
+        if (!Owned || AssignedTraderId != traderId)
+        {
+            throw new InvalidOperationException("Only the owning Trader can release the RFQ.");
+        }
+
+        SetOwnership(AssignedTraderId, false);
+    }
+
+    public void AssignTo(UserId traderId, long expectedVersion)
+    {
+        EnsureOpenCurrent(expectedVersion);
+        if (Owned)
+        {
+            throw new InvalidOperationException("Owned RFQs cannot be assigned.");
+        }
+
+        SetOwnership(traderId, false);
+    }
+
+    public void TakeOver(UserId traderId, long expectedVersion)
+    {
+        EnsureOpenCurrent(expectedVersion);
+        if (!Owned)
+        {
+            throw new InvalidOperationException("Unowned RFQs do not require Take Over.");
+        }
+
+        if (AssignedTraderId == traderId)
+        {
+            throw new InvalidOperationException("The RFQ is already owned by this Trader.");
+        }
+
+        SetOwnership(traderId, true);
     }
 
     private void OpenInitialRevision()
@@ -211,6 +271,34 @@ public sealed class RfqCase
         {
             throw new InvalidOperationException("The RFQ Case is not an initial Draft.");
         }
+    }
+
+    private void EnsureOpenCurrent(long expectedVersion)
+    {
+        if (Lifecycle is not OpenRfq)
+        {
+            throw new InvalidOperationException("Ownership can only change for an Open RFQ.");
+        }
+
+        if (CurrentVersion != expectedVersion)
+        {
+            throw new InvalidOperationException("The RFQ Case was changed by another user.");
+        }
+    }
+
+    private void SetOwnership(UserId assignedTraderId, bool owned)
+    {
+        var open = (OpenRfq)Lifecycle;
+        AssignedTraderId = assignedTraderId;
+        Owned = owned;
+        CurrentVersion++;
+        Lifecycle = new OpenRfq(
+            open.CurrentRevisionId,
+            open.ContactOwnerId,
+            assignedTraderId,
+            open.QuoteStatus,
+            open.QuoteRequestReason,
+            owned);
     }
 
     private static void ValidateConfirmation(

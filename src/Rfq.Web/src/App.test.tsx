@@ -1,18 +1,21 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
-import { AppShell, SalesScreen, type SalesScreenProps } from './App'
-import type { ClientSearchResult, RfqDefaults, SalesRfq, SecuritySearchResult } from './services/api'
+import { AppShell, SalesScreen, TraderScreen, type SalesScreenProps, type TraderScreenProps } from './App'
+import type { ClientSearchResult, RfqDefaults, SalesRfq, SecuritySearchResult, TraderRfq } from './services/api'
+
+type GridRow = SalesRfq | TraderRfq
 
 vi.mock('ag-grid-react', () => ({
   AgGridReact: ({ rowData, onRowClicked }: {
-    rowData: SalesRfq[]
-    onRowClicked?: (event: { data: SalesRfq }) => void
+    rowData: GridRow[]
+    onRowClicked?: (event: { data: GridRow }) => void
   }) => (
     <div>
       {rowData.map((row) => (
         <button key={row.caseId} onClick={() => onRowClicked?.({ data: row })}>
           {row.clientId} {row.clientName} {row.securityId} {row.securityJapaneseName}{' '}
-          {row.securityBbgDisplay} {row.rfqStatus} {row.revisionStatus}{' '}
+          {row.securityBbgDisplay} {row.rfqStatus}{' '}
+          {'revisionStatus' in row ? row.revisionStatus : ''}{' '}
           {row.quoteStatus} {row.quoteRequestReason}
         </button>
       ))}
@@ -172,5 +175,69 @@ describe('SalesScreen', () => {
       assignedTraderId: 'trader-a',
       expectedVersion: 3,
     }))
+  })
+})
+
+const traderRow: TraderRfq = {
+  caseId: 201,
+  clientId: 'client-001',
+  clientName: 'Client One',
+  securityId: 'sec-jgb-375',
+  securityJapaneseName: 'JGB 375',
+  securityBbgDisplay: 'JGB 0.5 03/20/2030 #375',
+  categoryId: 'JGB',
+  rfqStatus: 'Active',
+  quoteStatus: 'Requested',
+  quoteRequestReason: 'Initial',
+  contactOwnerId: 'sales-dev',
+  assignedTraderId: 'trader-a',
+  owned: false,
+  currentVersion: 4,
+  settlementDate: '2026-09-23',
+  notional: 100000000,
+  createdAt: '2026-09-21T00:00:00Z',
+}
+
+const traderProps: TraderScreenProps = {
+  rfqs: [traderRow],
+  traders: [
+    { userId: 'trader-a', name: 'Trader A' },
+    { userId: 'trader-b', name: 'Trader B' },
+  ],
+  currentUserId: 'trader-a',
+  isLoading: false,
+  isError: false,
+  isMutating: false,
+  onPickUp: vi.fn().mockResolvedValue(undefined),
+  onRelease: vi.fn().mockResolvedValue(undefined),
+  onAssign: vi.fn().mockResolvedValue(undefined),
+  onTakeOver: vi.fn().mockResolvedValue(undefined),
+  onReload: vi.fn(),
+}
+
+describe('TraderScreen', () => {
+  it('picks up a self-assigned unowned RFQ without confirmation', async () => {
+    const onPickUp = vi.fn().mockResolvedValue(undefined)
+    render(<TraderScreen {...traderProps} onPickUp={onPickUp} />)
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Up' }))
+
+    await waitFor(() => expect(onPickUp).toHaveBeenCalledWith(201, 4, false))
+  })
+
+  it('requires confirmation to take over an RFQ owned by another trader', async () => {
+    const onTakeOver = vi.fn().mockResolvedValue(undefined)
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{ ...traderRow, assignedTraderId: 'trader-b', owned: true }]}
+        onTakeOver={onTakeOver}
+      />,
+    )
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+    fireEvent.click(screen.getByRole('button', { name: 'Take Over' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
+
+    await waitFor(() => expect(onTakeOver).toHaveBeenCalledWith(201, 4, true))
   })
 })

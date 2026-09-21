@@ -54,8 +54,13 @@ body {
 }
 
 .work-pane,
-.rfq-grid-card {
+.rfq-grid-card,
+.trader-grid-card {
   min-height: 520px;
+}
+
+.ownership-actions {
+  margin-bottom: 16px;
 }
 
 .form-alert,

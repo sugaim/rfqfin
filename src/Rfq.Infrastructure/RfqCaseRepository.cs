@@ -47,7 +47,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                 QuoteRequestReason = rfqCase.QuoteRequestReason,
                 CurrentRevisionId = revision.RevisionId,
                 CurrentRevision = revision,
-                Version = 1,
+                Version = rfqCase.CurrentVersion,
                 ContactOwnerId = rfqCase.ContactOwnerId.Value,
                 AssignedTraderId = rfqCase.AssignedTraderId.Value,
                 Owned = rfqCase.Owned,
@@ -112,6 +112,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             UserId.Create(entity.Current.ContactOwnerId),
             UserId.Create(entity.Current.AssignedTraderId),
             entity.Current.Owned,
+            entity.Current.Version,
             revision,
             lifecycle);
     }
@@ -143,7 +144,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         entity.Current.ContactOwnerId = rfqCase.ContactOwnerId.Value;
         entity.Current.AssignedTraderId = rfqCase.AssignedTraderId.Value;
         entity.Current.Owned = rfqCase.Owned;
-        entity.Current.Version++;
+        entity.Current.Version = rfqCase.CurrentVersion;
     }
 
     public async Task<IReadOnlyList<SalesRfqListItem>> GetActiveSalesRfqsAsync(
@@ -194,6 +195,55 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                 entity.Current.CurrentRevision.Notional,
                 entity.Current.CurrentRevision.SalesAndTradingMessage,
                 entity.Current.CurrentRevision.Version,
+                entity.CreatedAt))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
+        string deskId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deskId);
+
+        return await dbContext.RfqCases
+            .AsNoTracking()
+            .Where(entity =>
+                entity.Current.Lifecycle == RfqLifecycleKind.Open
+                && dbContext.MasterUsers.Any(user =>
+                    user.UserId == entity.Current.AssignedTraderId
+                    && user.DeskId == deskId))
+            .OrderByDescending(entity => entity.CreatedAt)
+            .ThenBy(entity => entity.CaseId)
+            .Select(entity => new TraderRfqListItem(
+                entity.CaseId,
+                entity.ClientId,
+                dbContext.Clients
+                    .Where(client => client.ClientId == entity.ClientId)
+                    .Select(client => client.Name)
+                    .FirstOrDefault() ?? entity.ClientId,
+                entity.SecurityId,
+                dbContext.Securities
+                    .Where(security => security.SecurityId == entity.SecurityId)
+                    .Select(security => security.JapaneseName)
+                    .FirstOrDefault() ?? entity.SecurityId,
+                dbContext.Securities
+                    .Where(security => security.SecurityId == entity.SecurityId)
+                    .Select(security => security.BbgDisplay)
+                    .FirstOrDefault() ?? entity.SecurityId,
+                entity.CategorySnapshot,
+                entity.Current.RfqStatus.ToString(),
+                entity.Current.QuoteStatus == null
+                    ? null
+                    : entity.Current.QuoteStatus.Value.ToString(),
+                entity.Current.QuoteRequestReason == null
+                    ? null
+                    : entity.Current.QuoteRequestReason.Value.ToString(),
+                entity.Current.ContactOwnerId,
+                entity.Current.AssignedTraderId,
+                entity.Current.Owned,
+                entity.Current.Version,
+                entity.Current.CurrentRevision.SettlementDate,
+                entity.Current.CurrentRevision.Notional,
                 entity.CreatedAt))
             .ToListAsync(cancellationToken);
     }

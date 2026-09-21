@@ -13,6 +13,7 @@ public sealed record UpdateInitialDraftCommand(
 public sealed class UpdateInitialDraft(
     IRfqCaseRepository rfqCases,
     AssignedTraderValidator assignedTraderValidator,
+    IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
@@ -20,11 +21,11 @@ public sealed class UpdateInitialDraft(
         UpdateInitialDraftCommand command,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await GetOwnedDraftAsync(
+        var rfqCase = await GetCaseAsync(
             rfqCases,
-            currentUser,
             command.CaseId,
             cancellationToken);
+        authorization.EnsureCanEditRevision(currentUser.User, rfqCase);
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
             rfqCase.AssignedTraderId.Value,
@@ -41,20 +42,13 @@ public sealed class UpdateInitialDraft(
         return InitialRfqResult.From(rfqCase);
     }
 
-    internal static async Task<RfqCase> GetOwnedDraftAsync(
+    internal static async Task<RfqCase> GetCaseAsync(
         IRfqCaseRepository rfqCases,
-        ICurrentUser currentUser,
         long caseId,
         CancellationToken cancellationToken)
     {
         var rfqCase = await rfqCases.GetAsync(new CaseId(caseId), cancellationToken)
             ?? throw new KeyNotFoundException($"RFQ Case '{caseId}' was not found.");
-        if (rfqCase.ContactOwnerId != currentUser.User.UserId)
-        {
-            throw new UnauthorizedAccessException(
-                "Only the current Contact Owner can change the Draft Revision.");
-        }
-
         return rfqCase;
     }
 }
@@ -64,6 +58,7 @@ public sealed class ConfirmInitialDraft(
     AssignedTraderValidator assignedTraderValidator,
     IWorkingQuoteEnsurer workingQuoteEnsurer,
     ISystemDateProvider systemDateProvider,
+    IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
@@ -72,11 +67,11 @@ public sealed class ConfirmInitialDraft(
         UpdateInitialDraftCommand command,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await UpdateInitialDraft.GetOwnedDraftAsync(
+        var rfqCase = await UpdateInitialDraft.GetCaseAsync(
             rfqCases,
-            currentUser,
             command.CaseId,
             cancellationToken);
+        authorization.EnsureCanConfirmRevision(currentUser.User, rfqCase);
         var assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
             rfqCase.AssignedTraderId.Value,
@@ -109,6 +104,7 @@ public sealed class ConfirmNewRfq(
     IRfqCaseRepository rfqCases,
     IWorkingQuoteEnsurer workingQuoteEnsurer,
     ISystemDateProvider systemDateProvider,
+    IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
@@ -117,6 +113,7 @@ public sealed class ConfirmNewRfq(
         CreateDraftCommand command,
         CancellationToken cancellationToken = default)
     {
+        authorization.EnsureCanCreateRevision(currentUser.User);
         var rfqCase = await initialRfqFactory.CreateAsync(command, cancellationToken);
         var systemDate = await systemDateProvider.GetTodayAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
@@ -139,6 +136,7 @@ public sealed class ConfirmNewRfq(
 
 public sealed class DiscardInitialDraft(
     IRfqCaseRepository rfqCases,
+    IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
@@ -147,11 +145,11 @@ public sealed class DiscardInitialDraft(
         long expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await UpdateInitialDraft.GetOwnedDraftAsync(
+        var rfqCase = await UpdateInitialDraft.GetCaseAsync(
             rfqCases,
-            currentUser,
             caseId,
             cancellationToken);
+        authorization.EnsureCanDiscardRevision(currentUser.User, rfqCase);
         rfqCase.DiscardInitialDraft(expectedVersion);
         rfqCases.Update(rfqCase);
         await unitOfWork.SaveChangesAsync(cancellationToken);

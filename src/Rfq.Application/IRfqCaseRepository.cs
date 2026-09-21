@@ -13,6 +13,10 @@ public interface IRfqCaseRepository
     Task<IReadOnlyList<SalesRfqListItem>> GetActiveSalesRfqsAsync(
         UserId salesUserId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
+        string deskId,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IWorkingQuoteEnsurer

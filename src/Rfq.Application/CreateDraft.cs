@@ -48,6 +48,8 @@ public sealed record InitialRfqResult(
 public sealed class CreateDraft(
     InitialRfqFactory initialRfqFactory,
     IRfqCaseRepository rfqCases,
+    IRfqAuthorization authorization,
+    ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
     public async Task<InitialRfqResult> ExecuteAsync(
@@ -55,6 +57,7 @@ public sealed class CreateDraft(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        authorization.EnsureCanCreateRevision(currentUser.User);
 
         var rfqCase = await initialRfqFactory.CreateAsync(command, cancellationToken);
         rfqCases.Add(rfqCase);

@@ -8,7 +8,8 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddRfqApplication();
 builder.Services.AddRfqInfrastructure(builder.Configuration);
-builder.Services.AddSingleton<ICurrentUser, DevelopmentCurrentUser>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, DevelopmentCurrentUser>();
 
 var app = builder.Build();
 
