@@ -8,10 +8,13 @@ namespace Rfq.Api.Controllers;
 public sealed class EventsController(IEventFeed events) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<PersistedEvent>>> GetAfter(
+    public async Task<ActionResult<IReadOnlyList<PersistedEventResponse>>> GetAfter(
         [FromQuery] long after = 0,
-        CancellationToken cancellationToken = default) =>
-        Ok(await events.GetAfterAsync(after, cancellationToken));
+        CancellationToken cancellationToken = default)
+    {
+        var items = await events.GetAfterAsync(after, cancellationToken);
+        return Ok(items.Select(PersistedEventResponse.From).ToArray());
+    }
 
     [HttpGet("stream")]
     public async Task Stream([FromQuery] long after = 0,
@@ -32,4 +35,23 @@ public sealed class EventsController(IEventFeed events) : ControllerBase
             await Response.Body.FlushAsync(cancellationToken);
         }
     }
+}
+
+public sealed record PersistedEventResponse(
+    long EventId,
+    DateTimeOffset OccurredAt,
+    string? ActorUserId,
+    long CaseId,
+    string Kind,
+    string Type,
+    string PayloadJson)
+{
+    public static PersistedEventResponse From(PersistedEvent item) => new(
+        item.EventId,
+        item.OccurredAt,
+        item.ActorUserId?.Value,
+        item.CaseId.Value,
+        item.Kind.ToString(),
+        item.Type,
+        item.PayloadJson);
 }

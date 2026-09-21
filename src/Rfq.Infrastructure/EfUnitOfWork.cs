@@ -31,28 +31,32 @@ public sealed class EfUnitOfWork(
                 {
                     EventId = cursor.LastEventId,
                     OccurredAt = pending.OccurredAt,
-                    ActorUserId = pending.ActorUserId,
+                    ActorUserId = pending.ActorUserId.Value,
                 };
                 dbContext.Events.Add(parent);
-                if (pending.Kind == "Rfq")
+                switch (pending)
                 {
-                    dbContext.RfqEvents.Add(new RfqEventEntity
-                    {
-                        EventId = parent.EventId,
-                        CaseId = pending.CaseId!.Value,
-                        Type = pending.Type,
-                        PayloadJson = pending.PayloadJson,
-                    });
-                }
-                else
-                {
-                    dbContext.QuoteEvents.Add(new QuoteEventEntity
-                    {
-                        EventId = parent.EventId,
-                        QuoteId = pending.QuoteId!.Value,
-                        Type = pending.Type,
-                        PayloadJson = pending.PayloadJson,
-                    });
+                    case PendingRfqEvent rfqEvent:
+                        dbContext.RfqEvents.Add(new RfqEventEntity
+                        {
+                            EventId = parent.EventId,
+                            CaseId = rfqEvent.CaseId.Value,
+                            Type = rfqEvent.Type.ToString(),
+                            PayloadJson = rfqEvent.PayloadJson,
+                        });
+                        break;
+                    case PendingQuoteEvent quoteEvent:
+                        dbContext.QuoteEvents.Add(new QuoteEventEntity
+                        {
+                            EventId = parent.EventId,
+                            QuoteId = quoteEvent.QuoteId.Value,
+                            Type = quoteEvent.Type.ToString(),
+                            PayloadJson = quoteEvent.PayloadJson,
+                        });
+                        break;
+                    default:
+                        throw new DomainInvariantException(
+                            $"Unsupported pending event type '{pending.GetType().Name}'.");
                 }
             }
             await dbContext.SaveChangesAsync(cancellationToken);

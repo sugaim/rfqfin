@@ -33,5 +33,5 @@ public sealed class DevelopmentCurrentUser(
     private static CurrentUser Create(string userId, UserRole role) => new(
         UserId.Create(userId),
         new HashSet<UserRole> { role },
-        "jpy-credit");
+        DeskId.Create("jpy-credit"));
 }

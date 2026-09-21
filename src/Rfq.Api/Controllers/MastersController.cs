@@ -44,7 +44,7 @@ public sealed class MastersController(
                 user.UserId.Value,
                 user.Name,
                 user.Roles.Select(item => item.ToString()).Order().ToArray(),
-                user.DeskId,
+                user.DeskId.Value,
                 user.DefaultQuoteExpiryMinutes)));
     }
 }

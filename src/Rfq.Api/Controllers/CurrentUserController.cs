@@ -17,7 +17,7 @@ public sealed class CurrentUserController(
         return Ok(new CurrentUserResponse(
             currentUser.User.UserId.Value,
             currentUser.User.Roles.Select(role => role.ToString()).Order().ToArray(),
-            currentUser.User.DeskId,
+            currentUser.User.DeskId.Value,
             user?.DefaultQuoteExpiryMinutes));
     }
 }

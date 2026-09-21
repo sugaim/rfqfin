@@ -17,11 +17,10 @@ public interface IRfqCaseRepository
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
-        string deskId,
+        DeskId deskId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ExpiredQuoteCandidate>> GetExpiredQuotesAsync(
         DateTimeOffset now,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<ExpiredQuoteCandidate>>([]);
+        CancellationToken cancellationToken = default);
 }

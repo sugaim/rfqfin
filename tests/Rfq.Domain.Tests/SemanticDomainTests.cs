@@ -19,6 +19,13 @@ public sealed class SemanticDomainTests
     }
 
     [Fact]
+    public void DeskId_normalizes_and_rejects_empty_values()
+    {
+        Assert.Equal("jpy-credit", DeskId.Create("  jpy-credit  ").Value);
+        Assert.Throws<DomainValidationException>(() => DeskId.Create(" "));
+    }
+
+    [Fact]
     public void Present_and_unpresent_preserve_confirmed_quote()
     {
         var (rfq, quote) = ConfirmQuote();

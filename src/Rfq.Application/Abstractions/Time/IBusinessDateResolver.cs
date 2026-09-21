@@ -8,6 +8,6 @@ public interface IBusinessDateResolver
 {
     Task<DateOnly> ResolveAsync(
         DateTimeOffset instant,
-        string deskId,
+        DeskId deskId,
         CancellationToken cancellationToken = default);
 }

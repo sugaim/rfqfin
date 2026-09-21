@@ -64,8 +64,11 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
 
     public void Record(QuoteTransition transition)
     {
-        pending.Add(new("Quote", null, transition.QuoteId.Value,
-            transition.Kind.ToString(), transition.PerformedBy.Value, transition.OccurredAt,
+        pending.Add(new PendingQuoteEvent(
+            transition.QuoteId,
+            transition.Kind,
+            transition.PerformedBy,
+            transition.OccurredAt,
             JsonSerializer.Serialize(new
             {
                 transition.Kind,
@@ -77,8 +80,11 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
 
     public void Record(RfqTransition transition)
     {
-        pending.Add(new("Rfq", transition.CaseId.Value, transition.QuoteId?.Value,
-            transition.Kind.ToString(), transition.PerformedBy.Value, transition.OccurredAt,
+        pending.Add(new PendingRfqEvent(
+            transition.CaseId,
+            transition.Kind,
+            transition.PerformedBy,
+            transition.OccurredAt,
             JsonSerializer.Serialize(new
             {
                 transition.Kind,
@@ -95,14 +101,26 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
     internal void Clear() => pending.Clear();
 }
 
-internal sealed record PendingEvent(
-    string Kind,
-    long? CaseId,
-    Guid? QuoteId,
-    string Type,
-    string? ActorUserId,
+internal abstract record PendingEvent(
+    UserId ActorUserId,
     DateTimeOffset OccurredAt,
     string PayloadJson);
+
+internal sealed record PendingRfqEvent(
+    CaseId CaseId,
+    RfqTransitionKind Type,
+    UserId ActorUserId,
+    DateTimeOffset OccurredAt,
+    string PayloadJson)
+    : PendingEvent(ActorUserId, OccurredAt, PayloadJson);
+
+internal sealed record PendingQuoteEvent(
+    QuoteId QuoteId,
+    QuoteTransitionKind Type,
+    UserId ActorUserId,
+    DateTimeOffset OccurredAt,
+    string PayloadJson)
+    : PendingEvent(ActorUserId, OccurredAt, PayloadJson);
 
 public sealed class CaseMemoRepository(RfqDbContext dbContext) : ICaseMemoRepository
 {

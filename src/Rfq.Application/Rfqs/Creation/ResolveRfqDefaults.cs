@@ -32,7 +32,7 @@ public sealed class ResolveRfqDefaults(
             ?? throw new KeyNotFoundException(
                 $"Current user '{currentUser.User.UserId.Value}' was not found.");
         if (!assignedTrader.Roles.Contains(UserRole.Trader)
-            || !string.Equals(assignedTrader.DeskId, currentUser.User.DeskId, StringComparison.Ordinal))
+            || assignedTrader.DeskId != currentUser.User.DeskId)
         {
             throw new InvalidOperationException(
                 "The configured Assigned Trader must be a Trader on the current user's desk.");

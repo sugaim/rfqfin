@@ -232,7 +232,7 @@ public sealed class PostgreSqlUserDirectory(RfqDbContext dbContext) : IUserDirec
         user.Roles
             .Select(role => Enum.Parse<UserRole>(role, ignoreCase: false))
             .ToHashSet(),
-        user.DeskId,
+        DeskId.Create(user.DeskId),
         user.DefaultQuoteExpiryMinutes);
 }
 
@@ -292,14 +292,14 @@ public sealed class PostgreSqlBusinessDateResolver(RfqDbContext dbContext)
 {
     public async Task<DateOnly> ResolveAsync(
         DateTimeOffset instant,
-        string deskId,
+        DeskId deskId,
         CancellationToken cancellationToken = default)
     {
         var timeZoneId = await dbContext.Desks.AsNoTracking()
-            .Where(item => item.DeskId == deskId)
+            .Where(item => item.DeskId == deskId.Value)
             .Select(item => item.TimeZoneId)
             .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new KeyNotFoundException($"Desk '{deskId}' was not found.");
+            ?? throw new KeyNotFoundException($"Desk '{deskId.Value}' was not found.");
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, timeZone).DateTime);
     }

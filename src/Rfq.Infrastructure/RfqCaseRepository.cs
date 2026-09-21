@@ -254,10 +254,10 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
     }
 
     public async Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
-        string deskId,
+        DeskId deskId,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(deskId);
+        ArgumentNullException.ThrowIfNull(deskId);
 
         var cases = await dbContext.RfqCases
             .AsNoTracking()
@@ -269,7 +269,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                     || entity.Current.Lifecycle == RfqLifecycleKind.Closed)
                 && dbContext.MasterUsers.Any(user =>
                     user.UserId == entity.Current.AssignedTraderId
-                    && user.DeskId == deskId))
+                    && user.DeskId == deskId.Value))
             .OrderByDescending(entity => entity.CreatedAt)
             .ThenBy(entity => entity.CaseId)
             .ToListAsync(cancellationToken);

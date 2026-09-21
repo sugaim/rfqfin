@@ -18,7 +18,7 @@ public sealed class PostgreSqlOperationalQueries(
             .Include(item => item.Current).ThenInclude(item => item.CurrentRevision)
             .Where(item => dbContext.MasterUsers.Any(user =>
                 user.UserId == item.Current.AssignedTraderId
-                && user.DeskId == currentUser.User.DeskId));
+                && user.DeskId == currentUser.User.DeskId.Value));
         if (search.From is not null)
         {
             var from = new DateTimeOffset(search.From.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);

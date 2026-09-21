@@ -226,7 +226,8 @@ public sealed class SemanticApplicationTests
         CalculationDriver.Price, 100m, 100m, 1m, 1m, 0m, 1m, 1m, 10m, 10m);
 
     private static ICurrentUser Current(UserId id, UserRole role) =>
-        new CurrentUserService(new CurrentUser(id, new HashSet<UserRole> { role }, "desk"));
+        new CurrentUserService(new CurrentUser(
+            id, new HashSet<UserRole> { role }, DeskId.Create("desk")));
 
     private sealed record CurrentUserService(CurrentUser User) : ICurrentUser;
 
@@ -245,11 +246,17 @@ public sealed class SemanticApplicationTests
         public void Update(RfqCase rfq) { Updates++; Case = rfq; }
         public void UpdateRevision(RfqRevision revision) => ChangedRevisions.Add(revision);
         public Task<IReadOnlyList<SalesRfqListItem>> GetActiveSalesRfqsAsync(UserId id, CancellationToken token = default) => throw new NotSupportedException();
-        public Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(string desk, CancellationToken token = default)
+        public Task<IReadOnlyList<TraderRfqListItem>> GetActiveTraderRfqsAsync(
+            DeskId desk,
+            CancellationToken token = default)
         {
             TraderQueries++;
             return Task.FromResult(traderRows ?? (IReadOnlyList<TraderRfqListItem>)[]);
         }
+        public Task<IReadOnlyList<ExpiredQuoteCandidate>> GetExpiredQuotesAsync(
+            DateTimeOffset now,
+            CancellationToken token = default) =>
+            Task.FromResult<IReadOnlyList<ExpiredQuoteCandidate>>([]);
     }
 
     private sealed class WorkingRepository : IWorkingQuoteRepository
@@ -317,7 +324,10 @@ public sealed class SemanticApplicationTests
     private sealed class BusinessDates(DateOnly date) : IBusinessDateResolver
     {
         public DateTimeOffset? ReceivedInstant { get; private set; }
-        public Task<DateOnly> ResolveAsync(DateTimeOffset instant, string desk, CancellationToken token = default)
+        public Task<DateOnly> ResolveAsync(
+            DateTimeOffset instant,
+            DeskId desk,
+            CancellationToken token = default)
         { ReceivedInstant = instant; return Task.FromResult(date); }
     }
     private sealed class CaseIds : ICaseIdGenerator { public Task<CaseId> NextAsync(CancellationToken token = default) => Task.FromResult(new CaseId(11)); }
@@ -337,6 +347,7 @@ public sealed class SemanticApplicationTests
     {
         public Task<IReadOnlyList<UserSummary>> GetUsersAsync(UserRole? role = null, CancellationToken token = default) => throw new NotSupportedException();
         public Task<UserSummary?> ResolveAsync(UserId id, CancellationToken token = default) => Task.FromResult<UserSummary?>(
-            new(id, id.Value, new HashSet<UserRole> { id == Trader ? UserRole.Trader : UserRole.Sales }, "desk"));
+            new(id, id.Value, new HashSet<UserRole> { id == Trader ? UserRole.Trader : UserRole.Sales },
+                DeskId.Create("desk")));
     }
 }

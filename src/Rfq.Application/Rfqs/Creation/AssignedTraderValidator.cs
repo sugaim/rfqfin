@@ -16,10 +16,7 @@ public sealed class AssignedTraderValidator(
             ?? throw new KeyNotFoundException(
                 $"Assigned Trader '{assignedTraderId.Value}' was not found.");
         if (!assignedTrader.Roles.Contains(UserRole.Trader)
-            || !string.Equals(
-                assignedTrader.DeskId,
-                currentUser.User.DeskId,
-                StringComparison.Ordinal))
+            || assignedTrader.DeskId != currentUser.User.DeskId)
         {
             throw new ArgumentException(
                 "Assigned Trader must be a Trader on the current user's desk.",

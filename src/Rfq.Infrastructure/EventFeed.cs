@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Rfq.Application;
+using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
@@ -20,10 +21,15 @@ public sealed class PostgreSqlEventFeed(
                                 || rfq.Current.ContactOwnerId == user.UserId.Value
                                 || dbContext.MasterUsers.Any(master =>
                                     master.UserId == rfq.Current.AssignedTraderId
-                                    && master.DeskId == user.DeskId))
+                                    && master.DeskId == user.DeskId.Value))
                         orderby child.EventId
-                        select new PersistedEvent(child.EventId, parent.OccurredAt,
-                            parent.ActorUserId, child.CaseId, "Rfq", child.Type, child.PayloadJson);
+                        select new RfqEventRow(
+                            child.EventId,
+                            parent.OccurredAt,
+                            parent.ActorUserId,
+                            child.CaseId,
+                            child.Type,
+                            child.PayloadJson);
         var quoteEvents = from child in dbContext.QuoteEvents.AsNoTracking()
                           join parent in dbContext.Events.AsNoTracking() on child.EventId equals parent.EventId
                           join quote in dbContext.ConfirmedQuotes.AsNoTracking() on child.QuoteId equals quote.QuoteId
@@ -34,12 +40,33 @@ public sealed class PostgreSqlEventFeed(
                                   || rfq.Current.ContactOwnerId == user.UserId.Value
                                   || dbContext.MasterUsers.Any(master =>
                                       master.UserId == rfq.Current.AssignedTraderId
-                                      && master.DeskId == user.DeskId))
+                                      && master.DeskId == user.DeskId.Value))
                           orderby child.EventId
-                          select new PersistedEvent(child.EventId, parent.OccurredAt,
-                              parent.ActorUserId, revision.CaseId, "Quote", child.Type, child.PayloadJson);
-        var rfqItems = await rfqEvents.Take(1000).ToListAsync(cancellationToken);
-        var quoteItems = await quoteEvents.Take(1000).ToListAsync(cancellationToken);
+                          select new QuoteEventRow(
+                              child.EventId,
+                              parent.OccurredAt,
+                              parent.ActorUserId,
+                              revision.CaseId,
+                              child.QuoteId,
+                              child.Type,
+                              child.PayloadJson);
+        var rfqRows = await rfqEvents.Take(1000).ToListAsync(cancellationToken);
+        var quoteRows = await quoteEvents.Take(1000).ToListAsync(cancellationToken);
+        var rfqItems = rfqRows.Select(row => (PersistedEvent)new PersistedRfqEvent(
+            row.EventId,
+            row.OccurredAt,
+            ToUserId(row.ActorUserId),
+            new CaseId(row.CaseId),
+            row.Type,
+            row.PayloadJson));
+        var quoteItems = quoteRows.Select(row => (PersistedEvent)new PersistedQuoteEvent(
+            row.EventId,
+            row.OccurredAt,
+            ToUserId(row.ActorUserId),
+            new CaseId(row.CaseId),
+            new QuoteId(row.QuoteId),
+            row.Type,
+            row.PayloadJson));
         return rfqItems.Concat(quoteItems)
             .OrderBy(item => item.EventId)
             .Take(1000)
@@ -50,4 +77,24 @@ public sealed class PostgreSqlEventFeed(
         dbContext.Events.AsNoTracking().Select(item => (long?)item.EventId)
             .MaxAsync(cancellationToken).ContinueWith(task => task.Result ?? 0,
                 cancellationToken, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+
+    private static UserId? ToUserId(string? value) =>
+        value is null ? null : UserId.Create(value);
+
+    private sealed record RfqEventRow(
+        long EventId,
+        DateTimeOffset OccurredAt,
+        string? ActorUserId,
+        long CaseId,
+        string Type,
+        string PayloadJson);
+
+    private sealed record QuoteEventRow(
+        long EventId,
+        DateTimeOffset OccurredAt,
+        string? ActorUserId,
+        long CaseId,
+        Guid QuoteId,
+        string Type,
+        string PayloadJson);
 }

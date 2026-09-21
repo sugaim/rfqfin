@@ -53,10 +53,12 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
 
         await using var read = fixture.CreateContext();
         var feed = new PostgreSqlEventFeed(read, new CurrentUserService(
-            new CurrentUser(UserId.Create(salesId), new HashSet<UserRole> { UserRole.Sales }, "desk-jp")));
+            new CurrentUser(UserId.Create(salesId), new HashSet<UserRole> { UserRole.Sales },
+                DeskId.Create("jpy-credit"))));
         var item = Assert.Single(await feed.GetAfterAsync(0));
-        Assert.Equal(caseId, item.CaseId);
-        Assert.Equal("Quote", item.Kind);
+        Assert.Equal(new CaseId(caseId), item.CaseId);
+        Assert.Equal(PersistedEventKind.Quote, item.Kind);
+        Assert.Equal(new QuoteId(quoteId), Assert.IsType<PersistedQuoteEvent>(item).QuoteId);
     }
 
     [Fact]
@@ -168,7 +170,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         var before = await read.WorkingQuotes.CountAsync();
 
         await Assert.ThrowsAsync<DomainInvariantException>(
-            () => repository.GetActiveTraderRfqsAsync("jpy-credit"));
+            () => repository.GetActiveTraderRfqsAsync(DeskId.Create("jpy-credit")));
 
         Assert.Equal(before, await read.WorkingQuotes.CountAsync());
         Assert.False(read.ChangeTracker.HasChanges());
