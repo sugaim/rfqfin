@@ -66,10 +66,10 @@ These rules are the fastest way to understand what must not be casually refactor
 10. **Persistence shape may differ from Domain shape.** Current operational state is stored directly; persisted Events are audit/notification/history, not event sourcing.
 11. **SSE is a wake-up mechanism, not authoritative state.** Authoritative state comes from normal queries/persisted data.
 12. **Calculation does pricing; RFQ Application owns RFQ workflow.** Calculation must not become the owner of lifecycle, ownership, WorkingQuote persistence, or RFQ concurrency.
-13. **Do not silently replace actively edited operator state.** Remote change awareness and authoritative refresh/reconciliation are explicit.
+13. **Server query state is authoritative; local interaction state is separate.** The frontend must not reconstruct business transitions after mutations. Live/Paused reconciliation uses authoritative page projections, while short-lived protected input is not silently overwritten.
 14. **This is a dense operational desktop tool.** Information density, inline/grid editing, keyboard efficiency, and low-friction repeated actions are product requirements; confirmations should be proportional to risk rather than applied everywhere.
 15. **Semantic personal settings are typed.** Theme, Default Quote Mode, and Quote Expiry use typed contracts; grid layout alone is intentionally frontend-owned opaque JSON.
-16. **Source organization is feature-first.** Group by business/use-case ownership; use technical/framework buckets only for genuinely cross-cutting concepts.
+16. **Source organization follows ownership, not framework artifact type.** Backend/Application code groups by business/use-case ownership. Frontend workspace code is page-owned under `pages/<page>`; `shared` is for genuinely cross-page concepts, and `features` is reserved for independent cross-page user features rather than being another name for a page.
 
 ## 4. Documentation rule
 
@@ -787,6 +787,8 @@ No Case ID is created until Save Draft or Confirm.
 
 Closing an unsaved New form discards it without persistence.
 
+Unsaved New input is not authoritative server state and does not suspend Live refresh of the existing RFQ grid.
+
 ### Save Draft
 
 Minimum required:
@@ -800,7 +802,8 @@ Effects:
 - create initial Revision with `Draft`
 - lifecycle = `DraftRfq`
 - Case ID assigned
-- subsequent Draft edits autosave through an explicit initial-Draft Domain transition
+- the persisted Draft becomes the server-side working copy
+- subsequent field edits autosave through an explicit initial-Draft Domain transition when editing completes and the effective value actually changed
 
 ### Initial Confirm
 
@@ -898,7 +901,18 @@ Presentation is not required for Hit/Away Close.
 
 ## 5. Amendment Draft
 
-Editing Revision-owned fields on a confirmed/open RFQ creates or updates the one pending Draft Revision.
+A confirmed/open RFQ may have at most one pending amendment Draft Revision.
+
+The Draft may start in either of two intentional ways:
+
+- an inline edit completes with a value different from the effective current value, which creates or updates the pending Draft
+- an explicit `Start Amendment` action creates the pending Draft before pane-based editing begins
+
+Once a pending Draft exists, its editable fields are a server-side working copy and subsequent edits autosave when editing completes and the effective value actually changed.
+
+The effective value is the pending Draft value when present; otherwise it is the current confirmed Revision value.
+
+A zero-difference amendment Draft is a valid working state. It is not auto-discarded, cannot be confirmed, and remains until it acquires a real change or is explicitly discarded.
 
 While Draft is being edited:
 
@@ -1797,7 +1811,20 @@ Actions must preserve the same Application authorization/state rules as full-pan
 
 ### Amendment UX
 
-Editing confirmed Revision-owned cells creates/updates the one pending Draft Revision.
+Inline and pane editing intentionally use different amendment-start interactions while sharing the same persisted Draft model.
+
+Inline editing:
+
+- editing completion with no effective value change does nothing
+- editing completion with a real value change creates or updates the pending amendment Draft
+- the changed value is persisted immediately
+
+Pane editing:
+
+- `Start Amendment` explicitly creates the pending Draft
+- after that, field edits autosave on editing completion when the effective value changed
+- a zero-difference Draft is allowed but cannot be confirmed
+- Draft removal is explicit through Discard rather than automatic cleanup
 
 Changed cells are visually marked.
 
@@ -1807,9 +1834,13 @@ Draft contents remain Sales-side until confirmed.
 
 Sales supports Live and Paused operating modes.
 
-Remote events do not silently replace protected/editing state.
+Unsaved New state remains FE-local and does not block Live refresh.
 
-Paused mode accumulates pending remote changes until explicit refresh/resume reconciliation.
+Persisted Draft editing protects only the short-lived field-edit/save interaction, not the entire lifetime of the Draft or pane.
+
+Sales inline row actions are disabled in Live mode because a remote refresh may relocate rows between visual targeting and click, allowing a valid action to be sent to the wrong Case. Paused mode provides the stable row position required for those inline actions.
+
+This inline-row restriction is an interaction-safety rule, not a general prohibition on Sales commands while Live.
 
 ### Recent revisions
 
@@ -1895,7 +1926,11 @@ Apply-back to official WorkingQuote remains deferred unless explicitly implement
 
 Trader supports Live / Paused plus explicit Refresh.
 
-Normal remote changes must not silently move/replace rows during active work.
+Trader operations whose target is already fixed by `CaseId` through selection/pane state remain available in Live mode; row relocation does not retarget those operations.
+
+Short-lived local work that would be invalidated by replacement, such as active cell editing or an in-flight calculation/confirmation interaction, may temporarily protect refresh until that interaction finishes.
+
+This is intentionally different from Sales inline row actions: the safety criterion is target stability, not screen identity.
 
 ---
 
@@ -2011,11 +2046,54 @@ Do not expose/edit the opposite side's memo.
 
 Persisted Events + SSE provide remote-change awareness.
 
-SSE is a wake-up mechanism, not authoritative UI data.
+SSE is a wake-up mechanism, not authoritative UI data. Normal page queries/persisted projections remain the source of truth.
 
-Sales/Trader may keep protected local editing state and require explicit reconciliation.
+### State ownership
 
-Post Process uses explicit refresh plus mutation-triggered query invalidation; it does not need Trader-style Live/Pause operation.
+Sales/Trader frontend state is kept in three distinct categories:
+
+1. **Authoritative query state** — the latest server projection.
+2. **Paused display snapshot** — a separate snapshot that exists only to preserve Paused-mode display.
+3. **Local interaction state** — unsaved New input, an active field/cell editor, dialogs, and similar UI-local intent.
+
+Do not maintain a second mutable copy of Live server state merely to drive the grid. Do not derive lifecycle/ownership/quote transitions in the frontend after a successful mutation.
+
+### Live
+
+Live follows authoritative server state.
+
+On a remote wake-up:
+
+- when no protected interaction is active, perform authoritative catch-up
+- when a protected interaction is active, do not replace that interaction; mark that an update is pending and perform one authoritative catch-up when protection ends
+
+Protection is deliberately short-lived. It covers the field/cell editing and save/in-flight interval that would be unsafe to replace. It is not a long-lived page mode, pane-open flag, Draft-lifetime flag, or unsaved-New flag.
+
+### Paused
+
+Paused preserves its display snapshot when remote changes arrive.
+
+Remote changes set a boolean **Updates pending** indication. This is not a count of changed Cases or received events.
+
+Explicit Refresh replaces the Paused snapshot with authoritative state while remaining Paused.
+
+Paused -> Live performs authoritative catch-up, drops the Paused snapshot, and resumes Live behavior.
+
+Explicit Refresh and Paused -> Live are disabled while a protected interaction is active. Once the short-lived interaction finishes, they become available again.
+
+Successful explicit Refresh does not require a success toast; the refreshed data and cleared pending indication are the normal feedback. Refresh failure is surfaced explicitly.
+
+### Reconciliation after the current user's mutations
+
+Mutation responses are not used to predict the resulting business state in the frontend.
+
+- in Live, successful mutations are followed by authoritative page catch-up
+- in Paused, successful single-Case mutations re-read that Case through the page-specific authoritative query/projection and replace only that Case in the Paused snapshot
+- in Paused bulk operations, only Succeeded Cases are authoritatively re-read and replaced; Failed/Skipped Cases and unrelated rows remain on the Paused snapshot
+
+Page-specific catch-up side effects may differ, for example Sales recent-revision refresh or Trader calculation invalidation, without changing these core semantics.
+
+Post Process remains separate: it uses explicit refresh plus mutation-triggered authoritative query reconciliation and does not need Sales/Trader Live/Pause behavior.
 
 ---
 
@@ -3938,11 +4016,18 @@ Rationale:
 
 ---
 
-## 31. Do not auto-refresh active grids
+## 31. Live follows authoritative queries; Paused preserves an explicit snapshot
 
-Server changes mark updates available; user Refresh applies authoritative state.
+Live Sales/Trader views catch up to authoritative server projections. Paused views deliberately preserve a display snapshot until explicit Refresh or resume.
 
-Rationale remains avoiding invisible replacement of actively edited rows.
+Short-lived protected interactions defer replacement only for the unsafe interaction window; they do not turn ordinary Live work into a long-lived frozen snapshot.
+
+Rationale:
+
+- authoritative server state remains the single business source of truth
+- Paused remains useful when an operator explicitly needs positional/display stability
+- local editing safety is handled by short-lived protection rather than duplicating and manually maintaining Live business state
+- frontend business-state prediction is avoided
 
 ---
 
@@ -4137,15 +4222,39 @@ Member methods are not forbidden when they naturally belong to a value/factory/v
 
 ---
 
-## 47. Organize source by feature ownership before framework artifact type
+## 47. Organize source by ownership before framework artifact type
 
-Business/use-case features own their relevant API/Application files. Global technical folders are reserved for genuinely cross-cutting concerns.
+Backend/API/Application code remains grouped by business/use-case ownership. Global technical folders are reserved for genuinely cross-cutting concerns.
+
+Frontend organization is page-oriented:
+
+```text
+src/
+  app/
+  pages/
+    sales/
+    trader/
+    post-process/
+  shared/
+    ui/
+    grid/
+  services/
+  generated/
+  test/
+```
+
+Page-specific components, controllers/hooks, models, column definitions, and helpers remain under their owning page and should be grouped by human-recognizable concepts such as `operations`, `search`, `pricer`, `grid`, or `work-pane` when those concepts are substantial enough to justify a folder.
+
+Do not introduce page-local technical buckets such as generic `components/`, `hooks/`, `utils/`, and `types/` merely for classification.
+
+`shared` is for concepts genuinely reused across pages. A top-level `features` area is introduced only when an independent user-facing feature genuinely spans pages; Sales/Trader/Post Process page slices are not themselves called features.
 
 Rationale:
 
-- a change to one business feature is easier to discover in one place
-- controller/request/mapper/service buckets scatter one feature across the tree
-- feature ownership survives framework refactors better than artifact-type organization
+- a change to one business/page concept is easier to discover in one place
+- framework-artifact buckets scatter one concept across the tree
+- page ownership is simpler than strict multi-layer feature slicing at the current application size
+- cross-page sharing should be earned by real reuse rather than shape similarity
 
 ---
 
