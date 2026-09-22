@@ -47,6 +47,7 @@ export interface PostProcessScreenProps {
   onScopeChange: (value: PostProcessScope) => void
   onRefresh: () => Promise<void>
   onCommit: (items: PostProcessCommitItem[]) => Promise<BulkItemResult[]>
+  onPendingChange?: (hasPending: boolean) => void
 }
 
 export function PostProcessScreen({
@@ -61,6 +62,7 @@ export function PostProcessScreen({
   onScopeChange,
   onRefresh,
   onCommit,
+  onPendingChange,
 }: PostProcessScreenProps) {
   const [pending, setPending] = useState<
     Record<number, PendingPostProcessChange>
@@ -108,6 +110,10 @@ export function PostProcessScreen({
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [pendingChanges.length])
+
+  useEffect(() => {
+    onPendingChange?.(pendingChanges.length > 0)
+  }, [onPendingChange, pendingChanges.length])
 
   const updatePending = (
     row: PostProcessItem,
@@ -300,9 +306,10 @@ export function PostProcessScreen({
         cellEditor: 'agTextCellEditor',
         valueGetter: ({ data }) =>
           data
-            ? (pending[data.caseId]?.lifecycle?.correctionReason ??
-              data.lastCorrectionReason ??
-              '')
+            ? pending[data.caseId]?.lifecycle &&
+              isCorrection(pending[data.caseId].lifecycle!.type)
+              ? (pending[data.caseId].lifecycle!.correctionReason ?? '')
+              : (data.lastCorrectionReason ?? '')
             : '',
       },
       { field: 'lastChangedBy', headerName: 'Last Changed By', width: 140 },
@@ -341,7 +348,6 @@ export function PostProcessScreen({
         ),
       )
       setConfirmOpen(false)
-      await onRefresh()
     } catch {
       setError('Post Process changes could not be committed.')
     }

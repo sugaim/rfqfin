@@ -23,6 +23,7 @@ type GridColumn = {
   headerName?: string
   editable?: boolean | ((params: { data: PostProcessItem }) => boolean)
   cellRenderer?: (params: { data: PostProcessItem }) => ReactNode
+  valueGetter?: (params: { data: PostProcessItem }) => unknown
 }
 
 vi.mock('ag-grid-react', () => ({
@@ -68,6 +69,9 @@ vi.mock('ag-grid-react', () => ({
                 data-testid={`column-${row.caseId}-${key}`}
                 data-editable={String(editable)}
               >
+                {column.valueGetter
+                  ? String(column.valueGetter({ data: row }))
+                  : ''}
                 {column.cellRenderer?.({ data: row })}
                 {key === 'myMemo' && (
                   <button
@@ -183,7 +187,7 @@ describe('Post Process staging', () => {
     expect(screen.getByRole('button', { name: 'Confirm Changes (1)' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Changes (1)' }))
-    expect(screen.getByText('Active -> Away')).toBeInTheDocument()
+    expect(screen.getAllByText('Active -> Away')).not.toHaveLength(0)
     expect(screen.queryByText('Active -> Hit')).not.toBeInTheDocument()
     expect(screen.getByText('#101')).toBeInTheDocument()
     expect(screen.queryByText('#102')).not.toBeInTheDocument()
@@ -195,7 +199,11 @@ describe('Post Process staging', () => {
       .mockResolvedValue([
         { caseId: 101, status: 'Succeeded', code: null, message: null },
       ])
-    const hit = { ...baseItem, rfqStatus: 'Hit' as const }
+    const hit = {
+      ...baseItem,
+      rfqStatus: 'Hit' as const,
+      lastCorrectionReason: 'previous audit reason',
+    }
     renderScreen({ items: [hit], onCommit })
 
     expect(screen.queryByText(/Sales Memo|Trader Memo/)).not.toBeInTheDocument()
@@ -205,7 +213,11 @@ describe('Post Process staging', () => {
       'true',
     )
 
+    const reasonCell = screen.getByTestId('column-101-correctionReason')
+    expect(reasonCell).toHaveTextContent('previous audit reason')
+
     fireEvent.click(screen.getByRole('button', { name: 'Correct to Away' }))
+    expect(reasonCell).not.toHaveTextContent('previous audit reason')
     expect(
       screen.getByText(/Correction Reason is required/),
     ).toBeInTheDocument()
@@ -219,7 +231,7 @@ describe('Post Process staging', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Changes (1)' }))
     expect(screen.getByText('Changed')).toBeInTheDocument()
-    expect(screen.getByText('booking correction')).toBeInTheDocument()
+    expect(screen.getAllByText('booking correction')).not.toHaveLength(0)
     fireEvent.click(screen.getByRole('button', { name: 'Commit' }))
 
     await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(1))
@@ -259,7 +271,8 @@ describe('Post Process staging', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Changes (1)' }))
     fireEvent.click(screen.getByRole('button', { name: 'Commit' }))
-    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(1))
+    expect(onRefresh).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Confirm Changes (1)' }))
     fireEvent.click(screen.getByText(/0 succeeded/))
     expect(screen.getByText(/Case 101: Failed/)).toBeInTheDocument()
@@ -267,7 +280,7 @@ describe('Post Process staging', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     await screen.findByText('Discard all uncommitted Post Process changes?')
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
-    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
     expect(
       screen.getByRole('button', { name: 'Confirm Changes (0)' }),
     ).toBeDisabled()
@@ -313,17 +326,7 @@ describe('Post Process reconciliation', () => {
         isCommitting={false}
         onPresetChange={setPreset}
         onScopeChange={setScope}
-        onCommit={() =>
-          Promise.resolve([
-            {
-              caseId: 101,
-              status: 'Succeeded' as const,
-              code: null,
-              message: null,
-            },
-          ])
-        }
-        onRefresh={() => {
+        onCommit={() => {
           setItems((current) =>
             preset === 'Unclosed'
               ? []
@@ -333,8 +336,16 @@ describe('Post Process reconciliation', () => {
                   currentVersion: item.currentVersion + 1,
                 })),
           )
-          return Promise.resolve()
+          return Promise.resolve([
+            {
+              caseId: 101,
+              status: 'Succeeded' as const,
+              code: null,
+              message: null,
+            },
+          ])
         }}
+        onRefresh={() => Promise.resolve()}
       />
     )
   }

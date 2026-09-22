@@ -418,6 +418,7 @@ export interface ApiProblemDetails {
 
 export const api = createApi({
   reducerPath: 'api',
+  tagTypes: ['PostProcess'],
   baseQuery: fetchBaseQuery({
     baseUrl: '/api',
     prepareHeaders: (headers) => {
@@ -459,6 +460,7 @@ export const api = createApi({
       { preset: PostProcessPreset; scope: PostProcessScope }
     >({
       query: (params) => ({ url: '/post-process', params }),
+      providesTags: ['PostProcess'],
     }),
     commitPostProcess: builder.mutation<
       BulkItemResult[],
@@ -469,6 +471,10 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+      invalidatesTags: (result) =>
+        result?.some((item) => item.status === 'Succeeded')
+          ? ['PostProcess']
+          : [],
     }),
     searchRfqs: builder.query<RfqSearchResult, RfqSearchParams>({
       query: (params) => ({ url: '/rfqs/search', params }),

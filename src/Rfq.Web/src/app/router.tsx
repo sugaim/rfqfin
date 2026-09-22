@@ -1,4 +1,10 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import {
+  Navigate,
+  RouterProvider,
+  createBrowserRouter,
+  type RouteObject,
+  useRoutes,
+} from 'react-router'
 import { PostProcessWorkspace } from '@/features/post-process/PostProcessWorkspace'
 import { SalesWorkspace } from '@/features/sales/SalesWorkspace'
 import { TraderWorkspace } from '@/features/trader/TraderWorkspace'
@@ -14,24 +20,25 @@ function DefaultWorkspaceRoute() {
   return <Navigate to={defaultWorkspacePath()} replace />
 }
 
+export const appRoutes: RouteObject[] = [
+  {
+    element: <App />,
+    children: [
+      { index: true, element: <DefaultWorkspaceRoute /> },
+      { path: 'sales', element: <SalesWorkspace /> },
+      { path: 'trader', element: <TraderWorkspace /> },
+      { path: 'post-process', element: <PostProcessWorkspace /> },
+      { path: '*', element: <DefaultWorkspaceRoute /> },
+    ],
+  },
+]
+
 export function AppRoutes() {
-  return (
-    <Routes>
-      <Route element={<App />}>
-        <Route index element={<DefaultWorkspaceRoute />} />
-        <Route path="sales" element={<SalesWorkspace />} />
-        <Route path="trader" element={<TraderWorkspace />} />
-        <Route path="post-process" element={<PostProcessWorkspace />} />
-        <Route path="*" element={<DefaultWorkspaceRoute />} />
-      </Route>
-    </Routes>
-  )
+  return useRoutes(appRoutes)
 }
 
+const browserRouter = createBrowserRouter(appRoutes)
+
 export function AppRouter() {
-  return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
-  )
+  return <RouterProvider router={browserRouter} />
 }
