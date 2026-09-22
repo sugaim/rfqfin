@@ -213,6 +213,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales-rfqs/recent-revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesRecentRevisionResponse"][];
+                        "application/json": components["schemas"]["SalesRecentRevisionResponse"][];
+                        "text/json": components["schemas"]["SalesRecentRevisionResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rfqs/search": {
         parameters: {
             query?: never;
@@ -3399,12 +3438,46 @@ export interface components {
             requiresNarrowing: boolean;
         };
         RfqStatusValue: number;
+        SalesConfirmedQuoteSummaryResponse: {
+            /** Format: uuid */
+            quoteId: string;
+            mode: components["schemas"]["WorkingQuoteModeValue"];
+            /** Format: double */
+            price: number | null;
+            /** Format: double */
+            bbgYield: number | null;
+            /** Format: double */
+            finalSimpleYield: number | null;
+            /** Format: double */
+            gSpread: number | null;
+            /** Format: date-time */
+            confirmedAt: string;
+        } | null;
         SalesMemoResponse: {
             /** Format: int64 */
             caseId: number;
             memo: string;
             /** Format: int64 */
             version: number;
+        };
+        SalesRecentRevisionChangeResponse: {
+            field: components["schemas"]["SalesRecentRevisionFieldValue"];
+            before: string | null;
+            after: string | null;
+        };
+        SalesRecentRevisionFieldValue: number;
+        SalesRecentRevisionKindValue: number;
+        SalesRecentRevisionResponse: {
+            kind: components["schemas"]["SalesRecentRevisionKindValue"];
+            /** Format: date-time */
+            occurredAt: string;
+            /** Format: int64 */
+            caseId: number;
+            clientId: string;
+            clientName: string;
+            securityId: string;
+            securityName: string;
+            changes: components["schemas"]["SalesRecentRevisionChangeResponse"][];
         };
         SalesRfqResponse: {
             /** Format: int64 */
@@ -3427,6 +3500,7 @@ export interface components {
             /** Format: int64 */
             currentVersion: number;
             revisionStatus: components["schemas"]["RevisionStatusValue"];
+            salesId: string | null;
             contactOwnerId: string;
             assignedTraderId: string;
             /** Format: date */
@@ -3443,6 +3517,9 @@ export interface components {
             version: number;
             /** Format: date-time */
             createdAt: string;
+            /** Format: date-time */
+            stateSince: string;
+            confirmedQuote: components["schemas"]["SalesConfirmedQuoteSummaryResponse"];
             /** Format: uuid */
             draftRevisionId: string | null;
             /** Format: int64 */
@@ -3563,6 +3640,7 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        WorkingQuoteModeValue: number;
         WorkingQuoteResponse: {
             /** Format: int64 */
             caseId: number;

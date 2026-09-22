@@ -432,8 +432,17 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal("Away", closedSalesRow.RfqStatus);
         Assert.Null(closedSalesRow.CurrentQuoteId);
         Assert.Equal(hit.ClosedQuoteId, closedSalesRow.ClosedQuoteId);
+        Assert.Equal("sales-dev", closedSalesRow.SalesId);
+        Assert.True(closedSalesRow.StateSince > DateTimeOffset.MinValue);
+        Assert.Equal(99.5m, closedSalesRow.ConfirmedQuote?.Price);
         Assert.Equal("customer follow-up", closedSalesRow.SalesMemo);
         Assert.Equal(salesMemo.Version, closedSalesRow.SalesMemoVersion);
+
+        var recent = await sales.GetFromJsonAsync<List<SalesRecentRevisionBody>>(
+            "/api/sales-rfqs/recent-revisions?limit=50");
+        Assert.NotNull(recent);
+        Assert.DoesNotContain(recent, item => item.CaseId == hit.CaseId);
+        Assert.DoesNotContain(recent, item => item.CaseId == away.CaseId);
 
         var traderRows = await trader.GetFromJsonAsync<List<ManagedTraderRfqBody>>(
             "/api/trader-rfqs");
@@ -762,8 +771,14 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         string RfqStatus,
         Guid? CurrentQuoteId,
         Guid? ClosedQuoteId,
+        string? SalesId,
+        DateTimeOffset StateSince,
+        SalesQuoteSummaryBody? ConfirmedQuote,
         string SalesMemo,
         long SalesMemoVersion);
+
+    private sealed record SalesQuoteSummaryBody(decimal? Price);
+    private sealed record SalesRecentRevisionBody(long CaseId);
 
     private sealed record ManagedTraderRfqBody(
         long CaseId,

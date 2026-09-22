@@ -336,6 +336,141 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         Assert.Equal(1, item.Away);
     }
 
+    [Fact]
+    public async Task Sales_projection_returns_sales_quote_summary_and_state_transition_time()
+    {
+        await RecreateAndSeed();
+        DateTimeOffset stateSince = new(2026, 9, 22, 1, 23, 0, TimeSpan.Zero);
+        long caseId;
+        await using (var arrange = fixture.CreateContext())
+        {
+            var current = await arrange.CaseCurrents
+                .Where(item => item.CurrentQuoteId != null || item.ClosedQuoteId != null)
+                .OrderBy(item => item.CaseId).FirstAsync();
+            caseId = current.CaseId;
+            var eventId = (await arrange.Events.MaxAsync(item => (long?)item.EventId) ?? 0) + 1;
+            arrange.Events.Add(new EventEntity
+            {
+                EventId = eventId,
+                OccurredAt = stateSince,
+                ActorUserId = "sales-dev",
+            });
+            arrange.RfqEvents.Add(new RfqEventEntity
+            {
+                EventId = eventId,
+                CaseId = caseId,
+                Type = EventPersistenceTypeCodes.Rfq.Cancelled,
+                PayloadJson = "{}",
+            });
+            await arrange.SaveChangesAsync();
+        }
+
+        await using var read = fixture.CreateContext();
+        var item = (await new EfCoreSalesRfqQueries(read)
+            .GetAsync(UserId.Create("sales-dev"))).Single(value => value.CaseId.Value == caseId);
+
+        Assert.Equal(UserId.Create("sales-dev"), item.SalesId);
+        Assert.Equal(stateSince, item.StateSince);
+        Assert.NotNull(item.ConfirmedQuote);
+        Assert.NotNull(item.ConfirmedQuote.Price);
+    }
+
+    [Fact]
+    public async Task Sales_projection_maps_manual_quote_missing_values_to_null()
+    {
+        await RecreateAndSeed();
+        long caseId;
+        await using (var arrange = fixture.CreateContext())
+        {
+            var current = await arrange.CaseCurrents
+                .Where(item => item.CurrentQuoteId != null)
+                .OrderBy(item => item.CaseId).FirstAsync();
+            caseId = current.CaseId;
+            var quote = await arrange.ConfirmedQuotes.SingleAsync(
+                item => item.QuoteId == current.CurrentQuoteId);
+            quote.Mode = WorkingQuoteMode.Manual;
+            quote.CalculatedPayloadJson = null;
+            quote.ManualPayloadJson = QuotePayloadPersistence.Serialize(
+                new ManualQuotePayload(99.25m, null));
+            await arrange.SaveChangesAsync();
+        }
+
+        await using var read = fixture.CreateContext();
+        var item = (await new EfCoreSalesRfqQueries(read)
+            .GetAsync(UserId.Create("sales-dev"))).Single(value => value.CaseId.Value == caseId);
+
+        Assert.Equal(99.25m, item.ConfirmedQuote!.Price);
+        Assert.Equal(item.ConfirmedQuote.ConfirmedAt, item.StateSince);
+        Assert.Null(item.ConfirmedQuote.BbgYield);
+        Assert.Null(item.ConfirmedQuote.FinalSimpleYield);
+        Assert.Null(item.ConfirmedQuote.GSpread);
+    }
+
+    [Fact]
+    public async Task Recent_revisions_excludes_initial_values_and_returns_changed_pairs_newest_first()
+    {
+        await RecreateAndSeed();
+        long caseId;
+        var newer = new DateTimeOffset(2026, 9, 22, 2, 0, 0, TimeSpan.Zero);
+        await using (var arrange = fixture.CreateContext())
+        {
+            var current = await arrange.CaseCurrents
+                .Where(item => item.CurrentQuoteId != null)
+                .OrderBy(item => item.CaseId).FirstAsync();
+            caseId = current.CaseId;
+            var previous = await arrange.RfqRevisions.SingleAsync(
+                item => item.RevisionId == current.CurrentRevisionId);
+            previous.Status = RevisionStatus.Superseded;
+            var revisionId = Guid.NewGuid();
+            arrange.RfqRevisions.Add(new RfqRevisionEntity
+            {
+                RevisionId = revisionId,
+                CaseId = caseId,
+                Status = RevisionStatus.Confirmed,
+                Version = 2,
+                CreatedAt = newer.AddMinutes(-1),
+                CreatedBy = "sales-dev",
+                ConfirmedAt = newer,
+                ConfirmedBy = "sales-dev",
+                Notional = previous.Notional + 1_000_000m,
+                SettlementDate = previous.SettlementDate,
+                StandardSettlementDate = previous.StandardSettlementDate,
+                SalesAndTradingMessage = previous.SalesAndTradingMessage,
+            });
+            arrange.ConfirmedQuotes.Add(new ConfirmedQuoteEntity
+            {
+                QuoteId = Guid.NewGuid(),
+                RevisionId = revisionId,
+                SecurityId = "sec-jgb-375",
+                SettlementDate = previous.SettlementDate!.Value,
+                ConfirmedBy = "trader-a",
+                ConfirmedAt = newer.AddMinutes(1),
+                Mode = WorkingQuoteMode.Manual,
+                ManualPayloadJson = QuotePayloadPersistence.Serialize(
+                    new ManualQuotePayload(98.75m, 0.91m)),
+                RequestReasonAnswered = QuoteRequestReason.Revised,
+            });
+            await arrange.SaveChangesAsync();
+        }
+
+        await using var read = fixture.CreateContext();
+        var items = await new EfCoreSalesRecentRevisionQueries(read)
+            .GetAsync(UserId.Create("sales-dev"), 50);
+
+        var caseItems = items.Where(item => item.CaseId.Value == caseId).ToArray();
+        Assert.Equal(2, caseItems.Length);
+        Assert.Equal(SalesRecentRevisionKind.Quote, caseItems[0].Kind);
+        Assert.Equal(SalesRecentRevisionKind.Rfq, caseItems[1].Kind);
+        Assert.Contains(caseItems[0].Changes, change => change.Field == SalesRecentRevisionField.Price);
+        Assert.Contains(caseItems[1].Changes, change => change.Field == SalesRecentRevisionField.Notional);
+        Assert.True(items.Count <= 50);
+        Assert.Single(await new EfCoreSalesRecentRevisionQueries(read)
+            .GetAsync(UserId.Create("sales-dev"), 1));
+        var otherSales = await new EfCoreSalesRecentRevisionQueries(read)
+            .GetAsync(UserId.Create("sales-a"), 50);
+        Assert.DoesNotContain(otherSales, item => item.CaseId.Value == caseId);
+    }
+
     private static void AddRfqEvent(
         RfqDbContext context,
         long eventId,

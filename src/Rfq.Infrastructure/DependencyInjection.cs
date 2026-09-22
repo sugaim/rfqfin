@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddScoped<ICaseIdGenerator, PostgreSqlCaseIdGenerator>();
         services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
         services.AddScoped<ISalesRfqQueries, EfCoreSalesRfqQueries>();
+        services.AddScoped<ISalesRecentRevisionQueries, EfCoreSalesRecentRevisionQueries>();
         services.AddScoped<ITraderRfqQueries, EfCoreTraderRfqQueries>();
         services.AddScoped<IQuoteExpiryQueries, EfCoreQuoteExpiryQueries>();
         services.AddScoped<IWorkingQuoteRepository, WorkingQuoteRepository>();

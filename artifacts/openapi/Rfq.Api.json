@@ -261,6 +261,57 @@
         }
       }
     },
+    "/api/sales-rfqs/recent-revisions": {
+      "get": {
+        "tags": [
+          "SalesRfqs"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRecentRevisionResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRecentRevisionResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRecentRevisionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/rfqs/search": {
       "get": {
         "tags": [
@@ -5632,6 +5683,52 @@
       "RfqStatusValue": {
         "type": "integer"
       },
+      "SalesConfirmedQuoteSummaryResponse": {
+        "required": [
+          "quoteId",
+          "mode",
+          "price",
+          "bbgYield",
+          "finalSimpleYield",
+          "gSpread",
+          "confirmedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/WorkingQuoteModeValue"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "bbgYield": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "finalSimpleYield": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "gSpread": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "nullable": true
+      },
       "SalesMemoResponse": {
         "required": [
           "caseId",
@@ -5653,6 +5750,77 @@
           }
         }
       },
+      "SalesRecentRevisionChangeResponse": {
+        "required": [
+          "field",
+          "before",
+          "after"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/SalesRecentRevisionFieldValue"
+          },
+          "before": {
+            "type": "string",
+            "nullable": true
+          },
+          "after": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SalesRecentRevisionFieldValue": {
+        "type": "integer"
+      },
+      "SalesRecentRevisionKindValue": {
+        "type": "integer"
+      },
+      "SalesRecentRevisionResponse": {
+        "required": [
+          "kind",
+          "occurredAt",
+          "caseId",
+          "clientId",
+          "clientName",
+          "securityId",
+          "securityName",
+          "changes"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SalesRecentRevisionKindValue"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientName": {
+            "type": "string"
+          },
+          "securityId": {
+            "type": "string"
+          },
+          "securityName": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRecentRevisionChangeResponse"
+            }
+          }
+        }
+      },
       "SalesRfqResponse": {
         "required": [
           "caseId",
@@ -5670,6 +5838,7 @@
           "closedQuoteId",
           "currentVersion",
           "revisionStatus",
+          "salesId",
           "contactOwnerId",
           "assignedTraderId",
           "settlementDate",
@@ -5680,6 +5849,8 @@
           "salesMemoVersion",
           "version",
           "createdAt",
+          "stateSince",
+          "confirmedQuote",
           "draftRevisionId",
           "draftVersion",
           "draftSettlementDate",
@@ -5740,6 +5911,10 @@
           "revisionStatus": {
             "$ref": "#/components/schemas/RevisionStatusValue"
           },
+          "salesId": {
+            "type": "string",
+            "nullable": true
+          },
           "contactOwnerId": {
             "type": "string"
           },
@@ -5777,6 +5952,13 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "stateSince": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confirmedQuote": {
+            "$ref": "#/components/schemas/SalesConfirmedQuoteSummaryResponse"
           },
           "draftRevisionId": {
             "type": "string",
@@ -6162,6 +6344,9 @@
             "format": "int64"
           }
         }
+      },
+      "WorkingQuoteModeValue": {
+        "type": "integer"
       },
       "WorkingQuoteResponse": {
         "required": [

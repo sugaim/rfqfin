@@ -31,6 +31,7 @@ public sealed record SalesRfqListItem(
     QuoteId? ClosedQuoteId,
     StateVersion CurrentVersion,
     RevisionStatus RevisionStatus,
+    UserId? SalesId,
     UserId ContactOwnerId,
     UserId AssignedTraderId,
     DateOnly? SettlementDate,
@@ -41,8 +42,19 @@ public sealed record SalesRfqListItem(
     StateVersion SalesMemoVersion,
     StateVersion Version,
     DateTimeOffset CreatedAt,
+    DateTimeOffset StateSince,
+    SalesConfirmedQuoteSummary? ConfirmedQuote,
     RevisionId? DraftRevisionId,
     StateVersion? DraftVersion,
     DateOnly? DraftSettlementDate,
     decimal? DraftNotional,
     string? DraftSalesAndTradingMessage);
+
+public sealed record SalesConfirmedQuoteSummary(
+    QuoteId QuoteId,
+    WorkingQuoteMode Mode,
+    decimal? Price,
+    decimal? BbgYield,
+    decimal? FinalSimpleYield,
+    decimal? GSpread,
+    DateTimeOffset ConfirmedAt);
