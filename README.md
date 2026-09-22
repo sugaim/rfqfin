@@ -1,6 +1,6 @@
 # RFQ
 
-Internal JPY corporate bond RFQ application.
+Bond RFQ application.
 
 ## Prerequisites
 
