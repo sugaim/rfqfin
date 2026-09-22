@@ -249,6 +249,21 @@ describe('SalesScreen', () => {
     }))
   })
 
+  it('uses Alt+Enter to confirm the active New RFQ form', async () => {
+    const onConfirmNew = vi.fn().mockResolvedValue(undefined)
+    render(<SalesScreen {...baseProps} onConfirmNew={onConfirmNew} />)
+    fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
+    await selectRequiredMasters()
+    fireEvent.change(screen.getByLabelText('Notl (MM)'), { target: { value: '50' } })
+    fireEvent.keyDown(window, { key: 'Enter', altKey: true })
+
+    await waitFor(() => expect(onConfirmNew).toHaveBeenCalledWith(expect.objectContaining({
+      clientId: 'client-001',
+      securityId: 'sec-jgb-375',
+      notional: 50000000,
+    })))
+  })
+
   it('opens a saved draft and confirms it with optimistic version', async () => {
     const onConfirmDraft = vi.fn().mockResolvedValue(undefined)
     render(<SalesScreen {...baseProps} rfqs={[draftRow]} onConfirmDraft={onConfirmDraft} />)

@@ -372,14 +372,25 @@ export function SalesScreen(props: SalesScreenProps) {
         if (newIntent) setNewIntent(false)
         return
       }
-      if (!event.altKey || isTextEditingTarget(event.target)) return
+      if (!event.altKey) return
       const key = event.key.toLowerCase()
+      const editing = isTextEditingTarget(event.target)
+      if (editing && key !== 'enter') return
       if (key === 'n') { event.preventDefault(); startNew(); return }
       if (key === 'enter') {
         event.preventDefault()
-        if (selectedRows.length > 1 && selectedRows.some((row) => row.draftRevisionId))
+        if (newIntent || mode === 'draft') void saveDraft(true)
+        else if (selectedRows.length > 1 && selectedRows.some((row) => row.draftRevisionId))
           openBulk('confirm-amendments')
         else if (selected?.draftRevisionId) void executeCommand('confirm-amendment', selected)
+        return
+      }
+      if (selectedRows.length > 1) {
+        const bulkMapping: Partial<Record<string, SalesBulkCommand>> = {
+          p: 'present', u: 'unpresent', a: 'away', c: 'cancel',
+        }
+        const bulkCommand = bulkMapping[key]
+        if (bulkCommand) { event.preventDefault(); openBulk(bulkCommand) }
         return
       }
       if (!selected) return
@@ -462,11 +473,29 @@ export function SalesScreen(props: SalesScreenProps) {
     'sales-row-draft': ({ data }: { data?: SalesRfq }) => data?.revisionStatus === 'Draft',
     'sales-row-terminal': ({ data }: { data?: SalesRfq }) => Boolean(data && ['Cancelled', 'Hit', 'Away'].includes(data.rfqStatus)),
   }
-  const shortcutText = selectedRows.length > 1
-    ? `${selectedRows.length} selected · Alt+A Away · Right-click for actions`
-    : selected?.draftRevisionId
-      ? 'AMEND pending · Alt+Enter Confirm · Right-click for more'
-      : selected ? 'Alt+P Present · Alt+H Hit · Alt+A Away · Alt+C Cancel' : 'Right-click for actions'
+  const shortcutText = (() => {
+    if (selectedRows.length > 1) {
+      const shortcuts = [
+        selectedRows.some((row) => bulkEligibility('present', row, currentUserId)) ? 'Alt+P Present' : null,
+        selectedRows.some((row) => bulkEligibility('unpresent', row, currentUserId)) ? 'Alt+U Unpresent' : null,
+        selectedRows.some((row) => bulkEligibility('away', row, currentUserId)) ? 'Alt+A Away' : null,
+        selectedRows.some((row) => bulkEligibility('cancel', row, currentUserId)) ? 'Alt+C Cancel' : null,
+      ].filter(Boolean)
+      return [`${selectedRows.length} selected`, ...shortcuts, 'Right-click for actions'].join(' · ')
+    }
+    if (newIntent || mode === 'draft') return 'Alt+Enter Confirm · Esc Cancel'
+    if (!selected) return 'Right-click for actions'
+    if (selected.draftRevisionId) return 'AMEND pending · Alt+Enter Confirm · Right-click for more'
+    const shortcuts = [
+      commandEligible('present', selected, currentUserId) ? 'Alt+P Present' : null,
+      commandEligible('unpresent', selected, currentUserId) ? 'Alt+U Unpresent' : null,
+      commandEligible('hit', selected, currentUserId) ? 'Alt+H Hit' : null,
+      commandEligible('away', selected, currentUserId) ? 'Alt+A Away' : null,
+      commandEligible('cancel', selected, currentUserId) ? 'Alt+C Cancel' : null,
+      commandEligible('reopen', selected, currentUserId) ? 'Alt+R Reopen' : null,
+    ].filter(Boolean)
+    return [...shortcuts, 'Right-click for actions'].join(' · ')
+  })()
   const statusBar = useMemo<{ statusPanels: StatusPanelDef[] }>(() => ({ statusPanels: [
     { statusPanel: 'agSelectedRowCountComponent', align: 'left' },
     { statusPanel: 'agFilteredRowCountComponent', align: 'left' },
