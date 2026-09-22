@@ -3,30 +3,22 @@ using Rfq.Domain;
 namespace Rfq.Application;
 
 public sealed class CorrectOutcomeToHit(
-    IRfqCaseRepository cases,
-    IRfqAuthorization authorization,
-    ICurrentUser currentUser,
-    IRfqEventSink events,
-    IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    CorrectOutcomeOperation operation,
+    IUnitOfWork unitOfWork)
 {
-    public Task<CloseRfqResult> ExecuteAsync(
+    public async Task<CloseRfqResult> ExecuteAsync(
         CaseId caseId,
         string? reason,
         StateVersion expectedCurrentVersion,
-        CancellationToken cancellationToken = default) =>
-        CorrectOutcomeUseCase.ExecuteAsync(
+        CancellationToken cancellationToken = default)
+    {
+        CloseRfqResult result = await operation.ApplyAsync(
             caseId,
             reason,
             expectedCurrentVersion,
-            RfqLifecycleTransitions.CorrectToHit,
-            RfqStatus.Away,
             RfqStatus.Hit,
-            cases,
-            authorization,
-            currentUser,
-            events,
-            unitOfWork,
-            timeProvider,
             cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return result;
+    }
 }

@@ -3,11 +3,7 @@ using Rfq.Domain;
 namespace Rfq.Application;
 
 public sealed class UpdateSalesMemo(
-    IRfqCaseRepository rfqCases,
-    IRfqMemoRepository memos,
-    IUserDirectory users,
-    IRfqAuthorization authorization,
-    ICurrentUser currentUser,
+    UpdateMemoOperation operation,
     IUnitOfWork unitOfWork)
 {
     public async Task<MemoResult> ExecuteAsync(
@@ -16,14 +12,13 @@ public sealed class UpdateSalesMemo(
         StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        authorization.EnsureCanUpdateSalesMemo(currentUser.User);
-        RfqCase rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
-        await EnsureDeskAccessAsync(users, currentUser.User, rfqCase, cancellationToken);
-        SalesMemo salesMemo = await GetMemoAsync(memos, caseId, cancellationToken);
-        salesMemo = SalesMemoTransitions.Update(salesMemo, memo, expectedVersion);
-        memos.Update(salesMemo);
+        MemoResult result = await operation.ApplySalesAsync(
+            caseId,
+            memo,
+            expectedVersion,
+            cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new MemoResult(caseId, salesMemo.Value, salesMemo.Version);
+        return result;
     }
 
     internal static async Task<SalesMemo> GetMemoAsync(

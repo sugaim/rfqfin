@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
-import { DailyReviewWorkspace } from '@/features/daily-review/DailyReviewWorkspace'
+import { PostProcessWorkspace } from '@/features/post-process/PostProcessWorkspace'
 import { SalesWorkspace } from '@/features/sales/SalesWorkspace'
 import { TraderWorkspace } from '@/features/trader/TraderWorkspace'
 import { App } from '@/app/App'
@@ -21,7 +21,7 @@ export function AppRoutes() {
         <Route index element={<DefaultWorkspaceRoute />} />
         <Route path="sales" element={<SalesWorkspace />} />
         <Route path="trader" element={<TraderWorkspace />} />
-        <Route path="daily-review" element={<DailyReviewWorkspace />} />
+        <Route path="post-process" element={<PostProcessWorkspace />} />
         <Route path="*" element={<DefaultWorkspaceRoute />} />
       </Route>
     </Routes>

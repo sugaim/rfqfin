@@ -153,6 +153,7 @@ export interface SalesScreenProps {
     caseId: number,
     outcome: 'Hit' | 'Away',
     expectedCurrentVersion: number,
+    reason: string,
   ) => Promise<void>
   onChangeContactOwner?: (
     caseId: number,
@@ -1255,17 +1256,20 @@ export function SalesScreen(props: SalesScreenProps) {
                               refreshMode === 'live',
                             )
                           }
-                          onCorrectOutcome={() =>
+                          onCorrectOutcome={() => {
+                            const reason = window.prompt('Correction Reason')
+                            if (!reason?.trim()) return
                             void run(
                               () =>
                                 onCorrectOutcome(
                                   selected.caseId,
                                   selected.rfqStatus === 'Hit' ? 'Away' : 'Hit',
                                   selected.currentVersion,
+                                  reason.trim(),
                                 ),
                               refreshMode === 'live',
                             )
-                          }
+                          }}
                           onCommand={(command) =>
                             void executeCommand(command, selected)
                           }

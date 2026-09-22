@@ -24,8 +24,8 @@ vi.mock('@/features/sales/SalesWorkspace', () => ({
 vi.mock('@/features/trader/TraderWorkspace', () => ({
   TraderWorkspace: () => <div>Trader Workspace</div>,
 }))
-vi.mock('@/features/daily-review/DailyReviewWorkspace', () => ({
-  DailyReviewWorkspace: () => <div>Daily Review Workspace</div>,
+vi.mock('@/features/post-process/PostProcessWorkspace', () => ({
+  PostProcessWorkspace: () => <div>Post Process Workspace</div>,
 }))
 
 describe('App routing', () => {
@@ -34,7 +34,7 @@ describe('App routing', () => {
   it.each([
     ['/sales', 'Sales Workspace'],
     ['/trader', 'Trader Workspace'],
-    ['/daily-review', 'Daily Review Workspace'],
+    ['/post-process', 'Post Process Workspace'],
   ])('renders %s directly', (path, expected) => {
     render(
       <MemoryRouter initialEntries={[path]}>

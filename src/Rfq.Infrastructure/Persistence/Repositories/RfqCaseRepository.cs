@@ -35,6 +35,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             SecurityId = rfqCase.SecurityId.Value,
             CategorySnapshot = rfqCase.CategorySnapshot.Value,
             CreatedAt = rfqCase.CreatedAt,
+            CreatedBusinessDate = rfqCase.CreatedBusinessDate,
             CreatedBy = rfqCase.CreatedBy.Value,
             SalesId = rfqCase.SalesId?.Value,
             CopiedFromCaseId = rfqCase.CopiedFromCaseId?.Value,
@@ -52,6 +53,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                 CurrentRevision = revision,
                 CurrentQuoteId = rfqCase.CurrentQuoteId?.Value,
                 ClosedQuoteId = rfqCase.ClosedQuoteId?.Value,
+                ClosedBusinessDate = rfqCase.ClosedBusinessDate,
                 Version = rfqCase.Version.Value,
                 ContactOwnerId = rfqCase.ContactOwnerId.Value,
                 AssignedTraderId = rfqCase.AssignedTraderId.Value,
@@ -98,6 +100,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             SecurityId.Create(entity.SecurityId),
             CategoryId.Create(entity.CategorySnapshot),
             entity.CreatedAt,
+            entity.CreatedBusinessDate,
             UserId.Create(entity.CreatedBy),
             entity.SalesId is null ? null : UserId.Create(entity.SalesId),
             UserId.Create(entity.Current.ContactOwnerId),
@@ -150,6 +153,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         entity.Current.CurrentRevisionId = rfqCase.CurrentRevision.RevisionId.Value;
         entity.Current.CurrentQuoteId = rfqCase.CurrentQuoteId?.Value;
         entity.Current.ClosedQuoteId = rfqCase.ClosedQuoteId?.Value;
+        entity.Current.ClosedBusinessDate = rfqCase.ClosedBusinessDate;
         entity.Current.ContactOwnerId = rfqCase.ContactOwnerId.Value;
         entity.Current.AssignedTraderId = rfqCase.AssignedTraderId.Value;
         entity.Current.Owned = rfqCase.Ownership is Owned;
@@ -178,10 +182,13 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
     {
         var quoteId = new QuoteId(current.ClosedQuoteId
             ?? throw new DomainInvariantException("Closed RFQ is missing ClosedQuoteId."));
+        DateOnly businessDate = current.ClosedBusinessDate
+            ?? throw new DomainInvariantException(
+                "Closed RFQ is missing ClosedBusinessDate.");
         return current.RfqStatus switch
         {
-            RfqStatus.Hit => new HitRfq(revisionId, quoteId),
-            RfqStatus.Away => new AwayRfq(revisionId, quoteId),
+            RfqStatus.Hit => new HitRfq(revisionId, quoteId, businessDate),
+            RfqStatus.Away => new AwayRfq(revisionId, quoteId, businessDate),
             _ => throw new DomainInvariantException("Closed RFQ has an invalid RFQ status."),
         };
     }

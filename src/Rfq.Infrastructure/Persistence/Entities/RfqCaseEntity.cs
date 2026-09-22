@@ -9,6 +9,7 @@ internal sealed class RfqCaseEntity
     public string SecurityId { get; set; } = string.Empty;
     public string CategorySnapshot { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
+    public DateOnly? CreatedBusinessDate { get; set; }
     public string CreatedBy { get; set; } = string.Empty;
     public string? SalesId { get; set; }
     public long? CopiedFromCaseId { get; set; }

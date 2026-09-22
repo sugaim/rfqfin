@@ -17,6 +17,8 @@ internal sealed class EfCoreCaseCurrentConfiguration : IEntityTypeConfiguration<
         builder.Property(entity => entity.CurrentRevisionId).HasColumnName("current_revision_id");
         builder.Property(entity => entity.CurrentQuoteId).HasColumnName("current_quote_id");
         builder.Property(entity => entity.ClosedQuoteId).HasColumnName("closed_quote_id");
+        builder.Property(entity => entity.ClosedBusinessDate)
+            .HasColumnName("closed_business_date").HasColumnType("date");
         builder.Property(entity => entity.Version).HasColumnName("version").IsConcurrencyToken();
         builder.Property(entity => entity.ContactOwnerId).HasColumnName("contact_owner_id").HasMaxLength(100);
         builder.Property(entity => entity.AssignedTraderId).HasColumnName("assigned_trader_id").HasMaxLength(100);
@@ -29,6 +31,8 @@ internal sealed class EfCoreCaseCurrentConfiguration : IEntityTypeConfiguration<
             .HasForeignKey(entity => entity.CurrentQuoteId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(entity => entity.ClosedQuote).WithMany()
             .HasForeignKey(entity => entity.ClosedQuoteId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(entity => entity.RfqStatus)
+            .HasDatabaseName("ix_case_currents_rfq_status");
     }
 }
 

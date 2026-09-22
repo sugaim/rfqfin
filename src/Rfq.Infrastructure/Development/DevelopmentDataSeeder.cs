@@ -120,6 +120,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 SecurityId = security.Item1,
                 CategorySnapshot = security.Item2,
                 CreatedAt = created,
+                CreatedBusinessDate = isDraft ? null : new DateOnly(2026, 9, 21),
                 CreatedBy = revision.CreatedBy,
                 SalesId = index == 1 ? null : revision.CreatedBy,
                 Revisions = [revision],
@@ -149,6 +150,9 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                     CurrentRevision = revision,
                     CurrentQuoteId = lifecycle == RfqLifecycleKind.Open && isQuoted ? quoteId : null,
                     ClosedQuoteId = lifecycle == RfqLifecycleKind.Closed ? quoteId : null,
+                    ClosedBusinessDate = lifecycle == RfqLifecycleKind.Closed
+                        ? new DateOnly(2026, 9, 21)
+                        : null,
                     Version = 2,
                     ContactOwnerId = revision.CreatedBy,
                     AssignedTraderId = security.Item3,

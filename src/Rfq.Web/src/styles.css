@@ -548,6 +548,42 @@ body {
   margin-top: 3px;
 }
 
+.post-process-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.post-process-grid {
+  height: calc(100vh - 220px);
+  min-height: 420px;
+}
+.post-process-grid .post-process-row-unclosed {
+  background: rgba(173, 123, 33, 0.12) !important;
+}
+.post-process-grid .post-process-row-cancelled {
+  color: rgba(255, 255, 255, 0.48) !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+}
+.post-process-grid .post-process-row-pending {
+  box-shadow: inset 3px 0 #4ea3d8;
+}
+.post-process-confirm-table {
+  display: grid;
+  gap: 4px;
+}
+.post-process-confirm-row {
+  display: grid;
+  grid-template-columns: 65px 1.5fr 1fr 70px 1fr;
+  gap: 8px;
+  border-bottom: 1px solid #292929;
+  padding: 6px 0;
+  font-size: 12px;
+}
+.post-process-confirm-header {
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 600;
+}
+
 @media (max-width: 1180px) {
   .sales-main {
     grid-template-columns: minmax(0, 1fr) 290px;

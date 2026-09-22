@@ -38,10 +38,18 @@ internal static class EventPersistenceContract
     {
         PendingRfqClosedHitEvent item => Data(
             EventPersistenceTypeCodes.Rfq.ClosedHit,
-            new ClosePayload { QuoteId = item.QuoteId.Value }),
+            new ClosePayload
+            {
+                QuoteId = item.QuoteId.Value,
+                BusinessDate = item.EventBusinessDate,
+            }),
         PendingRfqClosedAwayEvent item => Data(
             EventPersistenceTypeCodes.Rfq.ClosedAway,
-            new ClosePayload { QuoteId = item.QuoteId.Value }),
+            new ClosePayload
+            {
+                QuoteId = item.QuoteId.Value,
+                BusinessDate = item.EventBusinessDate,
+            }),
         PendingRfqOutcomeCorrectedEvent item => Data(
             EventPersistenceTypeCodes.Rfq.OutcomeCorrected,
             new OutcomeCorrectedPayload
@@ -50,6 +58,7 @@ internal static class EventPersistenceContract
                 From = OutcomeCode(item.From),
                 To = OutcomeCode(item.To),
                 Reason = item.Reason,
+                BusinessDate = item.EventBusinessDate,
             }),
         PendingRfqContactOwnerChangedEvent item => Data(
             EventPersistenceTypeCodes.Rfq.ContactOwnerChanged,
@@ -57,7 +66,9 @@ internal static class EventPersistenceContract
         PendingRfqRevisionConfirmedEvent item => Data(
             EventPersistenceTypeCodes.Rfq.RevisionConfirmed,
             new RevisionConfirmedPayload { From = item.From?.Value, To = item.To.Value }),
-        PendingRfqCancelledEvent => Empty(EventPersistenceTypeCodes.Rfq.Cancelled),
+        PendingRfqCancelledEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.Cancelled,
+            new BusinessDatePayload { BusinessDate = item.EventBusinessDate }),
         PendingRfqReopenedEvent => Empty(EventPersistenceTypeCodes.Rfq.Reopened),
         PendingRfqPickedUpEvent item => Data(
             EventPersistenceTypeCodes.Rfq.PickedUp,
@@ -91,18 +102,33 @@ internal static class EventPersistenceContract
         return typeCode switch
         {
             EventPersistenceTypeCodes.Rfq.ClosedHit => new RfqClosedHitEvent(
-                eventId, occurredAt, actorUserId, caseId, QuoteIdOf(payloadJson)),
+                eventId,
+                occurredAt,
+                actorUserId,
+                caseId,
+                CloseOf(payloadJson).QuoteId,
+                CloseOf(payloadJson).BusinessDate),
             EventPersistenceTypeCodes.Rfq.ClosedAway => new RfqClosedAwayEvent(
-                eventId, occurredAt, actorUserId, caseId, QuoteIdOf(payloadJson)),
+                eventId,
+                occurredAt,
+                actorUserId,
+                caseId,
+                CloseOf(payloadJson).QuoteId,
+                CloseOf(payloadJson).BusinessDate),
             EventPersistenceTypeCodes.Rfq.OutcomeCorrected => OutcomeCorrected(
                 eventId, occurredAt, actorUserId, caseId, payloadJson),
             EventPersistenceTypeCodes.Rfq.ContactOwnerChanged => ContactOwnerChanged(
                 eventId, occurredAt, actorUserId, caseId, payloadJson),
             EventPersistenceTypeCodes.Rfq.RevisionConfirmed => RevisionConfirmed(
                 eventId, occurredAt, actorUserId, caseId, payloadJson),
-            EventPersistenceTypeCodes.Rfq.Cancelled => EmptyRfq(
-                payloadJson,
-                () => new RfqCancelledEvent(eventId, occurredAt, actorUserId, caseId)),
+            EventPersistenceTypeCodes.Rfq.Cancelled => new RfqCancelledEvent(
+                eventId,
+                occurredAt,
+                actorUserId,
+                caseId,
+                PersistenceJsonSerializer.Deserialize<BusinessDatePayload>(
+                    payloadJson,
+                    "cancelled event payload").BusinessDate),
             EventPersistenceTypeCodes.Rfq.Reopened => EmptyRfq(
                 payloadJson,
                 () => new RfqReopenedEvent(eventId, occurredAt, actorUserId, caseId)),
@@ -159,16 +185,16 @@ internal static class EventPersistenceContract
 
     private static EventPersistenceData Empty(string code) => Data(code, new EmptyPayload());
 
-    private static QuoteId QuoteIdOf(string json)
+    private static (QuoteId QuoteId, DateOnly BusinessDate) CloseOf(string json)
     {
-        Guid value = PersistenceJsonSerializer.Deserialize<ClosePayload>(
-            json, "RFQ close event payload").QuoteId;
-        if (value == Guid.Empty)
+        ClosePayload value = PersistenceJsonSerializer.Deserialize<ClosePayload>(
+            json, "RFQ close event payload");
+        if (value.QuoteId == Guid.Empty)
         {
             throw new DomainInvariantException("Persisted RFQ close event QuoteId is invalid.");
         }
 
-        return new QuoteId(value);
+        return (new QuoteId(value.QuoteId), value.BusinessDate);
     }
 
     private static RfqOutcomeCorrectedEvent OutcomeCorrected(
@@ -193,7 +219,11 @@ internal static class EventPersistenceContract
             new QuoteId(dto.QuoteId),
             ParseOutcome(dto.From),
             ParseOutcome(dto.To),
-            dto.Reason);
+            string.IsNullOrWhiteSpace(dto.Reason)
+                ? throw new DomainInvariantException(
+                    "Persisted outcome-corrected Reason is invalid.")
+                : dto.Reason,
+            dto.BusinessDate);
     }
 
     private static RfqContactOwnerChangedEvent ContactOwnerChanged(
@@ -290,14 +320,25 @@ internal static class EventPersistenceContract
 }
 
 internal sealed class EmptyPayload { }
-internal sealed class ClosePayload { public required Guid QuoteId { get; init; } }
+
+internal sealed class ClosePayload
+{
+    public required Guid QuoteId { get; init; }
+    public required DateOnly BusinessDate { get; init; }
+}
+
+internal sealed class BusinessDatePayload
+{
+    public required DateOnly BusinessDate { get; init; }
+}
 
 internal sealed class OutcomeCorrectedPayload
 {
     public required Guid QuoteId { get; init; }
     public required string From { get; init; }
     public required string To { get; init; }
-    public required string? Reason { get; init; }
+    public required string Reason { get; init; }
+    public required DateOnly BusinessDate { get; init; }
 }
 
 internal sealed class UserChangePayload

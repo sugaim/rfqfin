@@ -143,7 +143,7 @@ public enum QuoteRequestReasonValue
 public sealed record LifecycleRequest([Range(1, long.MaxValue)] long ExpectedCurrentVersion);
 
 public sealed record CorrectOutcomeRequest(
-    string? Reason,
+    [Required] string Reason,
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
 
 public sealed record BulkLifecycleItemRequest(

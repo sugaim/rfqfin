@@ -2175,6 +2175,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/post-process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    preset?: number;
+                    scope?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PostProcessItemResponse"][];
+                        "application/json": components["schemas"]["PostProcessItemResponse"][];
+                        "text/json": components["schemas"]["PostProcessItemResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/post-process/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PostProcessCommitRequest"];
+                    "text/json": components["schemas"]["PostProcessCommitRequest"];
+                    "application/*+json": components["schemas"]["PostProcessCommitRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BulkItemResponse"][];
+                        "application/json": components["schemas"]["BulkItemResponse"][];
+                        "text/json": components["schemas"]["BulkItemResponse"][];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me": {
         parameters: {
             query?: never;
@@ -3078,7 +3161,7 @@ export interface components {
             currentVersion: number;
         };
         CorrectOutcomeRequest: {
-            reason: string | null;
+            reason: string;
             /** Format: int64 */
             expectedCurrentVersion: number;
         };
@@ -3414,6 +3497,70 @@ export interface components {
             expectedVersion: number;
             confirmed: boolean;
         };
+        PostProcessCommitItemRequest: {
+            /** Format: int64 */
+            caseId: number;
+            /** Format: int64 */
+            expectedCurrentVersion: number;
+            lifecycleChange: components["schemas"]["PostProcessLifecycleChangeRequest"];
+            memoChange: components["schemas"]["PostProcessMemoChangeRequest"];
+        };
+        PostProcessCommitRequest: {
+            items: components["schemas"]["PostProcessCommitItemRequest"][];
+        };
+        PostProcessItemResponse: {
+            /** Format: int64 */
+            caseId: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date */
+            createdBusinessDate: string;
+            clientId: string;
+            clientName: string;
+            securityId: string;
+            securityName: string;
+            securityBbgDisplay: string;
+            /** Format: double */
+            notional: number | null;
+            /** Format: date */
+            settlementDate: string | null;
+            contactOwnerId: string;
+            salesId: string | null;
+            assignedTraderId: string;
+            rfqStatus: components["schemas"]["RfqStatusValue"];
+            /** Format: int64 */
+            currentVersion: number;
+            salesAndTradingMessage: string;
+            myMemo: string;
+            /** Format: int64 */
+            myMemoVersion: number;
+            /** Format: double */
+            price: number | null;
+            /** Format: double */
+            finalSimpleYield: number | null;
+            /** Format: double */
+            yield: number | null;
+            /** Format: double */
+            ysc: number | null;
+            /** Format: double */
+            gSpread: number | null;
+            /** Format: date */
+            closedBusinessDate: string | null;
+            lastCorrectionReason: string | null;
+            lastChangedBy: string | null;
+            /** Format: date-time */
+            lastChangedAt: string | null;
+        };
+        PostProcessLifecycleChangeRequest: {
+            type: components["schemas"]["PostProcessLifecycleChangeValue"];
+            correctionReason: string | null;
+        } | null;
+        PostProcessLifecycleChangeValue: number;
+        PostProcessMemoChangeRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+            value: string | null;
+        } | null;
         PresentationResponse: {
             /** Format: int64 */
             caseId: number;

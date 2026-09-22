@@ -351,7 +351,7 @@ describe('AppShell', () => {
     )
     expect(screen.getAllByText('Sales')).toHaveLength(2)
     expect(screen.getByText('Trader')).toBeInTheDocument()
-    expect(screen.getByText('Daily Review')).toBeInTheDocument()
+    expect(screen.getByText('Post Process')).toBeInTheDocument()
     expect(screen.getByText('API healthy')).toBeInTheDocument()
     expect(screen.getByText('Business Date: 2026-09-21')).toBeInTheDocument()
   })
@@ -883,6 +883,9 @@ describe('SalesScreen', () => {
   it('keeps the paused snapshot after correcting a closed outcome', async () => {
     const onCorrectOutcome = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
+    const prompt = vi
+      .spyOn(window, 'prompt')
+      .mockReturnValue('booking correction')
     render(
       <SalesScreen
         {...baseProps}
@@ -897,9 +900,15 @@ describe('SalesScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Correct outcome' }))
 
     await waitFor(() =>
-      expect(onCorrectOutcome).toHaveBeenCalledWith(101, 'Away', 7),
+      expect(onCorrectOutcome).toHaveBeenCalledWith(
+        101,
+        'Away',
+        7,
+        'booking correction',
+      ),
     )
     expect(onReload).not.toHaveBeenCalled()
+    prompt.mockRestore()
   })
 
   it('keeps the paused snapshot after an inline Amendment edit', async () => {

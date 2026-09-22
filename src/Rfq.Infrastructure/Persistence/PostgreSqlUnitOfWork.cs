@@ -43,6 +43,7 @@ public sealed class PostgreSqlUnitOfWork(
                             EventId = parent.EventId,
                             CaseId = rfqEvent.CaseId.Value,
                             Type = persistence.TypeCode,
+                            BusinessDate = rfqEvent.BusinessDate,
                             PayloadJson = persistence.PayloadJson,
                         });
                         break;

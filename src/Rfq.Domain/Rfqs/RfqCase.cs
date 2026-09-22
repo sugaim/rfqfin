@@ -8,6 +8,7 @@ public sealed class RfqCase
         SecurityId securityId,
         CategoryId categorySnapshot,
         DateTimeOffset createdAt,
+        DateOnly? createdBusinessDate,
         UserId createdBy,
         UserId? salesId,
         UserId contactOwnerId,
@@ -23,6 +24,7 @@ public sealed class RfqCase
         SecurityId = securityId;
         CategorySnapshot = categorySnapshot;
         CreatedAt = createdAt.ToUniversalTime();
+        CreatedBusinessDate = createdBusinessDate;
         CreatedBy = createdBy;
         SalesId = salesId;
         ContactOwnerId = contactOwnerId;
@@ -40,6 +42,7 @@ public sealed class RfqCase
     public SecurityId SecurityId { get; }
     public CategoryId CategorySnapshot { get; }
     public DateTimeOffset CreatedAt { get; }
+    public DateOnly? CreatedBusinessDate { get; }
     public UserId CreatedBy { get; }
     public UserId? SalesId { get; }
     public UserId ContactOwnerId { get; }
@@ -79,6 +82,7 @@ public sealed class RfqCase
     };
 
     public QuoteId? ClosedQuoteId => (Lifecycle as ClosedRfq)?.ClosedQuoteId;
+    public DateOnly? ClosedBusinessDate => (Lifecycle as ClosedRfq)?.ClosedBusinessDate;
     public Ownership? Ownership => (Lifecycle as OpenRfq)?.Ownership;
 
     public static RfqCase CreateDraft(
@@ -103,6 +107,7 @@ public sealed class RfqCase
             securityId,
             categorySnapshot,
             createdAt,
+            null,
             createdBy,
             salesId,
             createdBy,
@@ -119,6 +124,7 @@ public sealed class RfqCase
         RfqRevision? currentRevision = null,
         RfqRevision? pendingDraftRevision = null,
         bool clearPendingDraft = false,
+        DateOnly? createdBusinessDate = null,
         UserId? assignedTraderId = null,
         UserId? contactOwnerId = null) => new(
             CaseId,
@@ -126,6 +132,7 @@ public sealed class RfqCase
             SecurityId,
             CategorySnapshot,
             CreatedAt,
+            createdBusinessDate ?? CreatedBusinessDate,
             CreatedBy,
             SalesId,
             contactOwnerId ?? ContactOwnerId,
@@ -142,6 +149,7 @@ public sealed class RfqCase
         SecurityId securityId,
         CategoryId categorySnapshot,
         DateTimeOffset createdAt,
+        DateOnly? createdBusinessDate,
         UserId createdBy,
         UserId? salesId,
         UserId contactOwnerId,
@@ -156,6 +164,7 @@ public sealed class RfqCase
             securityId,
             categorySnapshot,
             createdAt,
+            createdBusinessDate,
             createdBy,
             salesId,
             contactOwnerId,
@@ -185,6 +194,12 @@ public sealed class RfqCase
         if (Lifecycle is not DraftRfq && CurrentRevision.Status != RevisionStatus.Confirmed)
         {
             throw new DomainInvariantException("Non-Draft lifecycle requires a Confirmed current Revision.");
+        }
+
+        if (Lifecycle is not DraftRfq && CreatedBusinessDate is null)
+        {
+            throw new DomainInvariantException(
+                "Non-Draft lifecycle requires a Created Business Date.");
         }
 
         if (PendingDraftRevision is not null && PendingDraftRevision.Status != RevisionStatus.Draft)

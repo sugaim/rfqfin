@@ -215,6 +215,7 @@ export interface TraderScreenProps {
   onCorrectOutcome: (
     row: TraderRfq,
     outcome: RfqOutcome,
+    reason: string,
   ) => Promise<CloseRfqResult | void>
   onChangeContactOwner: (
     row: TraderRfq,
@@ -1819,17 +1820,20 @@ function OperationsPane({
             </Button>
             <Popconfirm
               title="Correct closed outcome?"
-              onConfirm={() =>
+              onConfirm={() => {
+                const reason = window.prompt('Correction Reason')
+                if (!reason?.trim()) return
                 void onRun(
                   () =>
                     onCorrectOutcome(
                       selected,
                       selected.rfqStatus === 'Hit' ? 'Away' : 'Hit',
+                      reason.trim(),
                     ),
                   undefined,
                   selected,
                 )
-              }
+              }}
             >
               <Button
                 size="small"

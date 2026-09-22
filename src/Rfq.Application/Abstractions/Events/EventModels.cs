@@ -19,14 +19,16 @@ public sealed record RfqClosedHitEvent(
     DateTimeOffset OccurredAt,
     UserId? ActorUserId,
     CaseId CaseId,
-    QuoteId QuoteId) : RfqEvent(EventId, OccurredAt, ActorUserId, CaseId);
+    QuoteId QuoteId,
+    DateOnly BusinessDate) : RfqEvent(EventId, OccurredAt, ActorUserId, CaseId);
 
 public sealed record RfqClosedAwayEvent(
     long EventId,
     DateTimeOffset OccurredAt,
     UserId? ActorUserId,
     CaseId CaseId,
-    QuoteId QuoteId) : RfqEvent(EventId, OccurredAt, ActorUserId, CaseId);
+    QuoteId QuoteId,
+    DateOnly BusinessDate) : RfqEvent(EventId, OccurredAt, ActorUserId, CaseId);
 
 public sealed record RfqOutcomeCorrectedEvent(
     long EventId,
@@ -36,7 +38,8 @@ public sealed record RfqOutcomeCorrectedEvent(
     QuoteId QuoteId,
     RfqStatus From,
     RfqStatus To,
-    string? Reason)
+    string Reason,
+    DateOnly BusinessDate)
     : RfqEvent(EventId, OccurredAt, ActorUserId, CaseId);
 
 public sealed record RfqContactOwnerChangedEvent(
@@ -59,7 +62,8 @@ public sealed record RfqCancelledEvent(
     long EventId,
     DateTimeOffset OccurredAt,
     UserId? ActorUserId,
-    CaseId CaseId) : RfqEvent(EventId, OccurredAt, ActorUserId, CaseId);
+    CaseId CaseId,
+    DateOnly BusinessDate) : RfqEvent(EventId, OccurredAt, ActorUserId, CaseId);
 
 public sealed record RfqReopenedEvent(
     long EventId,
@@ -140,7 +144,8 @@ public sealed record RfqTransition(
     QuoteId? QuoteId = null,
     string? From = null,
     string? To = null,
-    string? Reason = null);
+    string? Reason = null,
+    DateOnly? BusinessDate = null);
 
 public enum RfqTransitionKind
 {

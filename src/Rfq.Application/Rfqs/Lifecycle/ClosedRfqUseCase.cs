@@ -11,16 +11,15 @@ internal static class ClosedRfqUseCase
         await cases.GetAsync(caseId, cancellationToken)
             ?? throw new RfqNotFoundException($"RFQ Case '{caseId}' was not found.");
 
-    public static async Task<CloseRfqResult> ApplyAsync(
+    public static CloseRfqResult Apply(
         RfqCase rfq,
         Func<RfqCase, CloseTransitionResult> transition,
         RfqTransitionKind eventKind,
+        DateOnly businessDate,
         IRfqCaseRepository cases,
         IRfqEventSink events,
-        IUnitOfWork unitOfWork,
         CurrentUser currentUser,
-        TimeProvider timeProvider,
-        CancellationToken cancellationToken)
+        TimeProvider timeProvider)
     {
         CloseTransitionResult result = transition(rfq);
         rfq = result.Rfq;
@@ -37,8 +36,8 @@ internal static class ClosedRfqUseCase
             rfq.CaseId,
             currentUser.UserId,
             timeProvider.GetUtcNow(),
-            closed.ClosedQuoteId));
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+            closed.ClosedQuoteId,
+            BusinessDate: businessDate));
         return ToResult(rfq);
     }
 

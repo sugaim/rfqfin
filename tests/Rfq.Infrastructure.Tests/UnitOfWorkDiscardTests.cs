@@ -20,7 +20,8 @@ public sealed class UnitOfWorkDiscardTests
             RfqTransitionKind.Cancelled,
             new CaseId(1),
             UserId.Create("sales"),
-            DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow,
+            BusinessDate: new DateOnly(2026, 9, 21)));
         var unitOfWork = new PostgreSqlUnitOfWork(context, sink);
 
         unitOfWork.DiscardChanges();

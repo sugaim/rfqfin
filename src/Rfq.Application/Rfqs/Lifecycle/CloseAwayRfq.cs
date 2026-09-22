@@ -6,9 +6,8 @@ public sealed class CloseAwayRfq(
     IRfqCaseRepository cases,
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
-    IRfqEventSink events,
-    IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    CloseRfqOperation operation,
+    IUnitOfWork unitOfWork)
 {
     public async Task<CloseAwayRfqResult> ExecuteAsync(
         CaseId caseId,
@@ -35,16 +34,12 @@ public sealed class CloseAwayRfq(
         }
 
         authorization.EnsureCanClose(currentUser.User, rfq);
-        CloseRfqResult result = await ClosedRfqUseCase.ApplyAsync(
-            rfq,
-            value => RfqLifecycleTransitions.CloseAway(value, expectedCurrentVersion),
-            RfqTransitionKind.ClosedAway,
-            cases,
-            events,
-            unitOfWork,
-            currentUser.User,
-            timeProvider,
+        CloseRfqResult result = await operation.ApplyAsync(
+            caseId,
+            RfqStatus.Away,
+            expectedCurrentVersion,
             cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
         return new CloseAwayRfqResult(CloseAwayOutcome.ClosedAway, result);
     }
 }

@@ -38,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<IRfqRevisionQueries, EfCoreRfqRevisionQueries>();
         services.AddScoped<IRfqQuoteQueries, EfCoreRfqQuoteQueries>();
         services.AddScoped<IEodQueries, EfCoreEodQueries>();
+        services.AddScoped<IPostProcessQueries, EfCorePostProcessQueries>();
+        services.AddScoped<IPostProcessVisibility, EfCorePostProcessVisibility>();
         services.AddScoped<IGridConfigStore, EfCoreGridConfigStore>();
         services.AddSingleton<IStandardSettlementResolver, MockStandardSettlementResolver>();
         services.AddScoped<IUnitOfWork, PostgreSqlUnitOfWork>();

@@ -29,11 +29,13 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
         RfqTransitionKind.ClosedHit => new PendingRfqClosedHitEvent(
             transition.CaseId,
             Required(transition.QuoteId, "ClosedHit QuoteId"),
+            RequiredBusinessDate(transition.BusinessDate, "ClosedHit BusinessDate"),
             transition.PerformedBy,
             transition.OccurredAt),
         RfqTransitionKind.ClosedAway => new PendingRfqClosedAwayEvent(
             transition.CaseId,
             Required(transition.QuoteId, "ClosedAway QuoteId"),
+            RequiredBusinessDate(transition.BusinessDate, "ClosedAway BusinessDate"),
             transition.PerformedBy,
             transition.OccurredAt),
         RfqTransitionKind.OutcomeCorrected => new PendingRfqOutcomeCorrectedEvent(
@@ -41,7 +43,10 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
             Required(transition.QuoteId, "OutcomeCorrected QuoteId"),
             ParseStatus(transition.From, "OutcomeCorrected From"),
             ParseStatus(transition.To, "OutcomeCorrected To"),
-            transition.Reason,
+            RequiredText(transition.Reason, "OutcomeCorrected Reason"),
+            RequiredBusinessDate(
+                transition.BusinessDate,
+                "OutcomeCorrected BusinessDate"),
             transition.PerformedBy,
             transition.OccurredAt),
         RfqTransitionKind.ContactOwnerChanged => new PendingRfqContactOwnerChangedEvent(
@@ -57,7 +62,10 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
             transition.PerformedBy,
             transition.OccurredAt),
         RfqTransitionKind.Cancelled => new PendingRfqCancelledEvent(
-            transition.CaseId, transition.PerformedBy, transition.OccurredAt),
+            transition.CaseId,
+            RequiredBusinessDate(transition.BusinessDate, "Cancelled BusinessDate"),
+            transition.PerformedBy,
+            transition.OccurredAt),
         RfqTransitionKind.Reopened => new PendingRfqReopenedEvent(
             transition.CaseId, transition.PerformedBy, transition.OccurredAt),
         RfqTransitionKind.PickedUp => new PendingRfqPickedUpEvent(
@@ -90,6 +98,14 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
 
     private static QuoteId Required(QuoteId? value, string field) => value
         ?? throw new DomainInvariantException($"{field} is required.");
+
+    private static DateOnly RequiredBusinessDate(DateOnly? value, string field) => value
+        ?? throw new DomainInvariantException($"{field} is required.");
+
+    private static string RequiredText(string? value, string field) =>
+        string.IsNullOrWhiteSpace(value)
+            ? throw new DomainInvariantException($"{field} is required.")
+            : value;
 
     private static UserId ParseUser(string? value, string field)
     {
@@ -130,7 +146,11 @@ public sealed class PersistedEventSink : IQuoteEventSink, IRfqEventSink
 
 internal abstract record PendingEvent(UserId ActorUserId, DateTimeOffset OccurredAt);
 
-internal abstract record PendingRfqEvent(CaseId CaseId, UserId ActorUserId, DateTimeOffset OccurredAt)
+internal abstract record PendingRfqEvent(
+    CaseId CaseId,
+    UserId ActorUserId,
+    DateTimeOffset OccurredAt,
+    DateOnly? BusinessDate = null)
     : PendingEvent(ActorUserId, OccurredAt);
 
 internal abstract record PendingQuoteEvent(QuoteId QuoteId, UserId ActorUserId, DateTimeOffset OccurredAt)
@@ -139,24 +159,29 @@ internal abstract record PendingQuoteEvent(QuoteId QuoteId, UserId ActorUserId, 
 internal sealed record PendingRfqClosedHitEvent(
     CaseId CaseId,
     QuoteId QuoteId,
+    DateOnly EventBusinessDate,
     UserId ActorUserId,
-    DateTimeOffset OccurredAt) : PendingRfqEvent(CaseId, ActorUserId, OccurredAt);
+    DateTimeOffset OccurredAt)
+    : PendingRfqEvent(CaseId, ActorUserId, OccurredAt, EventBusinessDate);
 
 internal sealed record PendingRfqClosedAwayEvent(
     CaseId CaseId,
     QuoteId QuoteId,
+    DateOnly EventBusinessDate,
     UserId ActorUserId,
-    DateTimeOffset OccurredAt) : PendingRfqEvent(CaseId, ActorUserId, OccurredAt);
+    DateTimeOffset OccurredAt)
+    : PendingRfqEvent(CaseId, ActorUserId, OccurredAt, EventBusinessDate);
 
 internal sealed record PendingRfqOutcomeCorrectedEvent(
     CaseId CaseId,
     QuoteId QuoteId,
     RfqStatus From,
     RfqStatus To,
-    string? Reason,
+    string Reason,
+    DateOnly EventBusinessDate,
     UserId ActorUserId,
     DateTimeOffset OccurredAt)
-    : PendingRfqEvent(CaseId, ActorUserId, OccurredAt);
+    : PendingRfqEvent(CaseId, ActorUserId, OccurredAt, EventBusinessDate);
 
 internal sealed record PendingRfqContactOwnerChangedEvent(
     CaseId CaseId,
@@ -172,8 +197,12 @@ internal sealed record PendingRfqRevisionConfirmedEvent(
     UserId ActorUserId,
     DateTimeOffset OccurredAt) : PendingRfqEvent(CaseId, ActorUserId, OccurredAt);
 
-internal sealed record PendingRfqCancelledEvent(CaseId CaseId, UserId ActorUserId, DateTimeOffset OccurredAt)
-    : PendingRfqEvent(CaseId, ActorUserId, OccurredAt);
+internal sealed record PendingRfqCancelledEvent(
+    CaseId CaseId,
+    DateOnly EventBusinessDate,
+    UserId ActorUserId,
+    DateTimeOffset OccurredAt)
+    : PendingRfqEvent(CaseId, ActorUserId, OccurredAt, EventBusinessDate);
 
 internal sealed record PendingRfqReopenedEvent(CaseId CaseId, UserId ActorUserId, DateTimeOffset OccurredAt)
     : PendingRfqEvent(CaseId, ActorUserId, OccurredAt);

@@ -18,7 +18,10 @@ public sealed record CancelledRfq : RfqLifecycle
 
 public abstract record ClosedRfq : RfqLifecycle
 {
-    protected ClosedRfq(RevisionId currentRevisionId, QuoteId closedQuoteId)
+    protected ClosedRfq(
+        RevisionId currentRevisionId,
+        QuoteId closedQuoteId,
+        DateOnly closedBusinessDate)
         : base(currentRevisionId)
     {
         if (closedQuoteId.Value == Guid.Empty)
@@ -27,19 +30,27 @@ public abstract record ClosedRfq : RfqLifecycle
         }
 
         ClosedQuoteId = closedQuoteId;
+        ClosedBusinessDate = closedBusinessDate;
     }
 
     public QuoteId ClosedQuoteId { get; }
+    public DateOnly ClosedBusinessDate { get; }
 }
 
 public sealed record HitRfq : ClosedRfq
 {
-    public HitRfq(RevisionId currentRevisionId, QuoteId closedQuoteId)
-        : base(currentRevisionId, closedQuoteId) { }
+    public HitRfq(
+        RevisionId currentRevisionId,
+        QuoteId closedQuoteId,
+        DateOnly closedBusinessDate)
+        : base(currentRevisionId, closedQuoteId, closedBusinessDate) { }
 }
 
 public sealed record AwayRfq : ClosedRfq
 {
-    public AwayRfq(RevisionId currentRevisionId, QuoteId closedQuoteId)
-        : base(currentRevisionId, closedQuoteId) { }
+    public AwayRfq(
+        RevisionId currentRevisionId,
+        QuoteId closedQuoteId,
+        DateOnly closedBusinessDate)
+        : base(currentRevisionId, closedQuoteId, closedBusinessDate) { }
 }

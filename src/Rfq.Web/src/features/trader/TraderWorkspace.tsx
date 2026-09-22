@@ -390,10 +390,11 @@ export function TraderWorkspace() {
           expectedCurrentVersion: row.currentVersion,
         }).unwrap()
       }
-      onCorrectOutcome={(row, outcome) =>
+      onCorrectOutcome={(row, outcome, reason) =>
         (outcome === 'Hit' ? correctHit : correctAway)({
           caseId: row.caseId,
           expectedCurrentVersion: row.currentVersion,
+          reason,
         }).unwrap()
       }
       onChangeContactOwner={(row, targetUserId) =>

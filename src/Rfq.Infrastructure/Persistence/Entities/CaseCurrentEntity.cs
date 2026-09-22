@@ -12,6 +12,7 @@ internal sealed class CaseCurrentEntity
     public Guid CurrentRevisionId { get; set; }
     public Guid? CurrentQuoteId { get; set; }
     public Guid? ClosedQuoteId { get; set; }
+    public DateOnly? ClosedBusinessDate { get; set; }
     public long Version { get; set; }
     public string ContactOwnerId { get; set; } = string.Empty;
     public string AssignedTraderId { get; set; } = string.Empty;

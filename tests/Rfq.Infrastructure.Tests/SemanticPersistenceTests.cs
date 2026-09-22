@@ -128,7 +128,8 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
             RfqTransitionKind.Cancelled,
             caseId,
             UserId.Create("sales-dev"),
-            DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow,
+            BusinessDate: new DateOnly(2026, 9, 21)));
         var unitOfWork = new PostgreSqlUnitOfWork(second, sink);
         await new PostgreSqlUnitOfWork(first).SaveChangesAsync();
 
@@ -539,6 +540,135 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         Assert.DoesNotContain(otherSales, item => item.CaseId.Value == caseId);
     }
 
+    [Fact]
+    public async Task Post_process_uses_business_facts_for_today_and_current_state_for_unclosed()
+    {
+        await RecreateAndSeed();
+        var today = new DateOnly(2026, 9, 21);
+        DateOnly oldBusinessDate = today.AddDays(-1);
+        long[] caseIds;
+        await using (RfqDbContext arrange = fixture.CreateContext())
+        {
+            RfqCaseEntity[] cases = await arrange.RfqCases
+                .Include(item => item.Current)
+                .Include(item => item.SalesMemo)
+                .OrderBy(item => item.CaseId)
+                .Take(8)
+                .ToArrayAsync();
+            caseIds = [.. cases.Select(item => item.CaseId)];
+            foreach (RfqCaseEntity rfqCase in cases.Where(item => item.CreatedBusinessDate != null))
+            {
+                rfqCase.CreatedBusinessDate = oldBusinessDate;
+            }
+
+            // Created today. The remaining active cases model quote-only and memo-only
+            // activity, neither of which is a Today business fact.
+            cases[1].CreatedBusinessDate = today;
+            ConfirmedQuoteEntity quoteOnly = await arrange.ConfirmedQuotes.SingleAsync(
+                item => item.QuoteId == cases[2].Current.CurrentQuoteId);
+            quoteOnly.ConfirmedAt = new DateTimeOffset(
+                2026, 9, 21, 3, 0, 0, TimeSpan.Zero);
+            cases[5].SalesMemo.Value = "memo changed without a business event";
+
+            cases[1].SalesId = "sales-dev";
+            cases[1].Current.ContactOwnerId = "sales-a";
+            cases[1].Current.AssignedTraderId = "trader-a";
+            cases[2].SalesId = null;
+            cases[2].Current.ContactOwnerId = "sales-dev";
+            cases[2].Current.AssignedTraderId = "trader-a";
+            cases[3].SalesId = null;
+            cases[3].Current.ContactOwnerId = "sales-a";
+            cases[3].Current.AssignedTraderId = "sales-dev";
+            cases[5].SalesId = "sales-a";
+            cases[5].Current.ContactOwnerId = "sales-a";
+            cases[5].Current.AssignedTraderId = "trader-a";
+
+            AddPostProcessEvent(
+                arrange,
+                1,
+                cases[6].CaseId,
+                EventPersistenceTypeCodes.Rfq.ClosedHit,
+                today,
+                PersistenceJsonSerializer.Serialize(new ClosePayload
+                {
+                    QuoteId = cases[6].Current.ClosedQuoteId!.Value,
+                    BusinessDate = today,
+                }));
+            AddPostProcessEvent(
+                arrange,
+                2,
+                cases[7].CaseId,
+                EventPersistenceTypeCodes.Rfq.OutcomeCorrected,
+                today,
+                PersistenceJsonSerializer.Serialize(new OutcomeCorrectedPayload
+                {
+                    QuoteId = cases[7].Current.ClosedQuoteId!.Value,
+                    From = "Hit",
+                    To = "Away",
+                    Reason = "same-day correction",
+                    BusinessDate = today,
+                }));
+            await arrange.SaveChangesAsync();
+        }
+
+        var permitted = caseIds.Select(value => new CaseId(value)).ToHashSet();
+        CurrentUser currentUser = CurrentSales().User;
+        await using RfqDbContext read = fixture.CreateContext();
+        var queries = new EfCorePostProcessQueries(read);
+
+        IReadOnlyList<PostProcessWorklistItem> todayItems = await queries.GetAsync(
+            PostProcessPreset.Today,
+            PostProcessScope.AllPermitted,
+            today,
+            currentUser,
+            permitted);
+        Assert.Equal<long>(
+            [caseIds[1], caseIds[6], caseIds[7]],
+            todayItems.Select(item => item.CaseId.Value).Order());
+        Assert.DoesNotContain(todayItems, item => item.CaseId.Value == caseIds[0]);
+        Assert.DoesNotContain(todayItems, item => item.CaseId.Value == caseIds[2]);
+        Assert.DoesNotContain(todayItems, item => item.CaseId.Value == caseIds[5]);
+        Assert.Equal(
+            "same-day correction",
+            todayItems.Single(item => item.CaseId.Value == caseIds[7]).LastCorrectionReason);
+
+        IReadOnlyList<PostProcessWorklistItem> unclosed = await queries.GetAsync(
+            PostProcessPreset.Unclosed,
+            PostProcessScope.AllPermitted,
+            today,
+            currentUser,
+            permitted);
+        Assert.Equal<long>(
+            [caseIds[1], caseIds[2], caseIds[3], caseIds[5]],
+            unclosed.Select(item => item.CaseId.Value).Order());
+
+        IReadOnlyList<PostProcessWorklistItem> mine = await queries.GetAsync(
+            PostProcessPreset.Unclosed,
+            PostProcessScope.Mine,
+            today,
+            currentUser,
+            permitted);
+        Assert.Equal<long>(
+            [caseIds[1], caseIds[2], caseIds[3]],
+            mine.Select(item => item.CaseId.Value).Order());
+    }
+
+    [Fact]
+    public async Task Closed_business_dates_round_trip_with_the_case_and_event()
+    {
+        await RecreateAndSeed();
+        await using RfqDbContext context = fixture.CreateContext();
+        RfqCaseEntity entity = await context.RfqCases
+            .Include(item => item.Current)
+            .FirstAsync(item => item.Current.RfqStatus == RfqStatus.Hit);
+        var repository = new RfqCaseRepository(context);
+
+        RfqCase restored = (await repository.GetAsync(new CaseId(entity.CaseId)))!;
+
+        Assert.Equal(new DateOnly(2026, 9, 21), restored.CreatedBusinessDate);
+        Assert.Equal(new DateOnly(2026, 9, 21), restored.ClosedBusinessDate);
+    }
+
     private static void AddRfqEvent(
         RfqDbContext context,
         long eventId,
@@ -563,6 +693,31 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
                 _ => throw new ArgumentOutOfRangeException(nameof(type)),
             },
             PayloadJson = "{}",
+        });
+    }
+
+    private static void AddPostProcessEvent(
+        RfqDbContext context,
+        long eventId,
+        long caseId,
+        string type,
+        DateOnly businessDate,
+        string payloadJson)
+    {
+        context.Events.Add(new EventEntity
+        {
+            EventId = eventId,
+            OccurredAt = new DateTimeOffset(
+                2026, 9, 21, checked((int)eventId), 0, 0, TimeSpan.Zero),
+            ActorUserId = "sales-dev",
+        });
+        context.RfqEvents.Add(new RfqEventEntity
+        {
+            EventId = eventId,
+            CaseId = caseId,
+            Type = type,
+            BusinessDate = businessDate,
+            PayloadJson = payloadJson,
         });
     }
 

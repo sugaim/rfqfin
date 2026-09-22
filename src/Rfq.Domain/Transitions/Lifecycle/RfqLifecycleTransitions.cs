@@ -16,6 +16,7 @@ public static class RfqLifecycleTransitions
             terms, businessDate, confirmedBy, confirmedAt, expectedRevisionVersion);
         return rfq.Next(
             currentRevision: revision,
+            createdBusinessDate: businessDate,
             assignedTraderId: assignedTraderId,
             lifecycle: new ActiveRfq(
                 revision.RevisionId,
@@ -76,12 +77,22 @@ public static class RfqLifecycleTransitions
     }
 
     public static CloseTransitionResult CloseHit(
-        RfqCase rfq, StateVersion expectedVersion) =>
-        Close(rfq, expectedVersion, (revisionId, quoteId) => new HitRfq(revisionId, quoteId));
+        RfqCase rfq,
+        DateOnly businessDate,
+        StateVersion expectedVersion) =>
+        Close(
+            rfq,
+            expectedVersion,
+            (revisionId, quoteId) => new HitRfq(revisionId, quoteId, businessDate));
 
     public static CloseTransitionResult CloseAway(
-        RfqCase rfq, StateVersion expectedVersion) =>
-        Close(rfq, expectedVersion, (revisionId, quoteId) => new AwayRfq(revisionId, quoteId));
+        RfqCase rfq,
+        DateOnly businessDate,
+        StateVersion expectedVersion) =>
+        Close(
+            rfq,
+            expectedVersion,
+            (revisionId, quoteId) => new AwayRfq(revisionId, quoteId, businessDate));
 
     public static RfqCase CorrectToHit(RfqCase rfq, StateVersion expectedVersion)
     {
@@ -92,7 +103,9 @@ public static class RfqLifecycleTransitions
         }
 
         return rfq.Next(lifecycle: new HitRfq(
-            away.CurrentRevisionId, away.ClosedQuoteId));
+            away.CurrentRevisionId,
+            away.ClosedQuoteId,
+            away.ClosedBusinessDate));
     }
 
     public static RfqCase CorrectToAway(RfqCase rfq, StateVersion expectedVersion)
@@ -104,7 +117,9 @@ public static class RfqLifecycleTransitions
         }
 
         return rfq.Next(lifecycle: new AwayRfq(
-            hit.CurrentRevisionId, hit.ClosedQuoteId));
+            hit.CurrentRevisionId,
+            hit.ClosedQuoteId,
+            hit.ClosedBusinessDate));
     }
 
     private static CloseTransitionResult Close(

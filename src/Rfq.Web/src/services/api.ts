@@ -149,6 +149,51 @@ export interface EodSummary {
   hit: number
   away: number
 }
+export type PostProcessPreset = 'Today' | 'Unclosed'
+export type PostProcessScope = 'Mine' | 'AllPermitted'
+export type PostProcessLifecycleChangeType =
+  'Hit' | 'Away' | 'Cancel' | 'CorrectToHit' | 'CorrectToAway'
+export interface PostProcessItem {
+  caseId: number
+  createdAt: string
+  createdBusinessDate: string
+  clientId: string
+  clientName: string
+  securityId: string
+  securityName: string
+  securityBbgDisplay: string
+  notional: number | null
+  settlementDate: string | null
+  contactOwnerId: string
+  salesId: string | null
+  assignedTraderId: string
+  rfqStatus: 'Active' | 'Presented' | 'Hit' | 'Away' | 'Cancelled'
+  currentVersion: number
+  salesAndTradingMessage: string
+  myMemo: string
+  myMemoVersion: number
+  price: number | null
+  finalSimpleYield: number | null
+  yield: number | null
+  ysc: number | null
+  gSpread: number | null
+  closedBusinessDate: string | null
+  lastCorrectionReason: string | null
+  lastChangedBy: string | null
+  lastChangedAt: string | null
+}
+export interface PostProcessCommitItem {
+  caseId: number
+  expectedCurrentVersion: number
+  lifecycleChange?: {
+    type: PostProcessLifecycleChangeType
+    correctionReason?: string | null
+  }
+  memoChange?: {
+    expectedVersion: number
+    value: string
+  }
+}
 export interface RfqSearchItem {
   caseId: number
   createdAt: string
@@ -408,6 +453,22 @@ export const api = createApi({
     }),
     getEod: builder.query<EodSummary[], string>({
       query: (date) => ({ url: '/eod', params: { date } }),
+    }),
+    getPostProcess: builder.query<
+      PostProcessItem[],
+      { preset: PostProcessPreset; scope: PostProcessScope }
+    >({
+      query: (params) => ({ url: '/post-process', params }),
+    }),
+    commitPostProcess: builder.mutation<
+      BulkItemResult[],
+      { items: PostProcessCommitItem[] }
+    >({
+      query: (body) => ({
+        url: '/post-process/commit',
+        method: 'POST',
+        body,
+      }),
     }),
     searchRfqs: builder.query<RfqSearchResult, RfqSearchParams>({
       query: (params) => ({ url: '/rfqs/search', params }),
@@ -757,7 +818,7 @@ export const api = createApi({
     }),
     correctOutcomeToHit: builder.mutation<
       CloseRfqResult,
-      { caseId: number; reason?: string; expectedCurrentVersion: number }
+      { caseId: number; reason: string; expectedCurrentVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
         url: `/rfqs/${caseId}/outcome/correct-to-hit`,
@@ -767,7 +828,7 @@ export const api = createApi({
     }),
     correctOutcomeToAway: builder.mutation<
       CloseRfqResult,
-      { caseId: number; reason?: string; expectedCurrentVersion: number }
+      { caseId: number; reason: string; expectedCurrentVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
         url: `/rfqs/${caseId}/outcome/correct-to-away`,
@@ -993,6 +1054,8 @@ export const {
   useWithdrawQuoteMutation,
   useScratchPriceMutation,
   useGetEodQuery,
+  useGetPostProcessQuery,
+  useCommitPostProcessMutation,
   useGetEventsQuery,
   useSearchRfqsQuery,
   useGetGridConfigQuery,

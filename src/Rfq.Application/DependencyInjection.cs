@@ -29,11 +29,14 @@ public static class DependencyInjection
         services.AddScoped<UnpresentQuote>();
         services.AddScoped<CloseHitRfq>();
         services.AddScoped<CloseAwayRfq>();
+        services.AddScoped<CloseRfqOperation>();
         services.AddScoped<CorrectOutcomeToHit>();
         services.AddScoped<CorrectOutcomeToAway>();
+        services.AddScoped<CorrectOutcomeOperation>();
         services.AddScoped<ChangeContactOwner>();
         services.AddScoped<UpdateSalesMemo>();
         services.AddScoped<UpdateTraderMemo>();
+        services.AddScoped<UpdateMemoOperation>();
         services.AddScoped<SaveAmendment>();
         services.AddScoped<ConfirmAmendment>();
         services.AddScoped<DiscardAmendment>();
@@ -52,10 +55,13 @@ public static class DependencyInjection
         services.AddScoped<BulkAssignTrader>();
         services.AddScoped<BulkCloseAwayRfqs>();
         services.AddScoped<CancelRfq>();
+        services.AddScoped<CancelRfqOperation>();
         services.AddScoped<BulkCancelRfqs>();
         services.AddScoped<ReopenRfq>();
         services.AddScoped<ExpireQuote>();
         services.AddScoped<ScratchPricer>();
+        services.AddScoped<GetPostProcessWorklist>();
+        services.AddScoped<CommitPostProcessChanges>();
 
         return services;
     }

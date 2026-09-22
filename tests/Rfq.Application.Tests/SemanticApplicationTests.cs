@@ -378,31 +378,55 @@ public sealed class SemanticApplicationTests
     public async Task Bulk_close_away_skips_away_but_fails_hit()
     {
         (RfqCase quoted, ConfirmedQuote _) = Quoted();
-        RfqCase away = RfqLifecycleTransitions.CloseAway(quoted, quoted.Version).Rfq;
+        RfqCase away = RfqLifecycleTransitions.CloseAway(
+            quoted,
+            Today,
+            quoted.Version).Rfq;
         var awayUnit = new UnitOfWork();
+        var awayCases = new CaseRepository(away);
+        var awayAuthorization = new RfqAuthorization();
+        ICurrentUser awayCurrent = Current(Sales, UserRole.Sales);
+        var awayEvents = new RfqEvents();
         var awayBulk = new BulkCloseAwayRfqs(
             new CloseAwayRfq(
-                new CaseRepository(away),
-                new RfqAuthorization(),
-                Current(Sales, UserRole.Sales),
-                new RfqEvents(),
-                awayUnit,
-                TimeProvider.System),
+                awayCases,
+                awayAuthorization,
+                awayCurrent,
+                new CloseRfqOperation(
+                    awayCases,
+                    awayAuthorization,
+                    awayCurrent,
+                    awayEvents,
+                    new BusinessDate(),
+                    TimeProvider.System),
+                awayUnit),
             awayUnit);
         BulkItemResult skipped = Assert.Single(await awayBulk.ExecuteAsync(
             [new LifecycleItem(away.CaseId, away.Version)]));
         Assert.Equal(BulkItemStatus.Skipped, skipped.Status);
 
-        RfqCase hit = RfqLifecycleTransitions.CloseHit(quoted, quoted.Version).Rfq;
+        RfqCase hit = RfqLifecycleTransitions.CloseHit(
+            quoted,
+            Today,
+            quoted.Version).Rfq;
         var hitUnit = new UnitOfWork();
+        var hitCases = new CaseRepository(hit);
+        var hitAuthorization = new RfqAuthorization();
+        ICurrentUser hitCurrent = Current(Sales, UserRole.Sales);
+        var hitEvents = new RfqEvents();
         var hitBulk = new BulkCloseAwayRfqs(
             new CloseAwayRfq(
-                new CaseRepository(hit),
-                new RfqAuthorization(),
-                Current(Sales, UserRole.Sales),
-                new RfqEvents(),
-                hitUnit,
-                TimeProvider.System),
+                hitCases,
+                hitAuthorization,
+                hitCurrent,
+                new CloseRfqOperation(
+                    hitCases,
+                    hitAuthorization,
+                    hitCurrent,
+                    hitEvents,
+                    new BusinessDate(),
+                    TimeProvider.System),
+                hitUnit),
             hitUnit);
         BulkItemResult failed = Assert.Single(await hitBulk.ExecuteAsync(
             [new LifecycleItem(hit.CaseId, hit.Version)]));

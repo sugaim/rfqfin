@@ -127,6 +127,10 @@ namespace Rfq.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("assigned_trader_id");
 
+                    b.Property<DateOnly?>("ClosedBusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("closed_business_date");
+
                     b.Property<Guid?>("ClosedQuoteId")
                         .HasColumnType("uuid")
                         .HasColumnName("closed_quote_id");
@@ -183,6 +187,9 @@ namespace Rfq.Infrastructure.Migrations
                     b.HasIndex("CurrentQuoteId");
 
                     b.HasIndex("CurrentRevisionId");
+
+                    b.HasIndex("RfqStatus")
+                        .HasDatabaseName("ix_case_currents_rfq_status");
 
                     b.ToTable("case_currents", (string)null);
                 });
@@ -480,6 +487,10 @@ namespace Rfq.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateOnly?>("CreatedBusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("created_business_date");
+
                     b.Property<string>("CreatedBy")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -501,6 +512,9 @@ namespace Rfq.Infrastructure.Migrations
 
                     b.HasIndex("CopiedFromCaseId");
 
+                    b.HasIndex("CreatedBusinessDate")
+                        .HasDatabaseName("ix_rfq_cases_created_business_date");
+
                     b.HasIndex("SalesId", "CreatedAt")
                         .HasDatabaseName("ix_rfq_cases_sales_id_created_at");
 
@@ -512,6 +526,10 @@ namespace Rfq.Infrastructure.Migrations
                     b.Property<long>("EventId")
                         .HasColumnType("bigint")
                         .HasColumnName("event_id");
+
+                    b.Property<DateOnly?>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
 
                     b.Property<long>("CaseId")
                         .HasColumnType("bigint")
@@ -531,6 +549,9 @@ namespace Rfq.Infrastructure.Migrations
                     b.HasKey("EventId");
 
                     b.HasIndex("CaseId");
+
+                    b.HasIndex("BusinessDate", "Type")
+                        .HasDatabaseName("ix_rfq_events_business_date_type");
 
                     b.ToTable("rfq_events", (string)null);
                 });

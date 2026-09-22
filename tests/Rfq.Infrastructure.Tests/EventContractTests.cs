@@ -9,6 +9,7 @@ public sealed class EventContractTests
 {
     private static readonly UserId Actor = UserId.Create("sales-dev");
     private static readonly DateTimeOffset Now = new(2026, 9, 21, 1, 2, 3, TimeSpan.Zero);
+    private static readonly DateOnly BusinessDate = new(2026, 9, 21);
 
     [Fact]
     public void Typed_event_writes_use_stable_code_and_event_specific_payload_only()
@@ -20,7 +21,8 @@ public sealed class EventContractTests
             new CaseId(42),
             Actor,
             Now,
-            quoteId));
+            quoteId,
+            BusinessDate: BusinessDate));
 
         PendingRfqClosedHitEvent pending = Assert.IsType<PendingRfqClosedHitEvent>(Assert.Single(sink.Pending));
         EventPersistenceData persisted = EventPersistenceContract.Serialize(pending);
@@ -28,7 +30,14 @@ public sealed class EventContractTests
         Assert.Equal(EventPersistenceTypeCodes.Rfq.ClosedHit, persisted.TypeCode);
         using var payload = JsonDocument.Parse(persisted.PayloadJson);
         Assert.Equal(quoteId.Value, payload.RootElement.GetProperty("quoteId").GetGuid());
-        Assert.Equal(["quoteId"], [.. payload.RootElement.EnumerateObject().Select(property => property.Name)]);
+        Assert.Equal(
+            BusinessDate,
+            DateOnly.Parse(
+                payload.RootElement.GetProperty("businessDate").GetString()!,
+                System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(
+            ["quoteId", "businessDate"],
+            [.. payload.RootElement.EnumerateObject().Select(property => property.Name)]);
     }
 
     [Fact]
@@ -41,12 +50,13 @@ public sealed class EventContractTests
             Actor,
             new CaseId(42),
             EventPersistenceTypeCodes.Rfq.ClosedHit,
-            $"{{\"quoteId\":\"{quoteId.Value}\"}}");
+            $"{{\"quoteId\":\"{quoteId.Value}\",\"businessDate\":\"2026-09-21\"}}");
 
         RfqClosedHitEvent closed = Assert.IsType<RfqClosedHitEvent>(item);
         Assert.Equal(new CaseId(42), closed.CaseId);
         Assert.Equal(quoteId, closed.QuoteId);
         Assert.Equal(Actor, closed.ActorUserId);
+        Assert.Equal(BusinessDate, closed.BusinessDate);
     }
 
     [Fact]
@@ -86,7 +96,8 @@ public sealed class EventContractTests
             new CaseId(42),
             Actor,
             Now,
-            QuoteId.New()));
+            QuoteId.New(),
+            BusinessDate: BusinessDate));
 
         EventPersistenceData persisted = EventPersistenceContract.Serialize(Assert.Single(sink.Pending));
 

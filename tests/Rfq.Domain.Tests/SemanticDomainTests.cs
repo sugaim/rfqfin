@@ -90,22 +90,32 @@ public sealed class SemanticDomainTests
     public void Close_and_outcome_correction_use_typed_lifecycle_states()
     {
         (RfqCase quoted, ConfirmedQuote quote) = ConfirmQuote();
-        RfqCase hit = RfqLifecycleTransitions.CloseHit(quoted, quoted.Version).Rfq;
+        RfqCase hit = RfqLifecycleTransitions.CloseHit(
+            quoted,
+            Today,
+            quoted.Version).Rfq;
         Assert.IsType<HitRfq>(hit.Lifecycle);
         Assert.Equal(quote.QuoteId, hit.ClosedQuoteId);
+        Assert.Equal(Today, hit.ClosedBusinessDate);
         RfqCase away = RfqLifecycleTransitions.CorrectToAway(hit, hit.Version);
         Assert.IsType<AwayRfq>(away.Lifecycle);
+        Assert.Equal(Today, away.ClosedBusinessDate);
         RfqCase corrected = RfqLifecycleTransitions.CorrectToHit(away, away.Version);
         Assert.IsType<HitRfq>(corrected.Lifecycle);
+        Assert.Equal(Today, corrected.ClosedBusinessDate);
     }
 
     [Fact]
     public void Close_away_creates_an_away_state()
     {
         (RfqCase quoted, ConfirmedQuote quote) = ConfirmQuote();
-        RfqCase away = RfqLifecycleTransitions.CloseAway(quoted, quoted.Version).Rfq;
+        RfqCase away = RfqLifecycleTransitions.CloseAway(
+            quoted,
+            Today,
+            quoted.Version).Rfq;
         Assert.IsType<AwayRfq>(away.Lifecycle);
         Assert.Equal(quote.QuoteId, away.ClosedQuoteId);
+        Assert.Equal(Today, away.ClosedBusinessDate);
     }
 
     [Fact]
@@ -261,7 +271,9 @@ public sealed class SemanticDomainTests
         RfqCase cancelled = RfqLifecycleTransitions.Cancel(open, open.Version);
         (RfqCase quoted, ConfirmedQuote _) = ConfirmQuote();
         RfqCase closed = RfqLifecycleTransitions.CloseHit(
-            quoted, quoted.Version).Rfq;
+            quoted,
+            Today,
+            quoted.Version).Rfq;
 
         foreach (RfqCase? rfq in new[] { draft, cancelled, closed })
         {
@@ -311,7 +323,7 @@ public sealed class SemanticDomainTests
     {
         RfqCase open = Open();
         Assert.Throws<DomainRuleViolationException>(
-            () => RfqLifecycleTransitions.CloseHit(open, open.Version));
+            () => RfqLifecycleTransitions.CloseHit(open, Today, open.Version));
         (RfqCase quoted, ConfirmedQuote _) = ConfirmQuote();
         AmendmentSaveResult save = AmendmentTransitions.SaveDraft(
             quoted,
@@ -321,7 +333,9 @@ public sealed class SemanticDomainTests
             Now,
             quoted.Version);
         CloseTransitionResult closed = RfqLifecycleTransitions.CloseHit(
-            save.Rfq, save.Rfq.Version);
+            save.Rfq,
+            Today,
+            save.Rfq.Version);
         Assert.Equal(RevisionStatus.Discarded, closed.DiscardedRevision!.Status);
         Assert.Equal(RfqStatus.Hit, closed.Rfq.Status);
     }

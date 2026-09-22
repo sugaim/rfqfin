@@ -383,10 +383,11 @@ export function SalesWorkspace() {
           .unwrap()
           .then(() => undefined)
       }
-      onCorrectOutcome={(caseId, outcome, expectedCurrentVersion) =>
+      onCorrectOutcome={(caseId, outcome, expectedCurrentVersion, reason) =>
         (outcome === 'Hit' ? correctToHit : correctToAway)({
           caseId,
           expectedCurrentVersion,
+          reason,
         })
           .unwrap()
           .then(() => undefined)

@@ -2858,6 +2858,120 @@
         }
       }
     },
+    "/api/post-process": {
+      "get": {
+        "tags": [
+          "PostProcess"
+        ],
+        "parameters": [
+          {
+            "name": "preset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostProcessItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostProcessItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostProcessItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/post-process/commit": {
+      "post": {
+        "tags": [
+          "PostProcess"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProcessCommitRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProcessCommitRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProcessCommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me": {
       "get": {
         "tags": [
@@ -4376,8 +4490,7 @@
         "type": "object",
         "properties": {
           "reason": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "expectedCurrentVersion": {
             "type": "integer",
@@ -5464,6 +5577,224 @@
             "type": "boolean"
           }
         }
+      },
+      "PostProcessCommitItemRequest": {
+        "required": [
+          "caseId",
+          "expectedCurrentVersion",
+          "lifecycleChange",
+          "memoChange"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lifecycleChange": {
+            "$ref": "#/components/schemas/PostProcessLifecycleChangeRequest"
+          },
+          "memoChange": {
+            "$ref": "#/components/schemas/PostProcessMemoChangeRequest"
+          }
+        }
+      },
+      "PostProcessCommitRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostProcessCommitItemRequest"
+            }
+          }
+        }
+      },
+      "PostProcessItemResponse": {
+        "required": [
+          "caseId",
+          "createdAt",
+          "createdBusinessDate",
+          "clientId",
+          "clientName",
+          "securityId",
+          "securityName",
+          "securityBbgDisplay",
+          "notional",
+          "settlementDate",
+          "contactOwnerId",
+          "salesId",
+          "assignedTraderId",
+          "rfqStatus",
+          "currentVersion",
+          "salesAndTradingMessage",
+          "myMemo",
+          "myMemoVersion",
+          "price",
+          "finalSimpleYield",
+          "yield",
+          "ysc",
+          "gSpread",
+          "closedBusinessDate",
+          "lastCorrectionReason",
+          "lastChangedBy",
+          "lastChangedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBusinessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientName": {
+            "type": "string"
+          },
+          "securityId": {
+            "type": "string"
+          },
+          "securityName": {
+            "type": "string"
+          },
+          "securityBbgDisplay": {
+            "type": "string"
+          },
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "contactOwnerId": {
+            "type": "string"
+          },
+          "salesId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "salesAndTradingMessage": {
+            "type": "string"
+          },
+          "myMemo": {
+            "type": "string"
+          },
+          "myMemoVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "finalSimpleYield": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "yield": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "ysc": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "gSpread": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "closedBusinessDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "lastCorrectionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastChangedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastChangedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "PostProcessLifecycleChangeRequest": {
+        "required": [
+          "type",
+          "correctionReason"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/PostProcessLifecycleChangeValue"
+          },
+          "correctionReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "nullable": true
+      },
+      "PostProcessLifecycleChangeValue": {
+        "type": "integer"
+      },
+      "PostProcessMemoChangeRequest": {
+        "required": [
+          "expectedVersion",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "nullable": true
       },
       "PresentationResponse": {
         "required": [
@@ -6586,6 +6917,9 @@
     },
     {
       "name": "Pricer"
+    },
+    {
+      "name": "PostProcess"
     },
     {
       "name": "Me"

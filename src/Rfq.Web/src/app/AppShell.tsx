@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router'
 const navigationItems = [
   { key: '/sales', label: 'Sales' },
   { key: '/trader', label: 'Trader' },
-  { key: '/daily-review', label: 'Daily Review' },
+  { key: '/post-process', label: 'Post Process' },
 ]
 
 export interface AppShellProps {
