@@ -15,7 +15,7 @@ public sealed class PostgreSqlClientSearch(RfqDbContext dbContext) : IClientSear
             return [];
         }
 
-        var input = query.Trim();
+        string input = query.Trim();
         return await dbContext.Clients
             .AsNoTracking()
             .Where(client =>

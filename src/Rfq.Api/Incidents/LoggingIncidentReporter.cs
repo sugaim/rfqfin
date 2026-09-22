@@ -1,18 +1,28 @@
 namespace Rfq.Api;
 
-public sealed class LoggingIncidentReporter(
+public sealed partial class LoggingIncidentReporter(
     ILogger<LoggingIncidentReporter> logger) : IIncidentReporter
 {
     public Task ReportAsync(
         Incident incident,
         CancellationToken cancellationToken = default)
     {
-        logger.LogError(
+        LogUnexpectedFailure(
+            logger,
             incident.Exception,
-            "Unexpected failure. Source={Source} TraceId={TraceId} Operation={Operation}",
             incident.Source,
             incident.TraceId,
             incident.Operation);
         return Task.CompletedTask;
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Unexpected failure. Source={Source} TraceId={TraceId} Operation={Operation}")]
+    private static partial void LogUnexpectedFailure(
+        ILogger logger,
+        Exception exception,
+        string source,
+        string? traceId,
+        string? operation);
 }

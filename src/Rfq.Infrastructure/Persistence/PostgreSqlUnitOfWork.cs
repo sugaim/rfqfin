@@ -20,13 +20,13 @@ public sealed class PostgreSqlUnitOfWork(
                 return;
             }
 
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-            var cursor = await dbContext.EventCursors
+            await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            EventCursorEntity cursor = await dbContext.EventCursors
                 .FromSqlRaw("SELECT * FROM event_cursors WHERE cursor_key = 'global' FOR UPDATE")
                 .SingleAsync(cancellationToken);
-            foreach (var pending in eventSink.Pending)
+            foreach (PendingEvent pending in eventSink.Pending)
             {
-                var persistence = EventPersistenceContract.Serialize(pending);
+                EventPersistenceData persistence = EventPersistenceContract.Serialize(pending);
                 cursor.LastEventId++;
                 var parent = new EventEntity
                 {

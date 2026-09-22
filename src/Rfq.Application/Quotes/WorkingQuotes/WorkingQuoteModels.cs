@@ -25,14 +25,14 @@ internal static class WorkingQuoteMutation
         StateVersion expectedWorkingQuoteVersion,
         CancellationToken cancellationToken)
     {
-        var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         if (rfqCase.Version != expectedCurrentVersion)
         {
             throw new StateVersionMismatchException("The RFQ was changed by another user.");
         }
 
         authorization.EnsureCanQuote(user, CalculateWorkingQuote.ToAuthorizationState(rfqCase));
-        var quote = await workingQuotes.GetAsync(
+        WorkingQuote quote = await workingQuotes.GetAsync(
             rfqCase.CurrentRevision.RevisionId,
             cancellationToken)
             ?? throw new RfqInvariantException("WorkingQuote was not found.");
@@ -58,11 +58,11 @@ public sealed record WorkingQuoteResult(
         CaseId caseId,
         WorkingQuote quote,
         StateVersion currentVersion) => new(
-        caseId,
-        quote.RevisionId,
-        quote.Mode,
-        quote.Calculated,
-        quote.Manual,
-        quote.Version,
-        currentVersion);
+            caseId,
+            quote.RevisionId,
+            quote.Mode,
+            quote.Calculated,
+            quote.Manual,
+            quote.Version,
+            currentVersion);
 }

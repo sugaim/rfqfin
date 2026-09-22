@@ -22,7 +22,10 @@ public abstract record ClosedRfq : RfqLifecycle
         : base(currentRevisionId)
     {
         if (closedQuoteId.Value == Guid.Empty)
+        {
             throw new DomainValidationException("Closed Quote ID is required.");
+        }
+
         ClosedQuoteId = closedQuoteId;
     }
 

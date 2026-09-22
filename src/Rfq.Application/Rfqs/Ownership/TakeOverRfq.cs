@@ -16,13 +16,18 @@ public sealed class TakeOverRfq(
         bool confirmed,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanTakeOver(currentUser.User, rfqCase, confirmed);
-        var previous = rfqCase.AssignedTraderId.Value;
+        string previous = rfqCase.AssignedTraderId.Value;
         rfqCase = RfqOwnershipTransitions.TakeOver(
             rfqCase, currentUser.User.UserId, expectedVersion);
-        PickUpRfq.Record(events, timeProvider, RfqTransitionKind.TakenOver,
-            rfqCase, currentUser.User.UserId, previous);
+        PickUpRfq.Record(
+            events,
+            timeProvider,
+            RfqTransitionKind.TakenOver,
+            rfqCase,
+            currentUser.User.UserId,
+            previous);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
     }
 }

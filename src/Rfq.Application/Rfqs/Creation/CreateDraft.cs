@@ -16,7 +16,9 @@ public sealed class CreateDraft(
         ArgumentNullException.ThrowIfNull(command);
         authorization.EnsureCanCreateRevision(currentUser.User);
 
-        var rfqCase = await initialRfqFactory.CreateAsync(command, cancellationToken);
+        RfqCase rfqCase = await initialRfqFactory.CreateAsync(
+            command,
+            cancellationToken: cancellationToken);
         rfqCases.Add(rfqCase);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return InitialRfqResult.From(rfqCase);

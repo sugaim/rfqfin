@@ -15,19 +15,24 @@ public sealed class RfqCreationContextController(
         [FromQuery, Required, MinLength(1)] string securityId,
         CancellationToken cancellationToken)
     {
-        var value = await resolver.ExecuteAsync(SecurityId.Create(securityId), cancellationToken);
+        Application.RfqCreationContext value = await resolver.ExecuteAsync(SecurityId.Create(securityId), cancellationToken);
         return RfqCreationContextApiMapper.ToApi(value);
     }
 }
 
 public sealed record RfqCreationContextResponse(
-    string CategoryId, string CategoryName,
-    string DefaultAssignedTraderId, string DefaultAssignedTraderName,
+    string CategoryId,
+    string CategoryName,
+    string DefaultAssignedTraderId,
+    string DefaultAssignedTraderName,
     DateOnly StandardSettlementDate);
 
 public static class RfqCreationContextApiMapper
 {
     public static RfqCreationContextResponse ToApi(Application.RfqCreationContext value) => new(
-        value.CategoryId.Value, value.CategoryName, value.DefaultAssignedTraderId.Value,
-        value.DefaultAssignedTraderName, value.StandardSettlementDate);
+        value.CategoryId.Value,
+        value.CategoryName,
+        value.DefaultAssignedTraderId.Value,
+        value.DefaultAssignedTraderName,
+        value.StandardSettlementDate);
 }

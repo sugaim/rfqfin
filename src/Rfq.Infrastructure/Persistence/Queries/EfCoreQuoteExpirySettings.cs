@@ -6,7 +6,8 @@ namespace Rfq.Infrastructure;
 
 public sealed class EfCoreQuoteExpirySettings(RfqDbContext dbContext) : IQuoteExpirySettings
 {
-    public async Task<QuoteExpiry> GetAsync(UserId userId,
+    public async Task<QuoteExpiry> GetAsync(
+        UserId userId,
         CancellationToken cancellationToken = default)
     {
         var minutes = await dbContext.MasterUsers.AsNoTracking()
@@ -27,10 +28,12 @@ public sealed class EfCoreQuoteExpirySettings(RfqDbContext dbContext) : IQuoteEx
         }
     }
 
-    public async Task<QuoteExpiry> SaveAsync(UserId userId, QuoteExpiry expiry,
+    public async Task<QuoteExpiry> SaveAsync(
+        UserId userId,
+        QuoteExpiry expiry,
         CancellationToken cancellationToken = default)
     {
-        var user = await dbContext.MasterUsers.SingleOrDefaultAsync(
+        MasterUserEntity user = await dbContext.MasterUsers.SingleOrDefaultAsync(
             item => item.UserId == userId.Value, cancellationToken)
             ?? throw new RfqInvariantException($"User '{userId.Value}' was not found.");
         user.DefaultQuoteExpiryMinutes = expiry switch

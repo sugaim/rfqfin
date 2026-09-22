@@ -9,30 +9,68 @@ namespace Rfq.Api.RfqSearch;
 public sealed class RfqSearchController(IRfqSearchQueries queries) : ControllerBase
 {
     [HttpGet]
-    public async Task<RfqSearchResponse> Get([FromQuery] RfqSearchRequest request,
+    public async Task<RfqSearchResponse> Get(
+        [FromQuery] RfqSearchRequest request,
         CancellationToken token) => RfqSearchApiMapper.ToApi(await queries.SearchAsync(
             RfqSearchApiMapper.ToQuery(request), token));
 }
 
-public enum RfqStatusValue { Draft, Active, Presented, Cancelled, Hit, Away }
-public enum QuoteStatusValue { Requested, Quoted }
-public sealed record RfqSearchRequest(DateOnly? CreatedFrom = null, DateOnly? CreatedTo = null,
-    string? ClientId = null, string? SecurityId = null, string? CategoryId = null,
-    string? ContactOwnerId = null, string? SalesId = null, string? AssignedTraderId = null,
-    RfqStatusValue? Status = null, long? CaseId = null);
-public sealed record RfqSearchResponse(IReadOnlyList<RfqSearchItemResponse> Items,
+public enum RfqStatusValue
+{
+    Draft,
+    Active,
+    Presented,
+    Cancelled,
+    Hit,
+    Away
+}
+
+public enum QuoteStatusValue
+{
+    Requested,
+    Quoted
+}
+
+public sealed record RfqSearchRequest(
+    DateOnly? CreatedFrom = null,
+    DateOnly? CreatedTo = null,
+    string? ClientId = null,
+    string? SecurityId = null,
+    string? CategoryId = null,
+    string? ContactOwnerId = null,
+    string? SalesId = null,
+    string? AssignedTraderId = null,
+    RfqStatusValue? Status = null,
+    long? CaseId = null);
+
+public sealed record RfqSearchResponse(
+    IReadOnlyList<RfqSearchItemResponse> Items,
     bool RequiresNarrowing);
-public sealed record RfqSearchItemResponse(long CaseId, DateTimeOffset CreatedAt,
-    string ClientId, string ClientName, string SecurityId, string SecurityName,
-    string CategoryId, RfqStatusValue Status, QuoteStatusValue? QuoteStatus,
-    string ContactOwnerId, string? SalesId, string AssignedTraderId,
-    decimal? Notional, DateOnly? SettlementDate,
-    decimal? Price, decimal? FinalSimpleYield, decimal? Ysc);
+
+public sealed record RfqSearchItemResponse(
+    long CaseId,
+    DateTimeOffset CreatedAt,
+    string ClientId,
+    string ClientName,
+    string SecurityId,
+    string SecurityName,
+    string CategoryId,
+    RfqStatusValue Status,
+    QuoteStatusValue? QuoteStatus,
+    string ContactOwnerId,
+    string? SalesId,
+    string AssignedTraderId,
+    decimal? Notional,
+    DateOnly? SettlementDate,
+    decimal? Price,
+    decimal? FinalSimpleYield,
+    decimal? Ysc);
 
 public static class RfqSearchApiMapper
 {
     public static Application.RfqSearch ToQuery(RfqSearchRequest value) => new(
-        value.CreatedFrom, value.CreatedTo,
+        value.CreatedFrom,
+        value.CreatedTo,
         value.ClientId is null ? null : Domain.ClientId.Create(value.ClientId),
         value.SecurityId is null ? null : Domain.SecurityId.Create(value.SecurityId),
         value.CategoryId is null ? null : Domain.CategoryId.Create(value.CategoryId),
@@ -41,13 +79,26 @@ public static class RfqSearchApiMapper
         value.AssignedTraderId is null ? null : UserId.Create(value.AssignedTraderId),
         value.Status is null ? null : Enum.Parse<RfqStatus>(value.Status.Value.ToString()),
         value.CaseId is null ? null : new CaseId(value.CaseId.Value));
+
     public static RfqSearchResponse ToApi(RfqSearchResult value) => new(
-        value.Items.Select(ToApi).ToArray(), value.RequiresNarrowing);
+        [.. value.Items.Select(ToApi)], value.RequiresNarrowing);
+
     private static RfqSearchItemResponse ToApi(RfqSearchItem value) => new(
-        value.CaseId.Value, value.CreatedAt, value.ClientId.Value, value.ClientName,
-        value.SecurityId.Value, value.SecurityName, value.CategoryId.Value,
+        value.CaseId.Value,
+        value.CreatedAt,
+        value.ClientId.Value,
+        value.ClientName,
+        value.SecurityId.Value,
+        value.SecurityName,
+        value.CategoryId.Value,
         Enum.Parse<RfqStatusValue>(value.Status.ToString()),
         value.QuoteStatus is null ? null : Enum.Parse<QuoteStatusValue>(value.QuoteStatus.Value.ToString()),
-        value.ContactOwnerId.Value, value.SalesId?.Value, value.AssignedTraderId.Value,
-        value.Notional, value.SettlementDate, value.Price, value.FinalSimpleYield, value.Ysc);
+        value.ContactOwnerId.Value,
+        value.SalesId?.Value,
+        value.AssignedTraderId.Value,
+        value.Notional,
+        value.SettlementDate,
+        value.Price,
+        value.FinalSimpleYield,
+        value.Ysc);
 }

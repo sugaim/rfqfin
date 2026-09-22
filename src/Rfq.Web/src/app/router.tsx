@@ -1,11 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
-import { DailyReviewWorkspace } from '../features/daily-review/DailyReviewWorkspace'
-import { SalesWorkspace } from '../features/sales/SalesWorkspace'
-import { TraderWorkspace } from '../features/trader/TraderWorkspace'
-import { App } from './App'
+import { DailyReviewWorkspace } from '@/features/daily-review/DailyReviewWorkspace'
+import { SalesWorkspace } from '@/features/sales/SalesWorkspace'
+import { TraderWorkspace } from '@/features/trader/TraderWorkspace'
+import { App } from '@/app/App'
 
 export function defaultWorkspacePath() {
-  const identity = window.localStorage.getItem('rfq-development-user') ?? 'sales-dev'
+  const identity =
+    window.localStorage.getItem('rfq-development-user') ?? 'sales-dev'
   return identity.startsWith('trader-') ? '/trader' : '/sales'
 }
 

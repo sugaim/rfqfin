@@ -19,15 +19,22 @@ public sealed class ConfirmNewRfq(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanCreateRevision(currentUser.User);
-        var rfqCase = await initialRfqFactory.CreateAsync(command, cancellationToken);
-        var businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
-        var now = timeProvider.GetUtcNow();
+        RfqCase rfqCase = await initialRfqFactory.CreateAsync(
+            command,
+            cancellationToken: cancellationToken);
+        DateOnly businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
+        DateTimeOffset now = timeProvider.GetUtcNow();
         rfqCase = RfqLifecycleTransitions.ConfirmInitial(
-            rfqCase, rfqCase.CurrentRevision.Terms, rfqCase.AssignedTraderId,
-            businessDate, currentUser.User.UserId, now, rfqCase.CurrentRevision.Version);
+            rfqCase,
+            rfqCase.CurrentRevision.Terms,
+            rfqCase.AssignedTraderId,
+            businessDate,
+            currentUser.User.UserId,
+            now,
+            rfqCase.CurrentRevision.Version);
 
         rfqCases.Add(rfqCase);
-        var defaultMode = quoteModeSettings is null
+        WorkingQuoteMode defaultMode = quoteModeSettings is null
             ? WorkingQuoteMode.Calculated
             : await quoteModeSettings.GetAsync(rfqCase.AssignedTraderId, cancellationToken);
         workingQuotes.Add(WorkingQuoteFactory.CreateInitialFor(

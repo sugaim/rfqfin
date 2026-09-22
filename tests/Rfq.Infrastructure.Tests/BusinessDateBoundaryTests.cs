@@ -9,8 +9,8 @@ public sealed class BusinessDateBoundaryTests
     {
         var jst = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tokyo");
 
-        var from = DeskDateBoundary.ToUtc(new DateOnly(2026, 9, 21), jst);
-        var to = DeskDateBoundary.ToUtc(new DateOnly(2026, 9, 22), jst);
+        DateTimeOffset from = DeskDateBoundary.ToUtc(new DateOnly(2026, 9, 21), jst);
+        DateTimeOffset to = DeskDateBoundary.ToUtc(new DateOnly(2026, 9, 22), jst);
 
         Assert.Equal(new DateTimeOffset(2026, 9, 20, 15, 0, 0, TimeSpan.Zero), from);
         Assert.Equal(new DateTimeOffset(2026, 9, 21, 15, 0, 0, TimeSpan.Zero), to);

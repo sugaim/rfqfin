@@ -23,7 +23,7 @@ public sealed class EfCoreQuoteModeSettings(RfqDbContext dbContext) : IQuoteMode
         WorkingQuoteMode mode,
         CancellationToken cancellationToken = default)
     {
-        var user = await dbContext.MasterUsers.SingleOrDefaultAsync(
+        MasterUserEntity user = await dbContext.MasterUsers.SingleOrDefaultAsync(
             item => item.UserId == userId.Value, cancellationToken)
             ?? throw new RfqInvariantException($"User '{userId}' was not found.");
         user.DefaultQuoteMode = mode;

@@ -9,7 +9,7 @@ public sealed class QuoteExpiryWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var seconds = Math.Max(1, configuration.GetValue("QuoteExpiry:IntervalSeconds", 10));
+        int seconds = Math.Max(1, configuration.GetValue("QuoteExpiry:IntervalSeconds", 10));
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(seconds));
         try
         {
@@ -36,10 +36,10 @@ public sealed class QuoteExpiryWorker(
 
     internal async Task ScanAsync(CancellationToken stoppingToken)
     {
-        using var scope = scopeFactory.CreateScope();
-        var expiryQueries = scope.ServiceProvider.GetRequiredService<IQuoteExpiryQueries>();
-        var useCase = scope.ServiceProvider.GetRequiredService<ExpireQuote>();
-        foreach (var candidate in await expiryQueries.GetExpiredAsync(
+        using IServiceScope scope = scopeFactory.CreateScope();
+        IQuoteExpiryQueries expiryQueries = scope.ServiceProvider.GetRequiredService<IQuoteExpiryQueries>();
+        ExpireQuote useCase = scope.ServiceProvider.GetRequiredService<ExpireQuote>();
+        foreach (ExpiredQuoteCandidate candidate in await expiryQueries.GetExpiredAsync(
             DateTimeOffset.UtcNow, stoppingToken))
         {
             await useCase.ExecuteAsync(candidate, stoppingToken);

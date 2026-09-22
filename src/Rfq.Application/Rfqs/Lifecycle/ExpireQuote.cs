@@ -8,10 +8,11 @@ public sealed class ExpireQuote(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
-    public async Task<bool> ExecuteAsync(ExpiredQuoteCandidate candidate,
+    public async Task<bool> ExecuteAsync(
+        ExpiredQuoteCandidate candidate,
         CancellationToken cancellationToken = default)
     {
-        var rfq = await cases.GetAsync(candidate.CaseId, cancellationToken);
+        RfqCase? rfq = await cases.GetAsync(candidate.CaseId, cancellationToken);
         if (rfq is null)
         {
             return false;
@@ -19,7 +20,8 @@ public sealed class ExpireQuote(
         try
         {
             rfq = QuoteTransitions.Expire(
-                rfq, candidate.QuoteId,
+                rfq,
+                candidate.QuoteId,
                 candidate.CurrentVersion);
         }
         catch (DomainRuleViolationException)
@@ -27,8 +29,11 @@ public sealed class ExpireQuote(
             return false;
         }
         cases.Update(rfq);
-        events.Record(new(QuoteTransitionKind.Expired, candidate.QuoteId,
-            UserId.Create("system"), timeProvider.GetUtcNow()));
+        events.Record(new(
+            QuoteTransitionKind.Expired,
+            candidate.QuoteId,
+            UserId.Create("system"),
+            timeProvider.GetUtcNow()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
     }

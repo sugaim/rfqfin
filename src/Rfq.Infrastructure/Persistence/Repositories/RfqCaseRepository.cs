@@ -66,7 +66,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         CaseId caseId,
         CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.RfqCases
+        RfqCaseEntity? entity = await dbContext.RfqCases
             .Include(item => item.Revisions)
             .Include(item => item.Current)
             .ThenInclude(current => current.CurrentRevision)
@@ -76,9 +76,9 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             return null;
         }
 
-        var revisionEntity = entity.Current.CurrentRevision;
-        var revision = ToDomainRevision(revisionEntity);
-        var pendingDraft = entity.Revisions
+        RfqRevisionEntity revisionEntity = entity.Current.CurrentRevision;
+        RfqRevision revision = ToDomainRevision(revisionEntity);
+        RfqRevision? pendingDraft = entity.Revisions
             .Where(item => item.RevisionId != revisionEntity.RevisionId)
             .Where(item => item.Status == RevisionStatus.Draft)
             .Select(ToDomainRevision)
@@ -113,11 +113,11 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
 
     public void Update(RfqCase rfqCase)
     {
-        var entity = dbContext.RfqCases.Local
+        RfqCaseEntity entity = dbContext.RfqCases.Local
             .SingleOrDefault(item => item.CaseId == rfqCase.CaseId.Value)
             ?? throw new InvalidOperationException(
                 "The RFQ Case must be loaded before it can be updated.");
-        var revision = entity.Revisions.SingleOrDefault(item =>
+        RfqRevisionEntity? revision = entity.Revisions.SingleOrDefault(item =>
             item.RevisionId == rfqCase.CurrentRevision.RevisionId.Value);
         if (revision is null)
         {
@@ -131,7 +131,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
 
         if (rfqCase.PendingDraftRevision is not null)
         {
-            var pendingDraft = entity.Revisions.SingleOrDefault(item =>
+            RfqRevisionEntity? pendingDraft = entity.Revisions.SingleOrDefault(item =>
                 item.RevisionId == rfqCase.PendingDraftRevision.RevisionId.Value);
             if (pendingDraft is null)
             {
@@ -158,7 +158,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
 
     public void UpdateRevision(RfqRevision revision)
     {
-        var entity = dbContext.RfqRevisions.Local.SingleOrDefault(item =>
+        RfqRevisionEntity entity = dbContext.RfqRevisions.Local.SingleOrDefault(item =>
             item.RevisionId == revision.RevisionId.Value)
             ?? throw new InvalidOperationException(
                 "The RFQ Revision must be loaded before it can be updated.");
@@ -188,7 +188,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
 
     private static OpenRfq RestoreOpen(CaseCurrentEntity current, RevisionId revisionId)
     {
-        var ownership = current.Owned ? (Ownership)new Owned() : new Unowned();
+        Ownership ownership = current.Owned ? (Ownership)new Owned() : new Unowned();
         if (current.RfqStatus == RfqStatus.Presented)
         {
             return new PresentedRfq(
@@ -200,7 +200,10 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         }
 
         if (current.RfqStatus != RfqStatus.Active)
+        {
             throw new DomainInvariantException("Open RFQ has an invalid RFQ status.");
+        }
+
         ActiveQuoteState quoteState = current.QuoteStatus switch
         {
             QuoteStatus.Requested => new QuoteRequested(
@@ -221,8 +224,11 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             new RevisionId(revision.RevisionId),
             new CaseId(revision.CaseId),
             revision.Status,
-            new RevisionTerms(revision.Notional, revision.SettlementDate,
-                revision.StandardSettlementDate, revision.SalesAndTradingMessage),
+            new RevisionTerms(
+                revision.Notional,
+                revision.SettlementDate,
+                revision.StandardSettlementDate,
+                revision.SalesAndTradingMessage),
             revision.CopiedFromRevisionId is null
                 ? null
                 : new RevisionId(revision.CopiedFromRevisionId.Value),
@@ -262,7 +268,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             return;
         }
 
-        var persisted = entity.Revisions.Single(item =>
+        RfqRevisionEntity persisted = entity.Revisions.Single(item =>
             item.RevisionId == changedRevision.RevisionId.Value);
         ApplyRevision(persisted, changedRevision);
     }

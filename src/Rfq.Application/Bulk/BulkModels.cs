@@ -40,17 +40,19 @@ internal static class BulkOperation
         CancellationToken cancellationToken)
     {
         var results = new List<BulkItemResult>(items.Count);
-        foreach (var item in items)
+        foreach (TItem? item in items)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var outcome = await action(item, cancellationToken);
-                results.Add(new BulkItemResult(caseId(item), outcome == BulkActionOutcome.Succeeded
-                    ? BulkItemStatus.Succeeded
-                    : BulkItemStatus.Skipped));
+                BulkActionOutcome outcome = await action(item, cancellationToken);
+                results.Add(new BulkItemResult(
+                    caseId(item),
+                    outcome == BulkActionOutcome.Succeeded
+                        ? BulkItemStatus.Succeeded
+                        : BulkItemStatus.Skipped));
             }
-            catch (ExpectedRfqException exception) when (TryMap(exception.Kind, out var code))
+            catch (ExpectedRfqException exception) when (TryMap(exception.Kind, out BulkFailureCode code))
             {
                 unitOfWork.DiscardChanges();
                 results.Add(new BulkItemResult(

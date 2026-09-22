@@ -14,8 +14,10 @@ public sealed class EfCoreUserCandidateQueries(RfqDbContext dbContext) : IUserCa
         DeskId deskId, CancellationToken cancellationToken = default) =>
         GetAsync(deskId, [UserRole.Sales.ToString(), UserRole.Trader.ToString()], cancellationToken);
 
-    private async Task<IReadOnlyList<UserCandidate>> GetAsync(DeskId deskId,
-        string[] roles, CancellationToken cancellationToken) => await dbContext.MasterUsers
+    private async Task<IReadOnlyList<UserCandidate>> GetAsync(
+        DeskId deskId,
+        string[] roles,
+        CancellationToken cancellationToken) => await dbContext.MasterUsers
         .AsNoTracking()
         .Where(user => user.DeskId == deskId.Value
             && user.Roles.Any(role => roles.Contains(role)))

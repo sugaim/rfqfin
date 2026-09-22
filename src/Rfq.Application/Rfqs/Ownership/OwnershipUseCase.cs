@@ -23,10 +23,10 @@ internal static class OwnershipUseCase
     }
 
     public static OwnershipResult ToResult(RfqCase rfqCase) => new(
-            rfqCase.CaseId,
-            rfqCase.AssignedTraderId,
-            rfqCase.Ownership is Owned,
-            rfqCase.Version);
+        rfqCase.CaseId,
+        rfqCase.AssignedTraderId,
+        rfqCase.Ownership is Owned,
+        rfqCase.Version);
 }
 
 public sealed record OwnershipResult(

@@ -4,11 +4,28 @@ using Rfq.Domain;
 
 namespace Rfq.Api.RfqQuotes;
 
-public enum QuoteExpiryType { None, After }
-public enum QuoteMode { Calculated, Manual }
+public enum QuoteExpiryType
+{
+    None,
+    After
+}
+
+public enum QuoteMode
+{
+    Calculated,
+    Manual
+}
+
 public enum CalculationDriverValue
 {
-    Price, BbgYield, SimpleYield, Ysc, GSpread, Asw, ISpread, ZSpread
+    Price,
+    BbgYield,
+    SimpleYield,
+    Ysc,
+    GSpread,
+    Asw,
+    ISpread,
+    ZSpread
 }
 
 public sealed record QuoteExpiryRequest(
@@ -18,10 +35,19 @@ public sealed record QuoteExpiryRequest(
 public sealed record QuoteExpiryResponse(QuoteExpiryType Type, int? Minutes);
 
 public sealed record CalculatedQuoteResponse(
-    CalculationDriverValue Driver, decimal DriverValue, decimal Price,
-    decimal BbgYield, decimal BaseSimpleYield, decimal SimpleYieldSlide,
-    decimal FinalSimpleYield, decimal InternalYield, decimal GSpread, decimal Asw,
-    decimal Ysc, decimal ISpread, decimal ZSpread);
+    CalculationDriverValue Driver,
+    decimal DriverValue,
+    decimal Price,
+    decimal BbgYield,
+    decimal BaseSimpleYield,
+    decimal SimpleYieldSlide,
+    decimal FinalSimpleYield,
+    decimal InternalYield,
+    decimal GSpread,
+    decimal Asw,
+    decimal Ysc,
+    decimal ISpread,
+    decimal ZSpread);
 
 public sealed record ManualQuoteResponse(decimal? Price, decimal? FinalSimpleYield);
 
@@ -42,7 +68,8 @@ public static class QuoteApiMapper
     public static QuoteExpiryResponse ToApi(QuoteExpiry expiry) => expiry switch
     {
         QuoteExpiry.None => new(QuoteExpiryType.None, null),
-        QuoteExpiry.After after => new(QuoteExpiryType.After,
+        QuoteExpiry.After after => new(
+            QuoteExpiryType.After,
             checked((int)after.Duration.TotalMinutes)),
         _ => throw new InvalidOperationException("Unknown Quote Expiry policy."),
     };
@@ -61,9 +88,18 @@ public static class QuoteApiMapper
                 CalculationDriver.ZSpread => CalculationDriverValue.ZSpread,
                 _ => throw new InvalidOperationException("Unknown Calculation Driver."),
             },
-            payload.DriverValue, payload.Price, payload.BbgYield, payload.BaseSimpleYield,
-            payload.SimpleYieldSlide, payload.FinalSimpleYield, payload.InternalYield,
-            payload.GSpread, payload.Asw, payload.Ysc, payload.ISpread, payload.ZSpread);
+            payload.DriverValue,
+            payload.Price,
+            payload.BbgYield,
+            payload.BaseSimpleYield,
+            payload.SimpleYieldSlide,
+            payload.FinalSimpleYield,
+            payload.InternalYield,
+            payload.GSpread,
+            payload.Asw,
+            payload.Ysc,
+            payload.ISpread,
+            payload.ZSpread);
 
     public static ManualQuoteResponse? ToApi(ManualQuotePayload? payload) =>
         payload is null ? null : new(payload.Price, payload.FinalSimpleYield);

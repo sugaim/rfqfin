@@ -8,7 +8,7 @@ public static partial class SecuritySearchNormalizer
 {
     public static string? NormalizeInternalCode(string query)
     {
-        var components = query.Trim().Split('-', StringSplitOptions.TrimEntries);
+        string[] components = query.Trim().Split('-', StringSplitOptions.TrimEntries);
         int[] widths;
         if (components.Length == 2)
         {
@@ -24,8 +24,8 @@ public static partial class SecuritySearchNormalizer
             return null;
         }
 
-        var normalized = new string[components.Length];
-        for (var index = 0; index < components.Length; index++)
+        string[] normalized = new string[components.Length];
+        for (int index = 0; index < components.Length; index++)
         {
             if (!components[index].All(char.IsDigit)
                 || components[index].Length == 0
@@ -42,22 +42,21 @@ public static partial class SecuritySearchNormalizer
 
     public static string NormalizeBbgText(string query)
     {
-        var tokens = WhitespacePattern()
+        string[] tokens = [.. WhitespacePattern()
             .Split(query.Trim().ToUpperInvariant())
-            .Where(token => token.Length > 0)
-            .ToArray();
+            .Where(token => token.Length > 0)];
 
         if (tokens.Length >= 2
             && decimal.TryParse(
                 tokens[1],
                 NumberStyles.AllowDecimalPoint,
                 CultureInfo.InvariantCulture,
-                out var coupon))
+                out decimal coupon))
         {
             tokens[1] = coupon.ToString("0.################", CultureInfo.InvariantCulture);
         }
 
-        if (tokens.Length >= 3 && TryNormalizeMaturity(tokens[2], out var maturity))
+        if (tokens.Length >= 3 && TryNormalizeMaturity(tokens[2], out string? maturity))
         {
             tokens[2] = maturity;
         }
@@ -67,18 +66,18 @@ public static partial class SecuritySearchNormalizer
 
     public static string? NormalizeIsinPrefix(string query)
     {
-        var normalized = query.Trim().ToUpperInvariant();
+        string normalized = query.Trim().ToUpperInvariant();
         return IsinPattern().IsMatch(normalized) ? normalized : null;
     }
 
     private static bool TryNormalizeMaturity(string value, out string normalized)
     {
         normalized = string.Empty;
-        var components = value.Split('/');
+        string[] components = value.Split('/');
         if (components.Length != 3
-            || !int.TryParse(components[0], out var month)
-            || !int.TryParse(components[1], out var day)
-            || !int.TryParse(components[2], out var year))
+            || !int.TryParse(components[0], out int month)
+            || !int.TryParse(components[1], out int day)
+            || !int.TryParse(components[2], out int year))
         {
             return false;
         }
@@ -89,11 +88,11 @@ public static partial class SecuritySearchNormalizer
         }
 
         if (!DateOnly.TryParseExact(
-                $"{year:D4}-{month:D2}-{day:D2}",
-                "yyyy-MM-dd",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var date))
+            $"{year:D4}-{month:D2}-{day:D2}",
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out DateOnly date))
         {
             return false;
         }

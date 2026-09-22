@@ -2,8 +2,21 @@ using Rfq.Application;
 
 namespace Rfq.Api;
 
-public enum BulkItemStatusValue { Succeeded, Skipped, Failed }
-public enum BulkFailureCodeValue { VersionConflict, InvalidState, Validation, Forbidden, NotFound }
+public enum BulkItemStatusValue
+{
+    Succeeded,
+    Skipped,
+    Failed
+}
+
+public enum BulkFailureCodeValue
+{
+    VersionConflict,
+    InvalidState,
+    Validation,
+    Forbidden,
+    NotFound
+}
 
 public sealed record BulkItemResponse(
     long CaseId,

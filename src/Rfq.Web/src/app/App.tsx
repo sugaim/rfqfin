@@ -7,9 +7,9 @@ import {
   useGetHealthQuery,
   useGetMeQuery,
   type PersistedEvent,
-} from '../services/api'
-import { AppShell } from './AppShell'
-import { applicationTheme } from './theme'
+} from '@/services/api'
+import { AppShell } from '@/app/AppShell'
+import { applicationTheme } from '@/app/theme'
 
 export interface AppOutletContext {
   currentUserId: string
@@ -21,7 +21,8 @@ export interface AppOutletContext {
 }
 
 export function App() {
-  const configuredIdentity = window.localStorage.getItem('rfq-development-user') ?? 'sales-dev'
+  const configuredIdentity =
+    window.localStorage.getItem('rfq-development-user') ?? 'sales-dev'
   const [refreshEventId, setRefreshEventId] = useState(0)
   const [refreshToken, setRefreshToken] = useState(0)
   const [remoteChangeVersion, setRemoteChangeVersion] = useState(0)
@@ -31,10 +32,14 @@ export function App() {
   const eventsQuery = useGetEventsQuery(refreshEventId)
   const health = healthQuery.isLoading
     ? 'checking'
-    : healthQuery.isError || healthQuery.data?.status !== 'ok' ? 'error' : 'ok'
+    : healthQuery.isError || healthQuery.data?.status !== 'ok'
+      ? 'error'
+      : 'ok'
   const businessDate = businessDateQuery.isLoading
     ? 'checking'
-    : businessDateQuery.isError ? 'unavailable' : businessDateQuery.data?.date
+    : businessDateQuery.isError
+      ? 'unavailable'
+      : businessDateQuery.data?.date
   const currentUserId = currentUserQuery.data?.userId ?? configuredIdentity
 
   const changeIdentity = (userId: string) => {
@@ -44,12 +49,17 @@ export function App() {
 
   const acknowledgeRemoteChanges = async () => {
     const result = await eventsQuery.refetch()
-    const latest = Math.max(0, ...(result.data ?? []).map((event) => event.eventId))
+    const latest = Math.max(
+      0,
+      ...(result.data ?? []).map((event) => event.eventId),
+    )
     setRefreshEventId(latest)
     setRefreshToken((current) => current + 1)
   }
 
-  const refreshUpdates = () => { void acknowledgeRemoteChanges() }
+  const refreshUpdates = () => {
+    void acknowledgeRemoteChanges()
+  }
 
   useEffect(() => {
     if (typeof EventSource === 'undefined') return undefined

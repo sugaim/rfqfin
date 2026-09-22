@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import type { SalesRfq } from '../../services/api'
+import type { SalesRfq } from '@/services/api'
 import {
-  bulkEligibility, commandEligible, derivePaneMode, isTextEditingTarget,
-  matchesSalesPreset, reconcileSelection, reflectConfirmedAmendment,
-  requiresConfirmation, rowActionCommands,
-} from './salesModel'
+  bulkEligibility,
+  commandEligible,
+  derivePaneMode,
+  isTextEditingTarget,
+  matchesSalesPreset,
+  reconcileSelection,
+  reflectConfirmedAmendment,
+  requiresConfirmation,
+  rowActionCommands,
+} from '@/features/sales/salesModel'
 
 const row = (overrides: Partial<SalesRfq> = {}): SalesRfq => ({
   caseId: 101,
@@ -44,25 +50,37 @@ describe('Sales pane mode', () => {
     expect(derivePaneMode(rows, undefined, false)).toBe('neutral')
     expect(derivePaneMode(rows, undefined, true)).toBe('new')
     expect(derivePaneMode(rows, 101, false)).toBe('waiting')
-    expect(derivePaneMode([row({ quoteStatus: 'Quoted' })], 101, false)).toBe('quoted')
-    expect(derivePaneMode([row({ rfqStatus: 'Presented', quoteStatus: 'Quoted' })], 101, false)).toBe('presented')
+    expect(derivePaneMode([row({ quoteStatus: 'Quoted' })], 101, false)).toBe(
+      'quoted',
+    )
+    expect(
+      derivePaneMode(
+        [row({ rfqStatus: 'Presented', quoteStatus: 'Quoted' })],
+        101,
+        false,
+      ),
+    ).toBe('presented')
   })
 
   it('keeps stable Case selections across refresh and removes disappeared Cases', () => {
-    expect(reconcileSelection([101, 102], [row(), row({ caseId: 103 })])).toEqual([101])
+    expect(
+      reconcileSelection([101, 102], [row(), row({ caseId: 103 })]),
+    ).toEqual([101])
   })
 })
 
 describe('Paused Sales snapshot transitions', () => {
   it('returns a Presented RFQ to Active when confirming an Amendment', () => {
-    const updated = reflectConfirmedAmendment(row({
-      rfqStatus: 'Presented',
-      quoteStatus: 'Quoted',
-      quoteRequestReason: null,
-      draftRevisionId: '00000000-0000-0000-0000-000000000201',
-      draftVersion: 1,
-      draftNotional: 250_000_000,
-    }))
+    const updated = reflectConfirmedAmendment(
+      row({
+        rfqStatus: 'Presented',
+        quoteStatus: 'Quoted',
+        quoteRequestReason: null,
+        draftRevisionId: '00000000-0000-0000-0000-000000000201',
+        draftVersion: 1,
+        draftNotional: 250_000_000,
+      }),
+    )
 
     expect(updated).toMatchObject({
       rfqStatus: 'Active',
@@ -81,7 +99,9 @@ describe('Sales preset filters', () => {
     const owned = row({ salesId: 'sales-a', contactOwnerId: 'sales-dev' })
     expect(matchesSalesPreset(owned, 'owner', 'sales-dev')).toBe(true)
     expect(matchesSalesPreset(owned, 'sales', 'sales-dev')).toBe(false)
-    expect(matchesSalesPreset(owned, 'owner-and-sales', 'sales-dev')).toBe(false)
+    expect(matchesSalesPreset(owned, 'owner-and-sales', 'sales-dev')).toBe(
+      false,
+    )
     expect(matchesSalesPreset(owned, 'owner-or-sales', 'sales-dev')).toBe(true)
   })
 })
@@ -92,8 +112,16 @@ describe('Sales command eligibility', () => {
     expect(commandEligible('present', quoted, 'sales-dev')).toBe(true)
     expect(commandEligible('hit', quoted, 'sales-dev')).toBe(true)
     expect(bulkEligibility('away', quoted, 'sales-dev')).toBe(true)
-    const bulkCommands = ['away', 'cancel', 'present', 'unpresent', 'confirm-drafts',
-      'discard-drafts', 'confirm-amendments', 'discard-amendments']
+    const bulkCommands = [
+      'away',
+      'cancel',
+      'present',
+      'unpresent',
+      'confirm-drafts',
+      'discard-drafts',
+      'confirm-amendments',
+      'discard-amendments',
+    ]
     expect(bulkCommands).not.toContain('hit')
   })
 
@@ -105,11 +133,18 @@ describe('Sales command eligibility', () => {
   })
 
   it('shows only row actions eligible for the current state and actor', () => {
-    expect(rowActionCommands(row({ quoteStatus: 'Quoted' }), 'sales-dev'))
-      .toEqual(['present', 'hit', 'away', 'cancel'])
-    expect(rowActionCommands(row({ revisionStatus: 'Draft', rfqStatus: 'Draft' }), 'sales-dev'))
-      .toEqual(['confirm-draft', 'discard-draft'])
-    expect(rowActionCommands(row({ quoteStatus: 'Quoted' }), 'sales-a')).toEqual([])
+    expect(
+      rowActionCommands(row({ quoteStatus: 'Quoted' }), 'sales-dev'),
+    ).toEqual(['present', 'hit', 'away', 'cancel'])
+    expect(
+      rowActionCommands(
+        row({ revisionStatus: 'Draft', rfqStatus: 'Draft' }),
+        'sales-dev',
+      ),
+    ).toEqual(['confirm-draft', 'discard-draft'])
+    expect(
+      rowActionCommands(row({ quoteStatus: 'Quoted' }), 'sales-a'),
+    ).toEqual([])
   })
 
   it('recognizes typing surfaces so character shortcuts remain safe', () => {

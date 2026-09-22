@@ -13,20 +13,25 @@ public sealed class UpdateInitialDraft(
         UpdateInitialDraftCommand command,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await GetCaseAsync(
+        RfqCase rfqCase = await GetCaseAsync(
             rfqCases,
             command.CaseId,
             cancellationToken);
         authorization.EnsureCanEditRevision(currentUser.User, rfqCase);
-        var assignedTraderId = await assignedTraderValidator.ResolveAsync(
+        UserId assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
             cancellationToken);
         if (command.StandardSettlementDate != rfqCase.CurrentRevision.StandardSettlementDate)
+        {
             throw new RfqRequestValidationException(
                 "Standard Settlement Date cannot differ from the RFQ creation context.");
+        }
+
         rfqCase = InitialDraftTransitions.Update(
             rfqCase,
-            new RevisionTerms(command.Notional, command.SettlementDate,
+            new RevisionTerms(
+                command.Notional,
+                command.SettlementDate,
                 command.StandardSettlementDate,
                 command.SalesAndTradingMessage),
             assignedTraderId,
@@ -42,7 +47,7 @@ public sealed class UpdateInitialDraft(
         CaseId caseId,
         CancellationToken cancellationToken)
     {
-        var rfqCase = await rfqCases.GetAsync(caseId, cancellationToken)
+        RfqCase rfqCase = await rfqCases.GetAsync(caseId, cancellationToken)
             ?? throw new RfqNotFoundException($"RFQ Case '{caseId}' was not found.");
         return rfqCase;
     }

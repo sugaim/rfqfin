@@ -9,9 +9,7 @@ public sealed class MockCalculationClient : ICalculationClient
         IReadOnlyList<CalculationRequest> requests,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<CalculationResult> results = requests
-            .Select(Calculate)
-            .ToArray();
+        IReadOnlyList<CalculationResult> results = [.. requests.Select(Calculate)];
         return Task.FromResult(results);
     }
 
@@ -25,9 +23,9 @@ public sealed class MockCalculationClient : ICalculationClient
                 "Mock calculation failure was requested.");
         }
 
-        var securityBasis = request.SecurityId.Value.Sum(character => character) % 50 / 100m;
-        var referenceYield = 0.7m + securityBasis;
-        var (price, baseSimpleYield, gSpread) = request.Driver switch
+        decimal securityBasis = request.SecurityId.Value.Sum(character => character) % 50 / 100m;
+        decimal referenceYield = 0.7m + securityBasis;
+        (decimal price, decimal baseSimpleYield, decimal gSpread) = request.Driver switch
         {
             CalculationDriver.Price => (
                 request.Parameter.Value,

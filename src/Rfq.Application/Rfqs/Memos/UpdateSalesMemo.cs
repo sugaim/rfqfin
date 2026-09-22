@@ -17,9 +17,9 @@ public sealed class UpdateSalesMemo(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanUpdateSalesMemo(currentUser.User);
-        var rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         await EnsureDeskAccessAsync(users, currentUser.User, rfqCase, cancellationToken);
-        var salesMemo = await GetMemoAsync(memos, caseId, cancellationToken);
+        SalesMemo salesMemo = await GetMemoAsync(memos, caseId, cancellationToken);
         salesMemo = SalesMemoTransitions.Update(salesMemo, memo, expectedVersion);
         memos.Update(salesMemo);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -40,7 +40,7 @@ public sealed class UpdateSalesMemo(
         RfqCase rfqCase,
         CancellationToken cancellationToken)
     {
-        var assignedTrader = await users.ResolveAsync(
+        UserSummary? assignedTrader = await users.ResolveAsync(
             rfqCase.AssignedTraderId,
             cancellationToken);
         if (assignedTrader is null || assignedTrader.DeskId != user.DeskId)

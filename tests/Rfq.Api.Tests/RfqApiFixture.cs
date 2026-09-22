@@ -24,10 +24,10 @@ public sealed class RfqApiFixture : IAsyncLifetime
         await _container.StartAsync();
         Factory = new TestWebApplicationFactory(_container.GetConnectionString());
 
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<RfqDbContext>();
+        await using AsyncServiceScope scope = Factory.Services.CreateAsyncScope();
+        RfqDbContext dbContext = scope.ServiceProvider.GetRequiredService<RfqDbContext>();
         await dbContext.Database.MigrateAsync();
-        var seeder = scope.ServiceProvider.GetRequiredService<DevelopmentDataSeeder>();
+        DevelopmentDataSeeder seeder = scope.ServiceProvider.GetRequiredService<DevelopmentDataSeeder>();
         await seeder.SeedAsync();
     }
 

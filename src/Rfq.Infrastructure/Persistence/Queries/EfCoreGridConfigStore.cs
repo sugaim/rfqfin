@@ -13,9 +13,10 @@ public sealed class EfCoreGridConfigStore(
         string configKey,
         CancellationToken cancellationToken = default)
     {
-        var item = await dbContext.UserGridConfigs.AsNoTracking().SingleOrDefaultAsync(
+        UserGridConfigEntity? item = await dbContext.UserGridConfigs.AsNoTracking().SingleOrDefaultAsync(
             value => value.UserId == currentUser.User.UserId.Value
-                && value.ScreenId == screenId && value.ConfigKey == configKey, cancellationToken);
+                && value.ScreenId == screenId && value.ConfigKey == configKey,
+            cancellationToken);
         return item is null ? null : ToConfig(item);
     }
 
@@ -26,9 +27,10 @@ public sealed class EfCoreGridConfigStore(
         string config,
         CancellationToken cancellationToken = default)
     {
-        var userId = currentUser.User.UserId.Value;
-        var item = await dbContext.UserGridConfigs.SingleOrDefaultAsync(value =>
-            value.UserId == userId && value.ScreenId == screenId && value.ConfigKey == configKey,
+        string userId = currentUser.User.UserId.Value;
+        UserGridConfigEntity? item = await dbContext.UserGridConfigs.SingleOrDefaultAsync(
+            value =>
+                value.UserId == userId && value.ScreenId == screenId && value.ConfigKey == configKey,
             cancellationToken);
         if (item is null)
         {

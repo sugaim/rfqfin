@@ -18,7 +18,8 @@ public sealed class EfCoreQuoteExpiryQueries(RfqDbContext dbContext) : IQuoteExp
                     && quote.ExpiresAt != null
                     && quote.ExpiresAt <= now))
             .Select(item => new ExpiredQuoteCandidate(
-                new CaseId(item.CaseId), new QuoteId(item.Current.CurrentQuoteId.GetValueOrDefault()),
+                new CaseId(item.CaseId),
+                new QuoteId(item.Current.CurrentQuoteId.GetValueOrDefault()),
                 new StateVersion(item.Current.Version)))
             .ToListAsync(cancellationToken);
 }

@@ -1,8 +1,8 @@
 import { Alert, Card, Space, Tag, Typography } from 'antd'
 import { AgGridReact } from 'ag-grid-react'
 import { useOutletContext } from 'react-router'
-import type { AppOutletContext } from '../../app/App'
-import { useGetEodQuery, useSearchRfqsQuery } from '../../services/api'
+import type { AppOutletContext } from '@/app/App'
+import { useGetEodQuery, useSearchRfqsQuery } from '@/services/api'
 
 export function DailyReviewWorkspace() {
   const { businessDate, events } = useOutletContext<AppOutletContext>()
@@ -23,15 +23,23 @@ export function DailyReviewWorkspace() {
       </Card>
       <Card title="Past RFQ">
         {pastQuery.data?.requiresNarrowing && (
-          <Alert type="warning" message="More than 20,000 results. Narrow the search." />
+          <Alert
+            type="warning"
+            message="More than 20,000 results. Narrow the search."
+          />
         )}
         <div className="rfq-grid">
           <AgGridReact
             rowData={pastQuery.data?.items ?? []}
             columnDefs={[
-              { field: 'caseId' }, { field: 'createdAt' }, { field: 'clientName' },
-              { field: 'securityName' }, { field: 'status' }, { field: 'quoteStatus' },
-              { field: 'contactOwnerId' }, { field: 'assignedTraderId' },
+              { field: 'caseId' },
+              { field: 'createdAt' },
+              { field: 'clientName' },
+              { field: 'securityName' },
+              { field: 'status' },
+              { field: 'quoteStatus' },
+              { field: 'contactOwnerId' },
+              { field: 'assignedTraderId' },
             ]}
             defaultColDef={{ sortable: true, filter: true, resizable: true }}
           />
@@ -40,7 +48,9 @@ export function DailyReviewWorkspace() {
       <Card title="Changes">
         <Typography.Text>Pending Updates: {events.length}</Typography.Text>
         {events.slice(-10).map((event) => (
-          <div key={event.eventId}>#{event.eventId} Case {event.caseId}: {event.type}</div>
+          <div key={event.eventId}>
+            #{event.eventId} Case {event.caseId}: {event.type}
+          </div>
         ))}
       </Card>
     </Space>

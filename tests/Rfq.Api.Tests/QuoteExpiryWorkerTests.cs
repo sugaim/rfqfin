@@ -13,13 +13,13 @@ public sealed class QuoteExpiryWorkerTests
     {
         var expected = new InvalidOperationException("repository contract failure");
         var reporter = new IncidentReporter();
-        using var provider = Services(
+        using ServiceProvider provider = Services(
             new ExpiryQueries([Candidate()]), new ThrowingCases(expected));
-        var worker = Worker(provider.GetRequiredService<IServiceScopeFactory>(), reporter);
+        QuoteExpiryWorker worker = Worker(provider.GetRequiredService<IServiceScopeFactory>(), reporter);
 
         await worker.RunScanBoundaryAsync(CancellationToken.None);
 
-        var incident = Assert.Single(reporter.Incidents);
+        Incident incident = Assert.Single(reporter.Incidents);
         Assert.Same(expected, incident.Exception);
         Assert.Equal("QuoteExpiryWorker", incident.Source);
     }
@@ -30,9 +30,9 @@ public sealed class QuoteExpiryWorkerTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var reporter = new IncidentReporter();
-        using var provider = Services(
+        using ServiceProvider provider = Services(
             new CancellingExpiryQueries(), new ThrowingCases(new Exception("unused")));
-        var worker = Worker(provider.GetRequiredService<IServiceScopeFactory>(), reporter);
+        QuoteExpiryWorker worker = Worker(provider.GetRequiredService<IServiceScopeFactory>(), reporter);
 
         await worker.RunScanBoundaryAsync(cancellation.Token);
 
@@ -42,9 +42,10 @@ public sealed class QuoteExpiryWorkerTests
     [Fact]
     public async Task Reporter_failure_does_not_escape_worker_boundary()
     {
-        using var provider = Services(
+        using ServiceProvider provider = Services(
             new ExpiryQueries([]), new ThrowingCases(new Exception("unused")));
-        var worker = Worker(provider.GetRequiredService<IServiceScopeFactory>(),
+        QuoteExpiryWorker worker = Worker(
+            provider.GetRequiredService<IServiceScopeFactory>(),
             new IncidentReporter(shouldThrow: true));
 
         await worker.ReportBestEffortAsync(new Exception("scan failed"));
@@ -67,10 +68,10 @@ public sealed class QuoteExpiryWorkerTests
     private static QuoteExpiryWorker Worker(
         IServiceScopeFactory scopeFactory,
         IIncidentReporter reporter) => new(
-        scopeFactory,
-        new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?> { ["QuoteExpiry:IntervalSeconds"] = "1" }).Build(),
-        reporter);
+            scopeFactory,
+            new ConfigurationBuilder().AddInMemoryCollection(
+                new Dictionary<string, string?> { ["QuoteExpiry:IntervalSeconds"] = "1" }).Build(),
+            reporter);
 
     private static ExpiredQuoteCandidate Candidate() => new(
         new CaseId(1), QuoteId.New(), new StateVersion(1));
@@ -94,8 +95,10 @@ public sealed class QuoteExpiryWorkerTests
     private sealed class ThrowingCases(Exception exception) : IRfqCaseRepository
     {
         public void Add(RfqCase rfqCase) => throw new NotSupportedException();
+
         public Task<RfqCase?> GetAsync(CaseId caseId, CancellationToken cancellationToken = default) =>
             Task.FromException<RfqCase?>(exception);
+
         public void Update(RfqCase rfqCase) => throw new NotSupportedException();
         public void UpdateRevision(RfqRevision revision) => throw new NotSupportedException();
     }
@@ -109,12 +112,14 @@ public sealed class QuoteExpiryWorkerTests
     {
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
         public void DiscardChanges() { }
     }
 
     private sealed class IncidentReporter(bool shouldThrow = false) : IIncidentReporter
     {
         public List<Incident> Incidents { get; } = [];
+
         public Task ReportAsync(Incident incident, CancellationToken cancellationToken = default)
         {
             Incidents.Add(incident);

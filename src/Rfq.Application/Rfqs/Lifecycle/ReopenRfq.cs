@@ -10,15 +10,20 @@ public sealed class ReopenRfq(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
 {
-    public async Task<LifecycleResult> ExecuteAsync(CaseId caseId, StateVersion expectedVersion,
+    public async Task<LifecycleResult> ExecuteAsync(
+        CaseId caseId,
+        StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfq = await ClosedRfqUseCase.LoadAsync(cases, caseId, cancellationToken);
+        RfqCase rfq = await ClosedRfqUseCase.LoadAsync(cases, caseId, cancellationToken);
         authorization.EnsureCanCancelOrReopen(currentUser.User, rfq);
         rfq = RfqLifecycleTransitions.Reopen(rfq, expectedVersion);
         cases.Update(rfq);
-        events.Record(new(RfqTransitionKind.Reopened, caseId,
-            currentUser.User.UserId, timeProvider.GetUtcNow()));
+        events.Record(new(
+            RfqTransitionKind.Reopened,
+            caseId,
+            currentUser.User.UserId,
+            timeProvider.GetUtcNow()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return WithdrawQuote.ToResult(rfq);
     }

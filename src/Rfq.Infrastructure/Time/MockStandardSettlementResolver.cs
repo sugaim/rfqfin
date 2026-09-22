@@ -9,8 +9,8 @@ public sealed class MockStandardSettlementResolver : IStandardSettlementResolver
     {
         ArgumentNullException.ThrowIfNull(securityId);
 
-        var result = businessDate;
-        for (var businessDays = 0; businessDays < 2;)
+        DateOnly result = businessDate;
+        for (int businessDays = 0; businessDays < 2;)
         {
             result = result.AddDays(1);
             if (result.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)

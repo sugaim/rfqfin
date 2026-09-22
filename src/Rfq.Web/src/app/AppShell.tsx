@@ -29,8 +29,9 @@ export function AppShell({
 }: AppShellProps) {
   const location = useLocation()
   const navigate = useNavigate()
-  const activeRoute = navigationItems.find((item) => location.pathname.startsWith(item.key))
-    ?? navigationItems[0]
+  const activeRoute =
+    navigationItems.find((item) => location.pathname.startsWith(item.key)) ??
+    navigationItems[0]
   const healthPresentation = {
     checking: { color: 'processing', text: 'API checking' },
     ok: { color: 'success', text: 'API healthy' },
@@ -40,7 +41,9 @@ export function AppShell({
   return (
     <Layout className="app-shell">
       <Layout.Header className="app-header">
-        <Typography.Title level={3} className="app-title">RFQ</Typography.Title>
+        <Typography.Title level={3} className="app-title">
+          RFQ
+        </Typography.Title>
         <Menu
           theme="dark"
           mode="horizontal"

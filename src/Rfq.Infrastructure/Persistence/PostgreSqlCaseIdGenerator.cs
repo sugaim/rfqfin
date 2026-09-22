@@ -10,7 +10,7 @@ public sealed class PostgreSqlCaseIdGenerator(RfqDbContext dbContext) : ICaseIdG
 
     public async Task<CaseId> NextAsync(CancellationToken cancellationToken = default)
     {
-        var value = await dbContext.Database
+        long value = await dbContext.Database
             .SqlQueryRaw<long>("SELECT nextval('rfq_case_id_seq') AS \"Value\"")
             .SingleAsync(cancellationToken);
 

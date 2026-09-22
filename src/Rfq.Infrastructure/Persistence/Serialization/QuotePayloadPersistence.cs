@@ -36,35 +36,57 @@ internal static class QuotePayloadPersistence
 
     internal static CalculatedQuotePayload DeserializeCalculated(string json)
     {
-        using var document = PersistenceJsonSerializer.Parse(json, "calculated quote payload");
-        if (!document.RootElement.TryGetProperty("type", out var discriminator))
+        using System.Text.Json.JsonDocument document = PersistenceJsonSerializer.Parse(json, "calculated quote payload");
+        if (!document.RootElement.TryGetProperty("type", out System.Text.Json.JsonElement discriminator))
+        {
             throw new DomainInvariantException(
                 "Persisted calculated quote payload type is missing.");
+        }
+
         if (discriminator.ValueKind != System.Text.Json.JsonValueKind.String
             || discriminator.GetString() != CalculatedV1)
+        {
             throw new DomainInvariantException("Persisted calculated quote payload has an unsupported type.");
+        }
+
         return From(PersistenceJsonSerializer.Deserialize<CalculatedQuotePayloadDtoV1>(
             json, "calculated quote payload"));
     }
 
     internal static ManualQuotePayload DeserializeManual(string json)
     {
-        using var document = PersistenceJsonSerializer.Parse(json, "manual quote payload");
-        if (!document.RootElement.TryGetProperty("type", out var discriminator))
+        using System.Text.Json.JsonDocument document = PersistenceJsonSerializer.Parse(json, "manual quote payload");
+        if (!document.RootElement.TryGetProperty("type", out System.Text.Json.JsonElement discriminator))
+        {
             throw new DomainInvariantException(
                 "Persisted manual quote payload type is missing.");
+        }
+
         if (discriminator.ValueKind != System.Text.Json.JsonValueKind.String
             || discriminator.GetString() != ManualV1)
+        {
             throw new DomainInvariantException("Persisted manual quote payload has an unsupported type.");
-        var dto = PersistenceJsonSerializer.Deserialize<ManualQuotePayloadDtoV1>(
+        }
+
+        ManualQuotePayloadDtoV1 dto = PersistenceJsonSerializer.Deserialize<ManualQuotePayloadDtoV1>(
             json, "manual quote payload");
         return new ManualQuotePayload(dto.Price, dto.FinalSimpleYield);
     }
 
     private static CalculatedQuotePayload From(CalculatedQuotePayloadDtoV1 dto) => new(
-        ParseDriver(dto.Driver), dto.DriverValue, dto.Price, dto.BbgYield,
-        dto.BaseSimpleYield, dto.SimpleYieldSlide, dto.FinalSimpleYield,
-        dto.InternalYield, dto.GSpread, dto.Asw, dto.Ysc, dto.ISpread, dto.ZSpread);
+        ParseDriver(dto.Driver),
+        dto.DriverValue,
+        dto.Price,
+        dto.BbgYield,
+        dto.BaseSimpleYield,
+        dto.SimpleYieldSlide,
+        dto.FinalSimpleYield,
+        dto.InternalYield,
+        dto.GSpread,
+        dto.Asw,
+        dto.Ysc,
+        dto.ISpread,
+        dto.ZSpread);
 
     private static string DriverCode(CalculationDriver driver) => driver switch
     {

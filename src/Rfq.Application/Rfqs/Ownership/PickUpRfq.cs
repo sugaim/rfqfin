@@ -16,7 +16,7 @@ public sealed class PickUpRfq(
         bool confirmed,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanPickUp(currentUser.User, rfqCase, confirmed);
         rfqCase = RfqOwnershipTransitions.PickUp(
             rfqCase, currentUser.User.UserId, expectedVersion);
@@ -24,9 +24,18 @@ public sealed class PickUpRfq(
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
     }
 
-    internal static void Record(IRfqEventSink events, TimeProvider timeProvider,
-        RfqTransitionKind kind, RfqCase rfqCase, UserId actor, string? from = null) =>
-        events.Record(new RfqTransition(kind, rfqCase.CaseId, actor,
-            timeProvider.GetUtcNow(), From: from,
+    internal static void Record(
+        IRfqEventSink events,
+        TimeProvider timeProvider,
+        RfqTransitionKind kind,
+        RfqCase rfqCase,
+        UserId actor,
+        string? from = null) =>
+        events.Record(new RfqTransition(
+            kind,
+            rfqCase.CaseId,
+            actor,
+            timeProvider.GetUtcNow(),
+            From: from,
             To: rfqCase.AssignedTraderId.Value));
 }

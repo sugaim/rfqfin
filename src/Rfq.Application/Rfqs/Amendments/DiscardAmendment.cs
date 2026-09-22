@@ -12,10 +12,11 @@ public sealed class DiscardAmendment(
         AmendmentItem command,
         CancellationToken cancellationToken = default)
     {
-        var rfq = await ClosedRfqUseCase.LoadAsync(cases, command.CaseId, cancellationToken);
+        RfqCase rfq = await ClosedRfqUseCase.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanDiscardRevision(currentUser.User, rfq);
-        var transition = AmendmentTransitions.Discard(
-            rfq, command.ExpectedCurrentVersion,
+        AmendmentDiscardResult transition = AmendmentTransitions.Discard(
+            rfq,
+            command.ExpectedCurrentVersion,
             command.ExpectedDraftVersion);
         rfq = transition.Rfq;
         cases.Update(rfq);

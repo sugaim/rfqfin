@@ -15,7 +15,7 @@ public static class PostgreSqlResetDevSafetyGuard
         }
 
         var connection = new NpgsqlConnectionStringBuilder(connectionString);
-        var isLocalHost = string.Equals(connection.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+        bool isLocalHost = string.Equals(connection.Host, "localhost", StringComparison.OrdinalIgnoreCase)
             || string.Equals(connection.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
             || string.Equals(connection.Host, "::1", StringComparison.OrdinalIgnoreCase);
 

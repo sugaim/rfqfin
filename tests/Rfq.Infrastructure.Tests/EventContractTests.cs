@@ -15,28 +15,35 @@ public sealed class EventContractTests
     {
         var sink = new PersistedEventSink();
         var quoteId = QuoteId.New();
-        sink.Record(new RfqTransition(RfqTransitionKind.ClosedHit, new CaseId(42),
-            Actor, Now, quoteId));
+        sink.Record(new RfqTransition(
+            RfqTransitionKind.ClosedHit,
+            new CaseId(42),
+            Actor,
+            Now,
+            quoteId));
 
-        var pending = Assert.IsType<PendingRfqClosedHitEvent>(Assert.Single(sink.Pending));
-        var persisted = EventPersistenceContract.Serialize(pending);
+        PendingRfqClosedHitEvent pending = Assert.IsType<PendingRfqClosedHitEvent>(Assert.Single(sink.Pending));
+        EventPersistenceData persisted = EventPersistenceContract.Serialize(pending);
 
         Assert.Equal(EventPersistenceTypeCodes.Rfq.ClosedHit, persisted.TypeCode);
         using var payload = JsonDocument.Parse(persisted.PayloadJson);
         Assert.Equal(quoteId.Value, payload.RootElement.GetProperty("quoteId").GetGuid());
-        Assert.Equal(["quoteId"], payload.RootElement.EnumerateObject()
-            .Select(property => property.Name).ToArray());
+        Assert.Equal(["quoteId"], [.. payload.RootElement.EnumerateObject().Select(property => property.Name)]);
     }
 
     [Fact]
     public void Persisted_type_and_payload_map_to_typed_application_event()
     {
         var quoteId = QuoteId.New();
-        var item = EventPersistenceContract.DeserializeRfq(
-            7, Now, Actor, new CaseId(42), EventPersistenceTypeCodes.Rfq.ClosedHit,
+        RfqEvent item = EventPersistenceContract.DeserializeRfq(
+            7,
+            Now,
+            Actor,
+            new CaseId(42),
+            EventPersistenceTypeCodes.Rfq.ClosedHit,
             $"{{\"quoteId\":\"{quoteId.Value}\"}}");
 
-        var closed = Assert.IsType<RfqClosedHitEvent>(item);
+        RfqClosedHitEvent closed = Assert.IsType<RfqClosedHitEvent>(item);
         Assert.Equal(new CaseId(42), closed.CaseId);
         Assert.Equal(quoteId, closed.QuoteId);
         Assert.Equal(Actor, closed.ActorUserId);
@@ -46,8 +53,14 @@ public sealed class EventContractTests
     public void Quote_type_maps_to_typed_application_event()
     {
         var quoteId = QuoteId.New();
-        var item = EventPersistenceContract.DeserializeQuote(9, Now, Actor, new CaseId(42),
-            quoteId, EventPersistenceTypeCodes.Quote.Presented, "{}");
+        QuoteEvent item = EventPersistenceContract.DeserializeQuote(
+            9,
+            Now,
+            Actor,
+            new CaseId(42),
+            quoteId,
+            EventPersistenceTypeCodes.Quote.Presented,
+            "{}");
 
         Assert.IsType<QuotePresentedEvent>(item);
     }
@@ -68,10 +81,14 @@ public sealed class EventContractTests
     public void Eod_codes_are_the_same_stable_contract_used_by_event_writes()
     {
         var sink = new PersistedEventSink();
-        sink.Record(new RfqTransition(RfqTransitionKind.ClosedAway, new CaseId(42),
-            Actor, Now, QuoteId.New()));
+        sink.Record(new RfqTransition(
+            RfqTransitionKind.ClosedAway,
+            new CaseId(42),
+            Actor,
+            Now,
+            QuoteId.New()));
 
-        var persisted = EventPersistenceContract.Serialize(Assert.Single(sink.Pending));
+        EventPersistenceData persisted = EventPersistenceContract.Serialize(Assert.Single(sink.Pending));
 
         Assert.Equal(EventPersistenceTypeCodes.Rfq.ClosedAway, persisted.TypeCode);
         Assert.Equal("ClosedHit", EventPersistenceTypeCodes.Rfq.ClosedHit);

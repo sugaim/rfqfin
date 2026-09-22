@@ -14,26 +14,29 @@ public sealed class BulkOperationTests
         { new RfqForbiddenException("forbidden"), BulkFailureCode.Forbidden },
     };
 
-    public static TheoryData<Exception> FatalErrors => new()
-    {
+    public static TheoryData<Exception> FatalErrors =>
+    [
         new CalculationFailureException(Guid.NewGuid(), "CALC", "calculation"),
         new InvalidOperationException("invalid operation"),
         new DomainInvariantException("domain invariant"),
         new RfqInvariantException("system invariant"),
         new Exception("unknown"),
-    };
+    ];
 
     [Fact]
     public async Task Successful_items_commit_independently()
     {
         var unitOfWork = new UnitOfWork();
-        var results = await BulkOperation.ExecuteAsync(
-            new[] { new CaseId(1), new CaseId(2), new CaseId(3) }, item => item,
+        IReadOnlyList<BulkItemResult> results = await BulkOperation.ExecuteAsync(
+            [new CaseId(1), new CaseId(2), new CaseId(3)],
+            item => item,
             async (_, token) =>
             {
                 await unitOfWork.SaveChangesAsync(token);
                 return BulkActionOutcome.Succeeded;
-            }, unitOfWork, CancellationToken.None);
+            },
+            unitOfWork,
+            CancellationToken.None);
 
         Assert.All(results, result => Assert.Equal(BulkItemStatus.Succeeded, result.Status));
         Assert.Equal(3, unitOfWork.Saves);
@@ -43,9 +46,9 @@ public sealed class BulkOperationTests
     public async Task Mixed_results_continue_after_recoverable_failure_and_discard_state()
     {
         var unitOfWork = new UnitOfWork();
-        var items = new[] { new CaseId(1), new CaseId(2), new CaseId(3), new CaseId(4) };
+        CaseId[] items = [new CaseId(1), new CaseId(2), new CaseId(3), new CaseId(4)];
 
-        var results = await BulkOperation.ExecuteAsync(
+        IReadOnlyList<BulkItemResult> results = await BulkOperation.ExecuteAsync(
             items,
             item => item,
             (item, _) => item.Value switch
@@ -76,15 +79,18 @@ public sealed class BulkOperationTests
         var unitOfWork = new UnitOfWork();
         var executed = new List<long>();
 
-        var results = await BulkOperation.ExecuteAsync(
-            [new CaseId(1), new CaseId(2)], item => item,
+        IReadOnlyList<BulkItemResult> results = await BulkOperation.ExecuteAsync(
+            [new CaseId(1), new CaseId(2)],
+            item => item,
             (item, _) =>
             {
                 executed.Add(item.Value);
                 return item.Value == 1
                     ? Task.FromException<BulkActionOutcome>(exception)
                     : Task.FromResult(BulkActionOutcome.Succeeded);
-            }, unitOfWork, CancellationToken.None);
+            },
+            unitOfWork,
+            CancellationToken.None);
 
         Assert.Equal([1L, 2L], executed);
         Assert.Equal(BulkItemStatus.Failed, results[0].Status);
@@ -101,15 +107,20 @@ public sealed class BulkOperationTests
         var unitOfWork = new UnitOfWork();
         var executed = new List<long>();
 
-        var thrown = await Assert.ThrowsAsync(exception.GetType(), () => BulkOperation.ExecuteAsync(
-            [new CaseId(1), new CaseId(2)], item => item,
-            (item, _) =>
-            {
-                executed.Add(item.Value);
-                return item.Value == 1
-                    ? Task.FromException<BulkActionOutcome>(exception)
-                    : Task.FromResult(BulkActionOutcome.Succeeded);
-            }, unitOfWork, CancellationToken.None));
+        Exception thrown = await Assert.ThrowsAsync(
+            exception.GetType(),
+            () => BulkOperation.ExecuteAsync(
+                [new CaseId(1), new CaseId(2)],
+                item => item,
+                (item, _) =>
+                {
+                    executed.Add(item.Value);
+                    return item.Value == 1
+                        ? Task.FromException<BulkActionOutcome>(exception)
+                        : Task.FromResult(BulkActionOutcome.Succeeded);
+                },
+                unitOfWork,
+                CancellationToken.None));
 
         Assert.Same(exception, thrown);
         Assert.Equal([1L], executed);
@@ -122,20 +133,24 @@ public sealed class BulkOperationTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => BulkOperation.ExecuteAsync(
-            [new CaseId(1)], item => item,
+            [new CaseId(1)],
+            item => item,
             (_, _) => Task.FromResult(BulkActionOutcome.Succeeded),
-            new UnitOfWork(), cancellation.Token));
+            new UnitOfWork(),
+            cancellation.Token));
     }
 
     private sealed class UnitOfWork : IUnitOfWork
     {
         public int Saves { get; private set; }
         public int Discards { get; private set; }
+
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             Saves++;
             return Task.CompletedTask;
         }
+
         public void DiscardChanges() => Discards++;
     }
 }

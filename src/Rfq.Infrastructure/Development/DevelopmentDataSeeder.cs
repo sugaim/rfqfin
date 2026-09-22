@@ -16,7 +16,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        var seedKeys = await dbContext.SeedMarkers
+        List<string> seedKeys = await dbContext.SeedMarkers
             .Select(marker => marker.Key)
             .ToListAsync(cancellationToken);
         if (!seedKeys.Contains(FoundationSeedKey, StringComparer.Ordinal))
@@ -47,7 +47,8 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
         {
             AddSyntheticHistory(string.Equals(
                 Environment.GetEnvironmentVariable("RFQ_SEED_PROFILE"),
-                "large", StringComparison.OrdinalIgnoreCase) ? 5000 : 750);
+                "large",
+                StringComparison.OrdinalIgnoreCase) ? 5000 : 750);
             dbContext.SeedMarkers.Add(
                 new SeedMarker(DemoHistorySeedKey, timeProvider.GetUtcNow()));
         }
@@ -57,35 +58,35 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
 
     private void AddSyntheticHistory(int count)
     {
-        var clients = new[] { "client-001", "client-002", "client-003", "client-004" };
-        var securities = new[]
-        {
+        string[] clients = ["client-001", "client-002", "client-003", "client-004"];
+        (string, string, string)[] securities =
+        [
             ("sec-jgb-375", "JGB", "trader-a"),
             ("sec-toyota-1", "CORP", "trader-b"),
             ("sec-toyota-2", "CORP", "trader-b"),
             ("sec-other-1", "OTHER", "trader-a"),
-        };
-        var payload = QuotePayloadPersistence.Serialize(new CalculatedQuotePayload(
+        ];
+        string payload = QuotePayloadPersistence.Serialize(new CalculatedQuotePayload(
             CalculationDriver.Price, 100m, 100m, .8m, .81m, 0m, .81m, .82m, 10m, 13m));
-        for (var index = 0; index < count; index++)
+        for (int index = 0; index < count; index++)
         {
-            var caseId = 1000L + index;
-            var security = securities[index % securities.Length];
-            var created = new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero)
+            long caseId = 1000L + index;
+            (string, string, string) security = securities[index % securities.Length];
+            DateTimeOffset created = new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero)
                 .AddMinutes(-(index * 37L));
-            var revisionId = DeterministicGuid(caseId, 1);
-            var quoteId = DeterministicGuid(caseId, 2);
-            var bucket = index % 8;
-            var isDraft = bucket == 0;
-            var isQuoted = bucket is 2 or 3 or 6 or 7;
-            var lifecycle = bucket switch
+            Guid revisionId = DeterministicGuid(caseId, 1);
+            Guid quoteId = DeterministicGuid(caseId, 2);
+            int bucket = index % 8;
+            bool isDraft = bucket == 0;
+            bool isQuoted = bucket is 2 or 3 or 6 or 7;
+            RfqLifecycleKind lifecycle = bucket switch
             {
                 0 => RfqLifecycleKind.Draft,
                 4 => RfqLifecycleKind.Cancelled,
                 6 or 7 => RfqLifecycleKind.Closed,
                 _ => RfqLifecycleKind.Open,
             };
-            var status = bucket switch
+            RfqStatus status = bucket switch
             {
                 0 => RfqStatus.Draft,
                 3 => RfqStatus.Presented,
@@ -94,7 +95,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 7 => RfqStatus.Away,
                 _ => RfqStatus.Active,
             };
-            var createdBy = index == 1
+            string createdBy = index == 1
                 ? security.Item3
                 : index % 3 == 0 ? "sales-a" : "sales-dev";
             var revision = new RfqRevisionEntity
@@ -189,7 +190,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
 
     private static Guid DeterministicGuid(long value, byte suffix)
     {
-        var bytes = new byte[16];
+        byte[] bytes = new byte[16];
         BitConverter.GetBytes(value).CopyTo(bytes, 0);
         bytes[15] = suffix;
         return new Guid(bytes);

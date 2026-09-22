@@ -31,7 +31,7 @@ public sealed class EfCoreSalesRfqQueries(RfqDbContext dbContext) : ISalesRfqQue
     {
         ArgumentNullException.ThrowIfNull(salesUserId);
 
-        var rows = await dbContext.RfqCases
+        List<SalesRow> rows = await dbContext.RfqCases
             .AsNoTracking()
             .Where(entity =>
                 (entity.SalesId == salesUserId.Value
@@ -98,26 +98,32 @@ public sealed class EfCoreSalesRfqQueries(RfqDbContext dbContext) : ISalesRfqQue
             .ToListAsync(cancellationToken);
 
         if (rows.Count == 0)
+        {
             return [];
+        }
 
-        var caseIds = rows.Select(row => row.CaseId).ToArray();
-        var quoteIds = rows.Select(row => row.CurrentQuoteId ?? row.ClosedQuoteId)
-            .Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToArray();
+        long[] caseIds = [.. rows.Select(row => row.CaseId)];
+        Guid[] quoteIds = [.. rows.Select(row => row.CurrentQuoteId ?? row.ClosedQuoteId)
+            .Where(id => id.HasValue).Select(id => id!.Value).Distinct()];
 
-        var quoteRows = quoteIds.Length == 0
+        List<QuoteRow> quoteRows = quoteIds.Length == 0
             ? []
             : await dbContext.ConfirmedQuotes.AsNoTracking()
                 .Where(quote => quoteIds.Contains(quote.QuoteId))
-                .Select(quote => new QuoteRow(quote.QuoteId, quote.Mode,
-                    quote.CalculatedPayloadJson, quote.ManualPayloadJson, quote.ConfirmedAt))
+                .Select(quote => new QuoteRow(
+                    quote.QuoteId,
+                    quote.Mode,
+                    quote.CalculatedPayloadJson,
+                    quote.ManualPayloadJson,
+                    quote.ConfirmedAt))
                 .ToListAsync(cancellationToken);
         var quotes = quoteRows.ToDictionary(row => row.QuoteId, ToSummary);
 
-        var rfqStateEvents = await dbContext.RfqEvents.AsNoTracking()
+        List<StateEvent> rfqStateEvents = await dbContext.RfqEvents.AsNoTracking()
             .Where(item => caseIds.Contains(item.CaseId) && StateRfqEvents.Contains(item.Type))
             .Select(item => new StateEvent(item.CaseId, item.Event.OccurredAt))
             .ToListAsync(cancellationToken);
-        var quoteStateEvents = await dbContext.QuoteEvents.AsNoTracking()
+        List<StateEvent> quoteStateEvents = await dbContext.QuoteEvents.AsNoTracking()
             .Where(item => StateQuoteEvents.Contains(item.Type)
                 && dbContext.ConfirmedQuotes.Any(quote => quote.QuoteId == item.QuoteId
                     && caseIds.Contains(quote.Revision.CaseId)))
@@ -130,67 +136,127 @@ public sealed class EfCoreSalesRfqQueries(RfqDbContext dbContext) : ISalesRfqQue
             .GroupBy(item => item.CaseId)
             .ToDictionary(group => group.Key, group => group.Max(item => item.OccurredAt));
 
-        return rows.Select(row =>
+        return [.. rows.Select(row =>
         {
-            var quote = quotes.GetValueOrDefault(
+            SalesConfirmedQuoteSummary? quote = quotes.GetValueOrDefault(
                 row.CurrentQuoteId ?? row.ClosedQuoteId ?? Guid.Empty);
-            var persistedStateStart = quote?.ConfirmedAt
+            DateTimeOffset persistedStateStart = quote?.ConfirmedAt
                 ?? row.CurrentRevisionConfirmedAt
                 ?? row.CurrentRevisionCreatedAt;
             return new SalesRfqListItem(
-                new CaseId(row.CaseId), ClientId.Create(row.ClientId), row.ClientName,
-                SecurityId.Create(row.SecurityId), row.SecurityJapaneseName, row.SecurityBbgDisplay,
-                CategoryId.Create(row.CategoryId), row.RfqStatus, row.QuoteStatus,
-                row.QuoteRequestReason, new RevisionId(row.CurrentRevisionId),
-                ToQuoteId(row.CurrentQuoteId), ToQuoteId(row.ClosedQuoteId),
-                new StateVersion(row.CurrentVersion), row.RevisionStatus,
+                new CaseId(row.CaseId),
+                ClientId.Create(row.ClientId),
+                row.ClientName,
+                SecurityId.Create(row.SecurityId),
+                row.SecurityJapaneseName,
+                row.SecurityBbgDisplay,
+                CategoryId.Create(row.CategoryId),
+                row.RfqStatus,
+                row.QuoteStatus,
+                row.QuoteRequestReason,
+                new RevisionId(row.CurrentRevisionId),
+                ToQuoteId(row.CurrentQuoteId),
+                ToQuoteId(row.ClosedQuoteId),
+                new StateVersion(row.CurrentVersion),
+                row.RevisionStatus,
                 row.SalesId is null ? null : UserId.Create(row.SalesId),
-                UserId.Create(row.ContactOwnerId), UserId.Create(row.AssignedTraderId),
-                row.SettlementDate, row.StandardSettlementDate, row.Notional,
-                row.SalesAndTradingMessage, row.SalesMemo, new StateVersion(row.SalesMemoVersion),
-                new StateVersion(row.Version), row.CreatedAt,
-                stateSince.GetValueOrDefault(row.CaseId, persistedStateStart), quote,
-                ToRevisionId(row.DraftRevisionId), ToStateVersion(row.DraftVersion),
-                row.DraftSettlementDate, row.DraftNotional, row.DraftSalesAndTradingMessage);
-        }).ToArray();
+                UserId.Create(row.ContactOwnerId),
+                UserId.Create(row.AssignedTraderId),
+                row.SettlementDate,
+                row.StandardSettlementDate,
+                row.Notional,
+                row.SalesAndTradingMessage,
+                row.SalesMemo,
+                new StateVersion(row.SalesMemoVersion),
+                new StateVersion(row.Version),
+                row.CreatedAt,
+                stateSince.GetValueOrDefault(row.CaseId, persistedStateStart),
+                quote,
+                ToRevisionId(row.DraftRevisionId),
+                ToStateVersion(row.DraftVersion),
+                row.DraftSettlementDate,
+                row.DraftNotional,
+                row.DraftSalesAndTradingMessage);
+        })];
     }
 
     private static SalesConfirmedQuoteSummary ToSummary(QuoteRow row)
     {
         if (row.Mode == WorkingQuoteMode.Calculated)
         {
-            var payload = QuotePayloadPersistence.DeserializeCalculated(row.CalculatedPayloadJson
+            CalculatedQuotePayload payload = QuotePayloadPersistence.DeserializeCalculated(row.CalculatedPayloadJson
                 ?? throw new DomainInvariantException("Calculated confirmed quote payload is missing."));
-            return new SalesConfirmedQuoteSummary(new QuoteId(row.QuoteId), row.Mode,
-                payload.Price, payload.BbgYield, payload.FinalSimpleYield, payload.GSpread,
+            return new SalesConfirmedQuoteSummary(
+                new QuoteId(row.QuoteId),
+                row.Mode,
+                payload.Price,
+                payload.BbgYield,
+                payload.FinalSimpleYield,
+                payload.GSpread,
                 row.ConfirmedAt);
         }
 
-        var manual = QuotePayloadPersistence.DeserializeManual(row.ManualPayloadJson
+        ManualQuotePayload manual = QuotePayloadPersistence.DeserializeManual(row.ManualPayloadJson
             ?? throw new DomainInvariantException("Manual confirmed quote payload is missing."));
-        return new SalesConfirmedQuoteSummary(new QuoteId(row.QuoteId), row.Mode,
-            manual.Price, null, manual.FinalSimpleYield, null, row.ConfirmedAt);
+        return new SalesConfirmedQuoteSummary(
+            new QuoteId(row.QuoteId),
+            row.Mode,
+            manual.Price,
+            null,
+            manual.FinalSimpleYield,
+            null,
+            row.ConfirmedAt);
     }
 
     private static RevisionId? ToRevisionId(Guid? value) =>
         value is null ? null : new RevisionId(value.Value);
+
     private static QuoteId? ToQuoteId(Guid? value) => value is null ? null : new QuoteId(value.Value);
+
     private static StateVersion? ToStateVersion(long? value) =>
         value is null ? null : new StateVersion(value.Value);
 
     private sealed record StateEvent(long CaseId, DateTimeOffset OccurredAt);
-    private sealed record QuoteRow(Guid QuoteId, WorkingQuoteMode Mode,
-        string? CalculatedPayloadJson, string? ManualPayloadJson, DateTimeOffset ConfirmedAt);
-    private sealed record SalesRow(long CaseId, string ClientId, string ClientName,
-        string SecurityId, string SecurityJapaneseName, string SecurityBbgDisplay,
-        string CategoryId, RfqStatus RfqStatus, QuoteStatus? QuoteStatus,
-        QuoteRequestReason? QuoteRequestReason, Guid CurrentRevisionId,
-        Guid? CurrentQuoteId, Guid? ClosedQuoteId, long CurrentVersion,
-        RevisionStatus RevisionStatus, string? SalesId, string ContactOwnerId,
-        string AssignedTraderId, DateOnly? SettlementDate, DateOnly StandardSettlementDate,
-        decimal? Notional, string SalesAndTradingMessage, string SalesMemo,
-        long SalesMemoVersion, long Version, DateTimeOffset CreatedAt,
-        DateTimeOffset CurrentRevisionCreatedAt, DateTimeOffset? CurrentRevisionConfirmedAt,
-        Guid? DraftRevisionId, long? DraftVersion, DateOnly? DraftSettlementDate,
-        decimal? DraftNotional, string? DraftSalesAndTradingMessage);
+
+    private sealed record QuoteRow(
+        Guid QuoteId,
+        WorkingQuoteMode Mode,
+        string? CalculatedPayloadJson,
+        string? ManualPayloadJson,
+        DateTimeOffset ConfirmedAt);
+
+    private sealed record SalesRow(
+        long CaseId,
+        string ClientId,
+        string ClientName,
+        string SecurityId,
+        string SecurityJapaneseName,
+        string SecurityBbgDisplay,
+        string CategoryId,
+        RfqStatus RfqStatus,
+        QuoteStatus? QuoteStatus,
+        QuoteRequestReason? QuoteRequestReason,
+        Guid CurrentRevisionId,
+        Guid? CurrentQuoteId,
+        Guid? ClosedQuoteId,
+        long CurrentVersion,
+        RevisionStatus RevisionStatus,
+        string? SalesId,
+        string ContactOwnerId,
+        string AssignedTraderId,
+        DateOnly? SettlementDate,
+        DateOnly StandardSettlementDate,
+        decimal? Notional,
+        string SalesAndTradingMessage,
+        string SalesMemo,
+        long SalesMemoVersion,
+        long Version,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset CurrentRevisionCreatedAt,
+        DateTimeOffset? CurrentRevisionConfirmedAt,
+        Guid? DraftRevisionId,
+        long? DraftVersion,
+        DateOnly? DraftSettlementDate,
+        decimal? DraftNotional,
+        string? DraftSalesAndTradingMessage);
 }

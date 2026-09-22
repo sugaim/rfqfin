@@ -14,7 +14,7 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
         CaseId caseId,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await dbContext.RfqCases
+        RfqCaseEntity? rfqCase = await dbContext.RfqCases
             .AsNoTracking()
             .Include(item => item.Current)
             .ThenInclude(current => current.CurrentRevision)
@@ -24,19 +24,22 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
             return null;
         }
 
-        var quoteEntity = await dbContext.WorkingQuotes
+        WorkingQuoteEntity quoteEntity = await dbContext.WorkingQuotes
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 item => item.RevisionId == rfqCase.Current.CurrentRevisionId,
                 cancellationToken)
             ?? throw new RfqInvariantException("WorkingQuote was not found.");
-        var settlementDate = rfqCase.Current.CurrentRevision.SettlementDate
+        DateOnly settlementDate = rfqCase.Current.CurrentRevision.SettlementDate
             ?? throw new RfqInvariantException("Confirmed Revision is missing SettlementDate.");
 
         if (rfqCase.Current.Lifecycle != RfqLifecycleKind.Open
             || rfqCase.Current.RfqStatus != RfqStatus.Active)
+        {
             throw new DomainInvariantException("WorkingQuote context requires an Active RFQ.");
-        var quoteState = rfqCase.Current.QuoteStatus switch
+        }
+
+        ActiveQuoteState quoteState = rfqCase.Current.QuoteStatus switch
         {
             QuoteStatus.Requested => (ActiveQuoteState)new QuoteRequested(
                 rfqCase.Current.QuoteRequestReason
@@ -62,7 +65,7 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
         RevisionId revisionId,
         CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.WorkingQuotes.SingleOrDefaultAsync(
+        WorkingQuoteEntity? entity = await dbContext.WorkingQuotes.SingleOrDefaultAsync(
             item => item.RevisionId == revisionId.Value,
             cancellationToken);
         return entity is null ? null : WorkingQuoteMapper.ToDomain(entity);
@@ -70,7 +73,7 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
 
     public void Update(WorkingQuote workingQuote)
     {
-        var entity = dbContext.WorkingQuotes.Local.SingleOrDefault(
+        WorkingQuoteEntity entity = dbContext.WorkingQuotes.Local.SingleOrDefault(
             item => item.RevisionId == workingQuote.RevisionId.Value)
             ?? throw new InvalidOperationException(
                 "The WorkingQuote must be loaded before it can be updated.");
@@ -90,13 +93,14 @@ public sealed class WorkingQuoteRepository(RfqDbContext dbContext) : IWorkingQuo
             AttemptedValue = failure.AttemptedValue,
             SimpleYieldSlide = failure.SimpleYieldSlide,
             PriorWorkingQuoteJson = JsonSerializer.Serialize(failure.PriorWorkingQuote),
-            RequestJson = JsonSerializer.Serialize(new
-            {
-                failure.RequestId,
-                failure.Driver,
-                failure.AttemptedValue,
-                failure.SimpleYieldSlide,
-            }),
+            RequestJson = JsonSerializer.Serialize(
+                new
+                {
+                    failure.RequestId,
+                    failure.Driver,
+                    failure.AttemptedValue,
+                    failure.SimpleYieldSlide,
+                }),
             ErrorCode = failure.ErrorCode,
             ErrorMessage = failure.ErrorMessage,
             OccurredAt = failure.OccurredAt.ToUniversalTime(),

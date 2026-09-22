@@ -13,9 +13,9 @@ public sealed class DevelopmentCurrentUser(
     {
         get
         {
-            var requestedUser = httpContextAccessor.HttpContext?.Request.Headers[HeaderName]
+            string? requestedUser = httpContextAccessor.HttpContext?.Request.Headers[HeaderName]
                 .FirstOrDefault();
-            var userId = string.IsNullOrWhiteSpace(requestedUser)
+            string userId = string.IsNullOrWhiteSpace(requestedUser)
                 ? configuration["DevelopmentIdentity:DefaultUserId"] ?? "sales-dev"
                 : requestedUser;
             return userId switch

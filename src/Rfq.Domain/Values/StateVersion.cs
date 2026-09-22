@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Rfq.Domain;
 
 public readonly record struct StateVersion
@@ -27,5 +29,5 @@ public readonly record struct StateVersion
         }
     }
 
-    public override string ToString() => Value.ToString();
+    public override string ToString() => Value.ToString(CultureInfo.InvariantCulture);
 }

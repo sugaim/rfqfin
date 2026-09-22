@@ -12,7 +12,7 @@ public sealed class EfCoreDeskLocalDateResolver(RfqDbContext dbContext)
         DeskId deskId,
         CancellationToken cancellationToken = default)
     {
-        var timeZoneId = await dbContext.Desks.AsNoTracking()
+        string timeZoneId = await dbContext.Desks.AsNoTracking()
             .Where(item => item.DeskId == deskId.Value)
             .Select(item => item.TimeZoneId)
             .SingleOrDefaultAsync(cancellationToken)

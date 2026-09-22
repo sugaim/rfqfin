@@ -36,11 +36,14 @@ internal static class EventPersistenceContract
 {
     internal static EventPersistenceData Serialize(PendingEvent pending) => pending switch
     {
-        PendingRfqClosedHitEvent item => Data(EventPersistenceTypeCodes.Rfq.ClosedHit,
+        PendingRfqClosedHitEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.ClosedHit,
             new ClosePayload { QuoteId = item.QuoteId.Value }),
-        PendingRfqClosedAwayEvent item => Data(EventPersistenceTypeCodes.Rfq.ClosedAway,
+        PendingRfqClosedAwayEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.ClosedAway,
             new ClosePayload { QuoteId = item.QuoteId.Value }),
-        PendingRfqOutcomeCorrectedEvent item => Data(EventPersistenceTypeCodes.Rfq.OutcomeCorrected,
+        PendingRfqOutcomeCorrectedEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.OutcomeCorrected,
             new OutcomeCorrectedPayload
             {
                 QuoteId = item.QuoteId.Value,
@@ -48,20 +51,25 @@ internal static class EventPersistenceContract
                 To = OutcomeCode(item.To),
                 Reason = item.Reason,
             }),
-        PendingRfqContactOwnerChangedEvent item => Data(EventPersistenceTypeCodes.Rfq.ContactOwnerChanged,
+        PendingRfqContactOwnerChangedEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.ContactOwnerChanged,
             new UserChangePayload { From = item.From.Value, To = item.To.Value }),
-        PendingRfqRevisionConfirmedEvent item => Data(EventPersistenceTypeCodes.Rfq.RevisionConfirmed,
+        PendingRfqRevisionConfirmedEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.RevisionConfirmed,
             new RevisionConfirmedPayload { From = item.From?.Value, To = item.To.Value }),
         PendingRfqCancelledEvent => Empty(EventPersistenceTypeCodes.Rfq.Cancelled),
         PendingRfqReopenedEvent => Empty(EventPersistenceTypeCodes.Rfq.Reopened),
-        PendingRfqPickedUpEvent item => Data(EventPersistenceTypeCodes.Rfq.PickedUp,
+        PendingRfqPickedUpEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.PickedUp,
             new AssignedTraderPayload { AssignedTraderId = item.AssignedTraderId.Value }),
-        PendingRfqReleasedEvent item => Data(EventPersistenceTypeCodes.Rfq.Released,
+        PendingRfqReleasedEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.Released,
             new AssignedTraderPayload { AssignedTraderId = item.AssignedTraderId.Value }),
         PendingRfqAssignedTraderChangedEvent item => Data(
             EventPersistenceTypeCodes.Rfq.AssignedTraderChanged,
             new UserChangePayload { From = item.From.Value, To = item.To.Value }),
-        PendingRfqTakenOverEvent item => Data(EventPersistenceTypeCodes.Rfq.TakenOver,
+        PendingRfqTakenOverEvent item => Data(
+            EventPersistenceTypeCodes.Rfq.TakenOver,
             new UserChangePayload { From = item.From.Value, To = item.To.Value }),
         PendingQuoteConfirmedEvent => Empty(EventPersistenceTypeCodes.Quote.Confirmed),
         PendingQuotePresentedEvent => Empty(EventPersistenceTypeCodes.Quote.Presented),
@@ -72,8 +80,13 @@ internal static class EventPersistenceContract
             $"Unsupported pending event type '{pending.GetType().Name}'."),
     };
 
-    internal static RfqEvent DeserializeRfq(long eventId, DateTimeOffset occurredAt,
-        UserId? actorUserId, CaseId caseId, string typeCode, string payloadJson)
+    internal static RfqEvent DeserializeRfq(
+        long eventId,
+        DateTimeOffset occurredAt,
+        UserId? actorUserId,
+        CaseId caseId,
+        string typeCode,
+        string payloadJson)
     {
         return typeCode switch
         {
@@ -87,29 +100,41 @@ internal static class EventPersistenceContract
                 eventId, occurredAt, actorUserId, caseId, payloadJson),
             EventPersistenceTypeCodes.Rfq.RevisionConfirmed => RevisionConfirmed(
                 eventId, occurredAt, actorUserId, caseId, payloadJson),
-            EventPersistenceTypeCodes.Rfq.Cancelled => EmptyRfq(payloadJson,
+            EventPersistenceTypeCodes.Rfq.Cancelled => EmptyRfq(
+                payloadJson,
                 () => new RfqCancelledEvent(eventId, occurredAt, actorUserId, caseId)),
-            EventPersistenceTypeCodes.Rfq.Reopened => EmptyRfq(payloadJson,
+            EventPersistenceTypeCodes.Rfq.Reopened => EmptyRfq(
+                payloadJson,
                 () => new RfqReopenedEvent(eventId, occurredAt, actorUserId, caseId)),
             EventPersistenceTypeCodes.Rfq.PickedUp => AssignedTrader(
-                payloadJson, id => new RfqPickedUpEvent(
+                payloadJson,
+                id => new RfqPickedUpEvent(
                     eventId, occurredAt, actorUserId, caseId, id)),
             EventPersistenceTypeCodes.Rfq.Released => AssignedTrader(
-                payloadJson, id => new RfqReleasedEvent(
+                payloadJson,
+                id => new RfqReleasedEvent(
                     eventId, occurredAt, actorUserId, caseId, id)),
             EventPersistenceTypeCodes.Rfq.AssignedTraderChanged => UserChanged(
-                payloadJson, (from, to) => new RfqAssignedTraderChangedEvent(
+                payloadJson,
+                (from, to) => new RfqAssignedTraderChangedEvent(
                     eventId, occurredAt, actorUserId, caseId, from, to)),
             EventPersistenceTypeCodes.Rfq.TakenOver => UserChanged(
-                payloadJson, (from, to) => new RfqTakenOverEvent(
+                payloadJson,
+                (from, to) => new RfqTakenOverEvent(
                     eventId, occurredAt, actorUserId, caseId, from, to)),
             _ => throw new DomainInvariantException(
                 $"Persisted RFQ event type '{typeCode}' is invalid."),
         };
     }
 
-    internal static QuoteEvent DeserializeQuote(long eventId, DateTimeOffset occurredAt,
-        UserId? actorUserId, CaseId caseId, QuoteId quoteId, string typeCode, string payloadJson)
+    internal static QuoteEvent DeserializeQuote(
+        long eventId,
+        DateTimeOffset occurredAt,
+        UserId? actorUserId,
+        CaseId caseId,
+        QuoteId quoteId,
+        string typeCode,
+        string payloadJson)
     {
         ValidateEmpty(payloadJson);
         return typeCode switch
@@ -131,40 +156,73 @@ internal static class EventPersistenceContract
 
     private static EventPersistenceData Data<T>(string code, T payload) where T : class =>
         new(code, PersistenceJsonSerializer.Serialize(payload));
+
     private static EventPersistenceData Empty(string code) => Data(code, new EmptyPayload());
 
     private static QuoteId QuoteIdOf(string json)
     {
-        var value = PersistenceJsonSerializer.Deserialize<ClosePayload>(
+        Guid value = PersistenceJsonSerializer.Deserialize<ClosePayload>(
             json, "RFQ close event payload").QuoteId;
         if (value == Guid.Empty)
+        {
             throw new DomainInvariantException("Persisted RFQ close event QuoteId is invalid.");
+        }
+
         return new QuoteId(value);
     }
 
-    private static RfqOutcomeCorrectedEvent OutcomeCorrected(long id, DateTimeOffset at,
-        UserId? actor, CaseId caseId, string json)
+    private static RfqOutcomeCorrectedEvent OutcomeCorrected(
+        long id,
+        DateTimeOffset at,
+        UserId? actor,
+        CaseId caseId,
+        string json)
     {
-        var dto = PersistenceJsonSerializer.Deserialize<OutcomeCorrectedPayload>(
+        OutcomeCorrectedPayload dto = PersistenceJsonSerializer.Deserialize<OutcomeCorrectedPayload>(
             json, "outcome-corrected event payload");
         if (dto.QuoteId == Guid.Empty)
+        {
             throw new DomainInvariantException("Persisted outcome-corrected QuoteId is invalid.");
-        return new RfqOutcomeCorrectedEvent(id, at, actor, caseId, new QuoteId(dto.QuoteId),
-            ParseOutcome(dto.From), ParseOutcome(dto.To), dto.Reason);
+        }
+
+        return new RfqOutcomeCorrectedEvent(
+            id,
+            at,
+            actor,
+            caseId,
+            new QuoteId(dto.QuoteId),
+            ParseOutcome(dto.From),
+            ParseOutcome(dto.To),
+            dto.Reason);
     }
 
-    private static RfqContactOwnerChangedEvent ContactOwnerChanged(long id, DateTimeOffset at,
-        UserId? actor, CaseId caseId, string json) =>
-        UserChanged(json, (from, to) => new RfqContactOwnerChangedEvent(
-            id, at, actor, caseId, from, to));
+    private static RfqContactOwnerChangedEvent ContactOwnerChanged(
+        long id,
+        DateTimeOffset at,
+        UserId? actor,
+        CaseId caseId,
+        string json) =>
+        UserChanged(
+            json,
+            (from, to) => new RfqContactOwnerChangedEvent(
+                id, at, actor, caseId, from, to));
 
-    private static RfqRevisionConfirmedEvent RevisionConfirmed(long id, DateTimeOffset at,
-        UserId? actor, CaseId caseId, string json)
+    private static RfqRevisionConfirmedEvent RevisionConfirmed(
+        long id,
+        DateTimeOffset at,
+        UserId? actor,
+        CaseId caseId,
+        string json)
     {
-        var dto = PersistenceJsonSerializer.Deserialize<RevisionConfirmedPayload>(
+        RevisionConfirmedPayload dto = PersistenceJsonSerializer.Deserialize<RevisionConfirmedPayload>(
             json, "revision-confirmed event payload");
-        return new RfqRevisionConfirmedEvent(id, at, actor, caseId,
-            dto.From is null ? null : ParseRevision(dto.From.Value), ParseRevision(dto.To));
+        return new RfqRevisionConfirmedEvent(
+            id,
+            at,
+            actor,
+            caseId,
+            dto.From is null ? null : ParseRevision(dto.From.Value),
+            ParseRevision(dto.To));
     }
 
     private static T EmptyRfq<T>(string json, Func<T> factory) where T : RfqEvent
@@ -176,7 +234,7 @@ internal static class EventPersistenceContract
     private static T AssignedTrader<T>(string json, Func<UserId, T> factory)
         where T : RfqEvent
     {
-        var value = PersistenceJsonSerializer.Deserialize<AssignedTraderPayload>(
+        string value = PersistenceJsonSerializer.Deserialize<AssignedTraderPayload>(
             json, "assigned-trader event payload").AssignedTraderId;
         return factory(ParseUser(value));
     }
@@ -184,7 +242,7 @@ internal static class EventPersistenceContract
     private static T UserChanged<T>(string json, Func<UserId, UserId, T> factory)
         where T : RfqEvent
     {
-        var dto = PersistenceJsonSerializer.Deserialize<UserChangePayload>(
+        UserChangePayload dto = PersistenceJsonSerializer.Deserialize<UserChangePayload>(
             json, "user-change event payload");
         return factory(ParseUser(dto.From), ParseUser(dto.To));
     }
@@ -195,7 +253,10 @@ internal static class EventPersistenceContract
     private static UserId ParseUser(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             throw new DomainInvariantException("Persisted event UserId is missing.");
+        }
+
         try { return UserId.Create(value); }
         catch (DomainValidationException exception)
         { throw new DomainInvariantException($"Persisted event UserId is invalid: {exception.Message}"); }
@@ -204,7 +265,10 @@ internal static class EventPersistenceContract
     private static RevisionId ParseRevision(Guid value)
     {
         if (value == Guid.Empty)
+        {
             throw new DomainInvariantException("Persisted event RevisionId is invalid.");
+        }
+
         return new RevisionId(value);
     }
 
@@ -227,6 +291,7 @@ internal static class EventPersistenceContract
 
 internal sealed class EmptyPayload { }
 internal sealed class ClosePayload { public required Guid QuoteId { get; init; } }
+
 internal sealed class OutcomeCorrectedPayload
 {
     public required Guid QuoteId { get; init; }
@@ -234,14 +299,17 @@ internal sealed class OutcomeCorrectedPayload
     public required string To { get; init; }
     public required string? Reason { get; init; }
 }
+
 internal sealed class UserChangePayload
 {
     public required string From { get; init; }
     public required string To { get; init; }
 }
+
 internal sealed class RevisionConfirmedPayload
 {
     public required Guid? From { get; init; }
     public required Guid To { get; init; }
 }
+
 internal sealed class AssignedTraderPayload { public required string AssignedTraderId { get; init; } }

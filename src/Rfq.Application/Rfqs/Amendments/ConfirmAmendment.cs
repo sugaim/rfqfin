@@ -17,10 +17,10 @@ public sealed class ConfirmAmendment(
         AmendmentItem command,
         CancellationToken cancellationToken = default)
     {
-        var rfq = await ClosedRfqUseCase.LoadAsync(cases, command.CaseId, cancellationToken);
+        RfqCase rfq = await ClosedRfqUseCase.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanConfirmRevision(currentUser.User, rfq);
-        var now = timeProvider.GetUtcNow();
-        var transition = AmendmentTransitions.Confirm(
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        AmendmentConfirmResult transition = AmendmentTransitions.Confirm(
             rfq,
             await businessDate.GetCurrentAsync(cancellationToken),
             currentUser.User.UserId,
@@ -30,11 +30,11 @@ public sealed class ConfirmAmendment(
         rfq = transition.Rfq;
         cases.Update(rfq);
         cases.UpdateRevision(transition.SupersededRevision);
-        var seed = rfq.CurrentRevision.QuoteSeedRevisionId is null
+        WorkingQuote? seed = rfq.CurrentRevision.QuoteSeedRevisionId is null
             ? null
             : await workingQuotes.GetAsync(
                 rfq.CurrentRevision.QuoteSeedRevisionId.Value, cancellationToken);
-        var defaultMode = quoteModeSettings is null
+        WorkingQuoteMode defaultMode = quoteModeSettings is null
             ? WorkingQuoteMode.Calculated
             : await quoteModeSettings.GetAsync(rfq.AssignedTraderId, cancellationToken);
         workingQuotes.Add(WorkingQuoteFactory.CreateForAmendment(

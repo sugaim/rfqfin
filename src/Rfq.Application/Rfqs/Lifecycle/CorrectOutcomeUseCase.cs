@@ -19,15 +19,19 @@ internal static class CorrectOutcomeUseCase
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var rfq = await ClosedRfqUseCase.LoadAsync(cases, caseId, cancellationToken);
+        RfqCase rfq = await ClosedRfqUseCase.LoadAsync(cases, caseId, cancellationToken);
         authorization.EnsureCanCorrectOutcome(currentUser.User, rfq);
         rfq = transition(rfq, expectedCurrentVersion);
         cases.Update(rfq);
         events.Record(new RfqTransition(
-            RfqTransitionKind.OutcomeCorrected, caseId, currentUser.User.UserId,
-            timeProvider.GetUtcNow(), rfq.ClosedQuoteId
+            RfqTransitionKind.OutcomeCorrected,
+            caseId,
+            currentUser.User.UserId,
+            timeProvider.GetUtcNow(),
+            rfq.ClosedQuoteId
                 ?? throw new DomainInvariantException("Corrected RFQ is not Closed."),
-            from.ToString(), to.ToString(),
+            from.ToString(),
+            to.ToString(),
             string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return ClosedRfqUseCase.ToResult(rfq);

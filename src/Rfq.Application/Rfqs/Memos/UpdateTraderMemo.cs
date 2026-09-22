@@ -17,13 +17,13 @@ public sealed class UpdateTraderMemo(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanUpdateTraderMemo(currentUser.User);
-        var rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         await UpdateSalesMemo.EnsureDeskAccessAsync(
             users,
             currentUser.User,
             rfqCase,
             cancellationToken);
-        var traderMemo = await memos.GetTraderAsync(caseId, cancellationToken)
+        TraderMemo traderMemo = await memos.GetTraderAsync(caseId, cancellationToken)
             ?? throw new RfqInvariantException(
                 $"Trader Memo for RFQ Case '{caseId}' was not found.");
         traderMemo = TraderMemoTransitions.Update(traderMemo, memo, expectedVersion);

@@ -17,27 +17,42 @@ public sealed class AssignTrader(
         StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanAssignTrader(currentUser.User, rfqCase);
-        var target = await assignedTraderValidator.ResolveAsync(
+        UserId target = await assignedTraderValidator.ResolveAsync(
             targetTraderId,
             cancellationToken);
         if (rfqCase.Version != expectedVersion)
+        {
             throw new StateVersionMismatchException("The RFQ Case was changed by another user.");
+        }
+
         if (rfqCase.AssignedTraderId == target)
         {
-            return new AssignTraderResult(AssignTraderOutcome.AlreadyAssigned,
+            return new AssignTraderResult(
+                AssignTraderOutcome.AlreadyAssigned,
                 OwnershipUseCase.ToResult(rfqCase));
         }
-        var previous = rfqCase.AssignedTraderId.Value;
+        string previous = rfqCase.AssignedTraderId.Value;
         rfqCase = RfqOwnershipTransitions.Assign(
             rfqCase, target, expectedVersion);
-        PickUpRfq.Record(events, timeProvider, RfqTransitionKind.AssignedTraderChanged,
-            rfqCase, currentUser.User.UserId, previous);
-        return new AssignTraderResult(AssignTraderOutcome.Assigned,
+        PickUpRfq.Record(
+            events,
+            timeProvider,
+            RfqTransitionKind.AssignedTraderChanged,
+            rfqCase,
+            currentUser.User.UserId,
+            previous);
+        return new AssignTraderResult(
+            AssignTraderOutcome.Assigned,
             await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken));
     }
 }
 
-public enum AssignTraderOutcome { Assigned, AlreadyAssigned }
+public enum AssignTraderOutcome
+{
+    Assigned,
+    AlreadyAssigned
+}
+
 public sealed record AssignTraderResult(AssignTraderOutcome Outcome, OwnershipResult Rfq);

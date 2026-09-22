@@ -14,9 +14,9 @@ public sealed class ApiErrorMiddleware(
         catch (Exception exception)
         {
             var mapped = default((int Status, string Code));
-            var isExpected = exception is ExpectedRfqException expected
+            bool isExpected = exception is ExpectedRfqException expected
                 && TryMap(expected.Kind, out mapped);
-            var (status, code) = isExpected
+            (int status, string code) = isExpected
                 ? mapped
                 : (StatusCodes.Status500InternalServerError, "InternalServerError");
             if (!isExpected)
@@ -35,7 +35,7 @@ public sealed class ApiErrorMiddleware(
                 }
             }
 
-            var detail = !isExpected
+            string detail = !isExpected
                 ? "An unexpected error occurred."
                 : exception.Message;
             var problem = new ProblemDetails

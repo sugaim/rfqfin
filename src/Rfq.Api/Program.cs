@@ -1,39 +1,41 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
-using Rfq.Application;
 using Rfq.Api;
+using Rfq.Application;
 using Rfq.Infrastructure;
 
-var builder = WebApplication.CreateBuilder(args);
-var generatingOpenApi =
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+bool generatingOpenApi =
     Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
 
 builder.Services.AddControllers(options => { })
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.Configure<ApiBehaviorOptions>(options =>
-{
-    options.InvalidModelStateResponseFactory = context =>
+builder.Services.Configure<ApiBehaviorOptions>(
+    options =>
     {
-        var errors = context.ModelState
-            .Where(item => item.Value?.Errors.Count > 0)
-            .ToDictionary(item => item.Key,
-                item => item.Value!.Errors.Select(error =>
-                    string.IsNullOrWhiteSpace(error.ErrorMessage)
-                        ? "The request value is invalid."
-                        : error.ErrorMessage).ToArray());
-        var problem = new ValidationProblemDetails(errors)
+        options.InvalidModelStateResponseFactory = context =>
         {
-            Status = StatusCodes.Status400BadRequest,
-            Title = "Validation",
-            Detail = "One or more request values are invalid.",
+            var errors = context.ModelState
+                .Where(item => item.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    item => item.Key,
+                    item => item.Value!.Errors.Select(error =>
+                        string.IsNullOrWhiteSpace(error.ErrorMessage)
+                            ? "The request value is invalid."
+                            : error.ErrorMessage).ToArray());
+            var problem = new ValidationProblemDetails(errors)
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Validation",
+                Detail = "One or more request values are invalid.",
+            };
+            problem.Extensions["code"] = "Validation";
+            problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+            return new BadRequestObjectResult(problem);
         };
-        problem.Extensions["code"] = "Validation";
-        problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
-        return new BadRequestObjectResult(problem);
-    };
-});
+    });
 builder.Services.AddOpenApi();
 if (!generatingOpenApi)
 {
@@ -45,7 +47,7 @@ if (!generatingOpenApi)
     builder.Services.AddHostedService<QuoteExpiryWorker>();
 }
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 if (!generatingOpenApi)
 {

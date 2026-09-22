@@ -7,9 +7,14 @@ public sealed class BulkConfirmAmendments(ConfirmAmendment confirm, IUnitOfWork 
     public Task<IReadOnlyList<BulkItemResult>> ExecuteAsync(
         IReadOnlyList<AmendmentItem> items,
         CancellationToken cancellationToken = default) =>
-        BulkOperation.ExecuteAsync(items, item => item.CaseId, async (item, token) =>
-        {
-            await confirm.ExecuteAsync(item, token);
-            return BulkActionOutcome.Succeeded;
-        }, unitOfWork, cancellationToken);
+        BulkOperation.ExecuteAsync(
+            items,
+            item => item.CaseId,
+            async (item, token) =>
+            {
+                await confirm.ExecuteAsync(item, token);
+                return BulkActionOutcome.Succeeded;
+            },
+            unitOfWork,
+            cancellationToken);
 }

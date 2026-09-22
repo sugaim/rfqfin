@@ -15,12 +15,16 @@ public sealed class ReleaseRfq(
         StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanRelease(currentUser.User, rfqCase);
         rfqCase = RfqOwnershipTransitions.Release(
             rfqCase, expectedVersion);
-        PickUpRfq.Record(events, timeProvider, RfqTransitionKind.Released,
-            rfqCase, currentUser.User.UserId);
+        PickUpRfq.Record(
+            events,
+            timeProvider,
+            RfqTransitionKind.Released,
+            rfqCase,
+            currentUser.User.UserId);
         return await OwnershipUseCase.SaveAsync(rfqCases, unitOfWork, rfqCase, cancellationToken);
     }
 }

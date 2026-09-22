@@ -14,7 +14,7 @@ public sealed class ConfirmedQuoteRepository(RfqDbContext dbContext)
         QuoteId quoteId,
         CancellationToken cancellationToken = default)
     {
-        var entity = await dbContext.ConfirmedQuotes
+        ConfirmedQuoteEntity? entity = await dbContext.ConfirmedQuotes
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.QuoteId == quoteId.Value, cancellationToken);
         return entity is null ? null : ConfirmedQuoteMapper.ToDomain(entity);
@@ -42,18 +42,18 @@ internal static class ConfirmedQuoteMapper
     };
 
     internal static ConfirmedQuote ToDomain(ConfirmedQuoteEntity entity) => ConfirmedQuote.Restore(
-            new QuoteId(entity.QuoteId),
-            new RevisionId(entity.RevisionId),
-            SecurityId.Create(entity.SecurityId),
-            entity.SettlementDate,
-            UserId.Create(entity.ConfirmedBy),
-            entity.ConfirmedAt,
-            entity.Mode,
-            entity.CalculatedPayloadJson is null ? null
-                : QuotePayloadPersistence.DeserializeCalculated(entity.CalculatedPayloadJson),
-            entity.ManualPayloadJson is null ? null
-                : QuotePayloadPersistence.DeserializeManual(entity.ManualPayloadJson),
-            entity.ExpiryMinutes,
-            entity.ExpiresAt,
-            entity.RequestReasonAnswered);
+        new QuoteId(entity.QuoteId),
+        new RevisionId(entity.RevisionId),
+        SecurityId.Create(entity.SecurityId),
+        entity.SettlementDate,
+        UserId.Create(entity.ConfirmedBy),
+        entity.ConfirmedAt,
+        entity.Mode,
+        entity.CalculatedPayloadJson is null ? null
+            : QuotePayloadPersistence.DeserializeCalculated(entity.CalculatedPayloadJson),
+        entity.ManualPayloadJson is null ? null
+            : QuotePayloadPersistence.DeserializeManual(entity.ManualPayloadJson),
+        entity.ExpiryMinutes,
+        entity.ExpiresAt,
+        entity.RequestReasonAnswered);
 }

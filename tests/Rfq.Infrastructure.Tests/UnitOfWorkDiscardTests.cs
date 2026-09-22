@@ -10,14 +10,16 @@ public sealed class UnitOfWorkDiscardTests
     [Fact]
     public void Discard_changes_clears_tracked_mutations_and_pending_events()
     {
-        var options = new DbContextOptionsBuilder<RfqDbContext>()
+        DbContextOptions<RfqDbContext> options = new DbContextOptionsBuilder<RfqDbContext>()
             .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused")
             .Options;
         using var context = new RfqDbContext(options);
         var sink = new PersistedEventSink();
         context.SeedMarkers.Add(new SeedMarker("pending", DateTimeOffset.UtcNow));
         sink.Record(new RfqTransition(
-            RfqTransitionKind.Cancelled, new CaseId(1), UserId.Create("sales"),
+            RfqTransitionKind.Cancelled,
+            new CaseId(1),
+            UserId.Create("sales"),
             DateTimeOffset.UtcNow));
         var unitOfWork = new PostgreSqlUnitOfWork(context, sink);
 

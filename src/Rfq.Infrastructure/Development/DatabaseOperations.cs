@@ -20,7 +20,7 @@ public sealed class DatabaseOperations(
         string environmentName,
         CancellationToken cancellationToken = default)
     {
-        var connectionString = dbContext.Database.GetConnectionString()
+        string connectionString = dbContext.Database.GetConnectionString()
             ?? throw new InvalidOperationException("The RFQ database connection string is missing.");
 
         PostgreSqlResetDevSafetyGuard.EnsureAllowed(environmentName, connectionString);

@@ -10,15 +10,15 @@ public sealed class PostgreSqlUserDirectory(RfqDbContext dbContext) : IUserDirec
         UserRole? role = null,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.MasterUsers.AsNoTracking();
+        IQueryable<MasterUserEntity> query = dbContext.MasterUsers.AsNoTracking();
         if (role is not null)
         {
-            var roleName = role.Value.ToString();
+            string roleName = role.Value.ToString();
             query = query.Where(user => user.Roles.Contains(roleName));
         }
 
-        var users = await query.OrderBy(user => user.Name).ToListAsync(cancellationToken);
-        return users.Select(ToSummary).ToArray();
+        List<MasterUserEntity> users = await query.OrderBy(user => user.Name).ToListAsync(cancellationToken);
+        return [.. users.Select(ToSummary)];
     }
 
     public async Task<UserSummary?> ResolveAsync(
@@ -27,7 +27,7 @@ public sealed class PostgreSqlUserDirectory(RfqDbContext dbContext) : IUserDirec
     {
         ArgumentNullException.ThrowIfNull(userId);
 
-        var user = await dbContext.MasterUsers
+        MasterUserEntity? user = await dbContext.MasterUsers
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 candidate => candidate.UserId == userId.Value,

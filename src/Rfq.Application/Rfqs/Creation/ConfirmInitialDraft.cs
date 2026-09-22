@@ -18,22 +18,27 @@ public sealed class ConfirmInitialDraft(
         UpdateInitialDraftCommand command,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await UpdateInitialDraft.GetCaseAsync(
+        RfqCase rfqCase = await UpdateInitialDraft.GetCaseAsync(
             rfqCases,
             command.CaseId,
             cancellationToken);
         authorization.EnsureCanConfirmRevision(currentUser.User, rfqCase);
-        var assignedTraderId = await assignedTraderValidator.ResolveAsync(
+        UserId assignedTraderId = await assignedTraderValidator.ResolveAsync(
             command.AssignedTraderId,
             cancellationToken);
         if (command.StandardSettlementDate != rfqCase.CurrentRevision.StandardSettlementDate)
+        {
             throw new RfqRequestValidationException(
                 "Standard Settlement Date cannot differ from the RFQ creation context.");
-        var businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
-        var now = timeProvider.GetUtcNow();
+        }
+
+        DateOnly businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
+        DateTimeOffset now = timeProvider.GetUtcNow();
         rfqCase = RfqLifecycleTransitions.ConfirmInitial(
             rfqCase,
-            new RevisionTerms(command.Notional, command.SettlementDate,
+            new RevisionTerms(
+                command.Notional,
+                command.SettlementDate,
                 command.StandardSettlementDate,
                 command.SalesAndTradingMessage),
             assignedTraderId,
@@ -43,7 +48,7 @@ public sealed class ConfirmInitialDraft(
             command.ExpectedVersion);
 
         rfqCases.Update(rfqCase);
-        var defaultMode = quoteModeSettings is null
+        WorkingQuoteMode defaultMode = quoteModeSettings is null
             ? WorkingQuoteMode.Calculated
             : await quoteModeSettings.GetAsync(rfqCase.AssignedTraderId, cancellationToken);
         workingQuotes.Add(WorkingQuoteFactory.CreateInitialFor(

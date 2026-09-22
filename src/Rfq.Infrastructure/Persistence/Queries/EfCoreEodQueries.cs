@@ -9,23 +9,23 @@ public sealed class EfCoreEodQueries(
     ICurrentUser currentUser) : IEodQueries
 {
     public async Task<IReadOnlyList<EodSummaryItem>> GetEodAsync(
-        DateOnly date,
+        DateOnly businessDate,
         CancellationToken cancellationToken = default)
     {
-        var deskId = currentUser.User.DeskId.Value;
-        var deskTimeZone = await ResolveDeskTimeZoneAsync(cancellationToken);
-        var utcFrom = DeskDateBoundary.ToUtc(date, deskTimeZone);
-        var utcTo = DeskDateBoundary.ToUtc(date.AddDays(1), deskTimeZone);
-        var openRows = await dbContext.RfqCases.AsNoTracking()
+        string deskId = currentUser.User.DeskId.Value;
+        TimeZoneInfo deskTimeZone = await ResolveDeskTimeZoneAsync(cancellationToken);
+        DateTimeOffset utcFrom = DeskDateBoundary.ToUtc(businessDate, deskTimeZone);
+        DateTimeOffset utcTo = DeskDateBoundary.ToUtc(businessDate.AddDays(1), deskTimeZone);
+        List<string> openRows = await dbContext.RfqCases.AsNoTracking()
             .Where(item => dbContext.MasterUsers.Any(user =>
-                    user.UserId == item.Current.AssignedTraderId
-                    && user.DeskId == deskId)
+                user.UserId == item.Current.AssignedTraderId
+                && user.DeskId == deskId)
                 && (item.Current.RfqStatus == RfqStatus.Active
-                    || item.Current.RfqStatus == RfqStatus.Presented))
+                || item.Current.RfqStatus == RfqStatus.Presented))
             .Select(item => item.Current.ContactOwnerId)
             .ToListAsync(cancellationToken);
-        var closedHitType = EventPersistenceTypeCodes.Rfq.ClosedHit;
-        var closedAwayType = EventPersistenceTypeCodes.Rfq.ClosedAway;
+        string closedHitType = EventPersistenceTypeCodes.Rfq.ClosedHit;
+        string closedAwayType = EventPersistenceTypeCodes.Rfq.ClosedAway;
         var closeRows = await (
             from rfqEvent in dbContext.RfqEvents.AsNoTracking()
             join eventEntity in dbContext.Events.AsNoTracking()
@@ -44,22 +44,21 @@ public sealed class EfCoreEodQueries(
                 rfqEvent.Type,
             }).ToListAsync(cancellationToken);
 
-        var ownerIds = openRows.Concat(closeRows.Select(item => item.ContactOwnerId))
+        IOrderedEnumerable<string> ownerIds = openRows.Concat(closeRows.Select(item => item.ContactOwnerId))
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal);
-        return ownerIds.Select(ownerId => new EodSummaryItem(
+        return [.. ownerIds.Select(ownerId => new EodSummaryItem(
             UserId.Create(ownerId),
             openRows.Count(item => item == ownerId),
             closeRows.Count(item => item.ContactOwnerId == ownerId && item.Type == closedHitType),
-            closeRows.Count(item => item.ContactOwnerId == ownerId && item.Type == closedAwayType)))
-            .ToArray();
+            closeRows.Count(item => item.ContactOwnerId == ownerId && item.Type == closedAwayType)))];
     }
 
     private async Task<TimeZoneInfo> ResolveDeskTimeZoneAsync(
         CancellationToken cancellationToken)
     {
-        var deskId = currentUser.User.DeskId.Value;
-        var timeZoneId = await dbContext.Desks.AsNoTracking()
+        string deskId = currentUser.User.DeskId.Value;
+        string timeZoneId = await dbContext.Desks.AsNoTracking()
             .Where(item => item.DeskId == deskId)
             .Select(item => item.TimeZoneId)
             .SingleOrDefaultAsync(cancellationToken)

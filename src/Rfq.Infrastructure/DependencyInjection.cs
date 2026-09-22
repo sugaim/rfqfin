@@ -49,7 +49,7 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString(PostgreSqlDatabaseConfiguration.ConnectionStringName)
+        string connectionString = configuration.GetConnectionString(PostgreSqlDatabaseConfiguration.ConnectionStringName)
             ?? throw new InvalidOperationException(
                 $"Connection string '{PostgreSqlDatabaseConfiguration.ConnectionStringName}' is not configured.");
 

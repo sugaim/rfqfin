@@ -10,8 +10,8 @@ public sealed class RfqDbContextFactory : IDesignTimeDbContextFactory<RfqDbConte
 
     public RfqDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable(
-                $"ConnectionStrings__{PostgreSqlDatabaseConfiguration.ConnectionStringName}")
+        string connectionString = Environment.GetEnvironmentVariable(
+            $"ConnectionStrings__{PostgreSqlDatabaseConfiguration.ConnectionStringName}")
             ?? DevelopmentConnectionString;
 
         var options = new DbContextOptionsBuilder<RfqDbContext>();

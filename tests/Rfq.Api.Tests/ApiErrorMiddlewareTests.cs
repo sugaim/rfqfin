@@ -15,12 +15,14 @@ public sealed class ApiErrorMiddlewareTests
         { new StateVersionMismatchException("version"), 409, "VersionConflict" },
         { new RfqNotFoundException("missing"), 404, "NotFound" },
         { new RfqForbiddenException("forbidden"), 403, "Forbidden" },
-        { new CalculationFailureException(Guid.NewGuid(), "CALC", "calculation"),
-            422, "CalculationFailure" },
+        {
+            new CalculationFailureException(Guid.NewGuid(), "CALC", "calculation"),
+            422,
+            "CalculationFailure" },
     };
 
-    public static TheoryData<Exception> UnexpectedErrors => new()
-    {
+    public static TheoryData<Exception> UnexpectedErrors =>
+    [
         new DomainInvariantException("domain invariant"),
         new RfqInvariantException("system invariant"),
         new InvalidOperationException("invalid operation"),
@@ -28,7 +30,7 @@ public sealed class ApiErrorMiddlewareTests
         new KeyNotFoundException("key"),
         new UnauthorizedAccessException("unauthorized"),
         new Exception("unknown"),
-    };
+    ];
 
     [Theory]
     [MemberData(nameof(ExpectedErrors))]
@@ -36,7 +38,7 @@ public sealed class ApiErrorMiddlewareTests
         Exception exception, int status, string code)
     {
         var reporter = new IncidentReporter();
-        var response = await InvokeAsync(exception, reporter);
+        ErrorResponse response = await InvokeAsync(exception, reporter);
 
         Assert.Equal(status, response.Status);
         Assert.Equal(code, response.Code);
@@ -51,14 +53,14 @@ public sealed class ApiErrorMiddlewareTests
         Exception exception)
     {
         var reporter = new IncidentReporter();
-        var response = await InvokeAsync(exception, reporter);
+        ErrorResponse response = await InvokeAsync(exception, reporter);
 
         Assert.Equal(StatusCodes.Status500InternalServerError, response.Status);
         Assert.Equal("InternalServerError", response.Code);
         Assert.Equal("An unexpected error occurred.", response.Detail);
         Assert.Equal("trace-07", response.TraceId);
         Assert.DoesNotContain(exception.Message, response.Json, StringComparison.Ordinal);
-        var incident = Assert.Single(reporter.Incidents);
+        Incident incident = Assert.Single(reporter.Incidents);
         Assert.Same(exception, incident.Exception);
         Assert.Equal(response.TraceId, incident.TraceId);
         Assert.Equal("POST /api/rfqs/1", incident.Operation);
@@ -67,7 +69,7 @@ public sealed class ApiErrorMiddlewareTests
     [Fact]
     public async Task Reporter_failure_does_not_replace_original_500_response()
     {
-        var response = await InvokeAsync(
+        ErrorResponse response = await InvokeAsync(
             new InvalidOperationException("internal"),
             new IncidentReporter(shouldThrow: true));
 
@@ -80,15 +82,19 @@ public sealed class ApiErrorMiddlewareTests
     {
         var failureLogId = Guid.NewGuid();
 
-        var response = await InvokeAsync(
+        ErrorResponse response = await InvokeAsync(
             new CalculationFailureException(failureLogId, "CALC-42", "calculation"),
             new IncidentReporter());
 
         using var document = JsonDocument.Parse(response.Json);
-        Assert.Equal("CALC-42", document.RootElement
-            .GetProperty("calculationErrorCode").GetString());
-        Assert.Equal(failureLogId.ToString(), document.RootElement
-            .GetProperty("failureLogId").GetString());
+        Assert.Equal(
+            "CALC-42",
+            document.RootElement
+                .GetProperty("calculationErrorCode").GetString());
+        Assert.Equal(
+            failureLogId.ToString(),
+            document.RootElement
+                .GetProperty("failureLogId").GetString());
         Assert.Equal("trace-07", document.RootElement.GetProperty("traceId").GetString());
     }
 
@@ -98,7 +104,7 @@ public sealed class ApiErrorMiddlewareTests
         var exception = new UnmappedExpectedException();
         var reporter = new IncidentReporter();
 
-        var response = await InvokeAsync(exception, reporter);
+        ErrorResponse response = await InvokeAsync(exception, reporter);
 
         Assert.Equal(StatusCodes.Status500InternalServerError, response.Status);
         Assert.Equal("InternalServerError", response.Code);
@@ -113,8 +119,10 @@ public sealed class ApiErrorMiddlewareTests
     {
         var middleware = new ApiErrorMiddleware(
             _ => Task.FromException(exception), reporter);
-        var context = new DefaultHttpContext();
-        context.TraceIdentifier = "trace-07";
+        var context = new DefaultHttpContext
+        {
+            TraceIdentifier = "trace-07"
+        };
         context.Request.Method = "POST";
         context.Request.Path = "/api/rfqs/1";
         context.Response.Body = new MemoryStream();
@@ -123,9 +131,9 @@ public sealed class ApiErrorMiddlewareTests
 
         context.Response.Body.Position = 0;
         using var reader = new StreamReader(context.Response.Body);
-        var json = await reader.ReadToEndAsync();
+        string json = await reader.ReadToEndAsync();
         using var document = JsonDocument.Parse(json);
-        var root = document.RootElement;
+        JsonElement root = document.RootElement;
         return new ErrorResponse(
             context.Response.StatusCode,
             root.GetProperty("code").GetString(),

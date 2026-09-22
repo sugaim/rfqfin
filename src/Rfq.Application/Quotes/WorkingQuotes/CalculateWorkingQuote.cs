@@ -20,7 +20,7 @@ public sealed class CalculateWorkingQuote(
         StateVersion expectedWorkingQuoteVersion,
         CancellationToken cancellationToken = default)
     {
-        var before = await GetContextAsync(caseId, cancellationToken);
+        QuoteEditContext before = await GetContextAsync(caseId, cancellationToken);
         ValidateExpected(before, expectedCurrentVersion, expectedWorkingQuoteVersion);
         authorization.EnsureCanQuote(currentUser.User, ToAuthorizationState(before));
 
@@ -31,7 +31,7 @@ public sealed class CalculateWorkingQuote(
             driver,
             ToParameter(driver, value),
             simpleYieldSlide);
-        var result = (await calculationClient.CalculateBulkAsync([request], cancellationToken))
+        CalculationResult result = (await calculationClient.CalculateBulkAsync([request], cancellationToken))
             .Single(item => item.RequestId == request.RequestId);
         if (result is CalculationError error)
         {
@@ -57,7 +57,7 @@ public sealed class CalculateWorkingQuote(
         }
 
         var success = (CalculationSuccess)result;
-        var rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await OwnershipUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         if (rfqCase.CurrentRevision.RevisionId != before.RevisionId
             || rfqCase.Version != expectedCurrentVersion)
         {
@@ -66,7 +66,7 @@ public sealed class CalculateWorkingQuote(
         }
 
         authorization.EnsureCanQuote(currentUser.User, ToAuthorizationState(rfqCase));
-        var quote = await workingQuotes.GetAsync(
+        WorkingQuote quote = await workingQuotes.GetAsync(
             rfqCase.CurrentRevision.RevisionId,
             cancellationToken)
             ?? throw new RfqInvariantException("WorkingQuote was not found.");
@@ -120,7 +120,7 @@ public sealed class CalculateWorkingQuote(
 
     private static QuoteAuthorizationState ToAuthorizationState(
         QuoteEditContext context) => new(
-        true, context.AssignedTraderId, context.Ownership, context.QuoteState);
+            true, context.AssignedTraderId, context.Ownership, context.QuoteState);
 
     internal static QuoteAuthorizationState ToAuthorizationState(RfqCase rfqCase) => new(
         rfqCase.Lifecycle is OpenRfq,

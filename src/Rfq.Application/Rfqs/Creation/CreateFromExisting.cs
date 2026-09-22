@@ -17,24 +17,27 @@ public sealed class CreateFromExisting(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanCreateRevision(currentUser.User);
-        var source = await ClosedRfqUseCase.LoadAsync(cases, sourceCaseId, cancellationToken);
-        var today = await businessDate.GetCurrentAsync(cancellationToken);
-        var sourceBusinessDate = await deskLocalDateResolver.ResolveAsync(
+        RfqCase source = await ClosedRfqUseCase.LoadAsync(cases, sourceCaseId, cancellationToken);
+        DateOnly today = await businessDate.GetCurrentAsync(cancellationToken);
+        DateOnly sourceBusinessDate = await deskLocalDateResolver.ResolveAsync(
             source.CreatedAt, currentUser.User.DeskId, cancellationToken);
-        var context = await resolveCreationContext.ExecuteAsync(
+        RfqCreationContext context = await resolveCreationContext.ExecuteAsync(
             source.SecurityId, cancellationToken);
-        var settlement = sourceBusinessDate == today
+        DateOnly settlement = sourceBusinessDate == today
             ? source.CurrentRevision.SettlementDate ?? context.StandardSettlementDate
             : context.StandardSettlementDate;
-        var copy = await factory.CreateAsync(new CreateDraftCommand(
-            source.ClientId,
-            source.SecurityId,
-            source.CurrentRevision.Notional,
-            settlement,
-            context.StandardSettlementDate,
-            source.CurrentRevision.SalesAndTradingMessage,
-            context.DefaultAssignedTraderId), cancellationToken,
-            source.CaseId, source.CurrentRevision.RevisionId);
+        RfqCase copy = await factory.CreateAsync(
+            new CreateDraftCommand(
+                source.ClientId,
+                source.SecurityId,
+                source.CurrentRevision.Notional,
+                settlement,
+                context.StandardSettlementDate,
+                source.CurrentRevision.SalesAndTradingMessage,
+                context.DefaultAssignedTraderId),
+            source.CaseId,
+            source.CurrentRevision.RevisionId,
+            cancellationToken);
         cases.Add(copy);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return InitialRfqResult.From(copy);

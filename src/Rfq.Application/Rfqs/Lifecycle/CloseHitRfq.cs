@@ -15,11 +15,17 @@ public sealed class CloseHitRfq(
         StateVersion expectedCurrentVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfq = await ClosedRfqUseCase.LoadAsync(cases, caseId, cancellationToken);
+        RfqCase rfq = await ClosedRfqUseCase.LoadAsync(cases, caseId, cancellationToken);
         authorization.EnsureCanClose(currentUser.User, rfq);
-        return await ClosedRfqUseCase.ApplyAsync(rfq,
+        return await ClosedRfqUseCase.ApplyAsync(
+            rfq,
             value => RfqLifecycleTransitions.CloseHit(value, expectedCurrentVersion),
-            RfqTransitionKind.ClosedHit, cases, events, unitOfWork,
-            currentUser.User, timeProvider, cancellationToken);
+            RfqTransitionKind.ClosedHit,
+            cases,
+            events,
+            unitOfWork,
+            currentUser.User,
+            timeProvider,
+            cancellationToken);
     }
 }

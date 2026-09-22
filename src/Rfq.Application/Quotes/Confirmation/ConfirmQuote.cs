@@ -19,7 +19,7 @@ public sealed class ConfirmQuote(
         StateVersion expectedWorkingQuoteVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await UpdateInitialDraft.GetCaseAsync(
+        RfqCase rfqCase = await UpdateInitialDraft.GetCaseAsync(
             rfqCases,
             caseId,
             cancellationToken);
@@ -29,7 +29,7 @@ public sealed class ConfirmQuote(
             throw new StateVersionMismatchException("The RFQ Case was changed by another user.");
         }
 
-        var workingQuote = await workingQuotes.GetAsync(
+        WorkingQuote workingQuote = await workingQuotes.GetAsync(
             rfqCase.CurrentRevision.RevisionId,
             cancellationToken)
             ?? throw new RfqInvariantException("WorkingQuote was not found.");
@@ -38,12 +38,14 @@ public sealed class ConfirmQuote(
             throw new StateVersionMismatchException("The WorkingQuote was changed by another user.");
         }
 
-        var now = timeProvider.GetUtcNow();
-        var transition = QuoteTransitions.Confirm(
-            rfqCase, workingQuote, QuoteId.New(),
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        QuoteConfirmationResult transition = QuoteTransitions.Confirm(
+            rfqCase,
+            workingQuote,
+            QuoteId.New(),
             new QuoteConfirmation(currentUser.User.UserId, now, expiry));
         rfqCase = transition.Rfq;
-        var confirmedQuote = transition.ConfirmedQuote;
+        ConfirmedQuote confirmedQuote = transition.ConfirmedQuote;
         confirmedQuotes.Add(confirmedQuote);
         rfqCases.Update(rfqCase);
         eventSink.Record(new QuoteTransition(

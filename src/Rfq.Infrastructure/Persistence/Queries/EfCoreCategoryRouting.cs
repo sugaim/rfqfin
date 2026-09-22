@@ -14,13 +14,11 @@ public sealed class EfCoreCategoryRouting(
     {
         ArgumentNullException.ThrowIfNull(categoryId);
 
-        var traderId = await dbContext.CategoryRoutings
+        string? traderId = await dbContext.CategoryRoutings
             .AsNoTracking()
             .Where(routing => routing.CategoryId == categoryId.Value)
             .Select(routing => routing.DefaultTraderId)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (traderId is null)
-            throw new RfqInvariantException(
+            .SingleOrDefaultAsync(cancellationToken) ?? throw new RfqInvariantException(
                 $"No default Assigned Trader is configured for category '{categoryId.Value}'.");
         try { return UserId.Create(traderId); }
         catch (DomainValidationException exception)
@@ -42,8 +40,11 @@ public sealed class EfCoreCategoryRouting(
                 join trader in dbContext.MasterUsers.AsNoTracking()
                     on routing.DefaultTraderId equals trader.UserId
                 orderby category.Name
-                select new CategoryRoutingItem(CategoryId.Create(category.CategoryId), category.Name,
-                    UserId.Create(trader.UserId), trader.Name)).ToListAsync(cancellationToken);
+                select new CategoryRoutingItem(
+                    CategoryId.Create(category.CategoryId),
+                    category.Name,
+                    UserId.Create(trader.UserId),
+                    trader.Name)).ToListAsync(cancellationToken);
         }
         catch (DomainValidationException exception)
         {
@@ -56,17 +57,20 @@ public sealed class EfCoreCategoryRouting(
         UserId traderId,
         CancellationToken cancellationToken = default)
     {
-        var category = await dbContext.Categories.SingleOrDefaultAsync(
+        CategoryEntity category = await dbContext.Categories.SingleOrDefaultAsync(
             item => item.CategoryId == categoryId.Value, cancellationToken)
             ?? throw new RfqNotFoundException($"Category '{categoryId.Value}' was not found.");
-        var trader = await dbContext.MasterUsers.SingleOrDefaultAsync(
+        MasterUserEntity trader = await dbContext.MasterUsers.SingleOrDefaultAsync(
             item => item.UserId == traderId.Value, cancellationToken)
             ?? throw new RfqNotFoundException($"Trader '{traderId.Value}' was not found.");
         if (!trader.Roles.Contains(UserRole.Trader.ToString())
             || trader.DeskId != currentUser.User.DeskId.Value)
+        {
             throw new RfqRequestValidationException(
                 "Default Assigned Trader must be a Trader on the current user's desk.");
-        var routing = await dbContext.CategoryRoutings.SingleOrDefaultAsync(
+        }
+
+        CategoryRoutingEntity routing = await dbContext.CategoryRoutings.SingleOrDefaultAsync(
             item => item.CategoryId == categoryId.Value, cancellationToken)
             ?? throw new RfqInvariantException(
                 $"No routing row exists for category '{categoryId.Value}'.");

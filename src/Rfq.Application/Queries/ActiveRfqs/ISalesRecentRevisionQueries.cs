@@ -10,7 +10,11 @@ public interface ISalesRecentRevisionQueries
         CancellationToken cancellationToken = default);
 }
 
-public enum SalesRecentRevisionKind { Rfq, Quote }
+public enum SalesRecentRevisionKind
+{
+    Rfq,
+    Quote
+}
 
 public enum SalesRecentRevisionField
 {

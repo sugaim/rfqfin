@@ -88,7 +88,14 @@ export interface SalesConfirmedQuoteSummary {
 }
 
 export interface SalesRecentRevisionChange {
-  field: 'Notional' | 'Settlement' | 'Message' | 'Price' | 'Yield' | 'Simple' | 'GSpread'
+  field:
+    | 'Notional'
+    | 'Settlement'
+    | 'Message'
+    | 'Price'
+    | 'Yield'
+    | 'Simple'
+    | 'GSpread'
   before: string | null
   after: string | null
 }
@@ -104,15 +111,86 @@ export interface SalesRecentRevision {
   changes: SalesRecentRevisionChange[]
 }
 
-export interface AmendmentResult { caseId: number; currentRevisionId: string; draftRevisionId: string | null; currentVersion: number; draftVersion: number | null; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null }
-export interface BulkItemResult { caseId: number; status: 'Succeeded' | 'Skipped' | 'Failed'; code: string | null; message: string | null }
-export interface LifecycleResult { caseId: number; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null; currentVersion: number }
-export interface PersistedEvent { type: string; eventId: number; occurredAt: string; actorUserId: string | null; caseId: number; quoteId?: string; [key: string]: unknown }
-export interface EodSummary { contactOwnerId: string; open: number; hit: number; away: number }
-export interface RfqSearchItem { caseId: number; createdAt: string; clientId: string; clientName: string; securityId: string; securityName: string; categoryId: string; status: string; quoteStatus: string | null; contactOwnerId: string; salesId: string | null; assignedTraderId: string; notional: number | null; settlementDate: string | null; price: number | null; finalSimpleYield: number | null; ysc: number | null }
-export interface RfqSearchResult { items: RfqSearchItem[]; requiresNarrowing: boolean }
-export interface RfqSearchParams { createdFrom?: string; createdTo?: string; clientId?: string; securityId?: string; categoryId?: string; contactOwnerId?: string; salesId?: string; assignedTraderId?: string; status?: string; caseId?: number }
-export interface GridConfig { screenId: string; configKey: string; version: number; config: unknown; updatedAt: string }
+export interface AmendmentResult {
+  caseId: number
+  currentRevisionId: string
+  draftRevisionId: string | null
+  currentVersion: number
+  draftVersion: number | null
+  rfqStatus: string
+  quoteStatus: string | null
+  quoteRequestReason: string | null
+}
+export interface BulkItemResult {
+  caseId: number
+  status: 'Succeeded' | 'Skipped' | 'Failed'
+  code: string | null
+  message: string | null
+}
+export interface LifecycleResult {
+  caseId: number
+  rfqStatus: string
+  quoteStatus: string | null
+  quoteRequestReason: string | null
+  currentVersion: number
+}
+export interface PersistedEvent {
+  type: string
+  eventId: number
+  occurredAt: string
+  actorUserId: string | null
+  caseId: number
+  quoteId?: string
+  [key: string]: unknown
+}
+export interface EodSummary {
+  contactOwnerId: string
+  open: number
+  hit: number
+  away: number
+}
+export interface RfqSearchItem {
+  caseId: number
+  createdAt: string
+  clientId: string
+  clientName: string
+  securityId: string
+  securityName: string
+  categoryId: string
+  status: string
+  quoteStatus: string | null
+  contactOwnerId: string
+  salesId: string | null
+  assignedTraderId: string
+  notional: number | null
+  settlementDate: string | null
+  price: number | null
+  finalSimpleYield: number | null
+  ysc: number | null
+}
+export interface RfqSearchResult {
+  items: RfqSearchItem[]
+  requiresNarrowing: boolean
+}
+export interface RfqSearchParams {
+  createdFrom?: string
+  createdTo?: string
+  clientId?: string
+  securityId?: string
+  categoryId?: string
+  contactOwnerId?: string
+  salesId?: string
+  assignedTraderId?: string
+  status?: string
+  caseId?: number
+}
+export interface GridConfig {
+  screenId: string
+  configKey: string
+  version: number
+  config: unknown
+  updatedAt: string
+}
 
 export interface SecuritySearchResult {
   securityId: string
@@ -154,8 +232,7 @@ export interface CurrentUserResponse {
 }
 
 export type QuoteExpiry =
-  | { type: 'None'; minutes: null }
-  | { type: 'After'; minutes: number }
+  { type: 'None'; minutes: null } | { type: 'After'; minutes: number }
 
 export interface TraderRfq {
   caseId: number
@@ -192,7 +269,15 @@ export interface TraderRfq {
 }
 
 export interface CalculatedQuotePayload {
-  driver: 'Price' | 'BbgYield' | 'SimpleYield' | 'Ysc' | 'GSpread' | 'Asw' | 'ISpread' | 'ZSpread'
+  driver:
+    | 'Price'
+    | 'BbgYield'
+    | 'SimpleYield'
+    | 'Ysc'
+    | 'GSpread'
+    | 'Asw'
+    | 'ISpread'
+    | 'ZSpread'
   driverValue: number
   price: number
   bbgYield: number
@@ -272,7 +357,9 @@ export interface MemoResult {
   version: number
 }
 
-export interface QuoteModeSetting { mode: 'Calculated' | 'Manual' }
+export interface QuoteModeSetting {
+  mode: 'Calculated' | 'Manual'
+}
 
 export interface ApiProblemDetails {
   status?: number
@@ -307,18 +394,61 @@ export const api = createApi({
     getActiveSalesRfqs: builder.query<SalesRfq[], void>({
       query: () => '/sales-rfqs',
     }),
-    getSalesRecentRevisions: builder.query<SalesRecentRevision[], number | void>({
-      query: (limit = 50) => ({ url: '/sales-rfqs/recent-revisions', params: { limit } }),
+    getSalesRecentRevisions: builder.query<
+      SalesRecentRevision[],
+      number | void
+    >({
+      query: (limit = 50) => ({
+        url: '/sales-rfqs/recent-revisions',
+        params: { limit },
+      }),
     }),
-    getEvents: builder.query<PersistedEvent[], number>({ query: (after) => ({ url: '/events', params: { after } }) }),
-    getEod: builder.query<EodSummary[], string>({ query: (date) => ({ url: '/eod', params: { date } }) }),
-    searchRfqs: builder.query<RfqSearchResult, RfqSearchParams>({ query: (params) => ({ url: '/rfqs/search', params }) }),
-    getGridConfig: builder.query<GridConfig, { screenId: string; configKey: string }>({ query: ({ screenId, configKey }) => `/me/grid-configs/${screenId}/${configKey}` }),
-    saveGridConfig: builder.mutation<GridConfig, { screenId: string; configKey: string; version: number; config: unknown }>({ query: ({ screenId, configKey, ...body }) => ({ url: `/me/grid-configs/${screenId}/${configKey}`, method: 'PUT', body }) }),
-    getQuoteExpiry: builder.query<QuoteExpiry, void>({ query: () => '/me/settings/quote-expiry' }),
-    saveQuoteExpiry: builder.mutation<QuoteExpiry, QuoteExpiry>({ query: (body) => ({ url: '/me/settings/quote-expiry', method: 'PUT', body }) }),
-    getDefaultQuoteMode: builder.query<QuoteModeSetting, void>({ query: () => '/me/settings/default-quote-mode' }),
-    saveDefaultQuoteMode: builder.mutation<QuoteModeSetting, QuoteModeSetting>({ query: (body) => ({ url: '/me/settings/default-quote-mode', method: 'PUT', body }) }),
+    getEvents: builder.query<PersistedEvent[], number>({
+      query: (after) => ({ url: '/events', params: { after } }),
+    }),
+    getEod: builder.query<EodSummary[], string>({
+      query: (date) => ({ url: '/eod', params: { date } }),
+    }),
+    searchRfqs: builder.query<RfqSearchResult, RfqSearchParams>({
+      query: (params) => ({ url: '/rfqs/search', params }),
+    }),
+    getGridConfig: builder.query<
+      GridConfig,
+      { screenId: string; configKey: string }
+    >({
+      query: ({ screenId, configKey }) =>
+        `/me/grid-configs/${screenId}/${configKey}`,
+    }),
+    saveGridConfig: builder.mutation<
+      GridConfig,
+      { screenId: string; configKey: string; version: number; config: unknown }
+    >({
+      query: ({ screenId, configKey, ...body }) => ({
+        url: `/me/grid-configs/${screenId}/${configKey}`,
+        method: 'PUT',
+        body,
+      }),
+    }),
+    getQuoteExpiry: builder.query<QuoteExpiry, void>({
+      query: () => '/me/settings/quote-expiry',
+    }),
+    saveQuoteExpiry: builder.mutation<QuoteExpiry, QuoteExpiry>({
+      query: (body) => ({
+        url: '/me/settings/quote-expiry',
+        method: 'PUT',
+        body,
+      }),
+    }),
+    getDefaultQuoteMode: builder.query<QuoteModeSetting, void>({
+      query: () => '/me/settings/default-quote-mode',
+    }),
+    saveDefaultQuoteMode: builder.mutation<QuoteModeSetting, QuoteModeSetting>({
+      query: (body) => ({
+        url: '/me/settings/default-quote-mode',
+        method: 'PUT',
+        body,
+      }),
+    }),
     createDraft: builder.mutation<InitialRfqResponse, CreateDraftRequest>({
       query: (body) => ({
         url: '/rfqs/drafts',
@@ -353,7 +483,10 @@ export const api = createApi({
         body,
       }),
     }),
-    discardDraft: builder.mutation<void, { caseId: number; expectedVersion: number }>({
+    discardDraft: builder.mutation<
+      void,
+      { caseId: number; expectedVersion: number }
+    >({
       query: ({ caseId, expectedVersion }) => ({
         url: `/rfqs/${caseId}/draft/discard`,
         method: 'POST',
@@ -403,14 +536,40 @@ export const api = createApi({
         body,
       }),
     }),
-    bulkPickUpRfqs: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedVersion: number; confirmed: boolean }[] }>({
-      query: (body) => ({ url: '/rfqs/ownership/bulk-pick-up', method: 'POST', body }),
+    bulkPickUpRfqs: builder.mutation<
+      BulkItemResult[],
+      {
+        items: { caseId: number; expectedVersion: number; confirmed: boolean }[]
+      }
+    >({
+      query: (body) => ({
+        url: '/rfqs/ownership/bulk-pick-up',
+        method: 'POST',
+        body,
+      }),
     }),
-    bulkReleaseRfqs: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedVersion: number }[] }>({
-      query: (body) => ({ url: '/rfqs/ownership/bulk-release', method: 'POST', body }),
+    bulkReleaseRfqs: builder.mutation<
+      BulkItemResult[],
+      { items: { caseId: number; expectedVersion: number }[] }
+    >({
+      query: (body) => ({
+        url: '/rfqs/ownership/bulk-release',
+        method: 'POST',
+        body,
+      }),
     }),
-    bulkAssignTrader: builder.mutation<BulkItemResult[], { targetAssignedTraderId: string; items: { caseId: number; expectedVersion: number }[] }>({
-      query: (body) => ({ url: '/rfqs/ownership/bulk-assign-trader', method: 'POST', body }),
+    bulkAssignTrader: builder.mutation<
+      BulkItemResult[],
+      {
+        targetAssignedTraderId: string
+        items: { caseId: number; expectedVersion: number }[]
+      }
+    >({
+      query: (body) => ({
+        url: '/rfqs/ownership/bulk-assign-trader',
+        method: 'POST',
+        body,
+      }),
     }),
     calculateWorkingQuote: builder.mutation<
       WorkingQuoteResult,
@@ -475,11 +634,32 @@ export const api = createApi({
         body,
       }),
     }),
-    bulkConfirmQuotes: builder.mutation<BulkItemResult[], { items: { caseId: number; expiry: QuoteExpiry; expectedCurrentVersion: number; expectedWorkingQuoteVersion: number }[] }>({
-      query: (body) => ({ url: '/rfqs/quotes/bulk-confirm', method: 'POST', body }),
+    bulkConfirmQuotes: builder.mutation<
+      BulkItemResult[],
+      {
+        items: {
+          caseId: number
+          expiry: QuoteExpiry
+          expectedCurrentVersion: number
+          expectedWorkingQuoteVersion: number
+        }[]
+      }
+    >({
+      query: (body) => ({
+        url: '/rfqs/quotes/bulk-confirm',
+        method: 'POST',
+        body,
+      }),
     }),
-    bulkWithdrawQuotes: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number }[] }>({
-      query: (body) => ({ url: '/rfqs/quotes/bulk-withdraw', method: 'POST', body }),
+    bulkWithdrawQuotes: builder.mutation<
+      BulkItemResult[],
+      { items: { caseId: number; expectedCurrentVersion: number }[] }
+    >({
+      query: (body) => ({
+        url: '/rfqs/quotes/bulk-withdraw',
+        method: 'POST',
+        body,
+      }),
     }),
     presentQuote: builder.mutation<
       PresentationResult,
@@ -514,35 +694,66 @@ export const api = createApi({
     closeAwayRfq: builder.mutation<
       CloseRfqResult,
       { caseId: number; expectedCurrentVersion: number }
-    >({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/close/away`, method: 'POST', body }) }),
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/close/away`,
+        method: 'POST',
+        body,
+      }),
+    }),
     bulkCloseAwayRfqs: builder.mutation<
       BulkItemResult[],
       { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
       query: (body) => ({ url: '/rfqs/bulk-close-away', method: 'POST', body }),
     }),
-    bulkPresentRfqs: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number }[] }>({
+    bulkPresentRfqs: builder.mutation<
+      BulkItemResult[],
+      { items: { caseId: number; expectedCurrentVersion: number }[] }
+    >({
       query: (body) => ({ url: '/rfqs/bulk-present', method: 'POST', body }),
     }),
-    bulkUnpresentRfqs: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number }[] }>({
+    bulkUnpresentRfqs: builder.mutation<
+      BulkItemResult[],
+      { items: { caseId: number; expectedCurrentVersion: number }[] }
+    >({
       query: (body) => ({ url: '/rfqs/bulk-unpresent', method: 'POST', body }),
     }),
-    bulkCancelRfqs: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number }[] }>({
+    bulkCancelRfqs: builder.mutation<
+      BulkItemResult[],
+      { items: { caseId: number; expectedCurrentVersion: number }[] }
+    >({
       query: (body) => ({ url: '/rfqs/bulk-cancel', method: 'POST', body }),
     }),
-    bulkConfirmInitialDrafts: builder.mutation<BulkItemResult[], { items: {
-      caseId: number
-      notional: number | null
-      settlementDate: string
-      standardSettlementDate: string
-      salesAndTradingMessage: string
-      assignedTraderId: string
-      expectedVersion: number
-    }[] }>({
-      query: (body) => ({ url: '/rfqs/drafts/bulk-confirm', method: 'POST', body }),
+    bulkConfirmInitialDrafts: builder.mutation<
+      BulkItemResult[],
+      {
+        items: {
+          caseId: number
+          notional: number | null
+          settlementDate: string
+          standardSettlementDate: string
+          salesAndTradingMessage: string
+          assignedTraderId: string
+          expectedVersion: number
+        }[]
+      }
+    >({
+      query: (body) => ({
+        url: '/rfqs/drafts/bulk-confirm',
+        method: 'POST',
+        body,
+      }),
     }),
-    bulkDiscardInitialDrafts: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedVersion: number }[] }>({
-      query: (body) => ({ url: '/rfqs/drafts/bulk-discard', method: 'POST', body }),
+    bulkDiscardInitialDrafts: builder.mutation<
+      BulkItemResult[],
+      { items: { caseId: number; expectedVersion: number }[] }
+    >({
+      query: (body) => ({
+        url: '/rfqs/drafts/bulk-discard',
+        method: 'POST',
+        body,
+      }),
     }),
     correctOutcomeToHit: builder.mutation<
       CloseRfqResult,
@@ -557,7 +768,13 @@ export const api = createApi({
     correctOutcomeToAway: builder.mutation<
       CloseRfqResult,
       { caseId: number; reason?: string; expectedCurrentVersion: number }
-    >({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/outcome/correct-to-away`, method: 'POST', body }) }),
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/outcome/correct-to-away`,
+        method: 'POST',
+        body,
+      }),
+    }),
     changeContactOwner: builder.mutation<
       ContactOwnerResult,
       {
@@ -593,22 +810,129 @@ export const api = createApi({
         body,
       }),
     }),
-    saveAmendment: builder.mutation<AmendmentResult, { caseId: number; notional: number | null; settlementDate: string | null; salesAndTradingMessage: string; expectedCurrentVersion: number; expectedDraftVersion: number | null }>({
-      query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/amendment`, method: 'PUT', body }),
+    saveAmendment: builder.mutation<
+      AmendmentResult,
+      {
+        caseId: number
+        notional: number | null
+        settlementDate: string | null
+        salesAndTradingMessage: string
+        expectedCurrentVersion: number
+        expectedDraftVersion: number | null
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/amendment`,
+        method: 'PUT',
+        body,
+      }),
     }),
-    confirmAmendment: builder.mutation<AmendmentResult, { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }>({
-      query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/amendment/confirm`, method: 'POST', body }),
+    confirmAmendment: builder.mutation<
+      AmendmentResult,
+      {
+        caseId: number
+        expectedCurrentVersion: number
+        expectedDraftVersion: number
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/amendment/confirm`,
+        method: 'POST',
+        body,
+      }),
     }),
-    discardAmendment: builder.mutation<AmendmentResult, { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }>({
-      query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/amendment/discard`, method: 'POST', body }),
+    discardAmendment: builder.mutation<
+      AmendmentResult,
+      {
+        caseId: number
+        expectedCurrentVersion: number
+        expectedDraftVersion: number
+      }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/amendment/discard`,
+        method: 'POST',
+        body,
+      }),
     }),
-    bulkConfirmAmendments: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }[] }>({ query: (body) => ({ url: '/rfqs/amendment/bulk-confirm', method: 'POST', body }) }),
-    bulkDiscardAmendments: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number; expectedDraftVersion: number }[] }>({ query: (body) => ({ url: '/rfqs/amendment/bulk-discard', method: 'POST', body }) }),
-    createFromExisting: builder.mutation<InitialRfqResponse, number>({ query: (caseId) => ({ url: `/rfqs/${caseId}/create-from-existing`, method: 'POST' }) }),
-    cancelRfq: builder.mutation<LifecycleResult, { caseId: number; expectedCurrentVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/cancel`, method: 'POST', body }) }),
-    reopenRfq: builder.mutation<LifecycleResult, { caseId: number; expectedCurrentVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/reopen`, method: 'POST', body }) }),
-    withdrawQuote: builder.mutation<LifecycleResult, { caseId: number; expectedVersion: number }>({ query: ({ caseId, ...body }) => ({ url: `/rfqs/${caseId}/quote/withdraw`, method: 'POST', body }) }),
-    scratchPrice: builder.mutation<CalculatedQuotePayload, { securityId: string; settlementDate: string; driver: CalculatedQuotePayload['driver']; value: number; simpleYieldSlide: number }>({ query: (body) => ({ url: '/pricer', method: 'POST', body }) }),
+    bulkConfirmAmendments: builder.mutation<
+      BulkItemResult[],
+      {
+        items: {
+          caseId: number
+          expectedCurrentVersion: number
+          expectedDraftVersion: number
+        }[]
+      }
+    >({
+      query: (body) => ({
+        url: '/rfqs/amendment/bulk-confirm',
+        method: 'POST',
+        body,
+      }),
+    }),
+    bulkDiscardAmendments: builder.mutation<
+      BulkItemResult[],
+      {
+        items: {
+          caseId: number
+          expectedCurrentVersion: number
+          expectedDraftVersion: number
+        }[]
+      }
+    >({
+      query: (body) => ({
+        url: '/rfqs/amendment/bulk-discard',
+        method: 'POST',
+        body,
+      }),
+    }),
+    createFromExisting: builder.mutation<InitialRfqResponse, number>({
+      query: (caseId) => ({
+        url: `/rfqs/${caseId}/create-from-existing`,
+        method: 'POST',
+      }),
+    }),
+    cancelRfq: builder.mutation<
+      LifecycleResult,
+      { caseId: number; expectedCurrentVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/cancel`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    reopenRfq: builder.mutation<
+      LifecycleResult,
+      { caseId: number; expectedCurrentVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/reopen`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    withdrawQuote: builder.mutation<
+      LifecycleResult,
+      { caseId: number; expectedVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/quote/withdraw`,
+        method: 'POST',
+        body,
+      }),
+    }),
+    scratchPrice: builder.mutation<
+      CalculatedQuotePayload,
+      {
+        securityId: string
+        settlementDate: string
+        driver: CalculatedQuotePayload['driver']
+        value: number
+        simpleYieldSlide: number
+      }
+    >({ query: (body) => ({ url: '/pricer', method: 'POST', body }) }),
     searchClients: builder.query<ClientSearchResult[], string>({
       query: (q) => ({ url: '/rfqs/candidates/clients', params: { q } }),
       keepUnusedDataFor: 0,
@@ -617,8 +941,12 @@ export const api = createApi({
       query: (q) => ({ url: '/rfqs/candidates/securities', params: { q } }),
       keepUnusedDataFor: 0,
     }),
-    getAssignableTraders: builder.query<UserSummary[], void>({ query: () => '/assignable-traders' }),
-    getContactOwnerCandidates: builder.query<UserSummary[], void>({ query: () => '/contact-owner-candidates' }),
+    getAssignableTraders: builder.query<UserSummary[], void>({
+      query: () => '/assignable-traders',
+    }),
+    getContactOwnerCandidates: builder.query<UserSummary[], void>({
+      query: () => '/contact-owner-candidates',
+    }),
     resolveRfqCreationContext: builder.query<
       RfqCreationContext,
       { securityId: string }

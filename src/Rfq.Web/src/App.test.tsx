@@ -1,11 +1,29 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
-import { AppShell } from './app/AppShell'
-import { SalesScreen, type SalesScreenProps } from './features/sales/SalesScreen'
-import { TraderScreen, type TraderScreenProps } from './features/trader/TraderScreen'
-import type { ClientSearchResult, RfqSearchItem, SalesRfq, SecuritySearchResult, TraderRfq } from './services/api'
+import { AppShell } from '@/app/AppShell'
+import {
+  SalesScreen,
+  type SalesScreenProps,
+} from '@/features/sales/SalesScreen'
+import {
+  TraderScreen,
+  type TraderScreenProps,
+} from '@/features/trader/TraderScreen'
+import type {
+  ClientSearchResult,
+  RfqSearchItem,
+  SalesRfq,
+  SecuritySearchResult,
+  TraderRfq,
+} from '@/services/api'
 
 type GridRow = SalesRfq | TraderRfq | RfqSearchItem
 type GridColumn = {
@@ -21,116 +39,205 @@ type GridColumn = {
 
 vi.mock('ag-grid-react', async () => {
   const React = await import('react')
-  return { AgGridReact: ({ rowData, columnDefs, onRowClicked, onSelectionChanged,
-    onCellEditRequest, readOnlyEdit, rowSelection, rowClassRules, statusBar, components }: {
-    rowData: GridRow[]
-    columnDefs?: GridColumn[]
-    onRowClicked?: (event: { data: GridRow }) => void
-    onSelectionChanged?: (event: { api: { getSelectedRows: () => GridRow[] } }) => void
-    onCellEditRequest?: (event: {
-      data: GridRow
-      newValue: string
-      colDef: { field: string }
-      column: { getColId: () => string }
-      api: { refreshCells: ReturnType<typeof vi.fn> }
-      node: object
-    }) => void
-    readOnlyEdit?: boolean
-    rowSelection?: { mode: string; checkboxes?: boolean; headerCheckbox?: boolean;
-      enableClickSelection?: boolean; enableSelectionWithoutKeys?: boolean; selectAll?: string }
-    rowClassRules?: Record<string, (params: { data: GridRow; node: { isSelected: () => boolean } }) => boolean>
-    statusBar?: { statusPanels: { statusPanel: string; statusPanelParams?: { text?: string } }[] }
-    components?: Record<string, (props: { text: string }) => ReactNode>
-  }) => {
-    const flatColumns = (columnDefs ?? []).flatMap(function flatten(column): GridColumn[] {
-      return column.children ? column.children.flatMap(flatten) : [column]
-    })
-    const [selectedIds, setSelectedIds] = React.useState<number[]>([])
-    const anchorIndex = React.useRef<number | undefined>(undefined)
-    const select = (row: GridRow, index: number, event: React.MouseEvent) => {
-      let next: number[]
-      if (event.shiftKey && anchorIndex.current !== undefined) {
-        const [start, end] = [anchorIndex.current, index].sort((left, right) => left - right)
-        next = rowData.slice(start, end + 1).map((item) => item.caseId)
-      } else if (event.ctrlKey || event.metaKey) {
-        next = selectedIds.includes(row.caseId)
-          ? selectedIds.filter((caseId) => caseId !== row.caseId)
-          : [...selectedIds, row.caseId]
-        anchorIndex.current = index
-      } else {
-        next = [row.caseId]
-        anchorIndex.current = index
+  return {
+    AgGridReact: ({
+      rowData,
+      columnDefs,
+      onRowClicked,
+      onSelectionChanged,
+      onCellEditRequest,
+      readOnlyEdit,
+      rowSelection,
+      rowClassRules,
+      statusBar,
+      components,
+    }: {
+      rowData: GridRow[]
+      columnDefs?: GridColumn[]
+      onRowClicked?: (event: { data: GridRow }) => void
+      onSelectionChanged?: (event: {
+        api: { getSelectedRows: () => GridRow[] }
+      }) => void
+      onCellEditRequest?: (event: {
+        data: GridRow
+        newValue: string
+        colDef: { field: string }
+        column: { getColId: () => string }
+        api: { refreshCells: ReturnType<typeof vi.fn> }
+        node: object
+      }) => void
+      readOnlyEdit?: boolean
+      rowSelection?: {
+        mode: string
+        checkboxes?: boolean
+        headerCheckbox?: boolean
+        enableClickSelection?: boolean
+        enableSelectionWithoutKeys?: boolean
+        selectAll?: string
       }
-      setSelectedIds(next)
-      onRowClicked?.({ data: row })
-      onSelectionChanged?.({ api: { getSelectedRows: () => rowData
-        .filter((item) => next.includes(item.caseId)) } })
-    }
-    return <div data-testid="grid-selection-config"
-      data-checkboxes={String(rowSelection?.checkboxes)}
-      data-header-checkbox={String(rowSelection?.headerCheckbox)}
-      data-click-selection={String(rowSelection?.enableClickSelection)}
-      data-selection-without-keys={String(rowSelection?.enableSelectionWithoutKeys)}
-      data-select-all={rowSelection?.selectAll}>
-      {rowData.map((row, index) => {
-        const selected = selectedIds.includes(row.caseId)
-        const classes = Object.entries(rowClassRules ?? {})
-          .filter(([, rule]) => rule({ data: row, node: { isSelected: () => selected } }))
-          .map(([name]) => name).join(' ')
-        return <div key={row.caseId} data-testid={`grid-row-${row.caseId}`} className={classes}>
-          <button onClick={(event) => select(row, index, event)}>
-            {row.clientId} {row.clientName} {row.securityId}{'securityJapaneseName' in row ? row.securityJapaneseName : row.securityName}{' '}
-            {'securityBbgDisplay' in row ? row.securityBbgDisplay : ''} {'rfqStatus' in row ? row.rfqStatus : row.status}{' '}
-            {'revisionStatus' in row ? row.revisionStatus : ''}{' '}
-            {row.quoteStatus} {'quoteRequestReason' in row ? row.quoteRequestReason : ''}
-          </button>
-          {readOnlyEdit && onCellEditRequest && (
-            <button
-              onClick={() => onCellEditRequest({
-                data: row,
-                newValue: '99.5',
-                colDef: { field: 'notional' },
-                column: { getColId: () => 'price' },
-                api: { refreshCells: vi.fn() },
-                node: {},
-              })}
-            >
-              Edit Price {row.caseId}
-            </button>
+      rowClassRules?: Record<
+        string,
+        (params: {
+          data: GridRow
+          node: { isSelected: () => boolean }
+        }) => boolean
+      >
+      statusBar?: {
+        statusPanels: {
+          statusPanel: string
+          statusPanelParams?: { text?: string }
+        }[]
+      }
+      components?: Record<string, (props: { text: string }) => ReactNode>
+    }) => {
+      const flatColumns = (columnDefs ?? []).flatMap(
+        function flatten(column): GridColumn[] {
+          return column.children ? column.children.flatMap(flatten) : [column]
+        },
+      )
+      const [selectedIds, setSelectedIds] = React.useState<number[]>([])
+      const anchorIndex = React.useRef<number | undefined>(undefined)
+      const select = (row: GridRow, index: number, event: React.MouseEvent) => {
+        let next: number[]
+        if (event.shiftKey && anchorIndex.current !== undefined) {
+          const [start, end] = [anchorIndex.current, index].sort(
+            (left, right) => left - right,
+          )
+          next = rowData.slice(start, end + 1).map((item) => item.caseId)
+        } else if (event.ctrlKey || event.metaKey) {
+          next = selectedIds.includes(row.caseId)
+            ? selectedIds.filter((caseId) => caseId !== row.caseId)
+            : [...selectedIds, row.caseId]
+          anchorIndex.current = index
+        } else {
+          next = [row.caseId]
+          anchorIndex.current = index
+        }
+        setSelectedIds(next)
+        onRowClicked?.({ data: row })
+        onSelectionChanged?.({
+          api: {
+            getSelectedRows: () =>
+              rowData.filter((item) => next.includes(item.caseId)),
+          },
+        })
+      }
+      return (
+        <div
+          data-testid="grid-selection-config"
+          data-checkboxes={String(rowSelection?.checkboxes)}
+          data-header-checkbox={String(rowSelection?.headerCheckbox)}
+          data-click-selection={String(rowSelection?.enableClickSelection)}
+          data-selection-without-keys={String(
+            rowSelection?.enableSelectionWithoutKeys,
           )}
-          {readOnlyEdit && onCellEditRequest && flatColumns.some((column) => column.field === 'traderMemo') && (
-            <button onClick={() => onCellEditRequest({
-              data: row, newValue: 'post-close desk note', colDef: { field: 'traderMemo' },
-              column: { getColId: () => 'traderMemo' }, api: { refreshCells: vi.fn() }, node: {},
-            })}>Edit Memo {row.caseId}</button>
-          )}
-          {flatColumns.filter((column) => column.colId || column.field === 'currentQuoteId').map((column) => {
-            const columnKey = column.colId ?? column.field!
-            const value = column.valueGetter
-              ? column.valueGetter({ data: row })
-              : (row as unknown as Record<string, unknown>)[columnKey]
-            const display = column.valueFormatter?.({ value }) ?? value ?? ''
+          data-select-all={rowSelection?.selectAll}
+        >
+          {rowData.map((row, index) => {
+            const selected = selectedIds.includes(row.caseId)
+            const classes = Object.entries(rowClassRules ?? {})
+              .filter(([, rule]) =>
+                rule({ data: row, node: { isSelected: () => selected } }),
+              )
+              .map(([name]) => name)
+              .join(' ')
             return (
-              <output
-                key={columnKey}
-                data-testid={`grid-${row.caseId}-${columnKey}`}
-                data-cell-editor={column.cellEditor ?? ''}
-                data-editable={column.editable?.({ data: row }) ? 'true' : 'false'}
+              <div
+                key={row.caseId}
+                data-testid={`grid-row-${row.caseId}`}
+                className={classes}
               >
-                {column.cellRenderer ? column.cellRenderer({ data: row }) : String(display)}
-              </output>
+                <button onClick={(event) => select(row, index, event)}>
+                  {row.clientId} {row.clientName} {row.securityId}
+                  {'securityJapaneseName' in row
+                    ? row.securityJapaneseName
+                    : row.securityName}{' '}
+                  {'securityBbgDisplay' in row ? row.securityBbgDisplay : ''}{' '}
+                  {'rfqStatus' in row ? row.rfqStatus : row.status}{' '}
+                  {'revisionStatus' in row ? row.revisionStatus : ''}{' '}
+                  {row.quoteStatus}{' '}
+                  {'quoteRequestReason' in row ? row.quoteRequestReason : ''}
+                </button>
+                {readOnlyEdit && onCellEditRequest && (
+                  <button
+                    onClick={() =>
+                      onCellEditRequest({
+                        data: row,
+                        newValue: '99.5',
+                        colDef: { field: 'notional' },
+                        column: { getColId: () => 'price' },
+                        api: { refreshCells: vi.fn() },
+                        node: {},
+                      })
+                    }
+                  >
+                    Edit Price {row.caseId}
+                  </button>
+                )}
+                {readOnlyEdit &&
+                  onCellEditRequest &&
+                  flatColumns.some(
+                    (column) => column.field === 'traderMemo',
+                  ) && (
+                    <button
+                      onClick={() =>
+                        onCellEditRequest({
+                          data: row,
+                          newValue: 'post-close desk note',
+                          colDef: { field: 'traderMemo' },
+                          column: { getColId: () => 'traderMemo' },
+                          api: { refreshCells: vi.fn() },
+                          node: {},
+                        })
+                      }
+                    >
+                      Edit Memo {row.caseId}
+                    </button>
+                  )}
+                {flatColumns
+                  .filter(
+                    (column) =>
+                      column.colId || column.field === 'currentQuoteId',
+                  )
+                  .map((column) => {
+                    const columnKey = column.colId ?? column.field!
+                    const value = column.valueGetter
+                      ? column.valueGetter({ data: row })
+                      : (row as unknown as Record<string, unknown>)[columnKey]
+                    const display =
+                      column.valueFormatter?.({ value }) ?? value ?? ''
+                    return (
+                      <output
+                        key={columnKey}
+                        data-testid={`grid-${row.caseId}-${columnKey}`}
+                        data-cell-editor={column.cellEditor ?? ''}
+                        data-editable={
+                          column.editable?.({ data: row }) ? 'true' : 'false'
+                        }
+                      >
+                        {column.cellRenderer
+                          ? column.cellRenderer({ data: row })
+                          : String(display)}
+                      </output>
+                    )
+                  })}
+              </div>
             )
           })}
+          {statusBar?.statusPanels.map((panel, index) => {
+            const Component = components?.[panel.statusPanel]
+            return Component ? (
+              <div key={index}>
+                {Component({
+                  text: panel.statusPanelParams?.text ?? '',
+                })}
+              </div>
+            ) : null
+          })}
         </div>
-      })}
-      {statusBar?.statusPanels.map((panel, index) => {
-        const Component = components?.[panel.statusPanel]
-        return Component ? <div key={index}>{Component({
-          text: panel.statusPanelParams?.text ?? '',
-        })}</div> : null
-      })}
-    </div>
-  } }
+      )
+    },
+  }
 })
 
 const clients: ClientSearchResult[] = [
@@ -221,18 +328,26 @@ const draftRow: SalesRfq = {
 }
 
 async function selectRequiredMasters() {
-  fireEvent.change(screen.getByLabelText('Client'), { target: { value: 'C001' } })
+  fireEvent.change(screen.getByLabelText('Client'), {
+    target: { value: 'C001' },
+  })
   fireEvent.click(screen.getByText(/青空銀行 · C001/))
-  fireEvent.change(screen.getByLabelText('Security'), { target: { value: '375' } })
+  fireEvent.change(screen.getByLabelText('Security'), {
+    target: { value: '375' },
+  })
   fireEvent.click(screen.getByText(/利付国債 第375回/))
-  await waitFor(() => expect(screen.getByLabelText('Settle')).toHaveValue('2026-09-23'))
+  await waitFor(() =>
+    expect(screen.getByLabelText('Settle')).toHaveValue('2026-09-23'),
+  )
 }
 
 describe('AppShell', () => {
   it('shows navigation, system date, and healthy API state', () => {
-    render(<MemoryRouter initialEntries={['/sales']}>
-      <AppShell health="ok" businessDate="2026-09-21" />
-    </MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/sales']}>
+        <AppShell health="ok" businessDate="2026-09-21" />
+      </MemoryRouter>,
+    )
     expect(screen.getAllByText('Sales')).toHaveLength(2)
     expect(screen.getByText('Trader')).toBeInTheDocument()
     expect(screen.getByText('Daily Review')).toBeInTheDocument()
@@ -245,9 +360,13 @@ describe('AppShell', () => {
       return <output>{useLocation().pathname}</output>
     }
 
-    render(<MemoryRouter initialEntries={['/sales']}>
-      <AppShell health="ok"><LocationProbe /></AppShell>
-    </MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/sales']}>
+        <AppShell health="ok">
+          <LocationProbe />
+        </AppShell>
+      </MemoryRouter>,
+    )
 
     fireEvent.click(screen.getByText('Trader'))
     expect(screen.getByText('/trader')).toBeInTheDocument()
@@ -278,20 +397,47 @@ describe('SalesScreen', () => {
   })
 
   it('keeps the active RFQ pane stable while Ctrl and Shift change bulk selection', () => {
-    render(<SalesScreen {...baseProps} rfqs={[quotedRow(101), quotedRow(102), quotedRow(103)]} />)
-    fireEvent.click(within(screen.getByTestId('grid-row-101')).getByRole('button', { name: /client-101/ }))
-    fireEvent.click(within(screen.getByTestId('grid-row-102')).getByRole('button', { name: /client-102/ }), { ctrlKey: true })
+    render(
+      <SalesScreen
+        {...baseProps}
+        rfqs={[quotedRow(101), quotedRow(102), quotedRow(103)]}
+      />,
+    )
+    fireEvent.click(
+      within(screen.getByTestId('grid-row-101')).getByRole('button', {
+        name: /client-101/,
+      }),
+    )
+    fireEvent.click(
+      within(screen.getByTestId('grid-row-102')).getByRole('button', {
+        name: /client-102/,
+      }),
+      { ctrlKey: true },
+    )
 
     expect(screen.getByText('Case 102')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'RFQ' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'RFQ' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
     expect(screen.getByRole('tab', { name: 'Bulk (2)' })).toBeInTheDocument()
     expect(screen.getByTestId('grid-row-101')).toHaveClass('sales-row-selected')
     expect(screen.getByTestId('grid-row-102')).toHaveClass('sales-row-selected')
 
-    fireEvent.click(within(screen.getByTestId('grid-row-103')).getByRole('button', { name: /client-103/ }), { shiftKey: true })
+    fireEvent.click(
+      within(screen.getByTestId('grid-row-103')).getByRole('button', {
+        name: /client-103/,
+      }),
+      { shiftKey: true },
+    )
     expect(screen.getByText('Case 103')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'RFQ' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByTestId('grid-row-101')).not.toHaveClass('sales-row-selected')
+    expect(screen.getByRole('tab', { name: 'RFQ' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.getByTestId('grid-row-101')).not.toHaveClass(
+      'sales-row-selected',
+    )
     expect(screen.getByTestId('grid-row-102')).toHaveClass('sales-row-selected')
     expect(screen.getByTestId('grid-row-103')).toHaveClass('sales-row-selected')
   })
@@ -299,7 +445,9 @@ describe('SalesScreen', () => {
   it('keeps the Bulk tab present and shows an empty state with insufficient selection', () => {
     render(<SalesScreen {...baseProps} rfqs={[quotedRow(101)]} />)
     fireEvent.click(screen.getByRole('tab', { name: 'Bulk (0)' }))
-    expect(screen.getByText('Select multiple RFQs for bulk operations')).toBeInTheDocument()
+    expect(
+      screen.getByText('Select multiple RFQs for bulk operations'),
+    ).toBeInTheDocument()
   })
 
   it('renders lifecycle and quote status returned by the API', () => {
@@ -311,26 +459,32 @@ describe('SalesScreen', () => {
       quoteRequestReason: 'Initial',
     }
     render(<SalesScreen {...baseProps} rfqs={[confirmed]} />)
-    expect(screen.getByText(/Active Confirmed Requested Initial/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Active Confirmed Requested Initial/),
+    ).toBeInTheDocument()
   })
 
   it('populates creation context and saves a draft with nullable notional', async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
-    render(<SalesScreen {...baseProps} onCreate={onCreate} onReload={onReload} />)
+    render(
+      <SalesScreen {...baseProps} onCreate={onCreate} onReload={onReload} />,
+    )
     fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
     await selectRequiredMasters()
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }))
 
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({
-      clientId: 'client-001',
-      securityId: 'sec-jgb-375',
-      notional: undefined,
-      settlementDate: '2026-09-23',
-      standardSettlementDate: '2026-09-23',
-      salesAndTradingMessage: '',
-      assignedTraderId: 'trader-a',
-    }))
+    await waitFor(() =>
+      expect(onCreate).toHaveBeenCalledWith({
+        clientId: 'client-001',
+        securityId: 'sec-jgb-375',
+        notional: undefined,
+        settlementDate: '2026-09-23',
+        standardSettlementDate: '2026-09-23',
+        salesAndTradingMessage: '',
+        assignedTraderId: 'trader-a',
+      }),
+    )
     expect(onReload).toHaveBeenCalledOnce()
   }, 15_000)
 
@@ -339,19 +493,25 @@ describe('SalesScreen', () => {
     render(<SalesScreen {...baseProps} onConfirmNew={onConfirmNew} />)
     fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
     await selectRequiredMasters()
-    fireEvent.change(screen.getByLabelText('Notl (MM)'), { target: { value: '250' } })
-    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'please quote' } })
+    fireEvent.change(screen.getByLabelText('Notl (MM)'), {
+      target: { value: '250' },
+    })
+    fireEvent.change(screen.getByLabelText('Message'), {
+      target: { value: 'please quote' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
 
-    await waitFor(() => expect(onConfirmNew).toHaveBeenCalledWith({
-      clientId: 'client-001',
-      securityId: 'sec-jgb-375',
-      notional: 250000000,
-      settlementDate: '2026-09-23',
-      standardSettlementDate: '2026-09-23',
-      salesAndTradingMessage: 'please quote',
-      assignedTraderId: 'trader-a',
-    }))
+    await waitFor(() =>
+      expect(onConfirmNew).toHaveBeenCalledWith({
+        clientId: 'client-001',
+        securityId: 'sec-jgb-375',
+        notional: 250000000,
+        settlementDate: '2026-09-23',
+        standardSettlementDate: '2026-09-23',
+        salesAndTradingMessage: 'please quote',
+        assignedTraderId: 'trader-a',
+      }),
+    )
   }, 15_000)
 
   it('uses Alt+Enter to confirm the active New RFQ form', async () => {
@@ -359,32 +519,46 @@ describe('SalesScreen', () => {
     render(<SalesScreen {...baseProps} onConfirmNew={onConfirmNew} />)
     fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
     await selectRequiredMasters()
-    fireEvent.change(screen.getByLabelText('Notl (MM)'), { target: { value: '50' } })
+    fireEvent.change(screen.getByLabelText('Notl (MM)'), {
+      target: { value: '50' },
+    })
     fireEvent.keyDown(window, { key: 'Enter', altKey: true })
 
-    await waitFor(() => expect(onConfirmNew).toHaveBeenCalledWith(expect.objectContaining({
-      clientId: 'client-001',
-      securityId: 'sec-jgb-375',
-      notional: 50000000,
-    })))
+    await waitFor(() =>
+      expect(onConfirmNew).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clientId: 'client-001',
+          securityId: 'sec-jgb-375',
+          notional: 50000000,
+        }),
+      ),
+    )
   })
 
   it('opens a saved draft and confirms it with optimistic version', async () => {
     const onConfirmDraft = vi.fn().mockResolvedValue(undefined)
-    render(<SalesScreen {...baseProps} rfqs={[draftRow]} onConfirmDraft={onConfirmDraft} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        rfqs={[draftRow]}
+        onConfirmDraft={onConfirmDraft}
+      />,
+    )
     fireEvent.click(screen.getByText(/client-grid 顧客表示名/))
     expect(screen.getByText('Case 101')).toBeInTheDocument()
     expect(screen.getByLabelText('Notl (MM)')).toHaveValue('100.00')
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
 
-    await waitFor(() => expect(onConfirmDraft).toHaveBeenCalledWith(101, {
-      notional: 100000000,
-      settlementDate: '2026-09-23',
-      standardSettlementDate: '2026-09-23',
-      salesAndTradingMessage: 'initial note',
-      assignedTraderId: 'trader-a',
-      expectedVersion: 3,
-    }))
+    await waitFor(() =>
+      expect(onConfirmDraft).toHaveBeenCalledWith(101, {
+        notional: 100000000,
+        settlementDate: '2026-09-23',
+        standardSettlementDate: '2026-09-23',
+        salesAndTradingMessage: 'initial note',
+        assignedTraderId: 'trader-a',
+        expectedVersion: 3,
+      }),
+    )
   })
 
   it('lets the Contact Owner Present an Active quoted RFQ', async () => {
@@ -408,69 +582,149 @@ describe('SalesScreen', () => {
   it.each([
     ['Hit', 'Hit'],
     ['Away', 'Away'],
-  ] as const)('executes paused row %s directly without confirmation', async (label, outcome) => {
-    const onClose = vi.fn().mockResolvedValue(undefined)
-    render(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quotedRow(101)]}
-      onClose={onClose} />)
+  ] as const)(
+    'executes paused row %s directly without confirmation',
+    async (label, outcome) => {
+      const onClose = vi.fn().mockResolvedValue(undefined)
+      render(
+        <SalesScreen
+          {...baseProps}
+          refreshMode="paused"
+          rfqs={[quotedRow(101)]}
+          onClose={onClose}
+        />,
+      )
 
-    fireEvent.click(screen.getByRole('button', { name: `Row 101 ${label}` }))
+      fireEvent.click(screen.getByRole('button', { name: `Row 101 ${label}` }))
 
-    await waitFor(() => expect(onClose).toHaveBeenCalledWith(101, outcome, 7))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
+      await waitFor(() => expect(onClose).toHaveBeenCalledWith(101, outcome, 7))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    },
+  )
 
   it('executes paused row Cancel directly without confirmation', async () => {
     const onCancel = vi.fn().mockResolvedValue(undefined)
-    render(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quotedRow(101)]}
-      onCancel={onCancel} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        rfqs={[quotedRow(101)]}
+        onCancel={onCancel}
+      />,
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Row 101 Cancel' }))
-    await waitFor(() => expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ caseId: 101 })))
+    await waitFor(() =>
+      expect(onCancel).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 101 }),
+      ),
+    )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('keeps row actions disabled in Live and enables them in Paused', () => {
-    const { rerender } = render(<SalesScreen {...baseProps} refreshMode="live"
-      rfqs={[quotedRow(101)]} />)
+    const { rerender } = render(
+      <SalesScreen {...baseProps} refreshMode="live" rfqs={[quotedRow(101)]} />,
+    )
     expect(screen.getByRole('button', { name: 'Row 101 Hit' })).toBeDisabled()
 
-    rerender(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quotedRow(101)]} />)
+    rerender(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        rfqs={[quotedRow(101)]}
+      />,
+    )
     expect(screen.getByRole('button', { name: 'Row 101 Hit' })).toBeEnabled()
   })
 
   it('preserves all eight bulk operations, excludes Bulk Hit, and moves results to the Result Bar', async () => {
     const onBulk = vi.fn().mockResolvedValue([
       { caseId: 101, status: 'Succeeded', code: null, message: null },
-      { caseId: 102, status: 'Failed', code: 'VersionConflict', message: 'Changed remotely' },
+      {
+        caseId: 102,
+        status: 'Failed',
+        code: 'VersionConflict',
+        message: 'Changed remotely',
+      },
     ])
-    render(<SalesScreen {...baseProps} refreshMode="paused"
-      rfqs={[quotedRow(101), quotedRow(102), {
-        ...quotedRow(103), quoteStatus: 'Requested', quoteRequestReason: 'Initial',
-      }]} onBulk={onBulk} />)
-    fireEvent.click(within(screen.getByTestId('grid-row-101')).getByRole('button', { name: /client-101/ }))
-    fireEvent.click(within(screen.getByTestId('grid-row-102')).getByRole('button', { name: /client-102/ }), { ctrlKey: true })
-    fireEvent.click(within(screen.getByTestId('grid-row-103')).getByRole('button', { name: /client-103/ }), { ctrlKey: true })
+    render(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        rfqs={[
+          quotedRow(101),
+          quotedRow(102),
+          {
+            ...quotedRow(103),
+            quoteStatus: 'Requested',
+            quoteRequestReason: 'Initial',
+          },
+        ]}
+        onBulk={onBulk}
+      />,
+    )
+    fireEvent.click(
+      within(screen.getByTestId('grid-row-101')).getByRole('button', {
+        name: /client-101/,
+      }),
+    )
+    fireEvent.click(
+      within(screen.getByTestId('grid-row-102')).getByRole('button', {
+        name: /client-102/,
+      }),
+      { ctrlKey: true },
+    )
+    fireEvent.click(
+      within(screen.getByTestId('grid-row-103')).getByRole('button', {
+        name: /client-103/,
+      }),
+      { ctrlKey: true },
+    )
     fireEvent.click(screen.getByRole('tab', { name: 'Bulk (3)' }))
 
-    for (const name of ['Away', 'Cancel', 'Present', 'Unpresent', 'Confirm Drafts',
-      'Discard Drafts', 'Confirm Amendments', 'Discard Amendments'])
+    for (const name of [
+      'Away',
+      'Cancel',
+      'Present',
+      'Unpresent',
+      'Confirm Drafts',
+      'Discard Drafts',
+      'Confirm Amendments',
+      'Discard Amendments',
+    ])
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Hit' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Hit' }),
+    ).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Away' }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(await screen.findByText('Bulk Away: 1 ok / 1 skipped / 1 failed')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    )
+    expect(
+      await screen.findByText('Bulk Away: 1 ok / 1 skipped / 1 failed'),
+    ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Details' }))
     expect(screen.getByText('Changed remotely')).toBeInTheDocument()
-    expect(screen.getByText('Not eligible in current state')).toBeInTheDocument()
+    expect(
+      screen.getByText('Not eligible in current state'),
+    ).toBeInTheDocument()
   }, 15_000)
 
   it('toggles Live/Pause, shows pending updates, and refreshes manually without changing mode', () => {
     const onRefreshModeChange = vi.fn()
     const onManualRefresh = vi.fn()
-    render(<SalesScreen {...baseProps} refreshMode="paused" pendingUpdateCount={4}
-      onRefreshModeChange={onRefreshModeChange} onManualRefresh={onManualRefresh} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        pendingUpdateCount={4}
+        onRefreshModeChange={onRefreshModeChange}
+        onManualRefresh={onManualRefresh}
+      />,
+    )
     expect(screen.getByText('Paused · 4 updates pending')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Live'))
     expect(onRefreshModeChange).toHaveBeenCalledOnce()
@@ -483,9 +737,19 @@ describe('SalesScreen', () => {
   it('keeps only Alt+L, Alt+N, Alt+Enter, and Esc workflow shortcuts', () => {
     const onRefreshModeChange = vi.fn()
     const onClose = vi.fn()
-    render(<SalesScreen {...baseProps} rfqs={[quotedRow(101)]}
-      onRefreshModeChange={onRefreshModeChange} onClose={onClose} />)
-    fireEvent.click(within(screen.getByTestId('grid-row-101')).getByRole('button', { name: /client-101/ }))
+    render(
+      <SalesScreen
+        {...baseProps}
+        rfqs={[quotedRow(101)]}
+        onRefreshModeChange={onRefreshModeChange}
+        onClose={onClose}
+      />,
+    )
+    fireEvent.click(
+      within(screen.getByTestId('grid-row-101')).getByRole('button', {
+        name: /client-101/,
+      }),
+    )
 
     for (const key of ['p', 'u', 'r', 'h', 'a', 'c'])
       fireEvent.keyDown(window, { key, altKey: true })
@@ -506,15 +770,24 @@ describe('SalesScreen', () => {
       quoteStatus: 'Quoted',
       currentVersion: 7,
     }
-    render(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quoted]}
-      onChangeContactOwner={onChangeContactOwner} onReload={onReload} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        rfqs={[quoted]}
+        onChangeContactOwner={onChangeContactOwner}
+        onReload={onReload}
+      />,
+    )
     fireEvent.click(screen.getByText(/client-grid/))
     fireEvent.mouseDown(screen.getByLabelText('Contact Owner'))
     fireEvent.click(await screen.findByText('営業 一郎'))
     fireEvent.click(screen.getByRole('button', { name: 'Change' }))
     fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
 
-    await waitFor(() => expect(onChangeContactOwner).toHaveBeenCalledWith(101, 'sales-a', 7))
+    await waitFor(() =>
+      expect(onChangeContactOwner).toHaveBeenCalledWith(101, 'sales-a', 7),
+    )
     expect(onReload).not.toHaveBeenCalled()
   })
 
@@ -522,18 +795,22 @@ describe('SalesScreen', () => {
     render(
       <SalesScreen
         {...baseProps}
-        rfqs={[{
-          ...draftRow,
-          rfqStatus: 'Active',
-          revisionStatus: 'Confirmed',
-          quoteStatus: 'Quoted',
-          quoteRequestReason: null,
-          currentQuoteId: '12345678-1234-1234-1234-123456789abc',
-        }]}
+        rfqs={[
+          {
+            ...draftRow,
+            rfqStatus: 'Active',
+            revisionStatus: 'Confirmed',
+            quoteStatus: 'Quoted',
+            quoteRequestReason: null,
+            currentQuoteId: '12345678-1234-1234-1234-123456789abc',
+          },
+        ]}
       />,
     )
 
-    expect(screen.getByTestId('grid-101-currentQuoteId')).toHaveTextContent('12345678')
+    expect(screen.getByTestId('grid-101-currentQuoteId')).toHaveTextContent(
+      '12345678',
+    )
     expect(screen.getByTestId('grid-101-currentQuoteId')).not.toHaveTextContent(
       '12345678-1234-1234-1234-123456789abc',
     )
@@ -545,15 +822,17 @@ describe('SalesScreen', () => {
       <SalesScreen
         {...baseProps}
         onClose={onClose}
-        rfqs={[{
-          ...draftRow,
-          rfqStatus: 'Active',
-          revisionStatus: 'Confirmed',
-          quoteStatus: 'Quoted',
-          quoteRequestReason: null,
-          currentQuoteId: '12345678-1234-1234-1234-123456789abc',
-          currentVersion: 7,
-        }]}
+        rfqs={[
+          {
+            ...draftRow,
+            rfqStatus: 'Active',
+            revisionStatus: 'Confirmed',
+            quoteStatus: 'Quoted',
+            quoteRequestReason: null,
+            currentQuoteId: '12345678-1234-1234-1234-123456789abc',
+            currentVersion: 7,
+          },
+        ]}
       />,
     )
 
@@ -572,16 +851,18 @@ describe('SalesScreen', () => {
         refreshMode="paused"
         onUpdateMemo={onUpdateMemo}
         onReload={onReload}
-        rfqs={[{
-          ...draftRow,
-          rfqStatus: 'Away',
-          revisionStatus: 'Confirmed',
-          quoteStatus: null,
-          currentQuoteId: null,
-          closedQuoteId: '12345678-1234-1234-1234-123456789abc',
-          salesMemo: 'existing note',
-          salesMemoVersion: 3,
-        }]}
+        rfqs={[
+          {
+            ...draftRow,
+            rfqStatus: 'Away',
+            revisionStatus: 'Confirmed',
+            quoteStatus: null,
+            currentQuoteId: null,
+            closedQuoteId: '12345678-1234-1234-1234-123456789abc',
+            salesMemo: 'existing note',
+            salesMemoVersion: 3,
+          },
+        ]}
       />,
     )
 
@@ -592,56 +873,78 @@ describe('SalesScreen', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    await waitFor(() => expect(onUpdateMemo).toHaveBeenCalledWith(
-      101,
-      'post-close follow-up',
-      3,
-    ))
+    await waitFor(() =>
+      expect(onUpdateMemo).toHaveBeenCalledWith(101, 'post-close follow-up', 3),
+    )
     expect(onReload).not.toHaveBeenCalled()
   })
 
   it('keeps the paused snapshot after correcting a closed outcome', async () => {
     const onCorrectOutcome = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
-    render(<SalesScreen {...baseProps} refreshMode="paused"
-      rfqs={[{ ...quotedRow(101), rfqStatus: 'Hit', quoteStatus: null }]}
-      onCorrectOutcome={onCorrectOutcome} onReload={onReload} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        rfqs={[{ ...quotedRow(101), rfqStatus: 'Hit', quoteStatus: null }]}
+        onCorrectOutcome={onCorrectOutcome}
+        onReload={onReload}
+      />,
+    )
 
     fireEvent.click(screen.getByText(/client-101/))
     fireEvent.click(screen.getByRole('button', { name: 'Correct outcome' }))
 
-    await waitFor(() => expect(onCorrectOutcome).toHaveBeenCalledWith(101, 'Away', 7))
+    await waitFor(() =>
+      expect(onCorrectOutcome).toHaveBeenCalledWith(101, 'Away', 7),
+    )
     expect(onReload).not.toHaveBeenCalled()
   })
 
   it('keeps the paused snapshot after an inline Amendment edit', async () => {
     const onSaveAmendment = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
-    render(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quotedRow(101)]}
-      onSaveAmendment={onSaveAmendment} onReload={onReload} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        rfqs={[quotedRow(101)]}
+        onSaveAmendment={onSaveAmendment}
+        onReload={onReload}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Price 101' }))
 
-    await waitFor(() => expect(onSaveAmendment).toHaveBeenCalledWith(
-      expect.objectContaining({ caseId: 101 }),
-      99_500_000,
-      '2026-09-23',
-      'initial note',
-    ))
+    await waitFor(() =>
+      expect(onSaveAmendment).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 101 }),
+        99_500_000,
+        '2026-09-23',
+        'initial note',
+      ),
+    )
     expect(onReload).not.toHaveBeenCalled()
   })
 
   it('opens the typed Recent Revisions drawer with changed fields only', async () => {
-    render(<SalesScreen {...baseProps} recentRevisions={[{
-      kind: 'Quote',
-      occurredAt: '2026-09-22T01:42:00Z',
-      caseId: 101,
-      clientId: 'client-grid',
-      clientName: 'Client Grid',
-      securityId: 'security-grid',
-      securityName: 'Security Grid',
-      changes: [{ field: 'Price', before: '99.85', after: '99.72' }],
-    }]} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        recentRevisions={[
+          {
+            kind: 'Quote',
+            occurredAt: '2026-09-22T01:42:00Z',
+            caseId: 101,
+            clientId: 'client-grid',
+            clientName: 'Client Grid',
+            securityId: 'security-grid',
+            securityName: 'Security Grid',
+            changes: [{ field: 'Price', before: '99.85', after: '99.72' }],
+          },
+        ]}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Recent Revisions' }))
 
@@ -722,28 +1025,53 @@ describe('TraderScreen', () => {
     render(<TraderScreen {...traderProps} onBulk={onBulk} />)
     fireEvent.click(screen.getByRole('button', { name: 'Pick (1)' }))
 
-    await waitFor(() => expect(onBulk).toHaveBeenCalledWith(
-      'pick', [expect.objectContaining({ caseId: 201 })], 5, undefined,
-    ))
+    await waitFor(() =>
+      expect(onBulk).toHaveBeenCalledWith(
+        'pick',
+        [expect.objectContaining({ caseId: 201 })],
+        5,
+        undefined,
+      ),
+    )
     const activeGrid = screen.getAllByTestId('grid-selection-config')[0]
     expect(activeGrid).toHaveAttribute('data-checkboxes', 'false')
-    expect(screen.getByTestId('grid-row-201')).toHaveClass('trader-row-attention-high')
+    expect(screen.getByTestId('grid-row-201')).toHaveClass(
+      'trader-row-attention-high',
+    )
   })
 
   it('searches with the default 1Y range and the selected 5Y preset', async () => {
-    const onSearch = vi.fn().mockResolvedValue({ items: [], requiresNarrowing: false })
-    render(<TraderScreen {...traderProps} businessDate="2026-09-22" onSearch={onSearch} />)
+    const onSearch = vi
+      .fn()
+      .mockResolvedValue({ items: [], requiresNarrowing: false })
+    render(
+      <TraderScreen
+        {...traderProps}
+        businessDate="2026-09-22"
+        onSearch={onSearch}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
-    await waitFor(() => expect(onSearch).toHaveBeenLastCalledWith(expect.objectContaining({
-      createdFrom: '2025-09-22', createdTo: '2026-09-22',
-    })))
+    await waitFor(() =>
+      expect(onSearch).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          createdFrom: '2025-09-22',
+          createdTo: '2026-09-22',
+        }),
+      ),
+    )
 
     fireEvent.click(screen.getByText('5Y'))
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
-    await waitFor(() => expect(onSearch).toHaveBeenLastCalledWith(expect.objectContaining({
-      createdFrom: '2021-09-22', createdTo: '2026-09-22',
-    })))
+    await waitFor(() =>
+      expect(onSearch).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          createdFrom: '2021-09-22',
+          createdTo: '2026-09-22',
+        }),
+      ),
+    )
   }, 10_000)
 
   it('requires confirmation to take over an RFQ owned by another trader', async () => {
@@ -759,9 +1087,11 @@ describe('TraderScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Take Over' }))
     fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
 
-    await waitFor(() => expect(onTakeOver).toHaveBeenCalledWith(
-      expect.objectContaining({ caseId: 201, currentVersion: 4 }),
-    ))
+    await waitFor(() =>
+      expect(onTakeOver).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 201, currentVersion: 4 }),
+      ),
+    )
   }, 10_000)
 
   it('lets the owner switch the working quote to manual mode', async () => {
@@ -777,10 +1107,12 @@ describe('TraderScreen', () => {
     fireEvent.mouseDown(screen.getByLabelText('Quote mode'))
     fireEvent.click((await screen.findAllByText('Manual')).at(-1)!)
 
-    await waitFor(() => expect(onChangeMode).toHaveBeenCalledWith(
-      expect.objectContaining({ caseId: 201, workingQuoteVersion: 1 }),
-      'Manual',
-    ))
+    await waitFor(() =>
+      expect(onChangeMode).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 201, workingQuoteVersion: 1 }),
+        'Manual',
+      ),
+    )
   })
 
   it('sends an edited calculated Price as the calculation driver', async () => {
@@ -795,79 +1127,129 @@ describe('TraderScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
 
-    await waitFor(() => expect(onCalculate).toHaveBeenCalledWith(
-      expect.objectContaining({ caseId: 201, workingQuoteVersion: 1 }),
-      'Price',
-      99.5,
-      0,
-    ))
+    await waitFor(() =>
+      expect(onCalculate).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 201, workingQuoteVersion: 1 }),
+        'Price',
+        99.5,
+        0,
+      ),
+    )
   })
 
   it('patches an authoritative calculation response without refreshing while Paused', async () => {
     const onPatchRow = vi.fn()
     const onReload = vi.fn()
     const payload = {
-      driver: 'Price' as const, driverValue: 99.5, price: 99.5, bbgYield: 0.8,
-      baseSimpleYield: 0.81, simpleYieldSlide: 0.03, finalSimpleYield: 0.84,
-      internalYield: 0.83, gSpread: 5, asw: 8, ysc: 6, iSpread: 7, zSpread: 6,
+      driver: 'Price' as const,
+      driverValue: 99.5,
+      price: 99.5,
+      bbgYield: 0.8,
+      baseSimpleYield: 0.81,
+      simpleYieldSlide: 0.03,
+      finalSimpleYield: 0.84,
+      internalYield: 0.83,
+      gSpread: 5,
+      asw: 8,
+      ysc: 6,
+      iSpread: 7,
+      zSpread: 6,
     }
-    const onCalculate = vi.fn().mockResolvedValue({ caseId: 201,
-      revisionId: traderRow.currentRevisionId, mode: 'Calculated', calculated: payload,
-      manual: null, version: 2, currentVersion: 4 })
-    render(<TraderScreen {...traderProps} refreshMode="paused"
-      rfqs={[{ ...traderRow, owned: true }]} onCalculate={onCalculate}
-      onPatchRow={onPatchRow} onReload={onReload} />)
+    const onCalculate = vi.fn().mockResolvedValue({
+      caseId: 201,
+      revisionId: traderRow.currentRevisionId,
+      mode: 'Calculated',
+      calculated: payload,
+      manual: null,
+      version: 2,
+      currentVersion: 4,
+    })
+    render(
+      <TraderScreen
+        {...traderProps}
+        refreshMode="paused"
+        rfqs={[{ ...traderRow, owned: true }]}
+        onCalculate={onCalculate}
+        onPatchRow={onPatchRow}
+        onReload={onReload}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
 
-    await waitFor(() => expect(onPatchRow).toHaveBeenCalledWith(201, expect.any(Function)))
+    await waitFor(() =>
+      expect(onPatchRow).toHaveBeenCalledWith(201, expect.any(Function)),
+    )
     expect(onReload).not.toHaveBeenCalled()
   })
 
   it('unlocks the row and exposes a compact calculation failure state', async () => {
-    const onCalculate = vi.fn().mockRejectedValue({ data: {
-      code: 'CalculationFailure', calculationErrorCode: 'PRICER_DOWN',
-      detail: 'Pricing is unavailable.', traceId: 'trace-1', failureLogId: 'log-1',
-    } })
-    render(<TraderScreen {...traderProps} rfqs={[{ ...traderRow, owned: true }]}
-      onCalculate={onCalculate} />)
+    const onCalculate = vi.fn().mockRejectedValue({
+      data: {
+        code: 'CalculationFailure',
+        calculationErrorCode: 'PRICER_DOWN',
+        detail: 'Pricing is unavailable.',
+        traceId: 'trace-1',
+        failureLogId: 'log-1',
+      },
+    })
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{ ...traderRow, owned: true }]}
+        onCalculate={onCalculate}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
 
-    await waitFor(() => expect(screen.getByTestId('grid-201-calcStatus')).toHaveTextContent('!'))
-    expect(screen.getByTestId('grid-201-price')).toHaveAttribute('data-editable', 'true')
+    await waitFor(() =>
+      expect(screen.getByTestId('grid-201-calcStatus')).toHaveTextContent('!'),
+    )
+    expect(screen.getByTestId('grid-201-price')).toHaveAttribute(
+      'data-editable',
+      'true',
+    )
   })
 
   it('shows yields as percent and spreads as basis points with numeric editors', () => {
     render(
       <TraderScreen
         {...traderProps}
-        rfqs={[{
-          ...traderRow,
-          owned: true,
-          calculated: {
-            driver: 'Price',
-            driverValue: 99.5,
-            price: 99.5,
-            bbgYield: 0.8,
-            baseSimpleYield: 0.81,
-            simpleYieldSlide: 0.03,
-            finalSimpleYield: 0.84,
-            internalYield: 0.83,
-            gSpread: 5,
-            asw: 8,
-            ysc: 6,
-            iSpread: 7,
-            zSpread: 6,
+        rfqs={[
+          {
+            ...traderRow,
+            owned: true,
+            calculated: {
+              driver: 'Price',
+              driverValue: 99.5,
+              price: 99.5,
+              bbgYield: 0.8,
+              baseSimpleYield: 0.81,
+              simpleYieldSlide: 0.03,
+              finalSimpleYield: 0.84,
+              internalYield: 0.83,
+              gSpread: 5,
+              asw: 8,
+              ysc: 6,
+              iSpread: 7,
+              zSpread: 6,
+            },
           },
-        }]}
+        ]}
       />,
     )
 
     expect(screen.getByTestId('grid-201-bbgYield')).toHaveTextContent('0.8%')
-    expect(screen.getByTestId('grid-201-baseSimpleYield')).toHaveTextContent('0.81%')
-    expect(screen.getByTestId('grid-201-simpleYieldSlide')).toHaveTextContent('0.03%')
-    expect(screen.getByTestId('grid-201-finalSimpleYield')).toHaveTextContent('0.84%')
+    expect(screen.getByTestId('grid-201-baseSimpleYield')).toHaveTextContent(
+      '0.81%',
+    )
+    expect(screen.getByTestId('grid-201-simpleYieldSlide')).toHaveTextContent(
+      '0.03%',
+    )
+    expect(screen.getByTestId('grid-201-finalSimpleYield')).toHaveTextContent(
+      '0.84%',
+    )
     expect(screen.getByTestId('grid-201-gSpread')).toHaveTextContent('5 bp')
     expect(screen.getByTestId('grid-201-bbgYield')).toHaveAttribute(
       'data-cell-editor',
@@ -883,27 +1265,29 @@ describe('TraderScreen', () => {
     render(
       <TraderScreen
         {...traderProps}
-        rfqs={[{
-          ...traderRow,
-          owned: true,
-          workingQuoteMode: 'Manual',
-          manual: { price: null, finalSimpleYield: null },
-          calculated: {
-            driver: 'Price',
-            driverValue: 99.5,
-            price: 99.5,
-            bbgYield: 0.8,
-            baseSimpleYield: 0.81,
-            simpleYieldSlide: 0.03,
-            finalSimpleYield: 0.84,
-            internalYield: 0.83,
-            gSpread: 5,
-            asw: 8,
-            ysc: 6,
-            iSpread: 7,
-            zSpread: 6,
+        rfqs={[
+          {
+            ...traderRow,
+            owned: true,
+            workingQuoteMode: 'Manual',
+            manual: { price: null, finalSimpleYield: null },
+            calculated: {
+              driver: 'Price',
+              driverValue: 99.5,
+              price: 99.5,
+              bbgYield: 0.8,
+              baseSimpleYield: 0.81,
+              simpleYieldSlide: 0.03,
+              finalSimpleYield: 0.84,
+              internalYield: 0.83,
+              gSpread: 5,
+              asw: 8,
+              ysc: 6,
+              iSpread: 7,
+              zSpread: 6,
+            },
           },
-        }]}
+        ]}
       />,
     )
 
@@ -953,27 +1337,34 @@ describe('TraderScreen', () => {
     fireEvent.click(confirmButton)
     fireEvent.click(await screen.findByRole('button', { name: 'Apply' }))
 
-    await waitFor(() => expect(onConfirmQuote).toHaveBeenCalledWith(
-      expect.objectContaining({ caseId: 201 }),
-      5,
-    ))
+    await waitFor(() =>
+      expect(onConfirmQuote).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 201 }),
+        5,
+      ),
+    )
   }, 10_000)
 
   it('locks quote editing after QuoteStatus becomes Quoted', () => {
     render(
       <TraderScreen
         {...traderProps}
-        rfqs={[{
-          ...traderRow,
-          owned: true,
-          quoteStatus: 'Quoted',
-          quoteRequestReason: null,
-          currentQuoteId: '00000000-0000-0000-0000-000000000301',
-        }]}
+        rfqs={[
+          {
+            ...traderRow,
+            owned: true,
+            quoteStatus: 'Quoted',
+            quoteRequestReason: null,
+            currentQuoteId: '00000000-0000-0000-0000-000000000301',
+          },
+        ]}
       />,
     )
 
-    expect(screen.getByTestId('grid-201-price')).toHaveAttribute('data-editable', 'false')
+    expect(screen.getByTestId('grid-201-price')).toHaveAttribute(
+      'data-editable',
+      'false',
+    )
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
   })
 
@@ -983,26 +1374,30 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         onUpdateMemo={onUpdateMemo}
-        rfqs={[{
-          ...traderRow,
-          rfqStatus: 'Hit',
-          quoteStatus: null,
-          quoteRequestReason: null,
-          currentQuoteId: null,
-          closedQuoteId: '00000000-0000-0000-0000-000000000301',
-          owned: false,
-          traderMemo: 'existing desk note',
-          traderMemoVersion: 4,
-        }]}
+        rfqs={[
+          {
+            ...traderRow,
+            rfqStatus: 'Hit',
+            quoteStatus: null,
+            quoteRequestReason: null,
+            currentQuoteId: null,
+            closedQuoteId: '00000000-0000-0000-0000-000000000301',
+            owned: false,
+            traderMemo: 'existing desk note',
+            traderMemoVersion: 4,
+          },
+        ]}
       />,
     )
 
     fireEvent.click(screen.getByText(/client-001 Client One/))
     fireEvent.click(screen.getByRole('button', { name: 'Edit Memo 201' }))
 
-    await waitFor(() => expect(onUpdateMemo).toHaveBeenCalledWith(
-      expect.objectContaining({ caseId: 201, traderMemoVersion: 4 }),
-      'post-close desk note',
-    ))
+    await waitFor(() =>
+      expect(onUpdateMemo).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 201, traderMemoVersion: 4 }),
+        'post-close desk note',
+      ),
+    )
   })
 })

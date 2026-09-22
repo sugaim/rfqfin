@@ -4,7 +4,8 @@ namespace Rfq.Application;
 
 public sealed class ScratchPricer(ICalculationClient calculationClient)
 {
-    public async Task<CalculatedQuotePayload> ExecuteAsync(ScratchPriceRequest input,
+    public async Task<CalculatedQuotePayload> ExecuteAsync(
+        ScratchPriceRequest input,
         CancellationToken cancellationToken = default)
     {
         var id = Guid.NewGuid();
@@ -20,9 +21,11 @@ public sealed class ScratchPricer(ICalculationClient calculationClient)
             CalculationDriver.ZSpread => new ZSpreadCalculationParameter(input.Value),
             _ => throw new ArgumentOutOfRangeException(nameof(input)),
         };
-        var result = (await calculationClient.CalculateBulkAsync([
-            new(id, input.SecurityId, input.SettlementDate, input.Driver, parameter, input.SimpleYieldSlide)
-        ], cancellationToken)).Single();
+        CalculationResult result = (await calculationClient.CalculateBulkAsync(
+            [
+                    new(id, input.SecurityId, input.SettlementDate, input.Driver, parameter, input.SimpleYieldSlide)
+                ],
+            cancellationToken)).Single();
         return result switch
         {
             CalculationSuccess success => success.Payload,
@@ -32,5 +35,9 @@ public sealed class ScratchPricer(ICalculationClient calculationClient)
     }
 }
 
-public sealed record ScratchPriceRequest(SecurityId SecurityId, DateOnly SettlementDate,
-    CalculationDriver Driver, decimal Value, decimal SimpleYieldSlide);
+public sealed record ScratchPriceRequest(
+    SecurityId SecurityId,
+    DateOnly SettlementDate,
+    CalculationDriver Driver,
+    decimal Value,
+    decimal SimpleYieldSlide);

@@ -17,7 +17,7 @@ public sealed class ChangeWorkingQuoteMode(
         StateVersion expectedWorkingQuoteVersion,
         CancellationToken cancellationToken = default)
     {
-        var (rfqCase, quote) = await WorkingQuoteMutation.LoadAsync(
+        (RfqCase rfqCase, WorkingQuote quote) = await WorkingQuoteMutation.LoadAsync(
             rfqCases,
             workingQuotes,
             authorization,

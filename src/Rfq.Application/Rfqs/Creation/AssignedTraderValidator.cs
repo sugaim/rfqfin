@@ -11,7 +11,7 @@ public sealed class AssignedTraderValidator(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(assignedTraderId);
-        var assignedTrader = await userDirectory.ResolveAsync(assignedTraderId, cancellationToken)
+        UserSummary assignedTrader = await userDirectory.ResolveAsync(assignedTraderId, cancellationToken)
             ?? throw new RfqNotFoundException(
                 $"Assigned Trader '{assignedTraderId.Value}' was not found.");
         if (!assignedTrader.Roles.Contains(UserRole.Trader)

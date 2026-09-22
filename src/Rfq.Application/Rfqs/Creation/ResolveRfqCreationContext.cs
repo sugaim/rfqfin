@@ -14,13 +14,13 @@ public sealed class ResolveRfqCreationContext(
         SecurityId securityId,
         CancellationToken cancellationToken = default)
     {
-        var businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
-        var security = await securitySearch.ResolveAsync(securityId, cancellationToken)
+        DateOnly businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
+        SecuritySearchResult security = await securitySearch.ResolveAsync(securityId, cancellationToken)
             ?? throw new RfqNotFoundException($"Security '{securityId}' was not found.");
-        var categoryId = security.CategoryId;
-        var assignedTraderId = await categoryRouting.GetDefaultAssignedTraderAsync(
+        CategoryId categoryId = security.CategoryId;
+        UserId assignedTraderId = await categoryRouting.GetDefaultAssignedTraderAsync(
             categoryId, cancellationToken);
-        var assignedTrader = await userDirectory.ResolveAsync(assignedTraderId, cancellationToken)
+        UserSummary assignedTrader = await userDirectory.ResolveAsync(assignedTraderId, cancellationToken)
             ?? throw new RfqInvariantException(
                 $"Assigned Trader '{assignedTraderId.Value}' was not found.");
         if (!assignedTrader.Roles.Contains(UserRole.Trader)

@@ -53,9 +53,17 @@ public sealed class RfqRevision
         UserId createdBy,
         RevisionId? copiedFromRevisionId = null,
         RevisionId? quoteSeedRevisionId = null) => new(
-            revisionId, caseId, RevisionStatus.Draft, terms,
-            copiedFromRevisionId, quoteSeedRevisionId, new StateVersion(1),
-            createdAt, createdBy, null, null);
+            revisionId,
+            caseId,
+            RevisionStatus.Draft,
+            terms,
+            copiedFromRevisionId,
+            quoteSeedRevisionId,
+            new StateVersion(1),
+            createdAt,
+            createdBy,
+            null,
+            null);
 
     internal RfqRevision UpdateDraft(RevisionTerms terms, StateVersion expectedVersion)
     {
@@ -89,18 +97,36 @@ public sealed class RfqRevision
     internal RfqRevision Supersede()
     {
         if (Status != RevisionStatus.Confirmed)
+        {
             throw new DomainRuleViolationException("Only a Confirmed Revision can be Superseded.");
+        }
+
         return Copy(status: RevisionStatus.Superseded, version: Version.Next());
     }
 
     internal static RfqRevision Restore(
-        RevisionId revisionId, CaseId caseId, RevisionStatus status,
-        RevisionTerms terms, RevisionId? copiedFromRevisionId,
-        RevisionId? quoteSeedRevisionId, StateVersion version,
-        DateTimeOffset createdAt, UserId createdBy,
-        DateTimeOffset? confirmedAt, UserId? confirmedBy) => new(
-            revisionId, caseId, status, terms, copiedFromRevisionId,
-            quoteSeedRevisionId, version, createdAt, createdBy, confirmedAt, confirmedBy);
+        RevisionId revisionId,
+        CaseId caseId,
+        RevisionStatus status,
+        RevisionTerms terms,
+        RevisionId? copiedFromRevisionId,
+        RevisionId? quoteSeedRevisionId,
+        StateVersion version,
+        DateTimeOffset createdAt,
+        UserId createdBy,
+        DateTimeOffset? confirmedAt,
+        UserId? confirmedBy) => new(
+            revisionId,
+            caseId,
+            status,
+            terms,
+            copiedFromRevisionId,
+            quoteSeedRevisionId,
+            version,
+            createdAt,
+            createdBy,
+            confirmedAt,
+            confirmedBy);
 
     private RfqRevision Copy(
         RevisionStatus? status = null,
@@ -108,30 +134,51 @@ public sealed class RfqRevision
         StateVersion? version = null,
         DateTimeOffset? confirmedAt = null,
         UserId? confirmedBy = null) => new(
-            RevisionId, CaseId, status ?? Status, terms ?? Terms,
-            CopiedFromRevisionId, QuoteSeedRevisionId, version ?? Version,
-            CreatedAt, CreatedBy, confirmedAt ?? ConfirmedAt, confirmedBy ?? ConfirmedBy);
+            RevisionId,
+            CaseId,
+            status ?? Status,
+            terms ?? Terms,
+            CopiedFromRevisionId,
+            QuoteSeedRevisionId,
+            version ?? Version,
+            CreatedAt,
+            CreatedBy,
+            confirmedAt ?? ConfirmedAt,
+            confirmedBy ?? ConfirmedBy);
 
     private void EnsureDraft(StateVersion expectedVersion)
     {
         if (Status != RevisionStatus.Draft)
+        {
             throw new DomainRuleViolationException("Only a Draft Revision can be changed.");
+        }
+
         DomainGuards.EnsureVersion(Version, expectedVersion, "Revision");
     }
 
     private static void ValidateConfirmedTerms(RevisionTerms terms, DateOnly businessDate)
     {
         if (terms.Notional is null or <= 0)
+        {
             throw new DomainValidationException("Notional must be greater than zero.");
+        }
+
         if (terms.SettlementDate is null)
+        {
             throw new DomainValidationException("Settlement date is required.");
+        }
+
         if (terms.SettlementDate < businessDate)
+        {
             throw new DomainValidationException("Settlement date must be on or after the system date.");
+        }
     }
 
     private void ValidateInvariant()
     {
         if (Status == RevisionStatus.Confirmed && (ConfirmedAt is null || ConfirmedBy is null))
+        {
             throw new DomainInvariantException("A Confirmed Revision requires confirmation metadata.");
+        }
     }
 }

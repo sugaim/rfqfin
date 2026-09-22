@@ -23,9 +23,9 @@ public sealed class ChangeContactOwner(
             throw new RfqRequestValidationException("Contact Owner handoff requires confirmation.");
         }
 
-        var rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await ClosedRfqUseCase.LoadAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanChangeContactOwner(currentUser.User, rfqCase);
-        var target = await users.ResolveAsync(targetUserId, cancellationToken)
+        UserSummary target = await users.ResolveAsync(targetUserId, cancellationToken)
             ?? throw new RfqNotFoundException($"User '{targetUserId}' was not found.");
         if (target.DeskId != currentUser.User.DeskId
             || !target.Roles.Any(role => role is UserRole.Sales or UserRole.Trader))
@@ -34,7 +34,7 @@ public sealed class ChangeContactOwner(
                 "Contact Owner must be a Sales or Trader user on the same desk.");
         }
 
-        var previous = rfqCase.ContactOwnerId.Value;
+        string previous = rfqCase.ContactOwnerId.Value;
         rfqCase = RfqResponsibilityTransitions.ChangeContactOwner(
             rfqCase, targetUserId, expectedCurrentVersion);
         rfqCases.Update(rfqCase);

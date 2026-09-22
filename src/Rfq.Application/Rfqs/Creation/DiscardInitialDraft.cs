@@ -13,7 +13,7 @@ public sealed class DiscardInitialDraft(
         StateVersion expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await UpdateInitialDraft.GetCaseAsync(
+        RfqCase rfqCase = await UpdateInitialDraft.GetCaseAsync(
             rfqCases,
             caseId,
             cancellationToken);

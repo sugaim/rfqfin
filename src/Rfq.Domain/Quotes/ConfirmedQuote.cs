@@ -3,11 +3,18 @@ namespace Rfq.Domain;
 public sealed class ConfirmedQuote
 {
     internal ConfirmedQuote(
-        QuoteId quoteId, RevisionId revisionId, SecurityId securityId,
-        DateOnly settlementDate, UserId confirmedBy, DateTimeOffset confirmedAt,
-        WorkingQuoteMode mode, CalculatedQuotePayload? calculated,
-        ManualQuotePayload? manual, int? expiryMinutes,
-        DateTimeOffset? expiresAt, QuoteRequestReason requestReasonAnswered)
+        QuoteId quoteId,
+        RevisionId revisionId,
+        SecurityId securityId,
+        DateOnly settlementDate,
+        UserId confirmedBy,
+        DateTimeOffset confirmedAt,
+        WorkingQuoteMode mode,
+        CalculatedQuotePayload? calculated,
+        ManualQuotePayload? manual,
+        int? expiryMinutes,
+        DateTimeOffset? expiresAt,
+        QuoteRequestReason requestReasonAnswered)
     {
         QuoteId = quoteId;
         RevisionId = revisionId;
@@ -37,11 +44,28 @@ public sealed class ConfirmedQuote
     public QuoteRequestReason RequestReasonAnswered { get; }
 
     internal static ConfirmedQuote Restore(
-        QuoteId quoteId, RevisionId revisionId, SecurityId securityId,
-        DateOnly settlementDate, UserId confirmedBy, DateTimeOffset confirmedAt,
-        WorkingQuoteMode mode, CalculatedQuotePayload? calculated,
-        ManualQuotePayload? manual, int? expiryMinutes,
-        DateTimeOffset? expiresAt, QuoteRequestReason requestReasonAnswered) => new(
-            quoteId, revisionId, securityId, settlementDate, confirmedBy, confirmedAt,
-            mode, calculated, manual, expiryMinutes, expiresAt, requestReasonAnswered);
+        QuoteId quoteId,
+        RevisionId revisionId,
+        SecurityId securityId,
+        DateOnly settlementDate,
+        UserId confirmedBy,
+        DateTimeOffset confirmedAt,
+        WorkingQuoteMode mode,
+        CalculatedQuotePayload? calculated,
+        ManualQuotePayload? manual,
+        int? expiryMinutes,
+        DateTimeOffset? expiresAt,
+        QuoteRequestReason requestReasonAnswered) => new(
+            quoteId,
+            revisionId,
+            securityId,
+            settlementDate,
+            confirmedBy,
+            confirmedAt,
+            mode,
+            calculated,
+            manual,
+            expiryMinutes,
+            expiresAt,
+            requestReasonAnswered);
 }

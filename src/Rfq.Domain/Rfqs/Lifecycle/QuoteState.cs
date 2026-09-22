@@ -14,4 +14,11 @@ public sealed record QuoteConfirmed : ActiveQuoteState
     public QuoteId QuoteId { get; }
 }
 
-public enum QuoteRequestReason { Initial, Revised, Reopened, Expired, Withdrawn }
+public enum QuoteRequestReason
+{
+    Initial,
+    Revised,
+    Reopened,
+    Expired,
+    Withdrawn
+}

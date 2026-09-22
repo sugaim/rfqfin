@@ -5,23 +5,18 @@ using Xunit;
 
 namespace Rfq.Api.Tests;
 
-public sealed class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class HealthEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
-    private readonly HttpClient _client;
-
-    public HealthEndpointTests(WebApplicationFactory<Program> factory)
-    {
-        _client = factory.CreateClient();
-    }
+    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task GetHealthReturnsOk()
     {
-        var response = await _client.GetAsync("/api/health");
+        HttpResponseMessage response = await _client.GetAsync("/api/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<HealthBody>();
+        HealthBody? body = await response.Content.ReadFromJsonAsync<HealthBody>();
         Assert.Equal("ok", body?.Status);
     }
 

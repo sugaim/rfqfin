@@ -3,10 +3,15 @@ namespace Rfq.Domain;
 public sealed class WorkingQuote
 {
     internal WorkingQuote(
-        RevisionId revisionId, WorkingQuoteMode mode,
-        CalculatedQuotePayload? calculated, ManualQuotePayload? manual,
-        StateVersion version, DateTimeOffset createdAt, UserId createdBy,
-        DateTimeOffset updatedAt, UserId updatedBy)
+        RevisionId revisionId,
+        WorkingQuoteMode mode,
+        CalculatedQuotePayload? calculated,
+        ManualQuotePayload? manual,
+        StateVersion version,
+        DateTimeOffset createdAt,
+        UserId createdBy,
+        DateTimeOffset updatedAt,
+        UserId updatedBy)
     {
         RevisionId = revisionId;
         Mode = mode;
@@ -30,15 +35,31 @@ public sealed class WorkingQuote
     public UserId UpdatedBy { get; }
 
     internal static WorkingQuote Restore(
-        RevisionId revisionId, WorkingQuoteMode mode,
-        CalculatedQuotePayload? calculated, ManualQuotePayload? manual,
-        StateVersion version, DateTimeOffset createdAt, UserId createdBy,
-        DateTimeOffset updatedAt, UserId updatedBy) => new(
-            revisionId, mode, calculated, manual, version,
-            createdAt, createdBy, updatedAt, updatedBy);
+        RevisionId revisionId,
+        WorkingQuoteMode mode,
+        CalculatedQuotePayload? calculated,
+        ManualQuotePayload? manual,
+        StateVersion version,
+        DateTimeOffset createdAt,
+        UserId createdBy,
+        DateTimeOffset updatedAt,
+        UserId updatedBy) => new(
+            revisionId,
+            mode,
+            calculated,
+            manual,
+            version,
+            createdAt,
+            createdBy,
+            updatedAt,
+            updatedBy);
 }
 
-public enum WorkingQuoteMode { Calculated, Manual }
+public enum WorkingQuoteMode
+{
+    Calculated,
+    Manual
+}
 
 public sealed record CalculatedQuotePayload
 {

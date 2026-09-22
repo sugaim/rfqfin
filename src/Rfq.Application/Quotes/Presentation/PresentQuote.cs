@@ -15,12 +15,12 @@ public sealed class PresentQuote(
         StateVersion expectedCurrentVersion,
         CancellationToken cancellationToken = default)
     {
-        var rfqCase = await UpdateInitialDraft.GetCaseAsync(rfqCases, caseId, cancellationToken);
+        RfqCase rfqCase = await UpdateInitialDraft.GetCaseAsync(rfqCases, caseId, cancellationToken);
         authorization.EnsureCanPresent(currentUser.User, rfqCase);
         rfqCase = RfqLifecycleTransitions.Present(
             rfqCase, expectedCurrentVersion);
 
-        var quoteId = rfqCase.CurrentQuoteId
+        QuoteId quoteId = rfqCase.CurrentQuoteId
             ?? throw new RfqInvariantException("Current ConfirmedQuote was not found.");
         rfqCases.Update(rfqCase);
         eventSink.Record(new QuoteTransition(

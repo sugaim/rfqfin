@@ -17,10 +17,10 @@ public sealed class PostgreSqlSecuritySearch(RfqDbContext dbContext) : ISecurity
             return [];
         }
 
-        var input = query.Trim();
-        var normalizedBbg = SecuritySearchNormalizer.NormalizeBbgText(input);
-        var normalizedInternalCode = SecuritySearchNormalizer.NormalizeInternalCode(input);
-        var normalizedIsin = SecuritySearchNormalizer.NormalizeIsinPrefix(input);
+        string input = query.Trim();
+        string normalizedBbg = SecuritySearchNormalizer.NormalizeBbgText(input);
+        string? normalizedInternalCode = SecuritySearchNormalizer.NormalizeInternalCode(input);
+        string? normalizedIsin = SecuritySearchNormalizer.NormalizeIsinPrefix(input);
         var candidates = new Dictionary<string, RankedSecurity>(StringComparer.Ordinal);
 
         await AddMatchesAsync(
@@ -74,12 +74,11 @@ public sealed class PostgreSqlSecuritySearch(RfqDbContext dbContext) : ISecurity
             candidates,
             cancellationToken);
 
-        return candidates.Values
+        return [.. candidates.Values
             .OrderBy(candidate => candidate.Rank)
             .ThenBy(candidate => candidate.Result.InternalCode, StringComparer.Ordinal)
             .Take(ResultLimit)
-            .Select(candidate => candidate.Result)
-            .ToArray();
+            .Select(candidate => candidate.Result)];
     }
 
     public async Task<SecuritySearchResult?> ResolveAsync(
@@ -88,7 +87,7 @@ public sealed class PostgreSqlSecuritySearch(RfqDbContext dbContext) : ISecurity
     {
         ArgumentNullException.ThrowIfNull(securityId);
 
-        var row = await BaseQuery()
+        SecurityRow? row = await BaseQuery()
             .Where(candidate => candidate.SecurityId == securityId.Value)
             .Select(candidate => new SecurityRow(
                 candidate.SecurityId,
@@ -111,7 +110,7 @@ public sealed class PostgreSqlSecuritySearch(RfqDbContext dbContext) : ISecurity
         Dictionary<string, RankedSecurity> candidates,
         CancellationToken cancellationToken)
     {
-        var rows = await query
+        List<SecurityRow> rows = await query
             .OrderBy(candidate => candidate.SecurityId)
             .Take(ResultLimit)
             .Select(candidate => new SecurityRow(
@@ -124,10 +123,10 @@ public sealed class PostgreSqlSecuritySearch(RfqDbContext dbContext) : ISecurity
                 candidate.CategoryId,
                 candidate.Category.Name))
             .ToListAsync(cancellationToken);
-        foreach (var row in rows)
+        foreach (SecurityRow? row in rows)
         {
-            var result = ToResult(row);
-            if (!candidates.TryGetValue(result.SecurityId.Value, out var existing)
+            SecuritySearchResult result = ToResult(row);
+            if (!candidates.TryGetValue(result.SecurityId.Value, out RankedSecurity? existing)
                 || rank < existing.Rank)
             {
                 candidates[result.SecurityId.Value] = new RankedSecurity(result, rank);

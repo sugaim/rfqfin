@@ -1,3 +1,7 @@
 namespace Rfq.Domain;
 
-public enum QuoteStatus { Requested, Quoted }
+public enum QuoteStatus
+{
+    Requested,
+    Quoted
+}

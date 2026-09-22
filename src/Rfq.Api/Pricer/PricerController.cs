@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
-using Rfq.Application;
 using Rfq.Api.RfqQuotes;
+using Rfq.Application;
 using Rfq.Domain;
 
 namespace Rfq.Api.Pricer;
@@ -11,11 +11,21 @@ namespace Rfq.Api.Pricer;
 public sealed class PricerController(ScratchPricer pricer) : ControllerBase
 {
     [HttpPost]
-    public async Task<CalculatedQuoteResponse> Price(PricerRequest request,
+    public async Task<CalculatedQuoteResponse> Price(
+        PricerRequest request,
         CancellationToken token) => QuoteApiMapper.ToApi(await pricer.ExecuteAsync(
-            new ScratchPriceRequest(SecurityId.Create(request.SecurityId), request.SettlementDate,
-                QuoteApiMapper.ToDomain(request.Driver), request.Value, request.SimpleYieldSlide), token))!;
+            new ScratchPriceRequest(
+                SecurityId.Create(request.SecurityId),
+                request.SettlementDate,
+                QuoteApiMapper.ToDomain(request.Driver),
+                request.Value,
+                request.SimpleYieldSlide),
+            token))!;
 }
-public sealed record PricerRequest([Required, MinLength(1)] string SecurityId,
-    DateOnly SettlementDate, [Required] CalculationDriverValue Driver,
-    decimal Value, decimal SimpleYieldSlide);
+
+public sealed record PricerRequest(
+    [Required, MinLength(1)] string SecurityId,
+    DateOnly SettlementDate,
+    [Required] CalculationDriverValue Driver,
+    decimal Value,
+    decimal SimpleYieldSlide);

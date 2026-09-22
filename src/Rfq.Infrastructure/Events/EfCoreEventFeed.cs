@@ -12,54 +12,54 @@ public sealed class EfCoreEventFeed(
         long eventId,
         CancellationToken cancellationToken = default)
     {
-        var user = currentUser.User;
-        var rfqEvents = from child in dbContext.RfqEvents.AsNoTracking()
-                        join parent in dbContext.Events.AsNoTracking() on child.EventId equals parent.EventId
-                        join rfq in dbContext.RfqCases.AsNoTracking() on child.CaseId equals rfq.CaseId
-                        where child.EventId > eventId
-                            && (rfq.SalesId == user.UserId.Value
-                                || rfq.Current.ContactOwnerId == user.UserId.Value
-                                || dbContext.MasterUsers.Any(master =>
-                                    master.UserId == rfq.Current.AssignedTraderId
-                                    && master.DeskId == user.DeskId.Value))
-                        orderby child.EventId
-                        select new RfqEventRow(
-                            child.EventId,
-                            parent.OccurredAt,
-                            parent.ActorUserId,
-                            child.CaseId,
-                            child.Type,
-                            child.PayloadJson);
-        var quoteEvents = from child in dbContext.QuoteEvents.AsNoTracking()
-                          join parent in dbContext.Events.AsNoTracking() on child.EventId equals parent.EventId
-                          join quote in dbContext.ConfirmedQuotes.AsNoTracking() on child.QuoteId equals quote.QuoteId
-                          join revision in dbContext.RfqRevisions.AsNoTracking() on quote.RevisionId equals revision.RevisionId
-                          join rfq in dbContext.RfqCases.AsNoTracking() on revision.CaseId equals rfq.CaseId
-                          where child.EventId > eventId
-                              && (rfq.SalesId == user.UserId.Value
-                                  || rfq.Current.ContactOwnerId == user.UserId.Value
-                                  || dbContext.MasterUsers.Any(master =>
-                                      master.UserId == rfq.Current.AssignedTraderId
-                                      && master.DeskId == user.DeskId.Value))
-                          orderby child.EventId
-                          select new QuoteEventRow(
-                              child.EventId,
-                              parent.OccurredAt,
-                              parent.ActorUserId,
-                              revision.CaseId,
-                              child.QuoteId,
-                              child.Type,
-                              child.PayloadJson);
-        var rfqRows = await rfqEvents.Take(1000).ToListAsync(cancellationToken);
-        var quoteRows = await quoteEvents.Take(1000).ToListAsync(cancellationToken);
-        var rfqItems = rfqRows.Select(row => (EventFeedItem)EventPersistenceContract.DeserializeRfq(
+        CurrentUser user = currentUser.User;
+        IQueryable<RfqEventRow> rfqEvents = from child in dbContext.RfqEvents.AsNoTracking()
+                                            join parent in dbContext.Events.AsNoTracking() on child.EventId equals parent.EventId
+                                            join rfq in dbContext.RfqCases.AsNoTracking() on child.CaseId equals rfq.CaseId
+                                            where child.EventId > eventId
+                                                && (rfq.SalesId == user.UserId.Value
+                                                    || rfq.Current.ContactOwnerId == user.UserId.Value
+                                                    || dbContext.MasterUsers.Any(master =>
+                                                        master.UserId == rfq.Current.AssignedTraderId
+                                                        && master.DeskId == user.DeskId.Value))
+                                            orderby child.EventId
+                                            select new RfqEventRow(
+                                                child.EventId,
+                                                parent.OccurredAt,
+                                                parent.ActorUserId,
+                                                child.CaseId,
+                                                child.Type,
+                                                child.PayloadJson);
+        IQueryable<QuoteEventRow> quoteEvents = from child in dbContext.QuoteEvents.AsNoTracking()
+                                                join parent in dbContext.Events.AsNoTracking() on child.EventId equals parent.EventId
+                                                join quote in dbContext.ConfirmedQuotes.AsNoTracking() on child.QuoteId equals quote.QuoteId
+                                                join revision in dbContext.RfqRevisions.AsNoTracking() on quote.RevisionId equals revision.RevisionId
+                                                join rfq in dbContext.RfqCases.AsNoTracking() on revision.CaseId equals rfq.CaseId
+                                                where child.EventId > eventId
+                                                    && (rfq.SalesId == user.UserId.Value
+                                                        || rfq.Current.ContactOwnerId == user.UserId.Value
+                                                        || dbContext.MasterUsers.Any(master =>
+                                                            master.UserId == rfq.Current.AssignedTraderId
+                                                            && master.DeskId == user.DeskId.Value))
+                                                orderby child.EventId
+                                                select new QuoteEventRow(
+                                                    child.EventId,
+                                                    parent.OccurredAt,
+                                                    parent.ActorUserId,
+                                                    revision.CaseId,
+                                                    child.QuoteId,
+                                                    child.Type,
+                                                    child.PayloadJson);
+        List<RfqEventRow> rfqRows = await rfqEvents.Take(1000).ToListAsync(cancellationToken);
+        List<QuoteEventRow> quoteRows = await quoteEvents.Take(1000).ToListAsync(cancellationToken);
+        IEnumerable<EventFeedItem> rfqItems = rfqRows.Select(row => (EventFeedItem)EventPersistenceContract.DeserializeRfq(
             row.EventId,
             row.OccurredAt,
             ToUserId(row.ActorUserId),
             new CaseId(row.CaseId),
             row.Type,
             row.PayloadJson));
-        var quoteItems = quoteRows.Select(row => (EventFeedItem)EventPersistenceContract.DeserializeQuote(
+        IEnumerable<EventFeedItem> quoteItems = quoteRows.Select(row => (EventFeedItem)EventPersistenceContract.DeserializeQuote(
             row.EventId,
             row.OccurredAt,
             ToUserId(row.ActorUserId),
@@ -67,16 +67,18 @@ public sealed class EfCoreEventFeed(
             new QuoteId(row.QuoteId),
             row.Type,
             row.PayloadJson));
-        return rfqItems.Concat(quoteItems)
+        return [.. rfqItems.Concat(quoteItems)
             .OrderBy(item => item.EventId)
-            .Take(1000)
-            .ToArray();
+            .Take(1000)];
     }
 
     public Task<long> GetLatestIdAsync(CancellationToken cancellationToken = default) =>
         dbContext.Events.AsNoTracking().Select(item => (long?)item.EventId)
-            .MaxAsync(cancellationToken).ContinueWith(task => task.Result ?? 0,
-                cancellationToken, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            .MaxAsync(cancellationToken).ContinueWith(
+                task => task.Result ?? 0,
+                cancellationToken,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
 
     private static UserId? ToUserId(string? value) =>
         value is null ? null : UserId.Create(value);

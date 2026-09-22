@@ -7,7 +7,7 @@ return await RunAsync(args);
 
 static async Task<int> RunAsync(string[] args)
 {
-    var command = args.FirstOrDefault();
+    string? command = args.FirstOrDefault();
     if (command is null or "--help" or "-h")
     {
         return ShowHelp();
@@ -20,7 +20,7 @@ static async Task<int> RunAsync(string[] args)
 
     try
     {
-        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             Args = [],
             ContentRootPath = AppContext.BaseDirectory,
@@ -29,10 +29,10 @@ static async Task<int> RunAsync(string[] args)
         builder.Logging.AddSimpleConsole(options => options.SingleLine = true);
         builder.Services.AddRfqDatabaseOperations(builder.Configuration);
 
-        using var host = builder.Build();
-        using var scope = host.Services.CreateScope();
-        var operations = scope.ServiceProvider.GetRequiredService<DatabaseOperations>();
-        var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+        using IHost host = builder.Build();
+        using IServiceScope scope = host.Services.CreateScope();
+        DatabaseOperations operations = scope.ServiceProvider.GetRequiredService<DatabaseOperations>();
+        IHostEnvironment environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
 
         switch (command)
         {

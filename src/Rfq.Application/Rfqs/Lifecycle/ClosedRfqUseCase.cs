@@ -22,22 +22,29 @@ internal static class ClosedRfqUseCase
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var result = transition(rfq);
+        CloseTransitionResult result = transition(rfq);
         rfq = result.Rfq;
         cases.Update(rfq);
         if (result.DiscardedRevision is not null)
+        {
             cases.UpdateRevision(result.DiscardedRevision);
-        var closed = rfq.Lifecycle as ClosedRfq
+        }
+
+        ClosedRfq closed = rfq.Lifecycle as ClosedRfq
             ?? throw new DomainInvariantException("Close result requires a Closed RFQ.");
-        events.Record(new RfqTransition(eventKind, rfq.CaseId, currentUser.UserId,
-            timeProvider.GetUtcNow(), closed.ClosedQuoteId));
+        events.Record(new RfqTransition(
+            eventKind,
+            rfq.CaseId,
+            currentUser.UserId,
+            timeProvider.GetUtcNow(),
+            closed.ClosedQuoteId));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToResult(rfq);
     }
 
     public static CloseRfqResult ToResult(RfqCase rfq)
     {
-        var closed = rfq.Lifecycle as ClosedRfq
+        ClosedRfq closed = rfq.Lifecycle as ClosedRfq
             ?? throw new DomainInvariantException("Close result requires a Closed RFQ.");
         return new CloseRfqResult(
             rfq.CaseId, rfq.Status, closed.ClosedQuoteId, false, rfq.Version);

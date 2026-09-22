@@ -7,8 +7,20 @@ namespace Rfq.Infrastructure.Tests;
 public sealed class QuotePersistenceContractTests
 {
     private static readonly CalculatedQuotePayload Calculated = new(
-        CalculationDriver.GSpread, 12.5m, 100.25m, .8m, .81m, .02m,
-        .83m, .84m, 12.5m, 15m, 13.5m, 14.5m, 13.5m);
+        CalculationDriver.GSpread,
+        12.5m,
+        100.25m,
+        .8m,
+        .81m,
+        .02m,
+        .83m,
+        .84m,
+        12.5m,
+        15m,
+        13.5m,
+        14.5m,
+        13.5m);
+
     private static readonly ManualQuotePayload Manual = new(100.25m, .83m);
 
     [Fact]
@@ -24,14 +36,16 @@ public sealed class QuotePersistenceContractTests
     [Fact]
     public void Current_payload_writes_and_reads_explicit_latest_variant_version()
     {
-        var calculatedJson = QuotePayloadPersistence.Serialize(Calculated);
-        var manualJson = QuotePayloadPersistence.Serialize(Manual);
+        string calculatedJson = QuotePayloadPersistence.Serialize(Calculated);
+        string manualJson = QuotePayloadPersistence.Serialize(Manual);
 
         using var calculatedDocument = JsonDocument.Parse(calculatedJson);
         using var manualDocument = JsonDocument.Parse(manualJson);
-        Assert.Equal(QuotePayloadPersistence.CalculatedV1,
+        Assert.Equal(
+            QuotePayloadPersistence.CalculatedV1,
             calculatedDocument.RootElement.GetProperty("type").GetString());
-        Assert.Equal(QuotePayloadPersistence.ManualV1,
+        Assert.Equal(
+            QuotePayloadPersistence.ManualV1,
             manualDocument.RootElement.GetProperty("type").GetString());
         Assert.Equal(Calculated, QuotePayloadPersistence.DeserializeCalculated(calculatedJson));
         Assert.Equal(Manual, QuotePayloadPersistence.DeserializeManual(manualJson));
@@ -50,13 +64,14 @@ public sealed class QuotePersistenceContractTests
     [Fact]
     public void Working_quote_mapper_round_trips_versioned_payload()
     {
-        var entity = WorkingEntity(QuotePayloadPersistence.Serialize(Calculated));
+        WorkingQuoteEntity entity = WorkingEntity(QuotePayloadPersistence.Serialize(Calculated));
 
-        var domain = WorkingQuoteMapper.ToDomain(entity);
-        var persisted = WorkingQuoteMapper.ToEntity(domain);
+        WorkingQuote domain = WorkingQuoteMapper.ToDomain(entity);
+        WorkingQuoteEntity persisted = WorkingQuoteMapper.ToEntity(domain);
 
         Assert.Equal(Calculated, domain.Calculated);
-        Assert.Equal(Calculated,
+        Assert.Equal(
+            Calculated,
             QuotePayloadPersistence.DeserializeCalculated(persisted.CalculatedPayloadJson!));
         Assert.Contains("\"type\":\"calculated-v1\"", persisted.CalculatedPayloadJson);
     }
@@ -77,8 +92,8 @@ public sealed class QuotePersistenceContractTests
             RequestReasonAnswered = QuoteRequestReason.Initial,
         };
 
-        var domain = ConfirmedQuoteMapper.ToDomain(entity);
-        var persisted = ConfirmedQuoteMapper.ToEntity(domain);
+        ConfirmedQuote domain = ConfirmedQuoteMapper.ToDomain(entity);
+        ConfirmedQuoteEntity persisted = ConfirmedQuoteMapper.ToEntity(domain);
 
         Assert.Equal(Manual, domain.Manual);
         Assert.Equal(Manual, QuotePayloadPersistence.DeserializeManual(persisted.ManualPayloadJson!));
