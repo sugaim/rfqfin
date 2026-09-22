@@ -12,6 +12,7 @@ import {
   useBulkPresentRfqsMutation,
   useBulkUnpresentRfqsMutation,
   useCancelRfqMutation,
+  useChangeContactOwnerMutation,
   useCloseAwayRfqMutation,
   useCloseHitRfqMutation,
   useConfirmAmendmentMutation,
@@ -25,6 +26,7 @@ import {
   useDiscardDraftMutation,
   useGetActiveSalesRfqsQuery,
   useGetAssignableTradersQuery,
+  useGetContactOwnerCandidatesQuery,
   useGetGridConfigQuery,
   useGetSalesRecentRevisionsQuery,
   useLazyResolveRfqCreationContextQuery,
@@ -49,6 +51,7 @@ export function SalesWorkspace() {
   const { currentUserId, remoteChangeVersion, acknowledgeRemoteChanges } = useOutletContext<AppOutletContext>()
   const rfqsQuery = useGetActiveSalesRfqsQuery()
   const tradersQuery = useGetAssignableTradersQuery()
+  const usersQuery = useGetContactOwnerCandidatesQuery()
   const gridConfigQuery = useGetGridConfigQuery({ screenId: 'sales', configKey: 'main' })
   const recentQuery = useGetSalesRecentRevisionsQuery(50)
   const [createDraft, createState] = useCreateDraftMutation()
@@ -63,6 +66,7 @@ export function SalesWorkspace() {
   const [correctToHit, correctToHitState] = useCorrectOutcomeToHitMutation()
   const [correctToAway, correctToAwayState] = useCorrectOutcomeToAwayMutation()
   const [cancelRfq, cancelState] = useCancelRfqMutation()
+  const [changeContactOwner, changeContactOwnerState] = useChangeContactOwnerMutation()
   const [reopenRfq, reopenState] = useReopenRfqMutation()
   const [createFromExisting, createFromExistingState] = useCreateFromExistingMutation()
   const [updateSalesMemo, updateSalesMemoState] = useUpdateSalesMemoMutation()
@@ -140,7 +144,7 @@ export function SalesWorkspace() {
   const mutationStates = [
     createState, updateState, confirmNewState, confirmState, discardState,
     presentState, unpresentState, closeHitState, closeAwayState, correctToHitState,
-    correctToAwayState, cancelState,
+    correctToAwayState, cancelState, changeContactOwnerState,
     reopenState, createFromExistingState, updateSalesMemoState, saveAmendmentState,
     confirmAmendmentState, discardAmendmentState, bulkAwayState, bulkCancelState,
     bulkPresentState, bulkUnpresentState, bulkConfirmDraftsState, bulkDiscardDraftsState,
@@ -152,6 +156,7 @@ export function SalesWorkspace() {
     clients={clients}
     securities={securities}
     traders={(tradersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))}
+    users={(usersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))}
     currentUserId={currentUserId}
     isLoading={rfqsQuery.isLoading || rfqsQuery.isFetching}
     isError={rfqsQuery.isError}
@@ -173,6 +178,9 @@ export function SalesWorkspace() {
     onClose={(caseId, outcome, expectedCurrentVersion) => (outcome === 'Hit' ? closeHitRfq : closeAwayRfq)({ caseId, expectedCurrentVersion }).unwrap().then(() => undefined)}
     onCorrectOutcome={(caseId, outcome, expectedCurrentVersion) => (outcome === 'Hit' ? correctToHit : correctToAway)({ caseId, expectedCurrentVersion }).unwrap().then(() => undefined)}
     onCancel={(row) => cancelRfq({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion }).unwrap().then(() => undefined)}
+    onChangeContactOwner={(caseId, targetUserId, expectedCurrentVersion) => changeContactOwner({
+      caseId, targetUserId, expectedCurrentVersion, confirmed: true,
+    }).unwrap().then(() => undefined)}
     onReopen={(row) => reopenRfq({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion }).unwrap().then(() => undefined)}
     onCreateFromExisting={(caseId) => createFromExisting(caseId).unwrap().then(() => undefined)}
     onUpdateMemo={(caseId, memo, expectedVersion) => updateSalesMemo({ caseId, memo, expectedVersion }).unwrap().then(() => undefined)}

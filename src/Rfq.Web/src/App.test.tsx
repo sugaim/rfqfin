@@ -300,6 +300,26 @@ describe('SalesScreen', () => {
     await waitFor(() => expect(onPresent).toHaveBeenCalledWith(101, 7))
   })
 
+  it('preserves Contact Owner handoff in the redesigned Work Pane', async () => {
+    const onChangeContactOwner = vi.fn().mockResolvedValue(undefined)
+    const quoted = {
+      ...draftRow,
+      rfqStatus: 'Active',
+      revisionStatus: 'Confirmed',
+      quoteStatus: 'Quoted',
+      currentVersion: 7,
+    }
+    render(<SalesScreen {...baseProps} rfqs={[quoted]}
+      onChangeContactOwner={onChangeContactOwner} />)
+    fireEvent.click(screen.getByText(/client-grid/))
+    fireEvent.mouseDown(screen.getByLabelText('Contact Owner'))
+    fireEvent.click(await screen.findByText('営業 一郎'))
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
+
+    await waitFor(() => expect(onChangeContactOwner).toHaveBeenCalledWith(101, 'sales-a', 7))
+  })
+
   it('shows the current quote ID in the same abbreviated form as Trader', () => {
     render(
       <SalesScreen

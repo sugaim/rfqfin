@@ -238,6 +238,22 @@ body {
   padding-top: 8px;
 }
 
+.owner-handoff {
+  margin-top: 12px;
+  border-top: 1px solid #262626;
+  padding-top: 8px;
+}
+
+.owner-handoff > .ant-typography {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.owner-handoff .ant-select {
+  flex: 1;
+  min-width: 0;
+}
+
 .memo-preview {
   display: inline-block;
   max-width: 190px;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, AutoComplete, Badge, Button, Descriptions, Drawer, Empty, Form, Input,
-  InputNumber, List, Modal, Select, Space, Spin, Tag, Tooltip, Typography, message,
+  InputNumber, List, Modal, Popconfirm, Select, Space, Spin, Tag, Tooltip, Typography, message,
 } from 'antd'
 import type {
   CellEditRequestEvent, ColDef, ColGroupDef, GetContextMenuItemsParams, GridApi,
@@ -96,7 +96,7 @@ function compactText(value: string, empty = '—') {
 
 export function SalesScreen(props: SalesScreenProps) {
   const {
-    rfqs, clients, securities, traders, currentUserId, isLoading, isError, isMutating,
+    rfqs, clients, securities, traders, users = [], currentUserId, isLoading, isError, isMutating,
     recentRevisions = [], recentRevisionsLoading = false, remoteUpdatePending = false,
     onTransientStateChange, onClientSearch, onSecuritySearch, onResolveDefaults,
     onCreate, onUpdate, onConfirmNew, onConfirmDraft, onDiscard, onPresent,
@@ -110,6 +110,7 @@ export function SalesScreen(props: SalesScreenProps) {
     onDiscardAmendment = async () => undefined,
     onBulk = async () => [],
     onCorrectOutcome = async () => undefined,
+    onChangeContactOwner = async () => undefined,
     onReload,
     gridConfigJson, onSaveGridConfig,
   } = props
@@ -120,6 +121,7 @@ export function SalesScreen(props: SalesScreenProps) {
   const [filterPreset, setFilterPreset] = useState<SalesFilterPreset>('all')
   const [memoEditing, setMemoEditing] = useState(false)
   const [memoDraft, setMemoDraft] = useState('')
+  const [targetContactOwnerId, setTargetContactOwnerId] = useState<string>()
   const [actionError, setActionError] = useState<string | null>(null)
   const [conflict, setConflict] = useState(false)
   const [defaultsLoading, setDefaultsLoading] = useState(false)
@@ -168,6 +170,7 @@ export function SalesScreen(props: SalesScreenProps) {
   const startNew = () => {
     setNewIntent(true)
     setSelectedCaseIds([])
+    setTargetContactOwnerId(undefined)
     gridApi?.deselectAll()
     form.resetFields()
     setActionError(null)
@@ -179,6 +182,7 @@ export function SalesScreen(props: SalesScreenProps) {
     setSelectedCaseIds([row.caseId])
     setMemoDraft(row.salesMemo)
     setMemoEditing(false)
+    setTargetContactOwnerId(undefined)
     setActionError(null)
     setConflict(false)
     if (row.revisionStatus === 'Draft') {
@@ -232,6 +236,7 @@ export function SalesScreen(props: SalesScreenProps) {
       await action()
       setNewIntent(false)
       setMemoEditing(false)
+      setTargetContactOwnerId(undefined)
       if (reload) await onReload()
     } catch (error) {
       const status = (error as { status?: number })?.status
@@ -580,6 +585,13 @@ export function SalesScreen(props: SalesScreenProps) {
           {mode === 'bulk' && <BulkPane rows={selectedRows} userId={currentUserId} onOpen={openBulk} />}
           {!['neutral', 'new', 'draft', 'bulk'].includes(mode) && selected && (
             <LifecyclePane row={selected} mode={mode} now={now} isMutating={isMutating}
+              users={users} currentUserId={currentUserId}
+              targetContactOwnerId={targetContactOwnerId}
+              onTargetContactOwnerChange={setTargetContactOwnerId}
+              onChangeContactOwner={() => targetContactOwnerId && void run(async () => {
+                await onChangeContactOwner(selected.caseId, targetContactOwnerId, selected.currentVersion)
+                setTargetContactOwnerId(undefined)
+              })}
               memoEditing={memoEditing} memoDraft={memoDraft}
               onMemoEdit={() => { setMemoDraft(selected.salesMemo); setMemoEditing(true) }}
               onMemoChange={setMemoDraft} onMemoCancel={() => setMemoEditing(false)}
@@ -632,9 +644,11 @@ function QuoteSummary({ row }: { row: SalesRfq }) {
   </div>
 }
 
-function LifecyclePane({ row, mode, now, isMutating, memoEditing, memoDraft,
-  onMemoEdit, onMemoChange, onMemoCancel, onMemoSave, onCorrectOutcome, onCommand }:
-  { row: SalesRfq; mode: string; now: number; isMutating: boolean; memoEditing: boolean; memoDraft: string; onMemoEdit: () => void; onMemoChange: (value: string) => void; onMemoCancel: () => void; onMemoSave: () => void; onCorrectOutcome: () => void; onCommand: (command: SalesCommand) => void }) {
+function LifecyclePane({ row, mode, now, isMutating, users, currentUserId,
+  targetContactOwnerId, onTargetContactOwnerChange, onChangeContactOwner,
+  memoEditing, memoDraft, onMemoEdit, onMemoChange, onMemoCancel, onMemoSave,
+  onCorrectOutcome, onCommand }:
+  { row: SalesRfq; mode: string; now: number; isMutating: boolean; users: UserOption[]; currentUserId: string; targetContactOwnerId?: string; onTargetContactOwnerChange: (value: string) => void; onChangeContactOwner: () => void; memoEditing: boolean; memoDraft: string; onMemoEdit: () => void; onMemoChange: (value: string) => void; onMemoCancel: () => void; onMemoSave: () => void; onCorrectOutcome: () => void; onCommand: (command: SalesCommand) => void }) {
   const amendment = row.draftRevisionId ? [
     row.draftNotional !== null && row.draftNotional !== undefined && row.draftNotional !== row.notional ? `Notl ${quoteValue(row.notional && row.notional / million, ' MM')} → ${quoteValue(row.draftNotional / million, ' MM')}` : null,
     row.draftSettlementDate && row.draftSettlementDate !== row.settlementDate ? `Settle ${row.settlementDate} → ${row.draftSettlementDate}` : null,
@@ -646,6 +660,7 @@ function LifecyclePane({ row, mode, now, isMutating, memoEditing, memoDraft,
       { key: 'notl', label: 'Notl', children: row.notional == null ? '—' : `${(row.notional / million).toLocaleString()} MM` },
       { key: 'settle', label: 'Settle', children: row.settlementDate ?? '—' },
       { key: 'trader', label: 'Trader', children: row.assignedTraderId },
+      { key: 'owner', label: 'Owner', children: users.find((user) => user.userId === row.contactOwnerId)?.name ?? row.contactOwnerId },
       { key: 'elapsed', label: 'Elapsed', children: `${elapsedLabel(row.stateSince, now)} · ${row.quoteRequestReason ?? 'current state'}` },
       { key: 'message', label: 'Message', children: compactText(row.salesAndTradingMessage) },
     ]} />
@@ -659,6 +674,21 @@ function LifecyclePane({ row, mode, now, isMutating, memoEditing, memoDraft,
       {(mode === 'hit' || mode === 'away') && <Button size="small" type="text" onClick={onCorrectOutcome}>Correct outcome</Button>}
       <Button size="small" type="text" onClick={() => onCommand('create-from-existing')}>Create New from Existing</Button>
     </div>
+    {row.contactOwnerId === currentUserId && <div className="owner-handoff">
+      <Typography.Text type="secondary">Contact Owner handoff</Typography.Text>
+      <Space.Compact block>
+        <Select size="small" aria-label="Contact Owner" value={targetContactOwnerId}
+          onChange={onTargetContactOwnerChange} options={users
+            .filter((user) => user.userId !== row.contactOwnerId)
+            .map((user) => ({ value: user.userId, label: user.name }))} />
+        <Popconfirm title={targetContactOwnerId
+          ? `Hand off Case ${row.caseId} to ${targetContactOwnerId}?`
+          : 'Select a Contact Owner.'}
+          disabled={!targetContactOwnerId} onConfirm={onChangeContactOwner}>
+          <Button size="small" disabled={!targetContactOwnerId || isMutating}>Change</Button>
+        </Popconfirm>
+      </Space.Compact>
+    </div>}
     <div className="memo-line">
       <Typography.Text type="secondary">Memo</Typography.Text>
       {memoEditing ? <><Input.TextArea aria-label="Sales-only Memo" size="small" autoSize={{ minRows: 2, maxRows: 4 }} value={memoDraft} onChange={(event) => onMemoChange(event.target.value)} /><Space><Button size="small" type="primary" loading={isMutating} onClick={onMemoSave}>Save</Button><Button size="small" onClick={onMemoCancel}>Cancel</Button></Space></> : <><Tooltip title={row.salesMemo}><span className="memo-preview">{compactText(row.salesMemo, 'No memo')}</span></Tooltip><Button size="small" type="link" onClick={onMemoEdit}>Edit</Button></>}
