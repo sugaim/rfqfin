@@ -51,6 +51,11 @@ vi.mock('@/services/api', async (importOriginal) => ({
     vi.fn(() => ({ unwrap: () => Promise.resolve([]) })),
     { isLoading: false },
   ],
+  useGetGridConfigQuery: () => ({ data: undefined }),
+  useSaveGridConfigMutation: () => [
+    vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) })),
+    { isLoading: false },
+  ],
 }))
 
 vi.mock('ag-grid-react', () => ({

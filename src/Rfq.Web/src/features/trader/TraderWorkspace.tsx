@@ -22,7 +22,6 @@ import {
   useGetActiveTraderRfqsQuery,
   useGetAssignableTradersQuery,
   useGetContactOwnerCandidatesQuery,
-  useGetDefaultQuoteModeQuery,
   useGetGridConfigQuery,
   useGetQuoteExpiryQuery,
   useLazySearchRfqsQuery,
@@ -30,7 +29,6 @@ import {
   usePresentQuoteMutation,
   useReleaseRfqMutation,
   useReopenRfqMutation,
-  useSaveDefaultQuoteModeMutation,
   useSaveGridConfigMutation,
   useScratchPriceMutation,
   useTakeOverRfqMutation,
@@ -61,7 +59,6 @@ export function TraderWorkspace() {
   const tradersQuery = useGetAssignableTradersQuery()
   const usersQuery = useGetContactOwnerCandidatesQuery()
   const quoteExpiryQuery = useGetQuoteExpiryQuery()
-  const defaultModeQuery = useGetDefaultQuoteModeQuery()
   const mainConfigQuery = useGetGridConfigQuery({
     screenId: 'trader',
     configKey: 'main',
@@ -76,7 +73,6 @@ export function TraderWorkspace() {
   })
   const [searchRfqs] = useLazySearchRfqsQuery()
   const [saveGridConfig] = useSaveGridConfigMutation()
-  const [saveDefaultMode] = useSaveDefaultQuoteModeMutation()
   const [pickUp, pickUpState] = usePickUpRfqMutation()
   const [release, releaseState] = useReleaseRfqMutation()
   const [assign, assignState] = useAssignTraderMutation()
@@ -278,7 +274,6 @@ export function TraderWorkspace() {
           ? quoteExpiryQuery.data.minutes
           : null
       }
-      defaultQuoteMode={defaultModeQuery.data?.mode ?? 'Calculated'}
       isLoading={
         rfqsQuery.isLoading || (refreshMode === 'live' && rfqsQuery.isFetching)
       }
@@ -415,11 +410,6 @@ export function TraderWorkspace() {
       onBulk={runBulk}
       onSearch={(params: RfqSearchParams) => searchRfqs(params).unwrap()}
       onScratchPrice={(input) => scratch(input).unwrap()}
-      onSaveDefaultQuoteMode={(mode) =>
-        saveDefaultMode({ mode })
-          .unwrap()
-          .then(() => undefined)
-      }
       mainGridConfigJson={configJson(mainConfigQuery.data?.config)}
       searchGridConfigJson={configJson(searchConfigQuery.data?.config)}
       confirmGridConfigJson={configJson(confirmConfigQuery.data?.config)}

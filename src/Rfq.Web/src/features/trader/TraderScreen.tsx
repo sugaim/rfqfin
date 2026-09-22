@@ -72,6 +72,12 @@ import {
   type TraderPaneTab,
   type TraderRefreshMode,
 } from '@/features/trader/traderModel'
+import {
+  applyGridLayout,
+  gridLayoutMenu,
+  initializeGridLayout,
+  type GridColumnGroupState,
+} from '@/features/grid/gridLayout'
 
 type UserOption = { userId: string; name: string }
 type RfqOutcome = 'Hit' | 'Away'
@@ -162,7 +168,6 @@ export interface TraderScreenProps {
   currentUserId: string
   businessDate?: string
   defaultExpiryMinutes: number | null
-  defaultQuoteMode?: 'Calculated' | 'Manual'
   isLoading: boolean
   isError: boolean
   isMutating: boolean
@@ -236,7 +241,6 @@ export interface TraderScreenProps {
     value: number
     simpleYieldSlide: number
   }) => Promise<CalculatedQuotePayload>
-  onSaveDefaultQuoteMode?: (mode: 'Calculated' | 'Manual') => Promise<void>
   mainGridConfigJson?: string
   searchGridConfigJson?: string
   confirmGridConfigJson?: string
@@ -252,7 +256,6 @@ export function TraderScreen(props: TraderScreenProps) {
     currentUserId,
     businessDate = new Date().toISOString().slice(0, 10),
     defaultExpiryMinutes,
-    defaultQuoteMode = 'Calculated',
     isLoading,
     isError,
     isMutating,
@@ -284,7 +287,6 @@ export function TraderScreen(props: TraderScreenProps) {
     onBulk = async () => [],
     onSearch = async () => ({ items: [], requiresNarrowing: false }),
     onScratchPrice,
-    onSaveDefaultQuoteMode,
     mainGridConfigJson,
     searchGridConfigJson,
     confirmGridConfigJson,
@@ -314,8 +316,6 @@ export function TraderScreen(props: TraderScreenProps) {
   )
   const [actionError, setActionError] = useState<string | null>(null)
   const [calcStates, setCalcStates] = useState<Record<number, CalcState>>({})
-  const [preferencesOpen, setPreferencesOpen] = useState(false)
-  const [preferredMode, setPreferredMode] = useState(defaultQuoteMode)
   const [scratch, setScratch] = useState<ScratchState>({
     securityId: '',
     notional: null,
@@ -334,6 +334,9 @@ export function TraderScreen(props: TraderScreenProps) {
   const mainGrid = useRef<GridApi<TraderRfq> | null>(null)
   const searchGrid = useRef<GridApi<RfqSearchItem> | null>(null)
   const confirmGrid = useRef<GridApi<TraderRfq> | null>(null)
+  const defaultColumnGroupStates = useRef<
+    Record<GridConfigKey, GridColumnGroupState>
+  >({ main: [], search: [], confirm: [] })
   const activeGridRegion = useRef<HTMLDivElement>(null)
   const searchCaseInput = useRef<InputRef>(null)
   const requestSequence = useRef(0)
@@ -372,7 +375,6 @@ export function TraderScreen(props: TraderScreenProps) {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
     return () => window.clearInterval(timer)
   }, [])
-  useEffect(() => setPreferredMode(defaultQuoteMode), [defaultQuoteMode])
   useEffect(() => {
     setSelectedCaseIds((ids) =>
       ids.filter((id) => rfqs.some((row) => row.caseId === id)),
@@ -384,18 +386,49 @@ export function TraderScreen(props: TraderScreenProps) {
       setActiveCaseId(undefined)
   }, [activeCaseId, rfqs])
 
-  const applyConfig = (api: GridApi, json: string | undefined) => {
-    if (!json) return
-    try {
-      api.applyColumnState({ state: JSON.parse(json), applyOrder: true })
-    } catch {
-      api.resetColumnState()
-    }
-  }
-  const saveLayout = async (key: GridConfigKey, api: GridApi | null) => {
-    if (api && onSaveGridConfig)
-      await onSaveGridConfig(key, JSON.stringify(api.getColumnState()))
-  }
+  const configFor = (key: GridConfigKey) =>
+    key === 'main'
+      ? mainGridConfigJson
+      : key === 'search'
+        ? searchGridConfigJson
+        : confirmGridConfigJson
+
+  const layoutMenu = <T,>(key: GridConfigKey, api: GridApi<T>) =>
+    gridLayoutMenu({
+      api,
+      configJson: configFor(key),
+      defaultColumnGroupState: defaultColumnGroupStates.current[key],
+      onSave: onSaveGridConfig
+        ? (configJson) => onSaveGridConfig(key, configJson)
+        : undefined,
+    })
+
+  useEffect(() => {
+    if (mainGrid.current)
+      applyGridLayout(
+        mainGrid.current,
+        mainGridConfigJson,
+        defaultColumnGroupStates.current.main,
+      )
+  }, [mainGridConfigJson])
+
+  useEffect(() => {
+    if (searchGrid.current)
+      applyGridLayout(
+        searchGrid.current,
+        searchGridConfigJson,
+        defaultColumnGroupStates.current.search,
+      )
+  }, [searchGridConfigJson])
+
+  useEffect(() => {
+    if (confirmGrid.current)
+      applyGridLayout(
+        confirmGrid.current,
+        confirmGridConfigJson,
+        defaultColumnGroupStates.current.confirm,
+      )
+  }, [confirmGridConfigJson])
 
   const reconcileAfterSuccess = async () => {
     if (refreshMode === 'live') await onReload()
@@ -972,7 +1005,6 @@ export function TraderScreen(props: TraderScreenProps) {
       if (!event.altKey) {
         if (event.key === 'Escape') {
           setConfirmRows(null)
-          setPreferencesOpen(false)
         }
         return
       }
@@ -1144,8 +1176,10 @@ export function TraderScreen(props: TraderScreenProps) {
                   tooltipShowDelay={350}
                   onGridReady={({ api }) => {
                     mainGrid.current = api
-                    applyConfig(api, mainGridConfigJson)
+                    defaultColumnGroupStates.current.main =
+                      initializeGridLayout(api, mainGridConfigJson)
                   }}
+                  getContextMenuItems={({ api }) => [layoutMenu('main', api)]}
                   onRowClicked={({ data }: RowClickedEvent<TraderRfq>) => {
                     if (data) {
                       setActiveCaseId(data.caseId)
@@ -1185,24 +1219,6 @@ export function TraderScreen(props: TraderScreenProps) {
                     onClick={() => setSearchFiltersOpen((value) => !value)}
                   >
                     {searchFiltersOpen ? 'Hide filters' : 'Filters'}
-                  </Button>
-                  <Button
-                    type="text"
-                    size="small"
-                    disabled={!searchGrid.current || !onSaveGridConfig}
-                    onClick={() =>
-                      void saveLayout('search', searchGrid.current)
-                    }
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    type="text"
-                    size="small"
-                    disabled={!searchGrid.current}
-                    onClick={() => searchGrid.current?.resetColumnState()}
-                  >
-                    Reset
                   </Button>
                 </Space>
               )}
@@ -1315,8 +1331,12 @@ export function TraderScreen(props: TraderScreenProps) {
                     headerHeight={29}
                     onGridReady={({ api }) => {
                       searchGrid.current = api
-                      applyConfig(api, searchGridConfigJson)
+                      defaultColumnGroupStates.current.search =
+                        initializeGridLayout(api, searchGridConfigJson)
                     }}
+                    getContextMenuItems={({ api }) => [
+                      layoutMenu('search', api),
+                    ]}
                   />
                 </div>
               </div>
@@ -1370,11 +1390,6 @@ export function TraderScreen(props: TraderScreenProps) {
                       onReopen={onReopen}
                       onCorrectOutcome={onCorrectOutcome}
                       onChangeContactOwner={onChangeContactOwner}
-                      onPreferences={() => setPreferencesOpen(true)}
-                      onSaveMain={() =>
-                        void saveLayout('main', mainGrid.current)
-                      }
-                      onResetMain={() => mainGrid.current?.resetColumnState()}
                     />
                   ),
                 },
@@ -1457,24 +1472,6 @@ export function TraderScreen(props: TraderScreenProps) {
               })),
             ]}
           />
-          <Space size={4}>
-            <Button
-              type="text"
-              size="small"
-              disabled={!confirmGrid.current || !onSaveGridConfig}
-              onClick={() => void saveLayout('confirm', confirmGrid.current)}
-            >
-              Save columns
-            </Button>
-            <Button
-              type="text"
-              size="small"
-              disabled={!confirmGrid.current}
-              onClick={() => confirmGrid.current?.resetColumnState()}
-            >
-              Reset
-            </Button>
-          </Space>
         </div>
         <div className="trader-confirm-grid">
           <AgGridReact<TraderRfq>
@@ -1486,35 +1483,14 @@ export function TraderScreen(props: TraderScreenProps) {
             defaultColDef={{ resizable: true }}
             onGridReady={({ api }) => {
               confirmGrid.current = api
-              applyConfig(api, confirmGridConfigJson)
+              defaultColumnGroupStates.current.confirm = initializeGridLayout(
+                api,
+                confirmGridConfigJson,
+              )
             }}
+            getContextMenuItems={({ api }) => [layoutMenu('confirm', api)]}
           />
         </div>
-      </Modal>
-
-      <Modal
-        title="Trader Preferences"
-        open={preferencesOpen}
-        onCancel={() => setPreferencesOpen(false)}
-        okText="Save"
-        onOk={() =>
-          void onSaveDefaultQuoteMode?.(preferredMode).then(() =>
-            setPreferencesOpen(false),
-          )
-        }
-      >
-        <Typography.Text>Default Quote Mode</Typography.Text>
-        <Segmented
-          block
-          value={preferredMode}
-          options={['Calculated', 'Manual']}
-          onChange={(value) =>
-            setPreferredMode(value as 'Calculated' | 'Manual')
-          }
-        />
-        <Typography.Paragraph type="secondary">
-          Applies only to newly created Working Quotes.
-        </Typography.Paragraph>
       </Modal>
     </div>
   )
@@ -1546,9 +1522,6 @@ function OperationsPane({
   onReopen,
   onCorrectOutcome,
   onChangeContactOwner,
-  onPreferences,
-  onSaveMain,
-  onResetMain,
 }: {
   selected?: TraderRfq
   selectedRows: TraderRfq[]
@@ -1584,9 +1557,6 @@ function OperationsPane({
   onReopen?: TraderScreenProps['onReopen']
   onCorrectOutcome: TraderScreenProps['onCorrectOutcome']
   onChangeContactOwner: TraderScreenProps['onChangeContactOwner']
-  onPreferences: () => void
-  onSaveMain: () => void
-  onResetMain: () => void
 }) {
   if (!selected)
     return (
@@ -1941,17 +1911,6 @@ function OperationsPane({
           </Space>
         </>
       )}
-      <div className="trader-pane-footer">
-        <Button type="text" size="small" onClick={onPreferences}>
-          Preferences
-        </Button>
-        <Button type="text" size="small" onClick={onSaveMain}>
-          Save Grid
-        </Button>
-        <Button type="text" size="small" onClick={onResetMain}>
-          Reset Grid
-        </Button>
-      </div>
     </div>
   )
 }

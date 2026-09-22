@@ -3,6 +3,8 @@ import { Modal } from 'antd'
 import {
   useCommitPostProcessMutation,
   useGetPostProcessQuery,
+  useGetGridConfigQuery,
+  useSaveGridConfigMutation,
   type PostProcessPreset,
   type PostProcessScope,
 } from '@/services/api'
@@ -16,7 +18,12 @@ export function PostProcessWorkspace() {
   const [scope, setScope] = useState<PostProcessScope>('Mine')
   const [hasPending, setHasPending] = useState(false)
   const query = useGetPostProcessQuery({ preset, scope })
+  const gridConfigQuery = useGetGridConfigQuery({
+    screenId: 'post-process',
+    configKey: 'main',
+  })
   const [commit, commitState] = useCommitPostProcessMutation()
+  const [saveGridConfig] = useSaveGridConfigMutation()
   const blocker = useBlocker(hasPending)
 
   return (
@@ -34,6 +41,21 @@ export function PostProcessWorkspace() {
         onRefresh={() => query.refetch().then(() => undefined)}
         onCommit={(items) => commit({ items }).unwrap()}
         onPendingChange={setHasPending}
+        gridConfigJson={
+          gridConfigQuery.data
+            ? JSON.stringify(gridConfigQuery.data.config)
+            : undefined
+        }
+        onSaveGridConfig={(configJson) =>
+          saveGridConfig({
+            screenId: 'post-process',
+            configKey: 'main',
+            version: (gridConfigQuery.data?.version ?? 0) + 1,
+            config: JSON.parse(configJson),
+          })
+            .unwrap()
+            .then(() => undefined)
+        }
       />
       <Modal
         title="Discard uncommitted Post Process changes?"

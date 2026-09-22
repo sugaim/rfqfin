@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Rfq.Infrastructure;
 
 #nullable disable
 
-namespace Rfq.Infrastructure.Migrations
+namespace Rfq.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(RfqDbContext))]
-    partial class RfqDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922124314_AddUserThemeSetting")]
+    partial class AddUserThemeSetting
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

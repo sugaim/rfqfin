@@ -64,6 +64,12 @@ import {
   type SalesRowCommand,
   type SalesFilterPreset,
 } from '@/features/sales/salesModel'
+import {
+  applyGridLayout,
+  gridLayoutMenu,
+  initializeGridLayout,
+  type GridColumnGroupState,
+} from '@/features/grid/gridLayout'
 
 type UserOption = { userId: string; name: string }
 type BulkSnapshotItem = { row: SalesRfq; eligible: boolean; reason?: string }
@@ -222,6 +228,7 @@ export function SalesScreen(props: SalesScreenProps) {
   } = props
   const [form] = Form.useForm<RfqFormValues>()
   const [gridApi, setGridApi] = useState<GridApi<SalesRfq> | null>(null)
+  const defaultColumnGroupState = useRef<GridColumnGroupState>([])
   const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([])
   const [activeCaseId, setActiveCaseId] = useState<number>()
   const [workPaneTab, setWorkPaneTab] = useState<'rfq' | 'bulk'>('rfq')
@@ -284,14 +291,7 @@ export function SalesScreen(props: SalesScreenProps) {
 
   useEffect(() => {
     if (!gridApi || !gridConfigJson) return
-    try {
-      gridApi.applyColumnState({
-        state: JSON.parse(gridConfigJson),
-        applyOrder: true,
-      })
-    } catch {
-      /* obsolete layouts reset to the application default */
-    }
+    applyGridLayout(gridApi, gridConfigJson, defaultColumnGroupState.current)
   }, [gridApi, gridConfigJson])
 
   const startNew = () => {
@@ -559,51 +559,53 @@ export function SalesScreen(props: SalesScreenProps) {
     params: GetContextMenuItemsParams<SalesRfq>,
   ): (DefaultMenuItem | MenuItemDef<SalesRfq>)[] => {
     const row = params.node?.data
-    if (!row) return []
     const items: (DefaultMenuItem | MenuItemDef<SalesRfq>)[] = []
-    const add = (command: SalesCommand, label: string) => {
-      if (commandEligible(command, row, currentUserId))
-        items.push({
-          name: label,
-          action: () =>
-            requestCommand(
-              command,
-              row,
-              requiresConfirmation('context-menu', command),
-            ),
-        })
+    if (row) {
+      const add = (command: SalesCommand, label: string) => {
+        if (commandEligible(command, row, currentUserId))
+          items.push({
+            name: label,
+            action: () =>
+              requestCommand(
+                command,
+                row,
+                requiresConfirmation('context-menu', command),
+              ),
+          })
+      }
+      add('present', 'Present')
+      add('unpresent', 'Unpresent')
+      add('hit', 'Hit')
+      add('away', 'Away')
+      add('cancel', 'Cancel')
+      add('reopen', 'Reopen')
+      add('confirm-amendment', 'Confirm Amendment')
+      add('discard-amendment', 'Discard Amendment')
+      if (items.length) items.push('separator')
+      items.push({
+        name: 'Create New from Existing',
+        action: () => void executeCommand('create-from-existing', row),
+      })
+      items.push({
+        name: 'Copy',
+        subMenu: [
+          {
+            name: 'Case ID',
+            action: () =>
+              void navigator.clipboard.writeText(String(row.caseId)),
+          },
+          {
+            name: 'Security ID',
+            action: () => void navigator.clipboard.writeText(row.securityId),
+          },
+          {
+            name: 'Client ID',
+            action: () => void navigator.clipboard.writeText(row.clientId),
+          },
+        ],
+      })
     }
-    add('present', 'Present')
-    add('unpresent', 'Unpresent')
-    add('hit', 'Hit')
-    add('away', 'Away')
-    add('cancel', 'Cancel')
-    add('reopen', 'Reopen')
-    add('confirm-amendment', 'Confirm Amendment')
-    add('discard-amendment', 'Discard Amendment')
     if (items.length) items.push('separator')
-    items.push({
-      name: 'Create New from Existing',
-      action: () => void executeCommand('create-from-existing', row),
-    })
-    items.push({
-      name: 'Copy',
-      subMenu: [
-        {
-          name: 'Case ID',
-          action: () => void navigator.clipboard.writeText(String(row.caseId)),
-        },
-        {
-          name: 'Security ID',
-          action: () => void navigator.clipboard.writeText(row.securityId),
-        },
-        {
-          name: 'Client ID',
-          action: () => void navigator.clipboard.writeText(row.clientId),
-        },
-      ],
-    })
-    items.push('separator')
     items.push({
       name: 'Select All Filtered',
       action: () =>
@@ -613,6 +615,15 @@ export function SalesScreen(props: SalesScreenProps) {
       name: 'Clear Selection',
       action: () => params.api.deselectAll(),
     })
+    items.push('separator')
+    items.push(
+      gridLayoutMenu({
+        api: params.api,
+        configJson: gridConfigJson,
+        defaultColumnGroupState: defaultColumnGroupState.current,
+        onSave: onSaveGridConfig,
+      }),
+    )
     return items
   }
 
@@ -988,24 +999,6 @@ export function SalesScreen(props: SalesScreenProps) {
           <Button size="small" onClick={() => setDrawerOpen(true)}>
             Recent Revisions
           </Button>
-          <Button
-            size="small"
-            disabled={!gridApi || !onSaveGridConfig}
-            onClick={() =>
-              gridApi &&
-              onSaveGridConfig &&
-              void onSaveGridConfig(JSON.stringify(gridApi.getColumnState()))
-            }
-          >
-            Save Layout
-          </Button>
-          <Button
-            size="small"
-            disabled={!gridApi}
-            onClick={() => gridApi?.resetColumnState()}
-          >
-            Reset Layout
-          </Button>
           <Tooltip title="Refresh latest snapshot">
             <Button
               size="small"
@@ -1062,7 +1055,13 @@ export function SalesScreen(props: SalesScreenProps) {
                   checkboxes: false,
                   headerCheckbox: false,
                 }}
-                onGridReady={({ api }) => setGridApi(api)}
+                onGridReady={({ api }) => {
+                  setGridApi(api)
+                  defaultColumnGroupState.current = initializeGridLayout(
+                    api,
+                    gridConfigJson,
+                  )
+                }}
                 onRowClicked={({ data }: RowClickedEvent<SalesRfq>) =>
                   data && selectRow(data)
                 }

@@ -12,6 +12,7 @@ public sealed class MeController(
     ICurrentUser currentUser,
     IQuoteExpirySettings expirySettings,
     IQuoteModeSettings quoteModeSettings,
+    IThemeSettings themeSettings,
     IGridConfigStore gridConfigs) : ControllerBase
 {
     [HttpGet]
@@ -48,6 +49,20 @@ public sealed class MeController(
                 QuoteApiMapper.ToDomain(request.Mode),
                 cancellationToken)));
 
+    [HttpGet("settings/theme")]
+    public async Task<ThemeResponse> GetTheme(CancellationToken cancellationToken) =>
+        new(MeApiMapper.ToApi(
+            await themeSettings.GetAsync(currentUser.User.UserId, cancellationToken)));
+
+    [HttpPut("settings/theme")]
+    public async Task<ThemeResponse> PutTheme(
+        ThemeRequest request,
+        CancellationToken cancellationToken) => new(MeApiMapper.ToApi(
+            await themeSettings.SaveAsync(
+                currentUser.User.UserId,
+                MeApiMapper.ToApplication(request.Mode),
+                cancellationToken)));
+
     [HttpGet("grid-configs/{screenId}/{configKey}")]
     public async Task<ActionResult<GridConfigResponse>> GetGridConfig(
         string screenId, string configKey, CancellationToken cancellationToken)
@@ -77,8 +92,20 @@ public enum UserRoleValue
 }
 
 public sealed record MeResponse(string UserId, IReadOnlyList<UserRoleValue> Roles, string DeskId);
+
 public sealed record QuoteModeRequest([Required] QuoteMode Mode);
+
 public sealed record QuoteModeResponse(QuoteMode Mode);
+
+public enum ThemeMode
+{
+    Light,
+    Dark
+}
+
+public sealed record ThemeRequest([Required] ThemeMode? Mode);
+
+public sealed record ThemeResponse(ThemeMode Mode);
 
 public sealed record GridConfigRequest(
     [Range(1, int.MaxValue)] int Version,
@@ -98,6 +125,21 @@ public static class MeApiMapper
         UserRole.Sales => UserRoleValue.Sales,
         UserRole.Trader => UserRoleValue.Trader,
         _ => throw new InvalidOperationException("Unknown User Role."),
+    };
+
+    public static ThemeMode ToApi(AppThemeMode value) => value switch
+    {
+        AppThemeMode.Light => ThemeMode.Light,
+        AppThemeMode.Dark => ThemeMode.Dark,
+        _ => throw new InvalidOperationException("Unknown application theme mode."),
+    };
+
+    public static AppThemeMode ToApplication(ThemeMode? value) => value switch
+    {
+        ThemeMode.Light => AppThemeMode.Light,
+        ThemeMode.Dark => AppThemeMode.Dark,
+        null => throw new RfqRequestValidationException("Theme mode is required."),
+        _ => throw new RfqRequestValidationException("Theme mode is invalid."),
     };
 
     public static GridConfigResponse ToApi(GridConfig value)

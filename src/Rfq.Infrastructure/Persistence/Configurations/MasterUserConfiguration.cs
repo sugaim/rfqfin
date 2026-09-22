@@ -16,6 +16,8 @@ internal sealed class PostgreSqlMasterUserConfiguration : IEntityTypeConfigurati
         builder.Property(entity => entity.DefaultQuoteExpiryMinutes).HasColumnName("default_quote_expiry_minutes");
         builder.Property(entity => entity.DefaultQuoteMode).HasColumnName("default_quote_mode")
             .HasConversion<string>().HasMaxLength(20);
+        builder.Property(entity => entity.Theme).HasColumnName("theme")
+            .HasConversion<string>().HasMaxLength(20);
         builder.HasOne<DeskEntity>().WithMany().HasForeignKey(entity => entity.DeskId)
             .OnDelete(DeleteBehavior.Restrict);
     }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Button,
@@ -13,6 +13,7 @@ import {
 import type {
   CellEditRequestEvent,
   ColDef,
+  GridApi,
   ICellRendererParams,
   RowClassParams,
 } from 'ag-grid-community'
@@ -32,6 +33,12 @@ import {
   toCommitItem,
   type PendingPostProcessChange,
 } from '@/features/post-process/postProcessModel'
+import {
+  applyGridLayout,
+  gridLayoutMenu,
+  initializeGridLayout,
+  type GridColumnGroupState,
+} from '@/features/grid/gridLayout'
 
 const million = 1_000_000
 
@@ -48,6 +55,8 @@ export interface PostProcessScreenProps {
   onRefresh: () => Promise<void>
   onCommit: (items: PostProcessCommitItem[]) => Promise<BulkItemResult[]>
   onPendingChange?: (hasPending: boolean) => void
+  gridConfigJson?: string
+  onSaveGridConfig?: (configJson: string) => Promise<void>
 }
 
 export function PostProcessScreen({
@@ -63,7 +72,11 @@ export function PostProcessScreen({
   onRefresh,
   onCommit,
   onPendingChange,
+  gridConfigJson,
+  onSaveGridConfig,
 }: PostProcessScreenProps) {
+  const gridApi = useRef<GridApi<PostProcessItem> | null>(null)
+  const defaultColumnGroupState = useRef<GridColumnGroupState>([])
   const [pending, setPending] = useState<
     Record<number, PendingPostProcessChange>
   >({})
@@ -114,6 +127,15 @@ export function PostProcessScreen({
   useEffect(() => {
     onPendingChange?.(pendingChanges.length > 0)
   }, [onPendingChange, pendingChanges.length])
+
+  useEffect(() => {
+    if (gridApi.current)
+      applyGridLayout(
+        gridApi.current,
+        gridConfigJson,
+        defaultColumnGroupState.current,
+      )
+  }, [gridConfigJson])
 
   const updatePending = (
     row: PostProcessItem,
@@ -467,6 +489,21 @@ export function PostProcessScreen({
               }: RowClassParams<PostProcessItem>) =>
                 Boolean(data && pending[data.caseId]),
             }}
+            onGridReady={({ api }) => {
+              gridApi.current = api
+              defaultColumnGroupState.current = initializeGridLayout(
+                api,
+                gridConfigJson,
+              )
+            }}
+            getContextMenuItems={({ api }) => [
+              gridLayoutMenu({
+                api,
+                configJson: gridConfigJson,
+                defaultColumnGroupState: defaultColumnGroupState.current,
+                onSave: onSaveGridConfig,
+              }),
+            ]}
           />
         </div>
       </Spin>

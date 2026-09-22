@@ -14,8 +14,25 @@ vi.mock('@/services/api', () => ({
     isLoading: false,
     isError: false,
   }),
-  useGetMeQuery: () => ({ data: { userId: 'sales-dev' } }),
+  useGetMeQuery: () => ({
+    data: { userId: 'sales-dev', roles: ['Sales'], deskId: 'jpy-credit' },
+  }),
   useGetEventsQuery: () => ({ data: [], refetch: vi.fn() }),
+  useGetThemeQuery: () => ({
+    data: { mode: 'Dark' },
+    isLoading: false,
+  }),
+  useGetDefaultQuoteModeQuery: () => ({
+    data: { mode: 'Calculated' },
+    isLoading: false,
+  }),
+  useGetQuoteExpiryQuery: () => ({
+    data: { type: 'None', minutes: null },
+    isLoading: false,
+  }),
+  useSaveThemeMutation: () => [vi.fn(), { isLoading: false }],
+  useSaveDefaultQuoteModeMutation: () => [vi.fn(), { isLoading: false }],
+  useSaveQuoteExpiryMutation: () => [vi.fn(), { isLoading: false }],
 }))
 
 vi.mock('@/features/sales/SalesWorkspace', () => ({

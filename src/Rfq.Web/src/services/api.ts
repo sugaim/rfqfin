@@ -406,6 +406,10 @@ export interface QuoteModeSetting {
   mode: 'Calculated' | 'Manual'
 }
 
+export interface ThemeSetting {
+  mode: 'Light' | 'Dark'
+}
+
 export interface ApiProblemDetails {
   status?: number
   title?: string
@@ -418,7 +422,7 @@ export interface ApiProblemDetails {
 
 export const api = createApi({
   reducerPath: 'api',
-  tagTypes: ['PostProcess'],
+  tagTypes: ['PostProcess', 'QuoteExpiry', 'QuoteMode', 'Theme', 'GridConfig'],
   baseQuery: fetchBaseQuery({
     baseUrl: '/api',
     prepareHeaders: (headers) => {
@@ -482,6 +486,9 @@ export const api = createApi({
     >({
       query: ({ screenId, configKey }) =>
         `/me/grid-configs/${screenId}/${configKey}`,
+      providesTags: (_result, _error, { screenId, configKey }) => [
+        { type: 'GridConfig', id: `${screenId}/${configKey}` },
+      ],
     }),
     saveGridConfig: builder.mutation<
       GridConfig,
@@ -492,9 +499,13 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
+      invalidatesTags: (_result, _error, { screenId, configKey }) => [
+        { type: 'GridConfig', id: `${screenId}/${configKey}` },
+      ],
     }),
     getQuoteExpiry: builder.query<QuoteExpiry, void>({
       query: () => '/me/settings/quote-expiry',
+      providesTags: ['QuoteExpiry'],
     }),
     saveQuoteExpiry: builder.mutation<QuoteExpiry, QuoteExpiry>({
       query: (body) => ({
@@ -502,9 +513,11 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
+      invalidatesTags: ['QuoteExpiry'],
     }),
     getDefaultQuoteMode: builder.query<QuoteModeSetting, void>({
       query: () => '/me/settings/default-quote-mode',
+      providesTags: ['QuoteMode'],
     }),
     saveDefaultQuoteMode: builder.mutation<QuoteModeSetting, QuoteModeSetting>({
       query: (body) => ({
@@ -512,6 +525,19 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
+      invalidatesTags: ['QuoteMode'],
+    }),
+    getTheme: builder.query<ThemeSetting, void>({
+      query: () => '/me/settings/theme',
+      providesTags: ['Theme'],
+    }),
+    saveTheme: builder.mutation<ThemeSetting, ThemeSetting>({
+      query: (body) => ({
+        url: '/me/settings/theme',
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Theme'],
     }),
     createDraft: builder.mutation<InitialRfqResponse, CreateDraftRequest>({
       query: (body) => ({
@@ -1071,8 +1097,10 @@ export const {
   useGetBusinessDateQuery,
   useGetQuoteExpiryQuery,
   useGetDefaultQuoteModeQuery,
+  useGetThemeQuery,
   useSaveDefaultQuoteModeMutation,
   useSaveQuoteExpiryMutation,
+  useSaveThemeMutation,
   useGetAssignableTradersQuery,
   useGetContactOwnerCandidatesQuery,
   useLazyResolveRfqCreationContextQuery,

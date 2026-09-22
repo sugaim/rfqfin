@@ -1,4 +1,40 @@
 :root {
+  --app-page-bg: #000;
+  --app-header-bg: #001529;
+  --app-content-bg: #141414;
+  --app-panel-bg: #111;
+  --app-panel-recessed-bg: #0d0d0d;
+  --app-panel-raised-bg: #171717;
+  --app-text: rgba(255, 255, 255, 0.85);
+  --app-text-secondary: #8c8c8c;
+  --app-text-tertiary: #777;
+  --app-text-quiet: #707070;
+  --app-border: #303030;
+  --app-border-subtle: #292929;
+  --app-separator: #262626;
+  --pane-accent: #45667f;
+  --pane-quoted-accent: #ad7b21;
+  --draft-accent: #6750a4;
+  --terminal-accent: #5b5b5b;
+  --row-sales-quoted-bg: rgba(153, 103, 20, 0.22);
+  --row-sales-draft-bg: rgba(74, 57, 111, 0.16);
+  --row-trader-attention-high-bg: rgba(165, 67, 48, 0.22);
+  --row-trader-attention-work-bg: rgba(173, 123, 33, 0.12);
+  --row-post-process-unclosed-bg: rgba(173, 123, 33, 0.12);
+  --row-terminal-bg: rgba(255, 255, 255, 0.025);
+  --row-terminal-fg: rgba(255, 255, 255, 0.48);
+  --row-selection-indicator: #4ea3d8;
+  --row-pending-change-indicator: #4ea3d8;
+  --amendment-changed-bg: rgba(112, 76, 157, 0.5);
+  --amendment-changed-indicator: #a984e5;
+  --amendment-panel-bg: #18141f;
+  --amendment-panel-indicator: #7657b1;
+  --result-success: #497a55;
+  --result-warning: #ad7b21;
+  --result-error: #a33d3d;
+  --failure-bg: #a33d3d;
+  --failure-fg: #fff;
+  --pricer-source-bg: #15191c;
   font-family:
     Inter,
     system-ui,
@@ -6,11 +42,49 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  color: rgba(255, 255, 255, 0.85);
-  background: #000;
-  color-scheme: dark;
+  color: var(--app-text);
+  background: var(--app-page-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+:root[data-app-theme='light'] {
+  --app-page-bg: #f3f4f6;
+  --app-header-bg: #fff;
+  --app-content-bg: #fff;
+  --app-panel-bg: #fff;
+  --app-panel-recessed-bg: #f8fafc;
+  --app-panel-raised-bg: #fff;
+  --app-text: #1f2328;
+  --app-text-secondary: #57606a;
+  --app-text-tertiary: #6e7781;
+  --app-text-quiet: #737d8c;
+  --app-border: #d0d7de;
+  --app-border-subtle: #d8dee4;
+  --app-separator: #e5e7eb;
+  --pane-accent: #537a99;
+  --pane-quoted-accent: #9a6700;
+  --draft-accent: #7657b1;
+  --terminal-accent: #8c959f;
+  --row-sales-quoted-bg: rgba(191, 135, 0, 0.16);
+  --row-sales-draft-bg: rgba(118, 87, 177, 0.1);
+  --row-trader-attention-high-bg: rgba(207, 66, 43, 0.14);
+  --row-trader-attention-work-bg: rgba(191, 135, 0, 0.12);
+  --row-post-process-unclosed-bg: rgba(191, 135, 0, 0.12);
+  --row-terminal-bg: rgba(31, 35, 40, 0.035);
+  --row-terminal-fg: rgba(31, 35, 40, 0.55);
+  --row-selection-indicator: #1677ff;
+  --row-pending-change-indicator: #0969da;
+  --amendment-changed-bg: rgba(130, 80, 190, 0.16);
+  --amendment-changed-indicator: #8250df;
+  --amendment-panel-bg: #f7f1ff;
+  --amendment-panel-indicator: #8250df;
+  --result-success: #1a7f37;
+  --result-warning: #9a6700;
+  --result-error: #cf222e;
+  --failure-bg: #cf222e;
+  --failure-fg: #fff;
+  --pricer-source-bg: #eef4f7;
 }
 
 * {
@@ -21,22 +95,25 @@ body {
   margin: 0;
   min-width: 960px;
   min-height: 100vh;
-  background: #000;
+  background: var(--app-page-bg);
 }
 
 .app-shell {
   min-height: 100vh;
+  background: var(--app-page-bg);
 }
 
 .app-header {
   display: flex;
   align-items: center;
   gap: 24px;
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-header-bg);
 }
 
 .app-title.ant-typography {
   margin: 0;
-  color: #fff;
+  color: var(--app-text);
 }
 
 .app-navigation {
@@ -46,7 +123,7 @@ body {
 .app-content {
   margin: 24px;
   padding: 24px;
-  background: #141414;
+  background: var(--app-content-bg);
   border-radius: 8px;
 }
 
@@ -82,8 +159,8 @@ body {
 }
 
 .amendment-changed-cell {
-  background: #4a3f11 !important;
-  box-shadow: inset 0 -2px #d4a106;
+  background: var(--amendment-changed-bg) !important;
+  box-shadow: inset 0 -2px var(--amendment-changed-indicator);
 }
 
 .sales-blotter {
@@ -98,7 +175,7 @@ body {
   min-height: 34px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #303030;
+  border-bottom: 1px solid var(--app-border);
   padding-bottom: 7px;
 }
 
@@ -116,8 +193,8 @@ body {
 
 .sales-grid-shell {
   min-width: 0;
-  border: 1px solid #303030;
-  background: #0d0d0d;
+  border: 1px solid var(--app-border);
+  background: var(--app-panel-recessed-bg);
 }
 
 .sales-grid {
@@ -128,7 +205,7 @@ body {
 }
 
 .sales-grid .sales-row-selected {
-  box-shadow: inset 3px 0 #4ea3d8;
+  box-shadow: inset 3px 0 var(--row-selection-indicator);
 }
 
 .row-action-buttons .ant-btn {
@@ -141,9 +218,9 @@ body {
 .sales-work-pane {
   min-width: 0;
   overflow: auto;
-  border: 1px solid #303030;
-  border-top: 2px solid #45667f;
-  background: #111;
+  border: 1px solid var(--app-border);
+  border-top: 2px solid var(--pane-accent);
+  background: var(--app-panel-bg);
   padding: 12px;
 }
 
@@ -159,18 +236,18 @@ body {
 }
 
 .sales-pane-quoted {
-  border-top-color: #ad7b21;
+  border-top-color: var(--pane-quoted-accent);
 }
 
 .sales-pane-draft,
 .sales-pane-new {
-  border-top-color: #6750a4;
+  border-top-color: var(--draft-accent);
 }
 
 .sales-pane-hit,
 .sales-pane-away,
 .sales-pane-cancelled {
-  border-top-color: #5b5b5b;
+  border-top-color: var(--terminal-accent);
 }
 
 .work-pane-header {
@@ -178,14 +255,14 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 10px;
-  border-bottom: 1px solid #262626;
+  border-bottom: 1px solid var(--app-separator);
   padding-bottom: 8px;
 }
 
 .work-pane-security {
   max-width: 245px;
   overflow: hidden;
-  color: #8c8c8c;
+  color: var(--app-text-secondary);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -200,7 +277,7 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   padding-left: 10px;
-  border-left: 2px solid #303030;
+  border-left: 2px solid var(--app-border);
 }
 
 .sales-form .ant-input-number {
@@ -214,7 +291,7 @@ body {
 
 .work-pane-facts .ant-descriptions-item-label {
   width: 68px;
-  color: #777;
+  color: var(--app-text-tertiary);
 }
 
 .quote-summary {
@@ -222,8 +299,8 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 1px;
   margin: 10px 0;
-  background: #303030;
-  border: 1px solid #303030;
+  background: var(--app-border);
+  border: 1px solid var(--app-border);
 }
 
 .quote-summary > div {
@@ -231,12 +308,12 @@ body {
   min-height: 42px;
   flex-direction: column;
   justify-content: center;
-  background: #171717;
+  background: var(--app-panel-raised-bg);
   padding: 5px 8px;
 }
 
 .quote-summary span {
-  color: #777;
+  color: var(--app-text-tertiary);
   font-size: 11px;
 }
 
@@ -255,21 +332,21 @@ body {
 
 .amendment-diff {
   margin-top: 10px;
-  border-left: 2px solid #7657b1;
-  background: #18141f;
+  border-left: 2px solid var(--amendment-panel-indicator);
+  background: var(--amendment-panel-bg);
   padding: 8px;
   font-size: 12px;
 }
 
 .memo-line {
   margin-top: 12px;
-  border-top: 1px solid #262626;
+  border-top: 1px solid var(--app-separator);
   padding-top: 8px;
 }
 
 .owner-handoff {
   margin-top: 12px;
-  border-top: 1px solid #262626;
+  border-top: 1px solid var(--app-separator);
   padding-top: 8px;
 }
 
@@ -298,20 +375,20 @@ body {
 }
 
 .bulk-result-bar {
-  border: 1px solid #303030;
-  background: #111;
+  border: 1px solid var(--app-border);
+  background: var(--app-panel-bg);
 }
 
 .bulk-result-success {
-  border-left: 3px solid #497a55;
+  border-left: 3px solid var(--result-success);
 }
 
 .bulk-result-warning {
-  border-left: 3px solid #ad7b21;
+  border-left: 3px solid var(--result-warning);
 }
 
 .bulk-result-error {
-  border-left: 3px solid #a33d3d;
+  border-left: 3px solid var(--result-error);
 }
 
 .bulk-result-summary {
@@ -327,7 +404,7 @@ body {
 .bulk-result-details {
   max-height: 220px;
   overflow: auto;
-  border-bottom: 1px solid #303030;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .bulk-result-details table {
@@ -338,33 +415,33 @@ body {
 
 .bulk-result-details th,
 .bulk-result-details td {
-  border-bottom: 1px solid #262626;
+  border-bottom: 1px solid var(--app-separator);
   padding: 5px 9px;
   text-align: left;
 }
 
 .sales-row-quoted {
-  background: rgba(153, 103, 20, 0.22) !important;
+  background: var(--row-sales-quoted-bg) !important;
 }
 
 .sales-row-draft {
-  background: rgba(74, 57, 111, 0.16) !important;
+  background: var(--row-sales-draft-bg) !important;
 }
 
 .sales-row-terminal {
-  color: rgba(255, 255, 255, 0.48) !important;
-  background: rgba(255, 255, 255, 0.025) !important;
+  color: var(--row-terminal-fg) !important;
+  background: var(--row-terminal-bg) !important;
 }
 
 .sales-row-quoted .amendment-changed-cell,
 .amendment-changed-cell {
-  background: rgba(112, 76, 157, 0.5) !important;
-  box-shadow: inset 0 -2px #a984e5;
+  background: var(--amendment-changed-bg) !important;
+  box-shadow: inset 0 -2px var(--amendment-changed-indicator);
 }
 
 .sales-shortcut-status {
   padding-inline: 8px;
-  color: #777;
+  color: var(--app-text-tertiary);
   font-size: 11px;
 }
 
@@ -379,7 +456,7 @@ body {
   min-height: 34px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #303030;
+  border-bottom: 1px solid var(--app-border);
   padding-bottom: 6px;
 }
 .trader-workspace {
@@ -402,8 +479,8 @@ body {
 .trader-search-section,
 .trader-side-pane {
   min-width: 0;
-  border: 1px solid #303030;
-  background: #0d0d0d;
+  border: 1px solid var(--app-border);
+  background: var(--app-panel-recessed-bg);
 }
 .trader-active-section,
 .trader-search-section {
@@ -416,7 +493,7 @@ body {
   min-height: 30px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #292929;
+  border-bottom: 1px solid var(--app-border-subtle);
   padding: 2px 7px;
 }
 .trader-active-grid {
@@ -426,7 +503,7 @@ body {
   --ag-selected-row-background-color: transparent;
 }
 .trader-shortcuts {
-  color: #707070;
+  color: var(--app-text-quiet);
   font-size: 10px;
 }
 .trader-search-section {
@@ -455,7 +532,7 @@ body {
   overflow: auto;
   flex-direction: column;
   gap: 5px;
-  border-right: 1px solid #292929;
+  border-right: 1px solid var(--app-border-subtle);
   padding: 7px;
 }
 .trader-search-results {
@@ -469,7 +546,7 @@ body {
   max-width: 50vw;
   resize: horizontal;
   overflow: auto;
-  border-top: 2px solid #45667f;
+  border-top: 2px solid var(--pane-accent);
   padding: 7px 10px;
 }
 .trader-side-pane > .ant-tabs > .ant-tabs-nav {
@@ -497,7 +574,7 @@ body {
 .trader-pane-footer {
   display: flex;
   flex-wrap: wrap;
-  border-top: 1px solid #292929;
+  border-top: 1px solid var(--app-border-subtle);
   padding-top: 6px;
 }
 .trader-confirm-grid {
@@ -515,8 +592,8 @@ body {
   width: 100%;
 }
 .pricer-source {
-  border-left: 2px solid #45667f;
-  background: #15191c;
+  border-left: 2px solid var(--pane-accent);
+  background: var(--pricer-source-bg);
   padding: 6px 8px;
   font-size: 12px;
 }
@@ -526,22 +603,22 @@ body {
   height: 19px;
   place-items: center;
   border-radius: 50%;
-  color: #fff;
-  background: #a33d3d;
+  color: var(--failure-fg);
+  background: var(--failure-bg);
   font-weight: 700;
 }
 .trader-active-grid .trader-row-attention-high {
-  background: rgba(165, 67, 48, 0.22) !important;
+  background: var(--row-trader-attention-high-bg) !important;
 }
 .trader-active-grid .trader-row-attention-work {
-  background: rgba(173, 123, 33, 0.12) !important;
+  background: var(--row-trader-attention-work-bg) !important;
 }
 .trader-active-grid .trader-row-terminal {
-  color: rgba(255, 255, 255, 0.48) !important;
-  background: rgba(255, 255, 255, 0.025) !important;
+  color: var(--row-terminal-fg) !important;
+  background: var(--row-terminal-bg) !important;
 }
 .trader-active-grid .trader-row-selected {
-  box-shadow: inset 3px 0 #4ea3d8;
+  box-shadow: inset 3px 0 var(--row-selection-indicator);
 }
 
 .revision-item .ant-list-item-meta-description > div {
@@ -558,14 +635,14 @@ body {
   min-height: 420px;
 }
 .post-process-grid .post-process-row-unclosed {
-  background: rgba(173, 123, 33, 0.12) !important;
+  background: var(--row-post-process-unclosed-bg) !important;
 }
 .post-process-grid .post-process-row-cancelled {
-  color: rgba(255, 255, 255, 0.48) !important;
-  background: rgba(255, 255, 255, 0.025) !important;
+  color: var(--row-terminal-fg) !important;
+  background: var(--row-terminal-bg) !important;
 }
 .post-process-grid .post-process-row-pending {
-  box-shadow: inset 3px 0 #4ea3d8;
+  box-shadow: inset 3px 0 var(--row-pending-change-indicator);
 }
 .post-process-confirm-table {
   display: grid;
@@ -575,12 +652,12 @@ body {
   display: grid;
   grid-template-columns: 65px 1.5fr 1fr 70px 1fr;
   gap: 8px;
-  border-bottom: 1px solid #292929;
+  border-bottom: 1px solid var(--app-border-subtle);
   padding: 6px 0;
   font-size: 12px;
 }
 .post-process-confirm-header {
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--app-text-secondary);
   font-weight: 600;
 }
 

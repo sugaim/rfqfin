@@ -2423,6 +2423,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/settings/theme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ThemeResponse"];
+                        "application/json": components["schemas"]["ThemeResponse"];
+                        "text/json": components["schemas"]["ThemeResponse"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ThemeRequest"];
+                    "text/json": components["schemas"]["ThemeRequest"];
+                    "application/*+json": components["schemas"]["ThemeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ThemeResponse"];
+                        "application/json": components["schemas"]["ThemeResponse"];
+                        "text/json": components["schemas"]["ThemeResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/grid-configs/{screenId}/{configKey}": {
         parameters: {
             query?: never;
@@ -3476,6 +3540,7 @@ export interface components {
         NullableOfQuoteExpiryType: number | null;
         NullableOfQuoteRequestReasonValue: number | null;
         NullableOfQuoteStatusValue: number | null;
+        NullableOfThemeMode: number | null;
         OwnershipItemRequest: {
             /** Format: int64 */
             caseId: number;
@@ -3784,6 +3849,13 @@ export interface components {
             isin: string;
             categoryId: string;
             categoryName: string;
+        };
+        ThemeMode: number;
+        ThemeRequest: {
+            mode: components["schemas"]["NullableOfThemeMode"];
+        };
+        ThemeResponse: {
+            mode: components["schemas"]["ThemeMode"];
         };
         TraderMemoResponse: {
             /** Format: int64 */

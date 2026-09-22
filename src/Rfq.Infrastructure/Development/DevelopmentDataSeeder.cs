@@ -230,7 +230,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 Name = "国債 トレーダー",
                 DeskId = "jpy-credit",
                 Roles = ["Trader"],
-                DefaultQuoteExpiryMinutes = 5,
+                DefaultQuoteExpiryMinutes = 15,
             },
             new MasterUserEntity
             {

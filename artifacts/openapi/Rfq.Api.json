@@ -3153,6 +3153,82 @@
         }
       }
     },
+    "/api/me/settings/theme": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me/grid-configs/{screenId}/{configKey}": {
       "get": {
         "tags": [
@@ -5515,6 +5591,10 @@
         "type": "integer",
         "nullable": true
       },
+      "NullableOfThemeMode": {
+        "type": "integer",
+        "nullable": true
+      },
       "OwnershipItemRequest": {
         "required": [
           "caseId",
@@ -6530,6 +6610,31 @@
           },
           "categoryName": {
             "type": "string"
+          }
+        }
+      },
+      "ThemeMode": {
+        "type": "integer"
+      },
+      "ThemeRequest": {
+        "required": [
+          "mode"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/NullableOfThemeMode"
+          }
+        }
+      },
+      "ThemeResponse": {
+        "required": [
+          "mode"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/ThemeMode"
           }
         }
       },

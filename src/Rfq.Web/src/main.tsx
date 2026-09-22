@@ -9,7 +9,7 @@ import { applyGlobalTheme } from '@/app/theme'
 import '@/styles.css'
 
 ModuleRegistry.registerModules([AllEnterpriseModule])
-applyGlobalTheme()
+applyGlobalTheme('Dark')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -498,6 +498,47 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
     }
 
     [Fact]
+    public async Task ThemeSettingDefaultsPersistsValidValuesAndIsScopedPerUser()
+    {
+        using HttpClient traderA = CreateClient("trader-a");
+        using HttpClient traderB = CreateClient("trader-b");
+
+        Assert.Equal(
+            "Dark",
+            (await traderB.GetFromJsonAsync<ThemeBody>(
+                "/api/me/settings/theme"))?.Mode);
+
+        HttpResponseMessage lightResponse = await traderA.PutAsJsonAsync(
+            "/api/me/settings/theme",
+            new { Mode = "Light" });
+        Assert.Equal(HttpStatusCode.OK, lightResponse.StatusCode);
+        Assert.Equal(
+            "Light",
+            (await lightResponse.Content.ReadFromJsonAsync<ThemeBody>())?.Mode);
+        Assert.Equal(
+            "Light",
+            (await traderA.GetFromJsonAsync<ThemeBody>(
+                "/api/me/settings/theme"))?.Mode);
+        Assert.Equal(
+            "Dark",
+            (await traderB.GetFromJsonAsync<ThemeBody>(
+                "/api/me/settings/theme"))?.Mode);
+
+        HttpResponseMessage darkResponse = await traderA.PutAsJsonAsync(
+            "/api/me/settings/theme",
+            new { Mode = "Dark" });
+        Assert.Equal(HttpStatusCode.OK, darkResponse.StatusCode);
+        Assert.Equal(
+            "Dark",
+            (await darkResponse.Content.ReadFromJsonAsync<ThemeBody>())?.Mode);
+
+        HttpResponseMessage invalidResponse = await traderA.PutAsJsonAsync(
+            "/api/me/settings/theme",
+            new { Mode = "System" });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task Feature_contracts_use_typed_events_tagged_expiry_json_grid_and_created_filters()
     {
         using HttpClient client = CreateClient("sales-dev");
@@ -772,6 +813,8 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
 
     private sealed record QuoteExpiryBody(string Type, int? Minutes);
     private sealed record QuoteModeBody(string Mode);
+
+    private sealed record ThemeBody(string Mode);
 
     private sealed record RfqSearchBody(
         IReadOnlyList<RfqSearchItemBody> Items,

@@ -1,3 +1,4 @@
+using Rfq.Application;
 using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
@@ -10,4 +11,5 @@ internal sealed class MasterUserEntity
     public string[] Roles { get; set; } = [];
     public int? DefaultQuoteExpiryMinutes { get; set; }
     public WorkingQuoteMode? DefaultQuoteMode { get; set; }
+    public AppThemeMode? Theme { get; set; }
 }

@@ -1,6 +1,13 @@
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { Button, Layout, Menu, Select, Tag, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router'
+import type { AppThemeMode } from '@/app/theme'
+import {
+  SettingsDrawer,
+  type PersonalSettingsDraft,
+} from '@/app/SettingsDrawer'
+import type { QuoteExpiry, QuoteModeSetting } from '@/services/api'
 
 const navigationItems = [
   { key: '/sales', label: 'Sales' },
@@ -16,6 +23,12 @@ export interface AppShellProps {
   onIdentityChange?: (userId: string) => void
   pendingUpdates?: number
   onRefreshUpdates?: () => void
+  isTrader?: boolean
+  themeMode?: AppThemeMode
+  quoteMode?: QuoteModeSetting['mode']
+  quoteExpiry?: QuoteExpiry
+  settingsLoading?: boolean
+  onSaveSettings?: (settings: PersonalSettingsDraft) => Promise<void>
 }
 
 export function AppShell({
@@ -26,7 +39,14 @@ export function AppShell({
   onIdentityChange,
   pendingUpdates = 0,
   onRefreshUpdates,
+  isTrader = false,
+  themeMode = 'Dark',
+  quoteMode = 'Calculated',
+  quoteExpiry = { type: 'None', minutes: null },
+  settingsLoading = false,
+  onSaveSettings = async () => undefined,
 }: AppShellProps) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const activeRoute =
@@ -45,13 +65,18 @@ export function AppShell({
           RFQ
         </Typography.Title>
         <Menu
-          theme="dark"
+          theme={themeMode === 'Dark' ? 'dark' : 'light'}
           mode="horizontal"
           selectedKeys={[activeRoute.key]}
           items={navigationItems}
           onClick={({ key }) => navigate(key)}
           className="app-navigation"
         />
+        {isTrader && (
+          <Button size="small" onClick={() => setSettingsOpen(true)}>
+            Settings
+          </Button>
+        )}
         <Select
           aria-label="Development identity"
           value={currentUserId}
@@ -76,6 +101,17 @@ export function AppShell({
         <Typography.Title level={2}>{activeRoute.label}</Typography.Title>
         {children}
       </Layout.Content>
+      {isTrader && (
+        <SettingsDrawer
+          open={settingsOpen}
+          theme={themeMode}
+          quoteMode={quoteMode}
+          quoteExpiry={quoteExpiry}
+          isLoading={settingsLoading}
+          onClose={() => setSettingsOpen(false)}
+          onSave={onSaveSettings}
+        />
+      )}
     </Layout>
   )
 }
