@@ -22,7 +22,7 @@ It deliberately does **not** prescribe a historical implementation sequence. Imp
 1. [01-domain-model.md](01-domain-model.md) — entities, immutable domain data, lifecycle states, revisions, quotes, ownership, category, memos, versions.
 2. [02-state-transitions.md](02-state-transitions.md) — business transition categories and transition rules.
 3. [03-use-cases-and-authorization.md](03-use-cases-and-authorization.md) — Application/Domain split, authorization, commands/queries, concurrency, errors.
-4. [04-ui-ux.md](04-ui-ux.md) — Sales/Trader/EOD screens, grid behavior, refresh/change tracking, search, pricer, and draft UX.
+4. [04-ui-ux.md](04-ui-ux.md) — Sales/Trader/Post Process workspaces, grid behavior, refresh/change tracking, search, pricer, settings, and draft UX.
 5. [05-persistence-and-events.md](05-persistence-and-events.md) — logical schema, mapping, event persistence, transactions, constraints.
 6. [06-calculation-and-search.md](06-calculation-and-search.md) — calculation boundary, WorkingQuote update flow, security/client search, defaults.
 7. [07-runtime-and-notifications.md](07-runtime-and-notifications.md) — ASP.NET runtime, SSE wake-up, event retrieval, expiry worker, observability.
@@ -124,6 +124,8 @@ RfqLifecycle
 │  └─ PresentedRfq
 ├─ CancelledRfq
 └─ ClosedRfq
+   ├─ HitRfq
+   └─ AwayRfq
 ```
 
 ### `DraftRfq`
@@ -161,7 +163,19 @@ Temporarily terminal; may be reopened. Old ConfirmedQuote is not resurrected on 
 
 ### `ClosedRfq`
 
-Terminal Hit/Away state and carries the `ClosedQuoteId` used for the outcome.
+Abstract terminal state carrying common close data, including:
+
+- `ClosedQuoteId`
+- `ClosedBusinessDate`
+
+Concrete terminal states are:
+
+- `HitRfq`
+- `AwayRfq`
+
+Hit/Away are therefore represented by state type, not by passing an outcome enum into a generic closed state.
+
+Cancelled is deliberately not a `ClosedRfq`: it is reopenable and has different semantics.
 
 ---
 
@@ -535,7 +549,32 @@ Infrastructure/API may map to raw `long` at boundaries.
 
 ---
 
-## 16. Create New from Existing
+## 16. Business Date facts
+
+Business Date is a first-class operational fact and is not reconstructed from UTC timestamps.
+
+Authoritative business date comes from the configured business-date provider and is represented as `DateOnly` at the Application/Domain boundary where applicable.
+
+Persisted facts include:
+
+- `CreatedBusinessDate` on the Case, established when an initial Draft is first confirmed/opened
+- `ClosedBusinessDate` on Hit/Away closed lifecycle state
+- `BusinessDate` on persisted RFQ events that are used for day-scoped operational queries
+
+Rules:
+
+- Draft Cases do not yet require `CreatedBusinessDate`
+- non-Draft Cases do
+- Hit/Away require `ClosedBusinessDate`
+- outcome correction does not rewrite the original close date
+- same-day outcome correction is allowed only when current Business Date equals the original `ClosedBusinessDate`
+- timestamps remain audit facts; Business Date remains the operational desk-day fact
+
+Do not infer these facts from `CreatedAt.UtcDateTime.Date` or timestamp ranges.
+
+---
+
+## 17. Create New from Existing
 
 Always creates a **new Case**.
 
@@ -863,13 +902,17 @@ Domain precondition:
 - Open RFQ has a current confirmed quote
 - Presentation is not required
 
-Effects:
+Effects are operation-specific:
 
 ```text
-OpenRfq -> ClosedRfq
-ClosedQuoteId = current quote
-Outcome = Hit | Away
+CloseHit(OpenRfq, BusinessDate)  -> HitRfq
+CloseAway(OpenRfq, BusinessDate) -> AwayRfq
 ```
+
+Both concrete closed states retain:
+
+- `ClosedQuoteId = current quote`
+- `ClosedBusinessDate = current Business Date`
 
 Also:
 
@@ -879,6 +922,8 @@ Also:
 - Case-level Assigned Trader retained
 - Case-level Contact Owner retained
 
+Public Application/API operations are explicit `CloseHitRfq` / `CloseAwayRfq`. An internal shared orchestration helper may still dispatch the two operations, but Hit/Away is not modeled as a generic public lifecycle payload.
+
 ### Bulk Close
 
 Bulk Hit/Away closes only Cases that are still eligible/open.
@@ -887,13 +932,19 @@ Already Hit/Away Cases are skipped; bulk Close never silently changes an existin
 
 ### Outcome correction
 
-Explicit transition only:
+Explicit Domain transitions only:
 
 ```text
-Closed(Hit) <-> Closed(Away)
+CorrectToAway(HitRfq) -> AwayRfq
+CorrectToHit(AwayRfq) -> HitRfq
 ```
 
-Case remains Closed; append outcome-correction history/event.
+Application additionally requires:
+
+- current Business Date equals the original `ClosedBusinessDate`
+- a non-empty trimmed correction reason
+
+The original `ClosedBusinessDate` is preserved. Append an `OutcomeCorrected` event carrying the correction reason and current Business Date.
 
 ---
 
@@ -1058,66 +1109,92 @@ Domain owns:
 
 ## 2. Application use cases
 
-Representative surface:
+Public Application use cases are operation-specific. Do not expose a generic workflow executor as the business API.
 
 ### RFQ / Revision
 
-- `CreateDraft`
-- `ConfirmInitialRevision`
-- `UpdateDraftRevision`
-- `ConfirmRevision` / Confirm Amendment
-- `DiscardRevision`
-- `CreateFromExisting`
+- CreateDraft
+- CreateFromExisting
+- UpdateInitialDraft
+- ConfirmInitialDraft
+- DiscardInitialDraft
+- SaveAmendment
+- ConfirmAmendment
+- DiscardAmendment
+- BulkConfirmAmendments
+- BulkDiscardAmendments
 
 ### Ownership / responsibility
 
-- `PickUp`
-- `Release`
-- `TakeOver`
-- `AssignTrader`
-- `ChangeContactOwner`
+- PickUpRfq
+- ReleaseRfq
+- AssignTrader
+- TakeOverRfq
+- ChangeContactOwner
 
-### Quote
+### Working Quote / Confirmed Quote
 
-- `UpdateWorkingQuote`
-- `ConfirmQuote`
-- `PresentQuote`
-- `UnpresentQuote`
-- `WithdrawQuote`
-- `ExpireQuote`
+- CalculateWorkingQuote
+- ChangeWorkingQuoteMode
+- UpdateManualWorkingQuote
+- ConfirmQuote
+- WithdrawQuote
+- BulkConfirmQuotes
+- BulkWithdrawQuotes
 
 ### Lifecycle
 
-- `CancelRfq`
-- `ReopenRfq`
-- `CloseHit`
-- `CloseAway`
-- `CorrectOutcome`
+- PresentQuote
+- UnpresentQuote
+- CloseHitRfq
+- CloseAwayRfq
+- CorrectOutcomeToHit
+- CorrectOutcomeToAway
+- CancelRfq
+- ReopenRfq
+- ExpireQuote
+- relevant operation-specific Bulk use cases
+
+Public close/correction APIs are explicit. Do not expose a generic `CloseRfq(outcome)` or `CorrectOutcome(outcome)` selector.
 
 ### Memos
 
-- `UpdateSalesMemo`
-- `UpdateTraderMemo`
+- UpdateSalesMemo
+- UpdateTraderMemo
+- UpdateMemoOperation where role-specific Post Process orchestration needs a common application path
+
+### Post Process
+
+- GetPostProcessWorklist
+- CommitPostProcessChanges
+
+Post Process commit is a bulk transport/use-case boundary with per-Case atomicity:
+
+- all staged changes for one Case commit atomically
+- different Cases are independent
+- expected failure for one Case does not roll back successful Cases
+- successful Cases are removed from FE pending state
+- failed/skipped Cases remain pending
+- after any normal commit response, Post Process queries reconcile with authoritative server state
+
+Visibility is a replaceable Application policy boundary separate from edit authorization.
 
 ### Query / support
 
-- `SearchRfqs`
-- `GetRfqDetail`
-- `GetRevisionHistory`
-- `GetQuoteHistory`
-- `GetEodSummary`
-- `GetEventsAfter`
-- `GetGridConfig`
-- `SaveGridConfig`
-- `SearchSecurity`
-- `ResolveSecurity`
-- `SearchClient`
-- `ResolveClient`
-- `ResolveRfqDefaults`
-- `ResolveStandardSettlement`
-- `CalculateBulk`
+Examples include:
 
-This is application responsibility, not mandatory one-to-one HTTP endpoint naming.
+- GetActiveSalesRfqs
+- GetActiveTraderRfqs
+- SearchRfqs
+- GetPostProcessWorklist
+- GetEventsAfter
+- ScratchPricer
+- ResolveRfqCreationContext
+- security/client/master queries
+- Get/Save GridConfig
+- typed current-user settings
+
+Query-side readers may project directly from relational state; they do not need to rehydrate the full Domain graph.
 
 ---
 
@@ -1303,43 +1380,55 @@ External calculation flow must re-read/revalidate RFQ/WorkingQuote state after t
 
 ---
 
-## 11. Domain exceptions and application errors
+## 11. Error taxonomy and boundaries
 
-Use a small Domain exception taxonomy:
-
-```text
-DomainException
-├─ DomainRuleViolationException
-├─ DomainValidationException
-├─ StateVersionMismatchException
-└─ DomainInvariantException
-```
-
-Do not create an exception subclass per operation.
-
-Application/API still distinguishes categories such as:
+Expected operational failures use one semantic classification shared across Domain, Application, API, Bulk, and background-worker boundaries.
 
 ```text
-Validation
-Conflict
-Forbidden
-NotFound
-CalculationFailure
-Invariant/Server fault
+RfqException
+├─ ExpectedRfqException
+│  └─ RfqErrorKind
+│     ├─ Validation
+│     ├─ InvalidState
+│     ├─ VersionConflict
+│     ├─ NotFound
+│     ├─ Forbidden
+│     └─ CalculationFailure
+└─ RfqInvariantException
+   └─ DomainInvariantException
 ```
 
-Stable error codes may be exposed where useful.
+Existing Domain exceptions participate in that hierarchy:
 
-Typical HTTP mapping:
+- `DomainValidationException` -> Validation
+- `DomainRuleViolationException` -> InvalidState
+- `StateVersionMismatchException` -> VersionConflict
+- `DomainInvariantException` -> unexpected invariant
+
+Application-level expected errors include:
+
+- `RfqRequestValidationException`
+- `RfqNotFoundException`
+- `RfqForbiddenException`
+- `CalculationFailureException`
+
+BCL exception types are not the public expected-error contract. In particular, `InvalidOperationException`, `ArgumentException`, `KeyNotFoundException`, and `UnauthorizedAccessException` must not be globally interpreted as normal 4xx business failures.
+
+HTTP mapping is policy at the API boundary:
 
 - Validation -> 400
-- Forbidden -> 403
+- InvalidState -> 409
+- VersionConflict -> 409
 - NotFound -> 404
-- Conflict -> 409
-- CalculationFailure -> 422 or application equivalent
-- invariant/data-corruption failure -> 5xx/operational alert, not normal user validation
+- Forbidden -> 403
+- CalculationFailure -> 422
+- unexpected/unclassified/invariant failure -> 500 with generic detail
 
-Bulk operations return per-item success/error where already designed.
+Expected ProblemDetails may expose the semantic message and stable code. Unexpected ProblemDetails must not expose the underlying exception message.
+
+All API ProblemDetails include a trace/correlation ID.
+
+Bulk continuation policy also depends on `RfqErrorKind`, not on arbitrary BCL exception classes. Unsupported or unexpected errors abort the bulk operation rather than being silently converted into per-item failures.
 
 ---
 
@@ -1361,13 +1450,44 @@ Do not call clock/repository services from Domain transitions.
 
 ## 13. API contract approach
 
-ASP.NET Core implementation remains code-first and authoritative.
+ASP.NET Core remains code-first and authoritative.
 
-API DTOs may use raw transport primitives.
+HTTP APIs are organized by business/use-case feature rather than large horizontal controller buckets. Requests, responses, and API mappers live beside the feature that owns them.
 
-Preserve existing external JSON/endpoint behavior through internal refactors where practical.
+At the HTTP boundary:
 
-Do not expose the internal lifecycle class hierarchy directly as a transport contract merely because it exists in Domain.
+- typed Domain/Application IDs become transport primitives
+- Domain enums/unions become API-owned typed contracts
+- API models do not expose Domain/Application types directly
+- concrete/static mapping is preferred over speculative mapper interfaces
+
+Do not introduce a generic JSON settings bag.
+
+Current-user settings use typed endpoints/contracts, including:
+
+```text
+GET/PUT /api/me/settings/quote-expiry
+GET/PUT /api/me/settings/default-quote-mode
+GET/PUT /api/me/settings/theme
+```
+
+Semantics:
+
+- Quote Expiry is a typed `None | After(duration)` policy
+- Default Quote Mode is typed `Calculated | Manual`
+- Theme is typed `Light | Dark`
+
+Persistence may store enum-like values as strings internally, but the frontend must not depend on raw persistence strings or untyped JSON for these settings.
+
+Grid configuration is intentionally different:
+
+```text
+GET/PUT /api/me/grid-configs/{screenId}/{configKey}
+```
+
+The backend treats grid configuration payload as opaque versioned JSON because layout shape is frontend-owned.
+
+Do not expose the internal lifecycle class hierarchy directly merely because it exists in Domain.
 
 ---
 
@@ -1394,483 +1514,450 @@ Manager is not automatically an RFQ owner. Future Manager overrides belong in ce
 
 ## 1. General principles
 
-- Sales and Trader screens do not need identical layouts.
-- Grid editing is a first-class workflow.
-- Do not silently refresh active editing state when server changes arrive.
-- Separate "there are updates" from "apply those updates".
-- User-specific grid layout is persisted server-side.
-- Keep unknown future workflows (List/Thread/Bulk) out of the initial UI.
+- Sales, Trader, and Post Process are distinct workspaces with different operating goals.
+- Grid interaction is a first-class workflow.
+- Dense desktop operation is preferred over vertically expensive decorative UI.
+- Do not silently replace actively edited data when server changes arrive.
+- Separate "there are remote updates" from "apply those updates".
+- Business-state color has semantic meaning and must remain readable in both Light and Dark themes.
+- Personal settings are persisted per current user.
+- Grid layout persistence is explicit and separate from general Settings.
 
----
-
-## 2. Sales screen
-
-Initial layout:
+Top-level routes are:
 
 ```text
-+-------------------+--------------------------------------+
-| Work pane         | Active RFQ Grid                      |
-| (always visible)  |                                      |
-|                   +--------------------------------------+
-|                   | Selected RFQ Revision / history      |
-+-------------------+--------------------------------------+
+/sales
+/trader
+/post-process
 ```
-
-The left work pane is a general work area, not only a New form.
-
-Suggested contextual behavior:
-
-- no selection -> New RFQ form
-- one selected -> selected RFQ detail/edit
-- multiple selected -> bulk actions where supported
-
-The initial version does not need `New Bulk`.
-
-### New RFQ form fields
-
-- Client
-- Security
-- Notional
-- Settlement Date
-- Sales & Trading Message
-- Sales-only Memo
-- Contact Owner
-- Assigned Trader
-
-Side is fixed `Customer Sell`.
-
-Security type is currently Bond and need not be editable.
 
 ---
 
-## 3. New RFQ form behavior
+## 2. Sales workspace
 
-New begins as FE-local unsaved state.
+Sales is an RFQ-entry and customer-contact workspace.
 
-### Save Draft
+Primary structure:
 
-Allowed once Client and Security are resolved.
+```text
+toolbar
++--------------------------------------+------------------+
+| RFQ grid                             | Work pane        |
+|                                      | RFQ / Bulk tabs  |
++--------------------------------------+------------------+
+result/status surfaces as needed
+```
 
-After Save Draft:
+The grid remains primary. The work pane shows the active RFQ/New form and a Bulk tab.
 
-- Case ID exists
-- initial Draft Revision is persisted
-- subsequent field commits autosave
+### New / Draft
 
-### Confirm
+Unsaved New is FE-local.
 
-May occur directly without a prior Save Draft if full validation succeeds.
+Save Draft requires resolved Client and Security and then persists a Case/Draft Revision.
 
-### Standard settlement
+Confirm may occur directly from unsaved New once full validation succeeds.
 
-Security selection triggers resolution of:
+Creation-context lookup supplies:
 
-- Category
+- category
 - default Assigned Trader
-- Standard Settlement Date
+- standard settlement date
 
-Display one Settlement field, prefilled with standard.
+The backend still revalidates authoritative values on create/confirm.
 
-User may overwrite actual settlement.
+### Selection
 
-Persist both:
+Use Excel-like row selection without checkbox-oriented UI.
 
-- `SettlementDate`
-- `StandardSettlementDate`
+- click -> active row
+- Ctrl/Cmd -> additive/toggle multi-select
+- Shift -> range selection
+- active row and bulk selection are related but not identical concepts
+- multi-selection must not automatically force the Work Pane away from the active RFQ
 
-Highlight if they differ.
+The Bulk tab remains explicit and shows selection count.
 
-Do not persist a redundant `IsOverride` flag.
+### Row actions
+
+Frequently used lifecycle actions may appear as compact row actions/context actions.
+
+Actions must preserve the same Application authorization/state rules as full-pane operations.
+
+### Amendment UX
+
+Editing confirmed Revision-owned cells creates/updates the one pending Draft Revision.
+
+Changed cells are visually marked.
+
+Draft contents remain Sales-side until confirmed.
+
+### Live / Paused refresh
+
+Sales supports Live and Paused operating modes.
+
+Remote events do not silently replace protected/editing state.
+
+Paused mode accumulates pending remote changes until explicit refresh/resume reconciliation.
+
+### Recent revisions
+
+A Recent Revisions surface may summarize recent RFQ/quote revisions for operational awareness. It is not the audit source of truth.
 
 ---
 
-## 4. Revision editing in the grid
+## 3. Trader workspace
 
-Revision-owned cells:
+Trader is a dense inline quoting workstation.
 
-- Notional
-- Settlement
-- Sales & Trading Message
-
-Editing a confirmed RFQ:
-
-- creates/updates the one Draft Revision
-- autosaves on cell commit
-- highlights changed cells on Sales side
-- does not change the current open/quote status until Confirm
-
-Actions:
-
-- Confirm Draft
-- Discard Draft
-- Confirm Selected
-- Discard Selected
-
-Bulk Confirm/Discard is Case-by-Case. A conflict on one selected RFQ does not have to fail all others.
-
-Trader does not see Draft contents before Sales confirms the Revision.
-
----
-
-## 5. Trader screen
-
-Initial layout:
+Primary structure:
 
 ```text
-+----------------------------------------------------------+
-| Active RFQ Grid                             [Open Pricer] |
-|                                      Calc Status column   |
-+----------------------------------------------------------+
-| [Past RFQ] [Changes]                                     |
-|                                                          |
-| Past RFQ search/results or change history                |
-+----------------------------------------------------------+
-
-                                      [right-side Pricer drawer]
+toolbar
++--------------------------------------------------+----------------+
+| Active RFQ grid                                  | Operations /   |
+|                                                  | Pricer pane    |
++--------------------------------------------------+----------------+
+| RFQ Search / result grid                         |                |
++--------------------------------------------------+----------------+
 ```
 
-Trader work is primarily inline in the main grid.
+The side pane may collapse; search remains available without turning the screen into a separate navigation flow.
 
-RFQ detail/memo/history may use a temporary modal where necessary.
+### Selection
 
----
+Use Excel-like row selection without visible selection checkboxes.
 
-## 6. Quote editing
+Selection supports bulk Pick/Confirm/operations while retaining a clear active row.
 
-Quote cells may include:
+### Quote editing
 
-- Price
-- Yield
-- Spread family columns
-- Slide
-- derived outputs
+Quote cells are edited inline.
 
 The edited cell determines the calculation driver.
 
-Edit commit:
+For each RFQ:
 
-1. build calculation request
-2. calculate
-3. on Success:
-   - update WorkingQuote
-   - update returned result fields
-4. on CalculationFailure:
-   - do not update WorkingQuote
-   - revert attempted UI value
-   - show toast
-   - persist failure log
+- at most one calculation request is considered current at a time
+- stale/late responses must not overwrite newer intent
+- calculation failure does not mutate WorkingQuote
+- unrelated RFQs must remain operable while one Case is calculating
 
-`QuoteStatus = Quoted` is normally locked for quote editing.
+### Manual mode
 
-When Requested again after Revised/Reopened/Expired/Withdrawn, retained WorkingQuote values become editable again.
+Calculated -> Manual starts Manual values empty.
 
----
+Calculated payload remains retained separately.
 
-## 7. Manual quote UI
+Manual -> Calculated restores retained calculated state.
 
-Calculated / Manual mode switch exists in the quote editing area.
+### Quote confirmation
 
-Manual fields:
+Confirm operates on eligible selected RFQs and uses optimistic versions.
 
-- Price
-- Final Simple Yield
+Bulk confirmation is Case-by-Case with explicit result reporting.
 
-On switching into Manual mode, Manual fields start empty.
+### Ownership operations
 
-Calculated state remains retained independently.
+Pick/Release/Assign/Take Over keep their existing confirmation semantics:
 
-Manual confirmation requires both fields.
+- self-assigned unowned Pick can be direct
+- picking another Trader's assignment requires confirmation
+- Take Over of another owner requires strong confirmation
+- multi-select Pick follows the same safety semantics consistently
 
----
+### Search
 
-## 8. Presentation / Close / Withdraw
+Past/search RFQ is server queried and displayed in a dedicated result grid.
 
-Presentation:
+Current pragmatic design keeps bounded result sets and client-side grid interaction rather than introducing complex paging infrastructure prematurely.
 
-- Contact Owner action
-- Presented RFQ cannot be withdrawn by Trader
-- Contact Owner may Unpresent, after which Trader may Withdraw
+### Pricer
 
-Close:
+Pricer is scratch state independent from official WorkingQuote after load.
 
-- Contact Owner selects Hit or Away and closes
-- Presentation is not required
+It may start empty or from an RFQ.
 
-Bulk Withdraw:
+Apply-back to official WorkingQuote remains deferred unless explicitly implemented later.
 
-- multi-select
-- withdraw eligible quoted, non-Presented cases
-- Presented cases are skipped and reported
+### Live / Paused refresh
 
-Bulk Close:
+Trader supports Live / Paused plus explicit Refresh.
 
-- closes only still-open cases
-- already Hit/Away cases are skipped
-- bulk close never silently changes an existing outcome
-
-Outcome correction is a separate explicit action.
+Normal remote changes must not silently move/replace rows during active work.
 
 ---
 
-## 9. Pick Up / Release / Assign / Take Over UX
+## 4. Post Process workspace
 
-### Pick Up
+Post Process replaces the earlier lightweight Daily Review/EOD placeholder.
 
-- self-assigned + unowned -> may proceed without confirmation
-- other-assigned + unowned -> confirmation
-- multi-select -> one summary confirmation
-- other-owned -> excluded
+Purpose:
 
-Shortcut-based bulk Pick Up should always confirm.
+- operational cleanup after/in addition to intraday quoting
+- find unclosed RFQs
+- close Hit/Away/Cancelled
+- correct same-Business-Date Hit/Away outcomes
+- update the current user's own-side memo
+- review today's relevant RFQs
 
-### Release
+It is not another Sales entry screen or Trader quoting screen.
 
-Self-owned only.
+Quote values are context only.
 
-No confirmation required initially.
+### Worklist controls
 
-### Assign to...
-
-Unowned only.
-
-Trader selection is the confirmation.
-
-### Take Over
-
-Other-owned only.
-
-Always use strong confirmation.
-
-Show current owner and target self.
-
-Notify previous owner.
-
----
-
-## 10. Refresh and server changes
-
-Do not auto-refresh grid data when server changes arrive.
-
-Instead:
-
-- show `Updates available`
-- user presses Refresh
-- Refresh re-fetches authoritative server state
-
-Refresh discards FE-only uncommitted edits.
-
-Autosaved Draft/WorkingQuote data already persisted on the server remains.
-
----
-
-## 11. Changes tab: two generations
-
-Changes must not disappear immediately after Refresh.
-
-Maintain two event windows in FE:
-
-### Last Refresh
-
-Events that were applied by the most recent Refresh.
-
-### Pending Updates
-
-Events that arrived after the most recent Refresh and have not yet been applied.
-
-Conceptually:
+Primary toolbar:
 
 ```text
-PreviousRefreshEventId
-LastRefreshEventId
-LatestSeenEventId
+[ Today | Unclosed ] [ Mine | All permitted ] [ Confirm Changes (N) ] [ Refresh ]
 ```
 
-Windows:
+### Unclosed
 
-```text
-Last Refresh:
-(PreviousRefreshEventId, LastRefreshEventId]
+Includes current:
 
-Pending:
-(LastRefreshEventId, LatestSeenEventId]
-```
+- Active
+- Presented
 
-On Refresh:
+across Business Dates.
 
-```text
-Pending -> Last Refresh
-Pending becomes empty
-```
+Excludes Draft, Cancelled, Hit, Away.
 
-This is FE-local operational history, not the audit source of truth.
+### Today
 
----
+Today is defined by persisted Business Date facts, not timestamp ranges.
 
-## 12. Toasts
+An RFQ belongs to Today when, for the current Business Date, it was:
 
-Normal changes:
-
-- mark Updates Available only
-
-Important state changes:
-
-- show in-app toast
-
-Initial important event candidates:
-
-- Revision Confirmed
+- first opened/confirmed (`CreatedBusinessDate`)
+- closed Hit/Away
 - Cancelled
-- Reopened
-- Closed
-- Take Over
-- Contact Owner Changed
-- Withdrawn
-- Expired
+- outcome-corrected
 
-Presented/Unpresented does not need a toast initially.
+Quote/memo activity alone does not pull an older RFQ into Today.
 
-Server filters important events to those relevant to the current user/screen context.
+### Scope
+
+`Mine` means the current user matches at least one of:
+
+- SalesId
+- ContactOwnerId
+- AssignedTraderId
+
+`All permitted` is determined through a replaceable visibility policy.
+
+Visibility does not grant edit authority.
+
+### Staging and commit
+
+Post Process changes are FE-local until Confirm Changes.
+
+Pending state is keyed by CaseId and survives:
+
+- Today <-> Unclosed
+- Mine <-> All permitted
+
+Per Case, lifecycle and own-side memo changes are staged and reviewed together.
+
+Commit semantics:
+
+- one Case is atomic
+- different Cases are independent
+- successful Cases leave pending state
+- failed/skipped Cases remain pending
+- any normal commit response invalidates/reconciles Post Process query caches with authoritative server state
+
+Refresh discards pending changes only after confirmation.
+
+Browser reload/close and SPA navigation away from Post Process warn when pending changes exist.
+
+### Outcome correction
+
+Only Hit <-> Away correction is supported.
+
+Rules:
+
+- current Business Date must equal original `ClosedBusinessDate`
+- a new non-empty reason is required
+- historical correction reason may be displayed read-only when no new correction is staged
+- a newly staged correction reason starts empty and never implicitly reuses the previous audit reason
+
+Reopen is not a Post Process action.
+
+### Memo
+
+Post Process exposes only the current user's own-side memo:
+
+- Sales role -> Sales Memo
+- Trader role -> Trader Memo
+
+Do not expose/edit the opposite side's memo.
 
 ---
 
-## 13. Past RFQ search
+## 5. Refresh and remote-change semantics
 
-Past RFQ is always available on Trader screen.
+Persisted Events + SSE provide remote-change awareness.
 
-Search result unit:
+SSE is a wake-up mechanism, not authoritative UI data.
+
+Sales/Trader may keep protected local editing state and require explicit reconciliation.
+
+Post Process uses explicit refresh plus mutation-triggered query invalidation; it does not need Trader-style Live/Pause operation.
+
+---
+
+## 6. Result reporting
+
+Bulk/multi-item actions report per-Case results.
+
+Do not hide partial success.
+
+UI should distinguish:
+
+- Succeeded
+- Skipped
+- Failed
+
+Results may use compact expandable bars rather than modal-only reporting.
+
+---
+
+## 7. Personal Settings
+
+Use a small Settings surface rather than scattering persistent user preferences through toolbars.
+
+Current typed settings:
+
+### Theme
 
 ```text
-1 Case = 1 row
+Light
+Dark
 ```
 
-Do not expand Revision history in the normal search result initially.
+Theme switching is functional, not persistence-only.
 
-Filters:
+One application-level theme state drives:
 
-- Date range
-- Client
-- Security
-- Category
-- Contact Owner
-- Sales
-- Assigned Trader
-- Outcome / RfqStatus
-- Quote state as useful
-- Case ID
+- Ant Design
+- AG Grid
+- custom application CSS
+- portals such as Drawer/Modal/context menus
 
-Typical result columns:
+Do not implement separate inconsistent theme toggles per component library.
 
-- Date
-- Case ID
-- Client
-- Category
-- Security
-- Notional
-- Contact Owner
-- Trader
-- RfqStatus
-- Price
-- Spread Type
-- Spread
-- Slide
-- Yield
+### Quote Expiry
 
-Spread Type/Spread may show the quote driver spread if the driver was a spread.
+Trader preference for the next Working Quote/quote-confirm flow.
 
-Initial implementation:
+The UI may offer a small curated set such as:
 
-- server query
-- maximum approximately 20,000 results returned in one batch
-- FE ag-Grid performs client-side sort/filter
-- if result exceeds the cap, ask user to narrow criteria
-- paging/infinite scroll deferred until actual need is observed
+- None
+- 15 minutes
+- 1 hour
 
----
+The underlying contract remains typed `None | After(duration)`, not a magic nullable integer in the frontend.
 
-## 14. EOD screen
+### Default Quote Mode
 
-EOD is a separate tab because it belongs to a different operating phase of the day.
-
-Assume Contact Owner is always assigned.
-
-Primary view:
-
-| Contact Owner | Open | Hit | Away |
-|---|---:|---:|---:|
-
-Click Open to drill into that owner's unclosed RFQs.
-
-EOD is primarily **desk-wide remaining-work management**, not permission for everyone to decide everyone else's outcomes.
-
-Normal Hit/Away authority remains with Contact Owner.
-
-Do not auto-Away open RFQs at EOD.
-
----
-
-## 15. Pricer
-
-Pricer is an independent scratch tool.
-
-It may open:
-
-- from a selected RFQ, prefilled from that RFQ
-- with no RFQ selected, as an empty scratch pricer
-
-Suggested UI: right-side drawer on Trader screen.
-
-Pricer state is independent after load and does not automatically track RFQ changes.
-
-Minimum fields:
-
-- Security
-- Notional
-- Settlement Date
-- Calculation Type
-- Calculation Parameter
-- Slide
-- Result
-
-Apply-back to official WorkingQuote may be added later.
-
-Initial backend is mock.
-
----
-
-## 16. Grid configuration
-
-Persist grid layouts in DB.
-
-Logical model:
+Typed:
 
 ```text
-UserGridConfig
-- UserId
-- ScreenId
-- ConfigKey
-- Version
-- ConfigJson
-- UpdatedAt
+Calculated
+Manual
 ```
 
-Unique key:
+Changing the preference affects subsequent/new Working Quote usage as designed; it does not retroactively rewrite existing business state.
+
+### Save semantics
+
+Settings are edited in a local form state and persisted explicitly on Save.
+
+Do not create a generic arbitrary JSON settings bag.
+
+---
+
+## 8. Theme and color semantics
+
+Custom application colors use semantic tokens rather than literal color-name tokens.
+
+Examples of business semantics that remain distinct:
+
+- Sales quoted row
+- Sales draft/pending-amendment row
+- Trader high-attention row
+- Trader work-attention row
+- Post Process unclosed row
+- terminal/cancelled muted foreground/background
+- selected-row indicator
+- pending-change indicator
+- amendment-changed cell background/indicator
+- generic surfaces, borders, secondary text
+- success/warning/error states
+
+Two UI meanings must not share one token merely because their current RGB happens to match.
+
+In particular:
+
+- selected-row left marker
+- Post Process pending-change left marker
+
+are separate semantic tokens.
+
+Ant Design semantic states such as success/error/warning/processing/danger should remain semantic and follow the selected theme rather than being replaced by hard-coded green/red/orange values.
+
+The current Dark visual appearance is the baseline to preserve while adding a proper Light equivalent.
+
+---
+
+## 9. Grid configuration
+
+Grid configuration is user-specific and persisted server-side.
+
+Logical key:
 
 ```text
 (UserId, ScreenId, ConfigKey)
 ```
 
-Persist as appropriate:
+Persist layout-oriented state such as:
 
-- column visibility
-- order
+- column order
 - width
-- pin
-- optionally sort/filter state
+- visibility
+- pinning
+- sort where intentionally included
 
-Application-owned migration must handle release-time column ID rename/drop/add.
+Do not persist transient interaction state such as:
 
-Do not rely only on browser localStorage.
+- selection
+- scroll position
+- active editor
+- pending business edits
 
+Filter persistence should be deliberate rather than accidental.
+
+Grid layout remains frontend-owned opaque JSON at the backend boundary.
+
+### Interaction
+
+Do not consume a dedicated vertical toolbar row merely for layout controls.
+
+Expose compact Grid context-menu actions:
+
+```text
+Save Layout
+Load Layout
+Reset Layout
+```
+
+or equivalent concise wording.
+
+Save is explicit; do not autosave layout.
+
+Known independent configurations include Sales main grid and Trader main/search/confirm grids; Post Process may maintain its own main-grid config as the screen matures.
 
 ---
 
@@ -1900,6 +1987,7 @@ Contains stable Case facts such as:
 - SalesId?
 - CategorySnapshot (`CategoryId`)
 - CreatedAt
+- CreatedBusinessDate? // null only while initial Case remains Draft
 - CreatedBy
 - CopiedFromCaseId?
 - source metadata if added later
@@ -1915,6 +2003,7 @@ A flattened current projection may contain:
 - CurrentRevisionId
 - CurrentQuoteId?
 - ClosedQuoteId?
+- ClosedBusinessDate?
 - ContactOwnerId
 - AssignedTraderId
 - ownership boolean projection
@@ -1993,11 +2082,30 @@ Retain current logical roles for:
 - `CategoryRouting`
 - `CalculationFailureLog`
 - `UserGridConfig`
+- typed current-user preference storage (quote expiry, default quote mode, theme)
 - event cursor / Event tables
 
 ---
 
-## 3. StateVersion mapping
+## 3. Business Date persistence
+
+Business Date is stored as a date fact where operational semantics depend on desk day.
+
+Required persisted facts include:
+
+- Case `CreatedBusinessDate`
+- closed-state `ClosedBusinessDate`
+- event `BusinessDate` for RFQ events used by Today/Post Process semantics
+
+These values are written by Application use cases using the authoritative business-date provider.
+
+Do not implement Today/Post Process semantics by converting timestamps in SQL or by assuming UTC date equals desk date.
+
+Outcome correction preserves the original `ClosedBusinessDate`; the correction event carries the current Business Date.
+
+---
+
+## 4. StateVersion mapping
 
 Domain/Application use `StateVersion`.
 
@@ -2009,7 +2117,7 @@ Do not change DB columns to unsigned types.
 
 ---
 
-## 4. Domain rehydration
+## 5. Domain rehydration
 
 Persistence reconstruction must not require public mutable setters or public arbitrary `Restore` escape hatches.
 
@@ -2021,7 +2129,7 @@ If persisted columns represent an impossible combination, mapping should fail as
 
 ---
 
-## 5. Event persistence
+## 6. Event persistence
 
 Use a thin shared parent **at DB level**.
 
@@ -2045,8 +2153,11 @@ A DB-serialized cursor allocator held through transaction commit is acceptable. 
 EventId -> Event
 CaseId
 Type
+BusinessDate?
 Payload jsonb
 ```
+
+`BusinessDate` belongs on the RFQ-event child row because it is an RFQ business-day fact used by Post Process/operational queries. Quote events do not acquire a Business Date merely because they share the parent Event row.
 
 ### `QuoteEvent`
 
@@ -2073,7 +2184,7 @@ Queries that need CaseId join through the relation.
 
 ---
 
-## 6. Event types
+## 7. Event types
 
 ### RFQ event candidates
 
@@ -2103,7 +2214,7 @@ State mutation and event append occur in the same use-case transaction.
 
 ---
 
-## 7. Authoritative data vs projection
+## 8. Authoritative data vs projection
 
 Authoritative business data includes:
 
@@ -2122,7 +2233,7 @@ Do not rebuild it from events on every request.
 
 ---
 
-## 8. Repository boundaries
+## 9. Repository boundaries
 
 Application-facing repositories remain business/domain-oriented.
 
@@ -2140,7 +2251,7 @@ Query-side repositories/readers may project directly into query DTOs.
 
 ---
 
-## 9. Unit of Work / transactions
+## 10. Unit of Work / transactions
 
 A scoped EF `DbContext` may back multiple repositories.
 
@@ -2165,7 +2276,23 @@ Do not hold DB locks while performing external/heavy calculation.
 
 ---
 
-## 10. Loading strategy
+### Bulk transaction semantics
+
+A bulk HTTP request is not one atomic business transaction.
+
+For operation-specific bulk use cases:
+
+- execute the corresponding single-item use case per Case
+- one Case succeeds/fails atomically
+- successful prior Cases remain committed if a later Case fails with a recoverable expected error
+- expected recoverable failure must discard/reset the current scoped EF changes before continuing
+- unexpected/unclassified errors abort rather than being silently converted into item failures
+
+Do not duplicate single-item transition logic inside bulk implementations.
+
+---
+
+## 11. Loading strategy
 
 Command-side retrieval loads only state needed for the transition:
 
@@ -2180,7 +2307,7 @@ History/search uses query-side DTOs.
 
 ---
 
-## 11. DB constraints
+## 12. DB constraints
 
 Minimum constraints include:
 
@@ -2200,7 +2327,7 @@ Domain rules and DB constraints both protect critical invariants.
 
 ---
 
-## 12. Indexing and search projection
+## 13. Indexing and search projection
 
 Keep current pragmatic indexing strategy for expiry worker and Past RFQ search.
 
@@ -2210,7 +2337,7 @@ A future thin search projection may store references, but do not duplicate every
 
 ---
 
-## 13. Initial indexing
+## 14. Initial indexing
 
 Initial indexes should cover actual operational queries, including:
 
@@ -2222,7 +2349,7 @@ Do not pre-create every possible compound index. Observe real search patterns an
 
 ---
 
-## 14. Past RFQ read model
+## 15. Past RFQ read model
 
 Do not build a large copied snapshot before evidence requires it.
 
@@ -2697,7 +2824,7 @@ Future multi-instance coordination is deferred.
 
 ## 8. Logging, audit, observability
 
-Keep four concerns separate.
+Keep these concerns separate.
 
 ### Domain/business audit
 
@@ -2708,13 +2835,41 @@ Use persisted:
 
 ### Business calculation failure
 
-Use:
-
-- CalculationFailureLog
+Use CalculationFailureLog for expected calculation-engine failures where required by workflow/audit.
 
 ### Technical logging
 
-Use `ILogger<T>`.
+Use `ILogger<T>` for ordinary technical diagnostics.
+
+### Unexpected incidents
+
+Unexpected API/background-worker failures are reported through a Host-level `IIncidentReporter` abstraction.
+
+The reporter does not classify exceptions. Classification belongs to the caller/boundary.
+
+Initial implementation may simply log, but the boundary allows later integration with Sentry/Application Insights/OpenTelemetry/internal alerting without moving policy into Domain/Application.
+
+Incident reporting is best-effort:
+
+- reporter failure must not replace the original HTTP error
+- reporter failure must not terminate worker processing solely because alert delivery failed
+- avoid duplicate `LogError` between caller and reporter
+
+API unexpected errors:
+
+- return generic 500 detail
+- include `ProblemDetails.extensions.traceId`
+- report the same trace ID in the Incident
+- include concise operation identity such as HTTP method + path
+- do not include full request bodies or sensitive RFQ content by default
+
+### Background workers
+
+Normal shutdown cancellation is not an incident.
+
+Unexpected worker exceptions are reported through `IIncidentReporter`.
+
+Business-state races that the use case already classifies as expected must not be reintroduced as broad swallowed `InvalidOperationException` catches.
 
 ### Tracing / metrics
 
@@ -3000,7 +3155,9 @@ In-app notifications only initially.
 
 ### Manager workflow
 
-Authorization is centralized so Manager overrides can be added later; policy is deferred.
+Authorization is centralized so richer Manager overrides can be added later; policy is deferred.
+
+Post Process `All permitted` visibility is intentionally behind a replaceable policy seam and does not itself define a complete Manager role model.
 
 ### Pricer apply-back
 
@@ -3022,8 +3179,8 @@ Category is master data and routing is configurable in DB, but a new admin UI/wo
 - one WorkingQuote maximum per Revision
 - quote expiry supports None or a positive fixed duration
 - expiry check interval ≈ 10 seconds
-- no auto-Away at EOD
-- no automatic UI refresh of main RFQ data
+- no auto-Away at Post Process / end-of-day
+- no silent replacement of protected/actively edited Sales/Trader grid state
 - security/client search hits DB directly without broad result caching
 - Category values come from master data rather than a compile-time enum
 
@@ -3064,7 +3221,7 @@ Keep adaptable:
 - security-search index strategy
 - grid keyboard shortcuts
 - Sales lower-panel details
-- actual EOD procedure
+- exact future booking/reconciliation workflow after Post Process
 - manager override policy
 
 The design intentionally fixes business invariants while leaving these implementation details replaceable.
@@ -3109,6 +3266,8 @@ RfqLifecycle
 │  └─ PresentedRfq
 ├─ CancelledRfq
 └─ ClosedRfq
+   ├─ HitRfq
+   └─ AwayRfq
 ```
 
 Rationale:
@@ -3397,22 +3556,20 @@ Rationale:
 
 ---
 
-## 21. Use a small Domain exception taxonomy
+## 21. Use one semantic RFQ error classification
 
-Use categories such as:
+Expected operational failures share `ExpectedRfqException + RfqErrorKind` across Domain/Application/API/Bulk.
 
-- DomainRuleViolationException
-- DomainValidationException
-- StateVersionMismatchException
-- DomainInvariantException
-
-Do not create exception subclasses for every operation.
+Unexpected invariants use `RfqInvariantException` / `DomainInvariantException`.
 
 Rationale:
 
-- callers/API need to distinguish broad handling categories
-- hundreds of micro-exceptions add maintenance without value
-- invariant/data-corruption failures must not be mistaken for normal user validation
+- HTTP status is transport policy, not exception-type policy
+- Bulk continuation is orchestration policy, not exception-type policy
+- BCL exceptions must not accidentally become expected 4xx errors
+- one semantic classification prevents API and Bulk from disagreeing about the same failure
+
+Do not put HTTP status, log level, retryability, alerting, or ContinueBulk flags on exception types.
 
 ---
 
@@ -3608,3 +3765,88 @@ Rationale:
 - SSE is only a wake-up channel
 - reconnect recovery depends on the persisted feed
 - event coverage is determined by cross-session observability, not whether an event feels like audit history
+
+
+---
+
+## 39. Post Process is a staged operational worklist, not an EOD summary
+
+Post Process replaces the earlier Daily Review/EOD placeholder.
+
+It uses persisted Business Date facts, explicit visibility policy, FE-local staged changes, and per-Case atomic commit.
+
+Rationale:
+
+- operators may need to enter cleanup/memo changes after intraday work
+- reviewing several intended changes before commit reduces accidental lifecycle edits
+- Today semantics cannot be reconstructed reliably from quote/memo activity timestamps
+- visibility and edit authority are different concerns
+
+---
+
+## 40. Business Date is persisted when it is a business fact
+
+`CreatedBusinessDate`, `ClosedBusinessDate`, and relevant Event BusinessDate are explicit persisted values.
+
+Rationale:
+
+- UTC date is not desk business date
+- timestamp-range queries are brittle around desk/date boundaries
+- same-day outcome-correction rules need the original close business date, not a derived guess
+
+---
+
+## 41. Bulk public APIs remain operation-specific
+
+Bulk use cases orchestrate single-item use cases and expose partial-success results, but there is no generic public bulk workflow engine.
+
+Rationale:
+
+- operation names remain business-readable
+- single-item transitions stay the source of business rules
+- per-item Unit of Work cleanup is an orchestration concern
+- generic public bulk abstractions would erase useful business semantics
+
+---
+
+## 42. Typed user settings and opaque grid layout are intentionally different
+
+Theme, Default Quote Mode, and Quote Expiry are typed API/business preferences.
+
+Grid layout is versioned opaque frontend-owned JSON.
+
+Rationale:
+
+- semantic settings have a small closed value domain and deserve typed contracts
+- grid layout shape is library/UI-specific and should not leak into backend business models
+- a generic settings JSON bag would weaken type safety without helping grid layout
+
+---
+
+## 43. Theme colors are semantic, not literal
+
+Light/Dark theme changes one application-level theme state used by Ant Design, AG Grid, custom CSS, and portal UI.
+
+Business-state colors use semantic tokens.
+
+Rationale:
+
+- the same business meaning must remain recognizable across themes
+- literal color names couple code to one palette
+- two distinct meanings may currently share an RGB value but must remain independently changeable
+
+Selection indication and pending-change indication are therefore distinct tokens even if their initial color is identical.
+
+---
+
+## 44. Post Process query refresh and pending intent are separate state
+
+After a normal Post Process commit response, cached worklist queries reconcile with authoritative server state regardless of whether item results are Succeeded, Failed, or Skipped.
+
+Local pending changes are removed only for Succeeded Cases.
+
+Rationale:
+
+- a VersionConflict means the displayed server row may already be stale
+- retaining failed pending intent is useful to the operator
+- refreshing authoritative data must not imply clearing the operator's unresolved intent
