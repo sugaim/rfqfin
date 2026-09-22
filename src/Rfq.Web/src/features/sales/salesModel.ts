@@ -10,6 +10,24 @@ export type SalesBulkCommand = 'away' | 'cancel' | 'present' | 'unpresent'
   | 'confirm-drafts' | 'discard-drafts' | 'confirm-amendments' | 'discard-amendments'
 export type SalesInvocationSurface = 'work-pane' | 'row-action' | 'context-menu'
 
+export function reflectConfirmedAmendment(row: SalesRfq): SalesRfq {
+  return {
+    ...row,
+    notional: row.draftNotional ?? row.notional,
+    settlementDate: row.draftSettlementDate ?? row.settlementDate,
+    salesAndTradingMessage: row.draftSalesAndTradingMessage ?? row.salesAndTradingMessage,
+    draftRevisionId: null,
+    draftVersion: null,
+    draftNotional: null,
+    draftSettlementDate: null,
+    draftSalesAndTradingMessage: null,
+    rfqStatus: 'Active',
+    quoteStatus: 'Requested',
+    quoteRequestReason: 'Revised',
+    currentVersion: row.currentVersion + 1,
+  }
+}
+
 export function derivePaneMode(
   rows: SalesRfq[], activeCaseId: number | undefined, newIntent: boolean,
 ): SalesPaneMode {

@@ -384,7 +384,7 @@ export function SalesScreen(props: SalesScreenProps) {
       field === 'salesAndTradingMessage'
         ? String(event.newValue ?? '')
         : row.draftSalesAndTradingMessage ?? row.salesAndTradingMessage,
-    ))
+    ), refreshMode === 'live')
   }
 
   const contextMenu = (params: GetContextMenuItemsParams<SalesRfq>): (DefaultMenuItem | MenuItemDef<SalesRfq>)[] => {
@@ -632,16 +632,19 @@ export function SalesScreen(props: SalesScreenProps) {
               onChangeContactOwner={() => targetContactOwnerId && void run(async () => {
                 await onChangeContactOwner(selected.caseId, targetContactOwnerId, selected.currentVersion)
                 setTargetContactOwnerId(undefined)
-              })}
+              }, refreshMode === 'live')}
               memoEditing={memoEditing} memoDraft={memoDraft}
               onMemoEdit={() => { setMemoDraft(selected.salesMemo); setMemoEditing(true) }}
               onMemoChange={setMemoDraft} onMemoCancel={() => setMemoEditing(false)}
-              onMemoSave={() => void run(() => onUpdateMemo(selected.caseId, memoDraft, selected.salesMemoVersion))}
+              onMemoSave={() => void run(
+                () => onUpdateMemo(selected.caseId, memoDraft, selected.salesMemoVersion),
+                refreshMode === 'live',
+              )}
               onCorrectOutcome={() => void run(() => onCorrectOutcome(
                 selected.caseId,
                 selected.rfqStatus === 'Hit' ? 'Away' : 'Hit',
                 selected.currentVersion,
-              ))}
+              ), refreshMode === 'live')}
               onCommand={(command) => void executeCommand(command, selected)} />
           )}
               </> },

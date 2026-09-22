@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { SalesRfq } from '../../services/api'
 import {
   bulkEligibility, commandEligible, derivePaneMode, isTextEditingTarget,
-  matchesSalesPreset, reconcileSelection, requiresConfirmation, rowActionCommands,
+  matchesSalesPreset, reconcileSelection, reflectConfirmedAmendment,
+  requiresConfirmation, rowActionCommands,
 } from './salesModel'
 
 const row = (overrides: Partial<SalesRfq> = {}): SalesRfq => ({
@@ -49,6 +50,29 @@ describe('Sales pane mode', () => {
 
   it('keeps stable Case selections across refresh and removes disappeared Cases', () => {
     expect(reconcileSelection([101, 102], [row(), row({ caseId: 103 })])).toEqual([101])
+  })
+})
+
+describe('Paused Sales snapshot transitions', () => {
+  it('returns a Presented RFQ to Active when confirming an Amendment', () => {
+    const updated = reflectConfirmedAmendment(row({
+      rfqStatus: 'Presented',
+      quoteStatus: 'Quoted',
+      quoteRequestReason: null,
+      draftRevisionId: '00000000-0000-0000-0000-000000000201',
+      draftVersion: 1,
+      draftNotional: 250_000_000,
+    }))
+
+    expect(updated).toMatchObject({
+      rfqStatus: 'Active',
+      quoteStatus: 'Requested',
+      quoteRequestReason: 'Revised',
+      notional: 250_000_000,
+      draftRevisionId: null,
+      draftVersion: null,
+      currentVersion: 3,
+    })
   })
 })
 

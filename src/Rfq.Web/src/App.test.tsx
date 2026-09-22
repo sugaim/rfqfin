@@ -29,6 +29,7 @@ vi.mock('ag-grid-react', async () => {
     onCellEditRequest?: (event: {
       data: GridRow
       newValue: string
+      colDef: { field: string }
       column: { getColId: () => string }
       api: { refreshCells: ReturnType<typeof vi.fn> }
       node: object
@@ -84,6 +85,7 @@ vi.mock('ag-grid-react', async () => {
               onClick={() => onCellEditRequest({
                 data: row,
                 newValue: '99.5',
+                colDef: { field: 'notional' },
                 column: { getColId: () => 'price' },
                 api: { refreshCells: vi.fn() },
                 node: {},
@@ -486,6 +488,7 @@ describe('SalesScreen', () => {
 
   it('preserves Contact Owner handoff in the redesigned Work Pane', async () => {
     const onChangeContactOwner = vi.fn().mockResolvedValue(undefined)
+    const onReload = vi.fn().mockResolvedValue(undefined)
     const quoted = {
       ...draftRow,
       rfqStatus: 'Active',
@@ -493,8 +496,8 @@ describe('SalesScreen', () => {
       quoteStatus: 'Quoted',
       currentVersion: 7,
     }
-    render(<SalesScreen {...baseProps} rfqs={[quoted]}
-      onChangeContactOwner={onChangeContactOwner} />)
+    render(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quoted]}
+      onChangeContactOwner={onChangeContactOwner} onReload={onReload} />)
     fireEvent.click(screen.getByText(/client-grid/))
     fireEvent.mouseDown(screen.getByLabelText('Contact Owner'))
     fireEvent.click(await screen.findByText('営業 一郎'))
@@ -502,6 +505,7 @@ describe('SalesScreen', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
 
     await waitFor(() => expect(onChangeContactOwner).toHaveBeenCalledWith(101, 'sales-a', 7))
+    expect(onReload).not.toHaveBeenCalled()
   })
 
   it('shows the current quote ID in the same abbreviated form as Trader', () => {
@@ -551,10 +555,13 @@ describe('SalesScreen', () => {
 
   it('updates the Sales-only Memo after close', async () => {
     const onUpdateMemo = vi.fn().mockResolvedValue(undefined)
+    const onReload = vi.fn().mockResolvedValue(undefined)
     render(
       <SalesScreen
         {...baseProps}
+        refreshMode="paused"
         onUpdateMemo={onUpdateMemo}
+        onReload={onReload}
         rfqs={[{
           ...draftRow,
           rfqStatus: 'Away',
@@ -580,6 +587,38 @@ describe('SalesScreen', () => {
       'post-close follow-up',
       3,
     ))
+    expect(onReload).not.toHaveBeenCalled()
+  })
+
+  it('keeps the paused snapshot after correcting a closed outcome', async () => {
+    const onCorrectOutcome = vi.fn().mockResolvedValue(undefined)
+    const onReload = vi.fn().mockResolvedValue(undefined)
+    render(<SalesScreen {...baseProps} refreshMode="paused"
+      rfqs={[{ ...quotedRow(101), rfqStatus: 'Hit', quoteStatus: null }]}
+      onCorrectOutcome={onCorrectOutcome} onReload={onReload} />)
+
+    fireEvent.click(screen.getByText(/client-101/))
+    fireEvent.click(screen.getByRole('button', { name: 'Correct outcome' }))
+
+    await waitFor(() => expect(onCorrectOutcome).toHaveBeenCalledWith(101, 'Away', 7))
+    expect(onReload).not.toHaveBeenCalled()
+  })
+
+  it('keeps the paused snapshot after an inline Amendment edit', async () => {
+    const onSaveAmendment = vi.fn().mockResolvedValue(undefined)
+    const onReload = vi.fn().mockResolvedValue(undefined)
+    render(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quotedRow(101)]}
+      onSaveAmendment={onSaveAmendment} onReload={onReload} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Price 101' }))
+
+    await waitFor(() => expect(onSaveAmendment).toHaveBeenCalledWith(
+      expect.objectContaining({ caseId: 101 }),
+      99_500_000,
+      '2026-09-23',
+      'initial note',
+    ))
+    expect(onReload).not.toHaveBeenCalled()
   })
 
   it('opens the typed Recent Revisions drawer with changed fields only', async () => {

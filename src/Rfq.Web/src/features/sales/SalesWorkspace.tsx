@@ -44,7 +44,7 @@ import {
   type SecuritySearchResult,
 } from '../../services/api'
 import { SalesScreen } from './SalesScreen'
-import type { SalesBulkCommand, SalesRowCommand } from './salesModel'
+import { reflectConfirmedAmendment, type SalesBulkCommand, type SalesRowCommand } from './salesModel'
 import type { SalesRefreshMode } from './SalesScreen'
 
 export function SalesWorkspace() {
@@ -149,13 +149,7 @@ export function SalesWorkspace() {
           case 'cancel': return { ...row, rfqStatus: 'Cancelled', currentVersion: version }
           case 'reopen': return { ...row, rfqStatus: 'Active', quoteStatus: 'Requested',
             quoteRequestReason: 'Reopened', currentVersion: version }
-          case 'confirm-amendment': return { ...row,
-            notional: row.draftNotional ?? row.notional,
-            settlementDate: row.draftSettlementDate ?? row.settlementDate,
-            salesAndTradingMessage: row.draftSalesAndTradingMessage ?? row.salesAndTradingMessage,
-            draftRevisionId: null, draftVersion: null, draftNotional: null,
-            draftSettlementDate: null, draftSalesAndTradingMessage: null,
-            quoteStatus: 'Requested', quoteRequestReason: 'Revised', currentVersion: version }
+          case 'confirm-amendment': return reflectConfirmedAmendment(row)
           case 'discard-amendment': return { ...row, draftRevisionId: null, draftVersion: null,
             draftNotional: null, draftSettlementDate: null, draftSalesAndTradingMessage: null,
             currentVersion: version }
