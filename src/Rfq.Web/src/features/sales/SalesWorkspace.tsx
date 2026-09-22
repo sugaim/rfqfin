@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { message } from 'antd'
 import { useOutletContext } from 'react-router'
 import type { AppOutletContext } from '../../app/App'
 import {
@@ -45,7 +44,8 @@ import {
   type SecuritySearchResult,
 } from '../../services/api'
 import { SalesScreen } from './SalesScreen'
-import type { SalesBulkCommand } from './salesModel'
+import type { SalesBulkCommand, SalesRowCommand } from './salesModel'
+import type { SalesRefreshMode } from './SalesScreen'
 
 export function SalesWorkspace() {
   const { currentUserId, remoteChangeVersion, acknowledgeRemoteChanges } = useOutletContext<AppOutletContext>()
@@ -87,26 +87,83 @@ export function SalesWorkspace() {
   const [resolveDefaults] = useLazyResolveRfqCreationContextQuery()
   const [clients, setClients] = useState<ClientSearchResult[]>([])
   const [securities, setSecurities] = useState<SecuritySearchResult[]>([])
+  const [visibleRfqs, setVisibleRfqs] = useState<SalesRfq[]>([])
+  const [refreshMode, setRefreshMode] = useState<SalesRefreshMode>('live')
+  const [pendingUpdateCount, setPendingUpdateCount] = useState(0)
   const [protectedState, setProtectedState] = useState(false)
   const [deferredUpdate, setDeferredUpdate] = useState(false)
   const observedRemoteVersion = useRef(remoteChangeVersion)
 
   const catchUp = useCallback(async () => {
-    await Promise.all([rfqsQuery.refetch(), recentQuery.refetch()])
+    const [rfqResult] = await Promise.all([rfqsQuery.refetch(), recentQuery.refetch()])
+    if (rfqResult.data) setVisibleRfqs(rfqResult.data)
     await acknowledgeRemoteChanges()
     setDeferredUpdate(false)
+    setPendingUpdateCount(0)
   }, [acknowledgeRemoteChanges, recentQuery.refetch, rfqsQuery.refetch])
 
   useEffect(() => {
-    if (remoteChangeVersion === observedRemoteVersion.current) return
-    observedRemoteVersion.current = remoteChangeVersion
-    if (protectedState) setDeferredUpdate(true)
-    else void catchUp()
-  }, [catchUp, protectedState, remoteChangeVersion])
+    if (refreshMode === 'live' && !protectedState && rfqsQuery.data)
+      setVisibleRfqs(rfqsQuery.data)
+  }, [protectedState, refreshMode, rfqsQuery.data])
 
   useEffect(() => {
-    if (!protectedState && deferredUpdate) void catchUp()
-  }, [catchUp, deferredUpdate, protectedState])
+    if (remoteChangeVersion === observedRemoteVersion.current) return
+    const changeCount = Math.max(1, remoteChangeVersion - observedRemoteVersion.current)
+    observedRemoteVersion.current = remoteChangeVersion
+    if (refreshMode === 'paused') setPendingUpdateCount((current) => current + changeCount)
+    else if (protectedState) setDeferredUpdate(true)
+    else void catchUp()
+  }, [catchUp, protectedState, refreshMode, remoteChangeVersion])
+
+  useEffect(() => {
+    if (refreshMode === 'live' && !protectedState && deferredUpdate) void catchUp()
+  }, [catchUp, deferredUpdate, protectedState, refreshMode])
+
+  const changeRefreshMode = async (mode: SalesRefreshMode) => {
+    if (mode === refreshMode) return
+    setRefreshMode(mode)
+    if (mode === 'live') {
+      if (protectedState) setDeferredUpdate(true)
+      else await catchUp()
+    }
+  }
+
+  const applyRowAction = (command: SalesRowCommand, target: SalesRfq) => {
+    setVisibleRfqs((current) => {
+      if (command === 'discard-draft')
+        return current.filter((row) => row.caseId !== target.caseId)
+      return current.map((row) => {
+        if (row.caseId !== target.caseId) return row
+        const version = row.currentVersion + 1
+        switch (command) {
+          case 'confirm-draft': return { ...row, revisionStatus: 'Confirmed', rfqStatus: 'Active',
+            quoteStatus: 'Requested', quoteRequestReason: 'Initial', currentVersion: version,
+            version: row.version + 1 }
+          case 'present': return { ...row, rfqStatus: 'Presented', currentVersion: version }
+          case 'unpresent': return { ...row, rfqStatus: 'Active', currentVersion: version }
+          case 'hit':
+          case 'away': return { ...row, rfqStatus: command === 'hit' ? 'Hit' : 'Away',
+            quoteStatus: null, quoteRequestReason: null, currentQuoteId: null,
+            closedQuoteId: row.currentQuoteId, currentVersion: version }
+          case 'cancel': return { ...row, rfqStatus: 'Cancelled', currentVersion: version }
+          case 'reopen': return { ...row, rfqStatus: 'Active', quoteStatus: 'Requested',
+            quoteRequestReason: 'Reopened', currentVersion: version }
+          case 'confirm-amendment': return { ...row,
+            notional: row.draftNotional ?? row.notional,
+            settlementDate: row.draftSettlementDate ?? row.settlementDate,
+            salesAndTradingMessage: row.draftSalesAndTradingMessage ?? row.salesAndTradingMessage,
+            draftRevisionId: null, draftVersion: null, draftNotional: null,
+            draftSettlementDate: null, draftSalesAndTradingMessage: null,
+            quoteStatus: 'Requested', quoteRequestReason: 'Revised', currentVersion: version }
+          case 'discard-amendment': return { ...row, draftRevisionId: null, draftVersion: null,
+            draftNotional: null, draftSettlementDate: null, draftSalesAndTradingMessage: null,
+            currentVersion: version }
+          default: return row
+        }
+      })
+    })
+  }
 
   const lifecycleItems = (rows: SalesRfq[]) => ({ items: rows.map((row) => ({
     caseId: row.caseId, expectedCurrentVersion: row.currentVersion,
@@ -152,18 +209,23 @@ export function SalesWorkspace() {
   ]
 
   return <SalesScreen
-    rfqs={rfqsQuery.data ?? []}
+    rfqs={visibleRfqs}
     clients={clients}
     securities={securities}
     traders={(tradersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))}
     users={(usersQuery.data ?? []).map((user) => ({ userId: user.userId, name: user.name }))}
     currentUserId={currentUserId}
-    isLoading={rfqsQuery.isLoading || rfqsQuery.isFetching}
+    isLoading={rfqsQuery.isLoading || (refreshMode === 'live' && rfqsQuery.isFetching)}
     isError={rfqsQuery.isError}
     isMutating={mutationStates.some((state) => state.isLoading)}
     recentRevisions={recentQuery.data ?? []}
     recentRevisionsLoading={recentQuery.isLoading || recentQuery.isFetching}
     remoteUpdatePending={deferredUpdate}
+    refreshMode={refreshMode}
+    pendingUpdateCount={pendingUpdateCount}
+    onRefreshModeChange={changeRefreshMode}
+    onManualRefresh={catchUp}
+    onRowActionApplied={applyRowAction}
     onTransientStateChange={setProtectedState}
     onClientSearch={async (query) => setClients(query.trim() ? await searchClients(query).unwrap() : [])}
     onSecuritySearch={async (query) => setSecurities(query.trim() ? await searchSecurities(query).unwrap() : [])}
@@ -188,11 +250,9 @@ export function SalesWorkspace() {
     onConfirmAmendment={(row) => confirmAmendment({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! }).unwrap().then(() => undefined)}
     onDiscardAmendment={(row) => discardAmendment({ caseId: row.caseId, expectedCurrentVersion: row.currentVersion, expectedDraftVersion: row.draftVersion! }).unwrap().then(() => undefined)}
     onBulk={async (command, rows) => {
-      const results = await runBulk(command, rows)
-      void message.info(results.map((item) => `Case ${item.caseId}: ${item.status}`).join('; '))
-      return results
+      return runBulk(command, rows)
     }}
-    onReload={async () => { await Promise.all([rfqsQuery.refetch(), recentQuery.refetch()]) }}
+    onReload={catchUp}
     gridConfigJson={gridConfigQuery.data ? JSON.stringify(gridConfigQuery.data.config) : undefined}
     onSaveGridConfig={(configJson) => saveGridConfig({ screenId: 'sales', configKey: 'main', version: (gridConfigQuery.data?.version ?? 0) + 1, config: JSON.parse(configJson) }).unwrap().then(() => undefined)}
   />

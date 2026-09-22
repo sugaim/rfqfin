@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import { AppShell } from './app/AppShell'
@@ -14,13 +15,17 @@ type GridColumn = {
   valueFormatter?: (params: { value: unknown }) => unknown
   cellEditor?: string
   editable?: (params: { data: GridRow }) => boolean
+  cellRenderer?: (params: { data: GridRow }) => ReactNode
 }
 
-vi.mock('ag-grid-react', () => ({
-  AgGridReact: ({ rowData, columnDefs, onRowClicked, onCellEditRequest, readOnlyEdit }: {
+vi.mock('ag-grid-react', async () => {
+  const React = await import('react')
+  return { AgGridReact: ({ rowData, columnDefs, onRowClicked, onSelectionChanged,
+    onCellEditRequest, readOnlyEdit, rowSelection, rowClassRules, statusBar, components }: {
     rowData: GridRow[]
     columnDefs?: GridColumn[]
     onRowClicked?: (event: { data: GridRow }) => void
+    onSelectionChanged?: (event: { api: { getSelectedRows: () => GridRow[] } }) => void
     onCellEditRequest?: (event: {
       data: GridRow
       newValue: string
@@ -29,11 +34,46 @@ vi.mock('ag-grid-react', () => ({
       node: object
     }) => void
     readOnlyEdit?: boolean
-  }) => (
-    <div>
-      {rowData.map((row) => (
-        <div key={row.caseId}>
-          <button onClick={() => onRowClicked?.({ data: row })}>
+    rowSelection?: { mode: string; checkboxes?: boolean; headerCheckbox?: boolean;
+      enableClickSelection?: boolean; enableSelectionWithoutKeys?: boolean; selectAll?: string }
+    rowClassRules?: Record<string, (params: { data: GridRow; node: { isSelected: () => boolean } }) => boolean>
+    statusBar?: { statusPanels: { statusPanel: string; statusPanelParams?: { text?: string } }[] }
+    components?: Record<string, (props: { text: string }) => ReactNode>
+  }) => {
+    const [selectedIds, setSelectedIds] = React.useState<number[]>([])
+    const anchorIndex = React.useRef<number | undefined>(undefined)
+    const select = (row: GridRow, index: number, event: React.MouseEvent) => {
+      let next: number[]
+      if (event.shiftKey && anchorIndex.current !== undefined) {
+        const [start, end] = [anchorIndex.current, index].sort((left, right) => left - right)
+        next = rowData.slice(start, end + 1).map((item) => item.caseId)
+      } else if (event.ctrlKey || event.metaKey) {
+        next = selectedIds.includes(row.caseId)
+          ? selectedIds.filter((caseId) => caseId !== row.caseId)
+          : [...selectedIds, row.caseId]
+        anchorIndex.current = index
+      } else {
+        next = [row.caseId]
+        anchorIndex.current = index
+      }
+      setSelectedIds(next)
+      onRowClicked?.({ data: row })
+      onSelectionChanged?.({ api: { getSelectedRows: () => rowData
+        .filter((item) => next.includes(item.caseId)) } })
+    }
+    return <div data-testid="grid-selection-config"
+      data-checkboxes={String(rowSelection?.checkboxes)}
+      data-header-checkbox={String(rowSelection?.headerCheckbox)}
+      data-click-selection={String(rowSelection?.enableClickSelection)}
+      data-selection-without-keys={String(rowSelection?.enableSelectionWithoutKeys)}
+      data-select-all={rowSelection?.selectAll}>
+      {rowData.map((row, index) => {
+        const selected = selectedIds.includes(row.caseId)
+        const classes = Object.entries(rowClassRules ?? {})
+          .filter(([, rule]) => rule({ data: row, node: { isSelected: () => selected } }))
+          .map(([name]) => name).join(' ')
+        return <div key={row.caseId} data-testid={`grid-row-${row.caseId}`} className={classes}>
+          <button onClick={(event) => select(row, index, event)}>
             {row.clientId} {row.clientName} {row.securityId} {row.securityJapaneseName}{' '}
             {row.securityBbgDisplay} {row.rfqStatus}{' '}
             {'revisionStatus' in row ? row.revisionStatus : ''}{' '}
@@ -65,15 +105,21 @@ vi.mock('ag-grid-react', () => ({
                 data-cell-editor={column.cellEditor ?? ''}
                 data-editable={column.editable?.({ data: row }) ? 'true' : 'false'}
               >
-                {String(display)}
+                {column.cellRenderer ? column.cellRenderer({ data: row }) : String(display)}
               </output>
             )
           })}
         </div>
-      ))}
+      })}
+      {statusBar?.statusPanels.map((panel, index) => {
+        const Component = components?.[panel.statusPanel]
+        return Component ? <div key={index}>{Component({
+          text: panel.statusPanelParams?.text ?? '',
+        })}</div> : null
+      })}
     </div>
-  ),
-}))
+  } }
+})
 
 const clients: ClientSearchResult[] = [
   { clientId: 'client-001', code: 'C001', name: '青空銀行' },
@@ -197,6 +243,53 @@ describe('AppShell', () => {
 })
 
 describe('SalesScreen', () => {
+  const quotedRow = (caseId: number): SalesRfq => ({
+    ...draftRow,
+    caseId,
+    clientId: `client-${caseId}`,
+    rfqStatus: 'Active',
+    revisionStatus: 'Confirmed',
+    quoteStatus: 'Quoted',
+    quoteRequestReason: null,
+    currentQuoteId: `00000000-0000-0000-0000-${String(caseId).padStart(12, '0')}`,
+    currentVersion: 7,
+  })
+
+  it('configures Excel-like selection without visible checkboxes', () => {
+    render(<SalesScreen {...baseProps} rfqs={[quotedRow(101)]} />)
+    const config = screen.getByTestId('grid-selection-config')
+    expect(config).toHaveAttribute('data-checkboxes', 'false')
+    expect(config).toHaveAttribute('data-header-checkbox', 'false')
+    expect(config).toHaveAttribute('data-click-selection', 'true')
+    expect(config).toHaveAttribute('data-selection-without-keys', 'false')
+    expect(config).toHaveAttribute('data-select-all', 'filtered')
+  })
+
+  it('keeps the active RFQ pane stable while Ctrl and Shift change bulk selection', () => {
+    render(<SalesScreen {...baseProps} rfqs={[quotedRow(101), quotedRow(102), quotedRow(103)]} />)
+    fireEvent.click(within(screen.getByTestId('grid-row-101')).getByRole('button', { name: /client-101/ }))
+    fireEvent.click(within(screen.getByTestId('grid-row-102')).getByRole('button', { name: /client-102/ }), { ctrlKey: true })
+
+    expect(screen.getByText('Case 102')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'RFQ' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Bulk (2)' })).toBeInTheDocument()
+    expect(screen.getByTestId('grid-row-101')).toHaveClass('sales-row-selected')
+    expect(screen.getByTestId('grid-row-102')).toHaveClass('sales-row-selected')
+
+    fireEvent.click(within(screen.getByTestId('grid-row-103')).getByRole('button', { name: /client-103/ }), { shiftKey: true })
+    expect(screen.getByText('Case 103')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'RFQ' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('grid-row-101')).not.toHaveClass('sales-row-selected')
+    expect(screen.getByTestId('grid-row-102')).toHaveClass('sales-row-selected')
+    expect(screen.getByTestId('grid-row-103')).toHaveClass('sales-row-selected')
+  })
+
+  it('keeps the Bulk tab present and shows an empty state with insufficient selection', () => {
+    render(<SalesScreen {...baseProps} rfqs={[quotedRow(101)]} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Bulk (0)' }))
+    expect(screen.getByText('Select multiple RFQs for bulk operations')).toBeInTheDocument()
+  })
+
   it('renders lifecycle and quote status returned by the API', () => {
     const confirmed = {
       ...draftRow,
@@ -227,7 +320,7 @@ describe('SalesScreen', () => {
       assignedTraderId: 'trader-a',
     }))
     expect(onReload).toHaveBeenCalledOnce()
-  })
+  }, 15_000)
 
   it('confirms a new RFQ directly without saving first', async () => {
     const onConfirmNew = vi.fn().mockResolvedValue(undefined)
@@ -247,7 +340,7 @@ describe('SalesScreen', () => {
       salesAndTradingMessage: 'please quote',
       assignedTraderId: 'trader-a',
     }))
-  })
+  }, 15_000)
 
   it('uses Alt+Enter to confirm the active New RFQ form', async () => {
     const onConfirmNew = vi.fn().mockResolvedValue(undefined)
@@ -298,6 +391,97 @@ describe('SalesScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Present' }))
 
     await waitFor(() => expect(onPresent).toHaveBeenCalledWith(101, 7))
+  })
+
+  it.each([
+    ['Hit', 'Hit'],
+    ['Away', 'Away'],
+  ] as const)('executes paused row %s directly without confirmation', async (label, outcome) => {
+    const onClose = vi.fn().mockResolvedValue(undefined)
+    render(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quotedRow(101)]}
+      onClose={onClose} />)
+
+    fireEvent.click(screen.getByRole('button', { name: `Row 101 ${label}` }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith(101, outcome, 7))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('executes paused row Cancel directly without confirmation', async () => {
+    const onCancel = vi.fn().mockResolvedValue(undefined)
+    render(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quotedRow(101)]}
+      onCancel={onCancel} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Row 101 Cancel' }))
+    await waitFor(() => expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ caseId: 101 })))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps row actions disabled in Live and enables them in Paused', () => {
+    const { rerender } = render(<SalesScreen {...baseProps} refreshMode="live"
+      rfqs={[quotedRow(101)]} />)
+    expect(screen.getByRole('button', { name: 'Row 101 Hit' })).toBeDisabled()
+
+    rerender(<SalesScreen {...baseProps} refreshMode="paused" rfqs={[quotedRow(101)]} />)
+    expect(screen.getByRole('button', { name: 'Row 101 Hit' })).toBeEnabled()
+  })
+
+  it('preserves all eight bulk operations, excludes Bulk Hit, and moves results to the Result Bar', async () => {
+    const onBulk = vi.fn().mockResolvedValue([
+      { caseId: 101, status: 'Succeeded', code: null, message: null },
+      { caseId: 102, status: 'Failed', code: 'VersionConflict', message: 'Changed remotely' },
+    ])
+    render(<SalesScreen {...baseProps} refreshMode="paused"
+      rfqs={[quotedRow(101), quotedRow(102), {
+        ...quotedRow(103), quoteStatus: 'Requested', quoteRequestReason: 'Initial',
+      }]} onBulk={onBulk} />)
+    fireEvent.click(within(screen.getByTestId('grid-row-101')).getByRole('button', { name: /client-101/ }))
+    fireEvent.click(within(screen.getByTestId('grid-row-102')).getByRole('button', { name: /client-102/ }), { ctrlKey: true })
+    fireEvent.click(within(screen.getByTestId('grid-row-103')).getByRole('button', { name: /client-103/ }), { ctrlKey: true })
+    fireEvent.click(screen.getByRole('tab', { name: 'Bulk (3)' }))
+
+    for (const name of ['Away', 'Cancel', 'Present', 'Unpresent', 'Confirm Drafts',
+      'Discard Drafts', 'Confirm Amendments', 'Discard Amendments'])
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hit' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Away' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await screen.findByText('Bulk Away: 1 ok / 1 skipped / 1 failed')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }))
+    expect(screen.getByText('Changed remotely')).toBeInTheDocument()
+    expect(screen.getByText('Not eligible in current state')).toBeInTheDocument()
+  }, 15_000)
+
+  it('toggles Live/Pause, shows pending updates, and refreshes manually without changing mode', () => {
+    const onRefreshModeChange = vi.fn()
+    const onManualRefresh = vi.fn()
+    render(<SalesScreen {...baseProps} refreshMode="paused" pendingUpdateCount={4}
+      onRefreshModeChange={onRefreshModeChange} onManualRefresh={onManualRefresh} />)
+    expect(screen.getByText('Paused · 4 updates pending')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Live'))
+    expect(onRefreshModeChange).toHaveBeenCalledOnce()
+    expect(onRefreshModeChange).toHaveBeenCalledWith('live')
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(onManualRefresh).toHaveBeenCalledOnce()
+    expect(onRefreshModeChange).toHaveBeenCalledOnce()
+  })
+
+  it('keeps only Alt+L, Alt+N, Alt+Enter, and Esc workflow shortcuts', () => {
+    const onRefreshModeChange = vi.fn()
+    const onClose = vi.fn()
+    render(<SalesScreen {...baseProps} rfqs={[quotedRow(101)]}
+      onRefreshModeChange={onRefreshModeChange} onClose={onClose} />)
+    fireEvent.click(within(screen.getByTestId('grid-row-101')).getByRole('button', { name: /client-101/ }))
+
+    for (const key of ['p', 'u', 'r', 'h', 'a', 'c'])
+      fireEvent.keyDown(window, { key, altKey: true })
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: 'l', altKey: true })
+    expect(onRefreshModeChange).toHaveBeenCalledWith('paused')
+    expect(screen.getByText(/Alt\+L Live\/Pause/)).toBeInTheDocument()
+    expect(screen.queryByText(/Alt\+H Hit/)).not.toBeInTheDocument()
   })
 
   it('preserves Contact Owner handoff in the redesigned Work Pane', async () => {

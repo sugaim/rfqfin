@@ -115,9 +115,21 @@ body {
 }
 
 .sales-grid {
+  --ag-selected-row-background-color: transparent;
   width: 100%;
   height: 100%;
   min-height: 620px;
+}
+
+.sales-grid .sales-row-selected {
+  box-shadow: inset 3px 0 #4ea3d8;
+}
+
+.row-action-buttons .ant-btn {
+  min-width: 24px;
+  height: 22px;
+  padding-inline: 5px;
+  font-size: 11px;
 }
 
 .sales-work-pane {
@@ -127,6 +139,17 @@ body {
   border-top: 2px solid #45667f;
   background: #111;
   padding: 12px;
+}
+
+.sales-work-pane > .ant-tabs,
+.sales-work-pane > .ant-tabs > .ant-tabs-content-holder,
+.sales-work-pane .ant-tabs-content,
+.sales-work-pane .ant-tabs-tabpane {
+  min-height: 100%;
+}
+
+.sales-work-pane > .ant-tabs > .ant-tabs-nav {
+  margin-bottom: 9px;
 }
 
 .sales-pane-quoted {
@@ -266,6 +289,52 @@ body {
 
 .bulk-pane .ant-list {
   margin-top: 10px;
+}
+
+.bulk-result-bar {
+  border: 1px solid #303030;
+  background: #111;
+}
+
+.bulk-result-success {
+  border-left: 3px solid #497a55;
+}
+
+.bulk-result-warning {
+  border-left: 3px solid #ad7b21;
+}
+
+.bulk-result-error {
+  border-left: 3px solid #a33d3d;
+}
+
+.bulk-result-summary {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bulk-result-details {
+  max-height: 220px;
+  overflow: auto;
+  border-bottom: 1px solid #303030;
+}
+
+.bulk-result-details table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.bulk-result-details th,
+.bulk-result-details td {
+  border-bottom: 1px solid #262626;
+  padding: 5px 9px;
+  text-align: left;
 }
 
 .sales-row-quoted {

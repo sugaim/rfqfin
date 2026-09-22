@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { SalesRfq } from '../../services/api'
 import {
   bulkEligibility, commandEligible, derivePaneMode, isTextEditingTarget,
-  matchesSalesPreset, reconcileSelection, requiresConfirmation,
+  matchesSalesPreset, reconcileSelection, requiresConfirmation, rowActionCommands,
 } from './salesModel'
 
 const row = (overrides: Partial<SalesRfq> = {}): SalesRfq => ({
@@ -40,12 +40,11 @@ const row = (overrides: Partial<SalesRfq> = {}): SalesRfq => ({
 describe('Sales pane mode', () => {
   it('does not treat no selection as New and derives lifecycle modes from server state', () => {
     const rows = [row()]
-    expect(derivePaneMode(rows, [], false)).toBe('neutral')
-    expect(derivePaneMode(rows, [], true)).toBe('new')
-    expect(derivePaneMode(rows, [101], false)).toBe('waiting')
-    expect(derivePaneMode([row({ quoteStatus: 'Quoted' })], [101], false)).toBe('quoted')
-    expect(derivePaneMode([row({ rfqStatus: 'Presented', quoteStatus: 'Quoted' })], [101], false)).toBe('presented')
-    expect(derivePaneMode([row(), row({ caseId: 102 })], [101, 102], false)).toBe('bulk')
+    expect(derivePaneMode(rows, undefined, false)).toBe('neutral')
+    expect(derivePaneMode(rows, undefined, true)).toBe('new')
+    expect(derivePaneMode(rows, 101, false)).toBe('waiting')
+    expect(derivePaneMode([row({ quoteStatus: 'Quoted' })], 101, false)).toBe('quoted')
+    expect(derivePaneMode([row({ rfqStatus: 'Presented', quoteStatus: 'Quoted' })], 101, false)).toBe('presented')
   })
 
   it('keeps stable Case selections across refresh and removes disappeared Cases', () => {
@@ -74,12 +73,19 @@ describe('Sales command eligibility', () => {
     expect(bulkCommands).not.toContain('hit')
   })
 
-  it('keeps Work Pane actions immediate and confirms dangerous context/shortcut actions', () => {
+  it('keeps row and Work Pane actions immediate while context actions retain confirmation', () => {
     expect(requiresConfirmation('work-pane', 'hit')).toBe(false)
+    expect(requiresConfirmation('row-action', 'hit')).toBe(false)
     expect(requiresConfirmation('context-menu', 'present')).toBe(false)
     expect(requiresConfirmation('context-menu', 'hit')).toBe(true)
-    expect(requiresConfirmation('shortcut', 'away')).toBe(true)
-    expect(requiresConfirmation('shortcut', 'cancel')).toBe(true)
+  })
+
+  it('shows only row actions eligible for the current state and actor', () => {
+    expect(rowActionCommands(row({ quoteStatus: 'Quoted' }), 'sales-dev'))
+      .toEqual(['present', 'hit', 'away', 'cancel'])
+    expect(rowActionCommands(row({ revisionStatus: 'Draft', rfqStatus: 'Draft' }), 'sales-dev'))
+      .toEqual(['confirm-draft', 'discard-draft'])
+    expect(rowActionCommands(row({ quoteStatus: 'Quoted' }), 'sales-a')).toEqual([])
   })
 
   it('recognizes typing surfaces so character shortcuts remain safe', () => {

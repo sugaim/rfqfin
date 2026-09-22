@@ -2,19 +2,19 @@ import type { SalesRfq } from '../../services/api'
 
 export type SalesFilterPreset = 'all' | 'owner' | 'sales' | 'owner-and-sales' | 'owner-or-sales'
 export type SalesPaneMode = 'neutral' | 'new' | 'draft' | 'waiting' | 'quoted'
-  | 'presented' | 'cancelled' | 'hit' | 'away' | 'bulk'
+  | 'presented' | 'cancelled' | 'hit' | 'away'
 export type SalesCommand = 'present' | 'unpresent' | 'hit' | 'away' | 'cancel' | 'reopen'
   | 'confirm-amendment' | 'discard-amendment' | 'create-from-existing'
+export type SalesRowCommand = SalesCommand | 'confirm-draft' | 'discard-draft'
 export type SalesBulkCommand = 'away' | 'cancel' | 'present' | 'unpresent'
   | 'confirm-drafts' | 'discard-drafts' | 'confirm-amendments' | 'discard-amendments'
-export type SalesInvocationSurface = 'work-pane' | 'context-menu' | 'shortcut'
+export type SalesInvocationSurface = 'work-pane' | 'row-action' | 'context-menu'
 
 export function derivePaneMode(
-  rows: SalesRfq[], selectedCaseIds: number[], newIntent: boolean,
+  rows: SalesRfq[], activeCaseId: number | undefined, newIntent: boolean,
 ): SalesPaneMode {
-  if (selectedCaseIds.length > 1) return 'bulk'
   if (newIntent) return 'new'
-  const selected = rows.find((row) => row.caseId === selectedCaseIds[0])
+  const selected = rows.find((row) => row.caseId === activeCaseId)
   if (!selected) return 'neutral'
   if (selected.revisionStatus === 'Draft') return 'draft'
   if (selected.rfqStatus === 'Presented') return 'presented'
@@ -22,6 +22,17 @@ export function derivePaneMode(
   if (selected.rfqStatus === 'Hit') return 'hit'
   if (selected.rfqStatus === 'Away') return 'away'
   return selected.quoteStatus === 'Quoted' ? 'quoted' : 'waiting'
+}
+
+export function rowActionCommands(row: SalesRfq, userId: string): SalesRowCommand[] {
+  if (row.contactOwnerId !== userId) return []
+  if (row.revisionStatus === 'Draft') return ['confirm-draft', 'discard-draft']
+  const commands: SalesRowCommand[] = []
+  if (row.draftRevisionId) commands.push('confirm-amendment', 'discard-amendment')
+  for (const command of ['present', 'unpresent', 'hit', 'away', 'cancel', 'reopen'] as const) {
+    if (commandEligible(command, row, userId)) commands.push(command)
+  }
+  return commands
 }
 
 export function reconcileSelection(caseIds: number[], rows: SalesRfq[]) {
@@ -103,5 +114,5 @@ export function isTextEditingTarget(target: EventTarget | null) {
 export function requiresConfirmation(
   surface: SalesInvocationSurface, command: SalesCommand,
 ) {
-  return surface !== 'work-pane' && ['hit', 'away', 'cancel'].includes(command)
+  return surface === 'context-menu' && ['hit', 'away', 'cancel'].includes(command)
 }

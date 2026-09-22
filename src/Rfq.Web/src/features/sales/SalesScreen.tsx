@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, AutoComplete, Badge, Button, Descriptions, Drawer, Empty, Form, Input,
-  InputNumber, List, Modal, Popconfirm, Select, Space, Spin, Tag, Tooltip, Typography, message,
+  InputNumber, List, Modal, Popconfirm, Segmented, Select, Space, Spin, Tabs,
+  Tag, Tooltip, Typography,
 } from 'antd'
 import type {
   CellEditRequestEvent, ColDef, ColGroupDef, GetContextMenuItemsParams, GridApi,
-  DefaultMenuItem, IRowNode, MenuItemDef, RowClickedEvent, SelectionChangedEvent, StatusPanelDef,
+  DefaultMenuItem, ICellRendererParams, IRowNode, MenuItemDef, RowClickedEvent,
+  RowClassParams, SelectionChangedEvent, StatusPanelDef,
 } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
 import type {
@@ -15,8 +17,8 @@ import type {
 import {
   bulkEligibility, commandEligible, derivePaneMode, displayState, elapsedLabel,
   isTextEditingTarget, matchesSalesPreset, requiresConfirmation,
-  reconcileSelection,
-  type SalesBulkCommand, type SalesCommand,
+  reconcileSelection, rowActionCommands,
+  type SalesBulkCommand, type SalesCommand, type SalesRowCommand,
   type SalesFilterPreset,
 } from './salesModel'
 
@@ -24,6 +26,8 @@ type UserOption = { userId: string; name: string }
 type BulkSnapshotItem = { row: SalesRfq; eligible: boolean; reason?: string }
 type BulkDialog = { command: SalesBulkCommand; items: BulkSnapshotItem[] }
 type SingleDialog = { command: SalesCommand; row: SalesRfq }
+type BulkResult = { command: SalesBulkCommand; items: BulkItemResult[] }
+export type SalesRefreshMode = 'live' | 'paused'
 
 const million = 1_000_000
 const filterOptions: { value: SalesFilterPreset; label: string }[] = [
@@ -58,6 +62,11 @@ export interface SalesScreenProps {
   recentRevisions?: SalesRecentRevision[]
   recentRevisionsLoading?: boolean
   remoteUpdatePending?: boolean
+  refreshMode?: SalesRefreshMode
+  pendingUpdateCount?: number
+  onRefreshModeChange?: (mode: SalesRefreshMode) => void | Promise<void>
+  onManualRefresh?: () => void | Promise<void>
+  onRowActionApplied?: (command: SalesRowCommand, row: SalesRfq) => void
   onTransientStateChange?: (protectedState: boolean) => void
   onClientSearch: (query: string) => void | Promise<void>
   onSecuritySearch: (query: string) => void | Promise<void>
@@ -98,6 +107,10 @@ export function SalesScreen(props: SalesScreenProps) {
   const {
     rfqs, clients, securities, traders, users = [], currentUserId, isLoading, isError, isMutating,
     recentRevisions = [], recentRevisionsLoading = false, remoteUpdatePending = false,
+    refreshMode = 'live', pendingUpdateCount = 0,
+    onRefreshModeChange = async () => undefined,
+    onManualRefresh,
+    onRowActionApplied = () => undefined,
     onTransientStateChange, onClientSearch, onSecuritySearch, onResolveDefaults,
     onCreate, onUpdate, onConfirmNew, onConfirmDraft, onDiscard, onPresent,
     onUnpresent, onClose,
@@ -117,6 +130,8 @@ export function SalesScreen(props: SalesScreenProps) {
   const [form] = Form.useForm<RfqFormValues>()
   const [gridApi, setGridApi] = useState<GridApi<SalesRfq> | null>(null)
   const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([])
+  const [activeCaseId, setActiveCaseId] = useState<number>()
+  const [workPaneTab, setWorkPaneTab] = useState<'rfq' | 'bulk'>('rfq')
   const [newIntent, setNewIntent] = useState(false)
   const [filterPreset, setFilterPreset] = useState<SalesFilterPreset>('all')
   const [memoEditing, setMemoEditing] = useState(false)
@@ -128,15 +143,16 @@ export function SalesScreen(props: SalesScreenProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [singleDialog, setSingleDialog] = useState<SingleDialog | null>(null)
   const [bulkDialog, setBulkDialog] = useState<BulkDialog | null>(null)
-  const [bulkResults, setBulkResults] = useState<BulkItemResult[] | null>(null)
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
+  const [resultExpanded, setResultExpanded] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const protectedRef = useRef(false)
 
   const selectedRows = useMemo(() => selectedCaseIds
     .map((caseId) => rfqs.find((row) => row.caseId === caseId))
     .filter((row): row is SalesRfq => Boolean(row)), [rfqs, selectedCaseIds])
-  const selected = selectedRows.length === 1 ? selectedRows[0] : undefined
-  const mode = derivePaneMode(rfqs, selectedCaseIds, newIntent)
+  const selected = rfqs.find((row) => row.caseId === activeCaseId)
+  const mode = derivePaneMode(rfqs, activeCaseId, newIntent)
   const isProtected = newIntent || mode === 'draft' || memoEditing
     || singleDialog !== null || bulkDialog !== null
 
@@ -149,6 +165,8 @@ export function SalesScreen(props: SalesScreenProps) {
 
   useEffect(() => {
     setSelectedCaseIds((current) => reconcileSelection(current, rfqs))
+    setActiveCaseId((current) => current !== undefined
+      && rfqs.some((row) => row.caseId === current) ? current : undefined)
   }, [rfqs])
 
   useEffect(() => {
@@ -169,6 +187,8 @@ export function SalesScreen(props: SalesScreenProps) {
 
   const startNew = () => {
     setNewIntent(true)
+    setWorkPaneTab('rfq')
+    setActiveCaseId(undefined)
     setSelectedCaseIds([])
     setTargetContactOwnerId(undefined)
     gridApi?.deselectAll()
@@ -179,7 +199,7 @@ export function SalesScreen(props: SalesScreenProps) {
 
   const selectRow = (row: SalesRfq) => {
     setNewIntent(false)
-    setSelectedCaseIds([row.caseId])
+    setActiveCaseId(row.caseId)
     setMemoDraft(row.salesMemo)
     setMemoEditing(false)
     setTargetContactOwnerId(undefined)
@@ -238,12 +258,14 @@ export function SalesScreen(props: SalesScreenProps) {
       setMemoEditing(false)
       setTargetContactOwnerId(undefined)
       if (reload) await onReload()
+      return true
     } catch (error) {
       const status = (error as { status?: number })?.status
       setConflict(status === 409)
       setActionError(status === 409
         ? 'This RFQ was updated elsewhere. Your local input is preserved; review and reload explicitly.'
         : 'The RFQ action could not be completed.')
+      return false
     }
   }
 
@@ -278,7 +300,7 @@ export function SalesScreen(props: SalesScreenProps) {
   }
 
   const executeCommand = async (command: SalesCommand, row: SalesRfq) => {
-    await run(async () => {
+    const succeeded = await run(async () => {
       switch (command) {
         case 'present': return onPresent(row.caseId, row.currentVersion)
         case 'unpresent': return onUnpresent(row.caseId, row.currentVersion)
@@ -290,7 +312,30 @@ export function SalesScreen(props: SalesScreenProps) {
         case 'discard-amendment': return onDiscardAmendment(row)
         case 'create-from-existing': return onCreateFromExisting(row.caseId)
       }
-    })
+    }, refreshMode === 'live')
+    if (succeeded && refreshMode === 'paused') onRowActionApplied(command, row)
+  }
+
+  const executeRowCommand = async (command: SalesRowCommand, row: SalesRfq) => {
+    if (refreshMode === 'live') return
+    if (command === 'confirm-draft') {
+      const { assignedTraderId, settlementDate, notional } = row
+      if (!assignedTraderId || !settlementDate || notional === null) return
+      const succeeded = await run(() => onConfirmDraft(row.caseId, {
+        notional,
+        settlementDate,
+        standardSettlementDate: row.standardSettlementDate,
+        salesAndTradingMessage: row.salesAndTradingMessage,
+        assignedTraderId,
+        expectedVersion: row.version,
+      }), false)
+      if (succeeded) onRowActionApplied(command, row)
+    } else if (command === 'discard-draft') {
+      const succeeded = await run(() => onDiscard(row.caseId, row.version), false)
+      if (succeeded) onRowActionApplied(command, row)
+    } else {
+      await executeCommand(command, row)
+    }
   }
 
   const requestCommand = (command: SalesCommand, row: SalesRfq, confirm: boolean) => {
@@ -306,30 +351,31 @@ export function SalesScreen(props: SalesScreenProps) {
       reason: bulkEligibility(command, row, currentUserId) ? undefined : 'Not eligible in current state',
     }))
     if (!items.some((item) => item.eligible)) return
-    setBulkResults(null)
     setBulkDialog({ command, items })
   }
 
   const applyBulk = async () => {
     if (!bulkDialog) return
+    const snapshot = bulkDialog
+    setBulkDialog(null)
     try {
-      const eligible = bulkDialog.items.filter((item) => item.eligible).map((item) => item.row)
-      const results = await onBulk(bulkDialog.command, eligible)
-      const skipped: BulkItemResult[] = bulkDialog.items.filter((item) => !item.eligible).map((item) => ({
+      const eligible = snapshot.items.filter((item) => item.eligible).map((item) => item.row)
+      const results = await onBulk(snapshot.command, eligible)
+      const skipped: BulkItemResult[] = snapshot.items.filter((item) => !item.eligible).map((item) => ({
         caseId: item.row.caseId, status: 'Skipped', code: 'InvalidState', message: item.reason ?? null,
       }))
-      setBulkResults([...results, ...skipped])
+      setBulkResult({ command: snapshot.command, items: [...results, ...skipped] })
+      setResultExpanded(false)
       await onReload()
     } catch {
       setActionError('The bulk operation could not be completed.')
-      setBulkDialog(null)
     }
   }
 
   const editAmendment = async (event: CellEditRequestEvent<SalesRfq>) => {
     const row = event.data
     if (!row || row.revisionStatus === 'Draft') return
-    setSelectedCaseIds([row.caseId])
+    setActiveCaseId(row.caseId)
     const field = event.colDef.field
     await run(() => onSaveAmendment(
       row,
@@ -367,6 +413,10 @@ export function SalesScreen(props: SalesScreenProps) {
         { name: 'Client ID', action: () => void navigator.clipboard.writeText(row.clientId) },
       ],
     })
+    items.push('separator')
+    items.push({ name: 'Select All Filtered', action: () => params.api
+      .forEachNodeAfterFilter((node) => node.setSelected(true)) })
+    items.push({ name: 'Clear Selection', action: () => params.api.deselectAll() })
     return items
   }
 
@@ -381,37 +431,32 @@ export function SalesScreen(props: SalesScreenProps) {
       const key = event.key.toLowerCase()
       const editing = isTextEditingTarget(event.target)
       if (editing && key !== 'enter') return
+      if (key === 'l') {
+        event.preventDefault()
+        void onRefreshModeChange(refreshMode === 'live' ? 'paused' : 'live')
+        return
+      }
       if (key === 'n') { event.preventDefault(); startNew(); return }
       if (key === 'enter') {
         event.preventDefault()
         if (newIntent || mode === 'draft') void saveDraft(true)
-        else if (selectedRows.length > 1 && selectedRows.some((row) => row.draftRevisionId))
-          openBulk('confirm-amendments')
         else if (selected?.draftRevisionId) void executeCommand('confirm-amendment', selected)
         return
       }
-      if (selectedRows.length > 1) {
-        const bulkMapping: Partial<Record<string, SalesBulkCommand>> = {
-          p: 'present', u: 'unpresent', a: 'away', c: 'cancel',
-        }
-        const bulkCommand = bulkMapping[key]
-        if (bulkCommand) { event.preventDefault(); openBulk(bulkCommand) }
-        return
-      }
-      if (!selected) return
-      const mapping: Record<string, SalesCommand> = {
-        p: 'present', u: 'unpresent', r: 'reopen',
-        h: 'hit', a: 'away', c: 'cancel',
-      }
-      const mapped = mapping[key]
-      if (mapped) { event.preventDefault(); requestCommand(
-        mapped, selected, requiresConfirmation('shortcut', mapped)) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
 
   const columns = useMemo<(ColDef<SalesRfq> | ColGroupDef<SalesRfq>)[]>(() => [
+    { field: 'caseId', headerName: 'Case', pinned: 'left', width: 78 },
+    {
+      colId: 'action', headerName: 'Action', pinned: 'left', width: 188,
+      sortable: false, filter: false, suppressMovable: true,
+      cellRenderer: ({ data }: ICellRendererParams<SalesRfq>) => data ? <RowActions row={data} userId={currentUserId}
+        disabled={refreshMode === 'live' || isMutating}
+        onCommand={(command) => void executeRowCommand(command, data)} /> : null,
+    },
     {
       groupId: 'client', headerName: 'Client', marryChildren: true, children: [
         { colId: 'client', headerName: 'Client', field: 'clientName', pinned: 'left', width: 140, tooltipField: 'clientName' },
@@ -470,36 +515,19 @@ export function SalesScreen(props: SalesScreenProps) {
     },
     { field: 'salesAndTradingMessage', headerName: 'Message', width: 180, tooltipField: 'salesAndTradingMessage', editable: ({ data }) => Boolean(data && data.revisionStatus !== 'Draft' && ['Active', 'Presented'].includes(data.rfqStatus)), valueGetter: ({ data }) => data?.draftSalesAndTradingMessage ?? data?.salesAndTradingMessage, cellClass: ({ data }) => data?.draftSalesAndTradingMessage != null ? 'amendment-changed-cell' : undefined },
     { field: 'currentQuoteId', headerName: 'Quote ID', hide: true, valueFormatter: ({ value }) => value ? String(value).slice(0, 8) : '' },
-    { field: 'caseId', headerName: 'Case', width: 85 },
-  ], [now])
+  ], [currentUserId, isMutating, now, refreshMode])
 
   const rowClassRules = {
-    'sales-row-quoted': ({ data }: { data?: SalesRfq }) => data?.rfqStatus === 'Active' && data.quoteStatus === 'Quoted',
-    'sales-row-draft': ({ data }: { data?: SalesRfq }) => data?.revisionStatus === 'Draft',
-    'sales-row-terminal': ({ data }: { data?: SalesRfq }) => Boolean(data && ['Cancelled', 'Hit', 'Away'].includes(data.rfqStatus)),
+    'sales-row-selected': ({ node }: RowClassParams<SalesRfq>) => Boolean(node.isSelected()),
+    'sales-row-quoted': ({ data }: RowClassParams<SalesRfq>) => data?.rfqStatus === 'Active' && data.quoteStatus === 'Quoted',
+    'sales-row-draft': ({ data }: RowClassParams<SalesRfq>) => data?.revisionStatus === 'Draft',
+    'sales-row-terminal': ({ data }: RowClassParams<SalesRfq>) => Boolean(data && ['Cancelled', 'Hit', 'Away'].includes(data.rfqStatus)),
   }
   const shortcutText = (() => {
-    if (selectedRows.length > 1) {
-      const shortcuts = [
-        selectedRows.some((row) => bulkEligibility('present', row, currentUserId)) ? 'Alt+P Present' : null,
-        selectedRows.some((row) => bulkEligibility('unpresent', row, currentUserId)) ? 'Alt+U Unpresent' : null,
-        selectedRows.some((row) => bulkEligibility('away', row, currentUserId)) ? 'Alt+A Away' : null,
-        selectedRows.some((row) => bulkEligibility('cancel', row, currentUserId)) ? 'Alt+C Cancel' : null,
-      ].filter(Boolean)
-      return [`${selectedRows.length} selected`, ...shortcuts, 'Right-click for actions'].join(' · ')
-    }
-    if (newIntent || mode === 'draft') return 'Alt+Enter Confirm · Esc Cancel'
-    if (!selected) return 'Right-click for actions'
-    if (selected.draftRevisionId) return 'AMEND pending · Alt+Enter Confirm · Right-click for more'
-    const shortcuts = [
-      commandEligible('present', selected, currentUserId) ? 'Alt+P Present' : null,
-      commandEligible('unpresent', selected, currentUserId) ? 'Alt+U Unpresent' : null,
-      commandEligible('hit', selected, currentUserId) ? 'Alt+H Hit' : null,
-      commandEligible('away', selected, currentUserId) ? 'Alt+A Away' : null,
-      commandEligible('cancel', selected, currentUserId) ? 'Alt+C Cancel' : null,
-      commandEligible('reopen', selected, currentUserId) ? 'Alt+R Reopen' : null,
-    ].filter(Boolean)
-    return [...shortcuts, 'Right-click for actions'].join(' · ')
+    const parts = selectedRows.length > 0 ? [`${selectedRows.length} selected`] : []
+    if (newIntent || mode === 'draft' || selected?.draftRevisionId) parts.push('Alt+Enter Confirm')
+    parts.push('Alt+L Live/Pause', 'Alt+N New', 'Right-click for actions')
+    return parts.join(' · ')
   })()
   const statusBar = useMemo<{ statusPanels: StatusPanelDef[] }>(() => ({ statusPanels: [
     { statusPanel: 'agSelectedRowCountComponent', align: 'left' },
@@ -514,12 +542,19 @@ export function SalesScreen(props: SalesScreenProps) {
           <Button type="primary" size="small" onClick={startNew}>New RFQ</Button>
           <Typography.Text type="secondary">Filter</Typography.Text>
           <Select size="small" value={filterPreset} options={filterOptions} onChange={setFilterPreset} style={{ width: 170 }} />
-          {remoteUpdatePending && <Badge status="processing" text="Update deferred" />}
+          <Segmented size="small" aria-label="Refresh mode"
+            value={refreshMode === 'live' ? 'Live' : 'Paused'} options={['Live', 'Paused']}
+            onChange={(value) => void onRefreshModeChange(value === 'Live' ? 'live' : 'paused')} />
+          {refreshMode === 'paused' && <Badge status={pendingUpdateCount ? 'warning' : 'default'}
+            text={`Paused · ${pendingUpdateCount} updates pending`} />}
+          {refreshMode === 'live' && remoteUpdatePending && <Badge status="processing" text="Update deferred" />}
         </Space>
         <Space size={8}>
           <Button size="small" onClick={() => setDrawerOpen(true)}>Recent Revisions</Button>
           <Button size="small" disabled={!gridApi || !onSaveGridConfig} onClick={() => gridApi && onSaveGridConfig && void onSaveGridConfig(JSON.stringify(gridApi.getColumnState()))}>Save Layout</Button>
           <Button size="small" disabled={!gridApi} onClick={() => gridApi?.resetColumnState()}>Reset Layout</Button>
+          <Tooltip title="Refresh latest snapshot"><Button size="small" aria-label="Refresh"
+            onClick={() => void (onManualRefresh ?? onReload)()}>↻</Button></Tooltip>
         </Space>
       </div>
 
@@ -538,7 +573,10 @@ export function SalesScreen(props: SalesScreenProps) {
                 headerHeight={30}
                 groupHeaderHeight={26}
                 tooltipShowDelay={400}
-                rowSelection={{ mode: 'multiRow', selectAll: 'filtered' }}
+                rowSelection={{
+                  mode: 'multiRow', selectAll: 'filtered', enableClickSelection: true,
+                  enableSelectionWithoutKeys: false, checkboxes: false, headerCheckbox: false,
+                }}
                 onGridReady={({ api }) => setGridApi(api)}
                 onRowClicked={({ data }: RowClickedEvent<SalesRfq>) => data && selectRow(data)}
                 onSelectionChanged={({ api }: SelectionChangedEvent<SalesRfq>) => setSelectedCaseIds(api.getSelectedRows().map((row) => row.caseId))}
@@ -555,7 +593,11 @@ export function SalesScreen(props: SalesScreenProps) {
           </Spin>
         </div>
         <aside className={`sales-work-pane sales-pane-${mode}`}>
-          <WorkPaneHeader mode={mode} row={selected} count={selectedRows.length} />
+          <Tabs size="small" activeKey={workPaneTab}
+            onChange={(key) => setWorkPaneTab(key as 'rfq' | 'bulk')}
+            items={[
+              { key: 'rfq', label: 'RFQ', children: <>
+          <WorkPaneHeader mode={mode} row={selected} />
           {(mode === 'new' || mode === 'draft') && (
             <Spin spinning={defaultsLoading}>
               <Form<RfqFormValues> form={form} layout="vertical" size="small" className="sales-form">
@@ -582,8 +624,7 @@ export function SalesScreen(props: SalesScreenProps) {
             </Spin>
           )}
           {mode === 'neutral' && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Select an RFQ or choose New RFQ" />}
-          {mode === 'bulk' && <BulkPane rows={selectedRows} userId={currentUserId} onOpen={openBulk} />}
-          {!['neutral', 'new', 'draft', 'bulk'].includes(mode) && selected && (
+          {!['neutral', 'new', 'draft'].includes(mode) && selected && (
             <LifecyclePane row={selected} mode={mode} now={now} isMutating={isMutating}
               users={users} currentUserId={currentUserId}
               targetContactOwnerId={targetContactOwnerId}
@@ -603,18 +644,24 @@ export function SalesScreen(props: SalesScreenProps) {
               ))}
               onCommand={(command) => void executeCommand(command, selected)} />
           )}
+              </> },
+              { key: 'bulk', label: `Bulk (${selectedRows.length})`, children:
+                <BulkPane rows={selectedRows} userId={currentUserId} onOpen={openBulk} /> },
+            ]} />
         </aside>
       </div>
+
+      {bulkResult && <BulkResultBar result={bulkResult} expanded={resultExpanded}
+        onToggle={() => setResultExpanded((current) => !current)} />}
 
       <Modal open={singleDialog !== null} title={singleDialog ? `${singleDialog.command.toUpperCase()} Case ${singleDialog.row.caseId}` : ''} okText="Apply" onCancel={() => setSingleDialog(null)} onOk={() => { if (singleDialog) void executeCommand(singleDialog.command, singleDialog.row); setSingleDialog(null) }}>
         {singleDialog && <p>{singleDialog.row.securityJapaneseName} · {singleDialog.row.clientName}</p>}
       </Modal>
-      <Modal open={bulkDialog !== null} title={bulkDialog ? `Bulk ${bulkDialog.command}` : ''} okText={bulkResults ? 'Close' : 'Apply'} onCancel={() => { setBulkDialog(null); setBulkResults(null) }} onOk={() => bulkResults ? (setBulkDialog(null), setBulkResults(null)) : void applyBulk()}>
-        {bulkResults
-          ? <List<BulkItemResult> size="small" dataSource={bulkResults} renderItem={(item) => <List.Item><Tag color={item.status === 'Succeeded' ? 'green' : item.status === 'Failed' ? 'red' : 'default'}>{item.status}</Tag> Case {item.caseId} {item.message}</List.Item>} />
-          : <List<BulkSnapshotItem> size="small" dataSource={bulkDialog?.items ?? []} renderItem={(item) => <List.Item><Tag color={item.eligible ? 'green' : 'default'}>{item.eligible ? '✓' : '–'}</Tag> Case {item.row.caseId} · {item.row.securityJapaneseName} {item.reason}</List.Item>} />}
+      <Modal open={bulkDialog !== null} title={bulkDialog ? `Bulk ${bulkDialog.command}` : ''}
+        okText="Apply" onCancel={() => setBulkDialog(null)} onOk={() => void applyBulk()}>
+        <List<BulkSnapshotItem> size="small" dataSource={bulkDialog?.items ?? []} renderItem={(item) => <List.Item><Tag color={item.eligible ? 'green' : 'default'}>{item.eligible ? '✓' : '–'}</Tag> Case {item.row.caseId} · {item.row.securityJapaneseName} {item.reason}</List.Item>} />
       </Modal>
-      <Drawer title="Recent Revisions" placement="right" width={480} open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+      <Drawer title="Recent Revisions" placement="right" size={480} open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Spin spinning={recentRevisionsLoading}>
           <List dataSource={recentRevisions} locale={{ emptyText: 'No confirmed revisions yet' }} renderItem={(item) => (
             <List.Item className="revision-item">
@@ -627,9 +674,8 @@ export function SalesScreen(props: SalesScreenProps) {
   )
 }
 
-function WorkPaneHeader({ mode, row, count }: { mode: string; row?: SalesRfq; count: number }) {
-  const title = mode === 'new' ? 'New RFQ' : mode === 'bulk' ? `${count} RFQs selected`
-    : row ? `Case ${row.caseId}` : 'Work Pane'
+function WorkPaneHeader({ mode, row }: { mode: string; row?: SalesRfq }) {
+  const title = mode === 'new' ? 'New RFQ' : row ? `Case ${row.caseId}` : 'Work Pane'
   return <div className="work-pane-header"><div><Typography.Text strong>{title}</Typography.Text>{row && <div className="work-pane-security">{row.clientName} · {row.securityJapaneseName}</div>}</div><Tag>{mode.toUpperCase()}</Tag></div>
 }
 
@@ -703,5 +749,66 @@ function BulkPane({ rows, userId, onOpen }: { rows: SalesRfq[]; userId: string; 
     { command: 'confirm-drafts', label: 'Confirm Drafts' }, { command: 'discard-drafts', label: 'Discard Drafts' },
     { command: 'confirm-amendments', label: 'Confirm Amendments' }, { command: 'discard-amendments', label: 'Discard Amendments' },
   ]
+  if (rows.length < 2) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+    description="Select multiple RFQs for bulk operations" />
   return <div className="bulk-pane"><Typography.Paragraph type="secondary">The confirmation snapshot includes all {rows.length} selected Cases. Bulk Hit is intentionally unavailable.</Typography.Paragraph><Space wrap>{actions.map(({ command, label }) => <Button key={command} size="small" disabled={!rows.some((row) => bulkEligibility(command, row, userId))} onClick={() => onOpen(command)}>{label}</Button>)}</Space><List size="small" dataSource={rows.slice(0, 8)} renderItem={(row) => <List.Item>Case {row.caseId} · {row.securityJapaneseName} <Tag>{displayState(row)}</Tag></List.Item>} />{rows.length > 8 && <Typography.Text type="secondary">+{rows.length - 8} more</Typography.Text>}</div>
+}
+
+const rowActionLabels: Record<SalesRowCommand, { short: string; full: string }> = {
+  'confirm-draft': { short: '✓', full: 'Confirm Draft' },
+  'discard-draft': { short: '×', full: 'Discard Draft' },
+  present: { short: 'P', full: 'Present' },
+  unpresent: { short: 'U', full: 'Unpresent' },
+  hit: { short: 'H', full: 'Hit' },
+  away: { short: 'A', full: 'Away' },
+  cancel: { short: 'X', full: 'Cancel' },
+  reopen: { short: 'R', full: 'Reopen' },
+  'confirm-amendment': { short: 'A✓', full: 'Confirm Amendment' },
+  'discard-amendment': { short: 'A×', full: 'Discard Amendment' },
+  'create-from-existing': { short: '+', full: 'Create New from Existing' },
+}
+
+function RowActions({ row, userId, disabled, onCommand }: {
+  row: SalesRfq
+  userId: string
+  disabled: boolean
+  onCommand: (command: SalesRowCommand) => void
+}) {
+  return <Space.Compact className="row-action-buttons">
+    {rowActionCommands(row, userId).map((command) => <Tooltip key={command}
+      title={disabled ? `${rowActionLabels[command].full} (Pause to enable)` : rowActionLabels[command].full}>
+      <Button size="small" aria-label={`Row ${row.caseId} ${rowActionLabels[command].full}`}
+        disabled={disabled} onClick={(event) => { event.stopPropagation(); onCommand(command) }}>
+        {rowActionLabels[command].short}
+      </Button>
+    </Tooltip>)}
+  </Space.Compact>
+}
+
+function BulkResultBar({ result, expanded, onToggle }: {
+  result: BulkResult
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const succeeded = result.items.filter((item) => item.status === 'Succeeded').length
+  const skipped = result.items.filter((item) => item.status === 'Skipped').length
+  const failed = result.items.filter((item) => item.status === 'Failed').length
+  const tone = failed ? 'error' : skipped ? 'warning' : 'success'
+  const details = result.items.filter((item) => item.status !== 'Succeeded')
+  return <section className={`bulk-result-bar bulk-result-${tone}`} aria-label="Bulk result">
+    {expanded && <div className="bulk-result-details"><table>
+      <thead><tr><th>Case</th><th>Result</th><th>Code</th><th>Message</th></tr></thead>
+      <tbody>{(details.length ? details : result.items).map((item) => <tr key={item.caseId}>
+        <td>{item.caseId}</td><td>{item.status}</td><td>{item.code}</td><td>{item.message}</td>
+      </tr>)}</tbody>
+    </table></div>}
+    <div className="bulk-result-summary" role="status">
+      <span>Bulk {bulkCommandLabel(result.command)}: {succeeded} ok / {skipped} skipped / {failed} failed</span>
+      <Button size="small" type="link" onClick={onToggle}>{expanded ? 'Collapse' : 'Details'}</Button>
+    </div>
+  </section>
+}
+
+function bulkCommandLabel(command: SalesBulkCommand) {
+  return command.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join(' ')
 }
