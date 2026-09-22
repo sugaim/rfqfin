@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Rfq.Application;
@@ -5,6 +6,8 @@ using Rfq.Api;
 using Rfq.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+var generatingOpenApi =
+    Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
 
 builder.Services.AddControllers(options => { })
     .AddJsonOptions(options =>
@@ -32,16 +35,22 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 builder.Services.AddOpenApi();
-builder.Services.AddRfqApplication();
-builder.Services.AddRfqInfrastructure(builder.Configuration);
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ICurrentUser, DevelopmentCurrentUser>();
-builder.Services.AddSingleton<IIncidentReporter, LoggingIncidentReporter>();
-builder.Services.AddHostedService<QuoteExpiryWorker>();
+if (!generatingOpenApi)
+{
+    builder.Services.AddRfqApplication();
+    builder.Services.AddRfqInfrastructure(builder.Configuration);
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<ICurrentUser, DevelopmentCurrentUser>();
+    builder.Services.AddSingleton<IIncidentReporter, LoggingIncidentReporter>();
+    builder.Services.AddHostedService<QuoteExpiryWorker>();
+}
 
 var app = builder.Build();
 
-app.UseMiddleware<ApiErrorMiddleware>();
+if (!generatingOpenApi)
+{
+    app.UseMiddleware<ApiErrorMiddleware>();
+}
 
 if (app.Environment.IsDevelopment())
 {

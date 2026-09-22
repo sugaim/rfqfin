@@ -1,0 +1,6272 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "Rfq.Api | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/rfqs/{caseId}/working-quote/calculate": {
+      "put": {
+        "tags": [
+          "WorkingQuotes"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalculateWorkingQuoteRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalculateWorkingQuoteRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalculateWorkingQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/working-quote/mode": {
+      "put": {
+        "tags": [
+          "WorkingQuotes"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeWorkingQuoteModeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeWorkingQuoteModeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeWorkingQuoteModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/working-quote/manual": {
+      "put": {
+        "tags": [
+          "WorkingQuotes"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateManualWorkingQuoteRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateManualWorkingQuoteRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateManualWorkingQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingQuoteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trader-rfqs": {
+      "get": {
+        "tags": [
+          "TraderRfqs"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TraderRfqResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TraderRfqResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TraderRfqResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales-rfqs": {
+      "get": {
+        "tags": [
+          "SalesRfqs"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRfqResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRfqResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRfqResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/search": {
+      "get": {
+        "tags": [
+          "RfqSearch"
+        ],
+        "parameters": [
+          {
+            "name": "CreatedFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "CreatedTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "ClientId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SecurityId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "CategoryId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ContactOwnerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SalesId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "AssignedTraderId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "CaseId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RfqSearchResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RfqSearchResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RfqSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/revisions": {
+      "get": {
+        "tags": [
+          "RfqRevisions"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RevisionResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RevisionResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RevisionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/contact-owner": {
+      "put": {
+        "tags": [
+          "RfqResponsibility"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeContactOwnerRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeContactOwnerRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeContactOwnerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOwnerResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOwnerResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOwnerResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/quote/confirm": {
+      "post": {
+        "tags": [
+          "RfqQuotes"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmQuoteRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmQuoteRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmQuoteResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmQuoteResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmQuoteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/quote/withdraw": {
+      "post": {
+        "tags": [
+          "RfqQuotes"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/quotes": {
+      "get": {
+        "tags": [
+          "RfqQuotes"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QuoteHistoryResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QuoteHistoryResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QuoteHistoryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/quotes/bulk-withdraw": {
+      "post": {
+        "tags": [
+          "RfqQuotes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/quotes/bulk-confirm": {
+      "post": {
+        "tags": [
+          "RfqQuotes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkConfirmQuoteRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkConfirmQuoteRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkConfirmQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/ownership/pick-up": {
+      "post": {
+        "tags": [
+          "RfqOwnership"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmedRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmedRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/ownership/release": {
+      "post": {
+        "tags": [
+          "RfqOwnership"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/ownership/take-over": {
+      "post": {
+        "tags": [
+          "RfqOwnership"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmedRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmedRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/assigned-trader": {
+      "put": {
+        "tags": [
+          "RfqOwnership"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTraderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTraderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTraderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/ownership/bulk-pick-up": {
+      "post": {
+        "tags": [
+          "RfqOwnership"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPickUpRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPickUpRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPickUpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/ownership/bulk-release": {
+      "post": {
+        "tags": [
+          "RfqOwnership"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkOwnershipRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkOwnershipRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkOwnershipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/ownership/bulk-assign-trader": {
+      "post": {
+        "tags": [
+          "RfqOwnership"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAssignTraderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAssignTraderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAssignTraderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/memos/sales": {
+      "put": {
+        "tags": [
+          "RfqMemos"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemoRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemoRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesMemoResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesMemoResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesMemoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/memos/trader": {
+      "put": {
+        "tags": [
+          "RfqMemos"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemoRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemoRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraderMemoResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraderMemoResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraderMemoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/present": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/unpresent": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/close/hit": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/close/away": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/outcome/correct-to-hit": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectOutcomeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectOutcomeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectOutcomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/outcome/correct-to-away": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectOutcomeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectOutcomeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectOutcomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/cancel": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/reopen": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/bulk-present": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/bulk-unpresent": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/bulk-close-away": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/bulk-cancel": {
+      "post": {
+        "tags": [
+          "RfqLifecycle"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLifecycleRequest2"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/drafts": {
+      "post": {
+        "tags": [
+          "RfqDrafts"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDraftRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDraftRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/drafts/confirm": {
+      "post": {
+        "tags": [
+          "RfqDrafts"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDraftRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDraftRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/draft": {
+      "put": {
+        "tags": [
+          "RfqDrafts"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDraftRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDraftRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/draft/confirm": {
+      "post": {
+        "tags": [
+          "RfqDrafts"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDraftRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDraftRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/draft/discard": {
+      "post": {
+        "tags": [
+          "RfqDrafts"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/create-from-existing": {
+      "post": {
+        "tags": [
+          "RfqDrafts"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitialRfqResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/drafts/bulk-confirm": {
+      "post": {
+        "tags": [
+          "RfqDrafts"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkConfirmDraftRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkConfirmDraftRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkConfirmDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/drafts/bulk-discard": {
+      "post": {
+        "tags": [
+          "RfqDrafts"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDiscardDraftRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDiscardDraftRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDiscardDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/creation-context": {
+      "get": {
+        "tags": [
+          "RfqCreationContext"
+        ],
+        "parameters": [
+          {
+            "name": "securityId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RfqCreationContextResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RfqCreationContextResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RfqCreationContextResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/amendment": {
+      "put": {
+        "tags": [
+          "RfqAmendments"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAmendmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAmendmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAmendmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/amendment/confirm": {
+      "post": {
+        "tags": [
+          "RfqAmendments"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendmentActionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendmentActionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendmentActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/{caseId}/amendment/discard": {
+      "post": {
+        "tags": [
+          "RfqAmendments"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendmentActionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendmentActionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendmentActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/amendment/bulk-confirm": {
+      "post": {
+        "tags": [
+          "RfqAmendments"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAmendmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAmendmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAmendmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/amendment/bulk-discard": {
+      "post": {
+        "tags": [
+          "RfqAmendments"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAmendmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAmendmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAmendmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pricer": {
+      "post": {
+        "tags": [
+          "Pricer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricerRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricerRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalculatedQuoteResponse2"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalculatedQuoteResponse2"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalculatedQuoteResponse2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/settings/quote-expiry": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteExpiryResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteExpiryResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteExpiryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteExpiryRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteExpiryRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteExpiryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteExpiryResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteExpiryResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteExpiryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/grid-configs/{screenId}/{configKey}": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "parameters": [
+          {
+            "name": "screenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "configKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridConfigResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridConfigResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "parameters": [
+          {
+            "name": "screenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "configKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GridConfigRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GridConfigRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GridConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridConfigResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridConfigResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/stream": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/eod": {
+      "get": {
+        "tags": [
+          "Eod"
+        ],
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EodResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EodResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EodResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/category-routings": {
+      "get": {
+        "tags": [
+          "CategoryRoutings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryRoutingResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryRoutingResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryRoutingResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/category-routings/{categoryId}": {
+      "put": {
+        "tags": [
+          "CategoryRoutings"
+        ],
+        "parameters": [
+          {
+            "name": "categoryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryRoutingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryRoutingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryRoutingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryRoutingResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryRoutingResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryRoutingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assignable-traders": {
+      "get": {
+        "tags": [
+          "Candidates"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserCandidateResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserCandidateResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserCandidateResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contact-owner-candidates": {
+      "get": {
+        "tags": [
+          "Candidates"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserCandidateResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserCandidateResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserCandidateResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/candidates/clients": {
+      "get": {
+        "tags": [
+          "Candidates"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientCandidateResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientCandidateResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientCandidateResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rfqs/candidates/securities": {
+      "get": {
+        "tags": [
+          "Candidates"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SecurityCandidateResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SecurityCandidateResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SecurityCandidateResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/business-date": {
+      "get": {
+        "tags": [
+          "BusinessDate"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessDateResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessDateResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessDateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AmendmentActionItemRequest": {
+        "required": [
+          "caseId",
+          "expectedCurrentVersion",
+          "expectedDraftVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedDraftVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AmendmentActionRequest": {
+        "required": [
+          "expectedCurrentVersion",
+          "expectedDraftVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedDraftVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AmendmentResponse": {
+        "required": [
+          "caseId",
+          "currentRevisionId",
+          "draftRevisionId",
+          "currentVersion",
+          "draftVersion",
+          "rfqStatus",
+          "quoteStatus",
+          "quoteRequestReason"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentRevisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "draftRevisionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "draftVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "quoteStatus": {
+            "$ref": "#/components/schemas/NullableOfQuoteStatusValue"
+          },
+          "quoteRequestReason": {
+            "$ref": "#/components/schemas/NullableOfQuoteRequestReasonValue"
+          }
+        }
+      },
+      "AssignTraderRequest": {
+        "required": [
+          "assignedTraderId",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "BulkAmendmentRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmendmentActionItemRequest"
+            }
+          }
+        }
+      },
+      "BulkAssignTraderRequest": {
+        "required": [
+          "targetAssignedTraderId",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "targetAssignedTraderId": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnershipItemRequest"
+            }
+          }
+        }
+      },
+      "BulkConfirmDraftRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmDraftItemRequest"
+            }
+          }
+        }
+      },
+      "BulkConfirmQuoteRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmQuoteItemRequest"
+            }
+          }
+        }
+      },
+      "BulkDiscardDraftRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscardDraftItemRequest"
+            }
+          }
+        }
+      },
+      "BulkItemResponse": {
+        "required": [
+          "caseId",
+          "status",
+          "code",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BulkItemStatusValue"
+          },
+          "code": {
+            "$ref": "#/components/schemas/NullableOfBulkFailureCodeValue"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BulkItemStatusValue": {
+        "type": "integer"
+      },
+      "BulkLifecycleItemRequest": {
+        "required": [
+          "caseId",
+          "expectedCurrentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "BulkLifecycleRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LifecycleItemRequest"
+            }
+          }
+        }
+      },
+      "BulkLifecycleRequest2": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkLifecycleItemRequest"
+            }
+          }
+        }
+      },
+      "BulkOwnershipRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnershipItemRequest"
+            }
+          }
+        }
+      },
+      "BulkPickUpRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PickUpItemRequest"
+            }
+          }
+        }
+      },
+      "BusinessDateResponse": {
+        "required": [
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "CalculatedQuoteResponse": {
+        "required": [
+          "driver",
+          "driverValue",
+          "price",
+          "bbgYield",
+          "baseSimpleYield",
+          "simpleYieldSlide",
+          "finalSimpleYield",
+          "internalYield",
+          "gSpread",
+          "asw"
+        ],
+        "type": "object",
+        "properties": {
+          "driver": {
+            "$ref": "#/components/schemas/CalculationDriverValue"
+          },
+          "driverValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "bbgYield": {
+            "type": "number",
+            "format": "double"
+          },
+          "baseSimpleYield": {
+            "type": "number",
+            "format": "double"
+          },
+          "simpleYieldSlide": {
+            "type": "number",
+            "format": "double"
+          },
+          "finalSimpleYield": {
+            "type": "number",
+            "format": "double"
+          },
+          "internalYield": {
+            "type": "number",
+            "format": "double"
+          },
+          "gSpread": {
+            "type": "number",
+            "format": "double"
+          },
+          "asw": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "nullable": true
+      },
+      "CalculatedQuoteResponse2": {
+        "required": [
+          "driver",
+          "driverValue",
+          "price",
+          "bbgYield",
+          "baseSimpleYield",
+          "simpleYieldSlide",
+          "finalSimpleYield",
+          "internalYield",
+          "gSpread",
+          "asw"
+        ],
+        "type": "object",
+        "properties": {
+          "driver": {
+            "$ref": "#/components/schemas/CalculationDriverValue"
+          },
+          "driverValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "bbgYield": {
+            "type": "number",
+            "format": "double"
+          },
+          "baseSimpleYield": {
+            "type": "number",
+            "format": "double"
+          },
+          "simpleYieldSlide": {
+            "type": "number",
+            "format": "double"
+          },
+          "finalSimpleYield": {
+            "type": "number",
+            "format": "double"
+          },
+          "internalYield": {
+            "type": "number",
+            "format": "double"
+          },
+          "gSpread": {
+            "type": "number",
+            "format": "double"
+          },
+          "asw": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CalculateWorkingQuoteRequest": {
+        "required": [
+          "driver",
+          "value",
+          "simpleYieldSlide",
+          "expectedCurrentVersion",
+          "expectedWorkingQuoteVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "driver": {
+            "$ref": "#/components/schemas/CalculationDriverValue"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "simpleYieldSlide": {
+            "type": "number",
+            "format": "double"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedWorkingQuoteVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CalculationDriverValue": {
+        "type": "integer"
+      },
+      "CategoryRoutingResponse": {
+        "required": [
+          "categoryId",
+          "categoryName",
+          "defaultTraderId",
+          "defaultTraderName"
+        ],
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string"
+          },
+          "defaultTraderId": {
+            "type": "string"
+          },
+          "defaultTraderName": {
+            "type": "string"
+          }
+        }
+      },
+      "ChangeContactOwnerRequest": {
+        "required": [
+          "contactOwnerId",
+          "expectedCurrentVersion",
+          "confirmed"
+        ],
+        "type": "object",
+        "properties": {
+          "contactOwnerId": {
+            "type": "string"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ChangeWorkingQuoteModeRequest": {
+        "required": [
+          "mode",
+          "expectedCurrentVersion",
+          "expectedWorkingQuoteVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/QuoteMode"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedWorkingQuoteVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ClientCandidateResponse": {
+        "required": [
+          "clientId",
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CloseResponse": {
+        "required": [
+          "caseId",
+          "rfqStatus",
+          "closedQuoteId",
+          "owned",
+          "currentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "closedQuoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owned": {
+            "type": "boolean"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ConfirmDraftItemRequest": {
+        "required": [
+          "caseId",
+          "notional",
+          "settlementDate",
+          "standardSettlementDate",
+          "salesAndTradingMessage",
+          "assignedTraderId",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "standardSettlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "salesAndTradingMessage": {
+            "type": "string"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ConfirmedRequest": {
+        "required": [
+          "expectedVersion",
+          "confirmed"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ConfirmQuoteItemRequest": {
+        "required": [
+          "caseId",
+          "expiry",
+          "expectedCurrentVersion",
+          "expectedWorkingQuoteVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiry": {
+            "$ref": "#/components/schemas/QuoteExpiryRequest"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedWorkingQuoteVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ConfirmQuoteRequest": {
+        "required": [
+          "expiry",
+          "expectedCurrentVersion",
+          "expectedWorkingQuoteVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "expiry": {
+            "$ref": "#/components/schemas/QuoteExpiryRequest"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedWorkingQuoteVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ConfirmQuoteResponse": {
+        "required": [
+          "caseId",
+          "quoteId",
+          "revisionId",
+          "rfqStatus",
+          "quoteStatus",
+          "mode",
+          "calculated",
+          "manual",
+          "confirmedAt",
+          "expiry",
+          "expiresAt",
+          "currentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "quoteStatus": {
+            "$ref": "#/components/schemas/QuoteStatusValue"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/QuoteMode"
+          },
+          "calculated": {
+            "$ref": "#/components/schemas/CalculatedQuoteResponse"
+          },
+          "manual": {
+            "$ref": "#/components/schemas/ManualQuoteResponse"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiry": {
+            "$ref": "#/components/schemas/QuoteExpiryResponse"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ContactOwnerResponse": {
+        "required": [
+          "caseId",
+          "contactOwnerId",
+          "currentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contactOwnerId": {
+            "type": "string"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CorrectOutcomeRequest": {
+        "required": [
+          "reason",
+          "expectedCurrentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CreateDraftRequest": {
+        "required": [
+          "clientId",
+          "securityId",
+          "notional",
+          "settlementDate",
+          "standardSettlementDate",
+          "salesAndTradingMessage",
+          "assignedTraderId"
+        ],
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string"
+          },
+          "securityId": {
+            "type": "string"
+          },
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "standardSettlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "salesAndTradingMessage": {
+            "type": "string"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          }
+        }
+      },
+      "DiscardDraftItemRequest": {
+        "required": [
+          "caseId",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "EodResponse": {
+        "required": [
+          "contactOwnerId",
+          "open",
+          "hit",
+          "away"
+        ],
+        "type": "object",
+        "properties": {
+          "contactOwnerId": {
+            "type": "string"
+          },
+          "open": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "away": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "EventResponse": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/EventResponseRfqClosedHitResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqClosedAwayResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqOutcomeCorrectedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqContactOwnerChangedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqRevisionConfirmedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqCancelledResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqReopenedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqPickedUpResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqReleasedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqAssignedTraderChangedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseRfqTakenOverResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseQuoteConfirmedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseQuotePresentedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseQuoteUnpresentedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseQuoteWithdrawnResponse"
+          },
+          {
+            "$ref": "#/components/schemas/EventResponseQuoteExpiredResponse"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "rfqClosedHit": "#/components/schemas/EventResponseRfqClosedHitResponse",
+            "rfqClosedAway": "#/components/schemas/EventResponseRfqClosedAwayResponse",
+            "rfqOutcomeCorrected": "#/components/schemas/EventResponseRfqOutcomeCorrectedResponse",
+            "rfqContactOwnerChanged": "#/components/schemas/EventResponseRfqContactOwnerChangedResponse",
+            "rfqRevisionConfirmed": "#/components/schemas/EventResponseRfqRevisionConfirmedResponse",
+            "rfqCancelled": "#/components/schemas/EventResponseRfqCancelledResponse",
+            "rfqReopened": "#/components/schemas/EventResponseRfqReopenedResponse",
+            "rfqPickedUp": "#/components/schemas/EventResponseRfqPickedUpResponse",
+            "rfqReleased": "#/components/schemas/EventResponseRfqReleasedResponse",
+            "rfqAssignedTraderChanged": "#/components/schemas/EventResponseRfqAssignedTraderChangedResponse",
+            "rfqTakenOver": "#/components/schemas/EventResponseRfqTakenOverResponse",
+            "quoteConfirmed": "#/components/schemas/EventResponseQuoteConfirmedResponse",
+            "quotePresented": "#/components/schemas/EventResponseQuotePresentedResponse",
+            "quoteUnpresented": "#/components/schemas/EventResponseQuoteUnpresentedResponse",
+            "quoteWithdrawn": "#/components/schemas/EventResponseQuoteWithdrawnResponse",
+            "quoteExpired": "#/components/schemas/EventResponseQuoteExpiredResponse"
+          }
+        }
+      },
+      "EventResponseQuoteConfirmedResponse": {
+        "required": [
+          "caseId",
+          "quoteId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "quoteConfirmed"
+            ],
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseQuoteExpiredResponse": {
+        "required": [
+          "caseId",
+          "quoteId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "quoteExpired"
+            ],
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseQuotePresentedResponse": {
+        "required": [
+          "caseId",
+          "quoteId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "quotePresented"
+            ],
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseQuoteUnpresentedResponse": {
+        "required": [
+          "caseId",
+          "quoteId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "quoteUnpresented"
+            ],
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseQuoteWithdrawnResponse": {
+        "required": [
+          "caseId",
+          "quoteId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "quoteWithdrawn"
+            ],
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqAssignedTraderChangedResponse": {
+        "required": [
+          "from",
+          "to",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqAssignedTraderChanged"
+            ],
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqCancelledResponse": {
+        "required": [
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqCancelled"
+            ],
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqClosedAwayResponse": {
+        "required": [
+          "quoteId",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqClosedAway"
+            ],
+            "type": "string"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqClosedHitResponse": {
+        "required": [
+          "quoteId",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqClosedHit"
+            ],
+            "type": "string"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqContactOwnerChangedResponse": {
+        "required": [
+          "from",
+          "to",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqContactOwnerChanged"
+            ],
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqOutcomeCorrectedResponse": {
+        "required": [
+          "quoteId",
+          "from",
+          "to",
+          "reason",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqOutcomeCorrected"
+            ],
+            "type": "string"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqPickedUpResponse": {
+        "required": [
+          "assignedTraderId",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqPickedUp"
+            ],
+            "type": "string"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqReleasedResponse": {
+        "required": [
+          "assignedTraderId",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqReleased"
+            ],
+            "type": "string"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqReopenedResponse": {
+        "required": [
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqReopened"
+            ],
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqRevisionConfirmedResponse": {
+        "required": [
+          "from",
+          "to",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqRevisionConfirmed"
+            ],
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventResponseRfqTakenOverResponse": {
+        "required": [
+          "from",
+          "to",
+          "caseId",
+          "eventId",
+          "occurredAt",
+          "actorUserId"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "rfqTakenOver"
+            ],
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "GridConfigRequest": {
+        "required": [
+          "version",
+          "config"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "config": {
+            "$ref": "#/components/schemas/JsonElement"
+          }
+        }
+      },
+      "GridConfigResponse": {
+        "required": [
+          "screenId",
+          "configKey",
+          "version",
+          "config",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "screenId": {
+            "type": "string"
+          },
+          "configKey": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "config": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HealthResponse": {
+        "required": [
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "InitialRfqResponse": {
+        "required": [
+          "caseId",
+          "revisionId",
+          "rfqStatus",
+          "revisionStatus",
+          "quoteStatus",
+          "quoteRequestReason",
+          "categoryId",
+          "contactOwnerId",
+          "assignedTraderId",
+          "notional",
+          "settlementDate",
+          "standardSettlementDate",
+          "salesAndTradingMessage",
+          "version",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "revisionStatus": {
+            "$ref": "#/components/schemas/RevisionStatusValue"
+          },
+          "quoteStatus": {
+            "$ref": "#/components/schemas/NullableOfQuoteStatusValue"
+          },
+          "quoteRequestReason": {
+            "$ref": "#/components/schemas/NullableOfQuoteRequestReasonValue"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "contactOwnerId": {
+            "type": "string"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "standardSettlementDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "salesAndTradingMessage": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "JsonElement": { },
+      "LifecycleItemRequest": {
+        "required": [
+          "caseId",
+          "expectedCurrentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LifecycleRequest": {
+        "required": [
+          "expectedCurrentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LifecycleResponse": {
+        "required": [
+          "caseId",
+          "rfqStatus",
+          "quoteStatus",
+          "quoteRequestReason",
+          "currentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "quoteStatus": {
+            "$ref": "#/components/schemas/NullableOfQuoteStatusValue"
+          },
+          "quoteRequestReason": {
+            "$ref": "#/components/schemas/NullableOfQuoteRequestReasonValue"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ManualQuoteResponse": {
+        "required": [
+          "price",
+          "finalSimpleYield"
+        ],
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "finalSimpleYield": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "nullable": true
+      },
+      "MeResponse": {
+        "required": [
+          "userId",
+          "roles",
+          "deskId"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserRoleValue"
+            }
+          },
+          "deskId": {
+            "type": "string"
+          }
+        }
+      },
+      "NullableOfBulkFailureCodeValue": {
+        "type": "integer",
+        "nullable": true
+      },
+      "NullableOfQuoteExpiryType": {
+        "type": "integer",
+        "nullable": true
+      },
+      "NullableOfQuoteRequestReasonValue": {
+        "type": "integer",
+        "nullable": true
+      },
+      "NullableOfQuoteStatusValue": {
+        "type": "integer",
+        "nullable": true
+      },
+      "OwnershipItemRequest": {
+        "required": [
+          "caseId",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "OwnershipResponse": {
+        "required": [
+          "caseId",
+          "assignedTraderId",
+          "owned",
+          "currentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "owned": {
+            "type": "boolean"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PickUpItemRequest": {
+        "required": [
+          "caseId",
+          "expectedVersion",
+          "confirmed"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PresentationResponse": {
+        "required": [
+          "caseId",
+          "quoteId",
+          "rfqStatus",
+          "quoteStatus",
+          "currentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "quoteStatus": {
+            "$ref": "#/components/schemas/QuoteStatusValue"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PricerRequest": {
+        "required": [
+          "securityId",
+          "settlementDate",
+          "driver",
+          "value",
+          "simpleYieldSlide"
+        ],
+        "type": "object",
+        "properties": {
+          "securityId": {
+            "type": "string"
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "driver": {
+            "$ref": "#/components/schemas/CalculationDriverValue"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "simpleYieldSlide": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "QuoteExpiryRequest": {
+        "required": [
+          "type",
+          "minutes"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/NullableOfQuoteExpiryType"
+          },
+          "minutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "QuoteExpiryResponse": {
+        "required": [
+          "type",
+          "minutes"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/QuoteExpiryType"
+          },
+          "minutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "QuoteExpiryType": {
+        "type": "integer"
+      },
+      "QuoteHistoryResponse": {
+        "required": [
+          "quoteId",
+          "revisionId",
+          "mode",
+          "confirmedAt",
+          "expiresAt",
+          "requestReason"
+        ],
+        "type": "object",
+        "properties": {
+          "quoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/QuoteMode"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "requestReason": {
+            "$ref": "#/components/schemas/QuoteRequestReasonValue"
+          }
+        }
+      },
+      "QuoteMode": {
+        "type": "integer"
+      },
+      "QuoteRequestReasonValue": {
+        "type": "integer"
+      },
+      "QuoteStatusValue": {
+        "type": "integer"
+      },
+      "RevisionResponse": {
+        "required": [
+          "revisionId",
+          "status",
+          "notional",
+          "settlementDate",
+          "message",
+          "version",
+          "createdAt",
+          "confirmedAt",
+          "copiedFromRevisionId",
+          "quoteSeedRevisionId"
+        ],
+        "type": "object",
+        "properties": {
+          "revisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RevisionStatusValue"
+          },
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "copiedFromRevisionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "quoteSeedRevisionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "RevisionStatusValue": {
+        "type": "integer"
+      },
+      "RfqCreationContextResponse": {
+        "required": [
+          "categoryId",
+          "categoryName",
+          "defaultAssignedTraderId",
+          "defaultAssignedTraderName",
+          "standardSettlementDate"
+        ],
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string"
+          },
+          "defaultAssignedTraderId": {
+            "type": "string"
+          },
+          "defaultAssignedTraderName": {
+            "type": "string"
+          },
+          "standardSettlementDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "RfqSearchItemResponse": {
+        "required": [
+          "caseId",
+          "createdAt",
+          "clientId",
+          "clientName",
+          "securityId",
+          "securityName",
+          "categoryId",
+          "status",
+          "quoteStatus",
+          "contactOwnerId",
+          "salesId",
+          "assignedTraderId",
+          "notional",
+          "settlementDate"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientName": {
+            "type": "string"
+          },
+          "securityId": {
+            "type": "string"
+          },
+          "securityName": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "quoteStatus": {
+            "$ref": "#/components/schemas/NullableOfQuoteStatusValue"
+          },
+          "contactOwnerId": {
+            "type": "string"
+          },
+          "salesId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "RfqSearchResponse": {
+        "required": [
+          "items",
+          "requiresNarrowing"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RfqSearchItemResponse"
+            }
+          },
+          "requiresNarrowing": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RfqStatusValue": {
+        "type": "integer"
+      },
+      "SalesMemoResponse": {
+        "required": [
+          "caseId",
+          "memo",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "memo": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SalesRfqResponse": {
+        "required": [
+          "caseId",
+          "clientId",
+          "clientName",
+          "securityId",
+          "securityJapaneseName",
+          "securityBbgDisplay",
+          "categoryId",
+          "rfqStatus",
+          "quoteStatus",
+          "quoteRequestReason",
+          "currentRevisionId",
+          "currentQuoteId",
+          "closedQuoteId",
+          "currentVersion",
+          "revisionStatus",
+          "contactOwnerId",
+          "assignedTraderId",
+          "settlementDate",
+          "standardSettlementDate",
+          "notional",
+          "salesAndTradingMessage",
+          "salesMemo",
+          "salesMemoVersion",
+          "version",
+          "createdAt",
+          "draftRevisionId",
+          "draftVersion",
+          "draftSettlementDate",
+          "draftNotional",
+          "draftSalesAndTradingMessage"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientName": {
+            "type": "string"
+          },
+          "securityId": {
+            "type": "string"
+          },
+          "securityJapaneseName": {
+            "type": "string"
+          },
+          "securityBbgDisplay": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "quoteStatus": {
+            "$ref": "#/components/schemas/NullableOfQuoteStatusValue"
+          },
+          "quoteRequestReason": {
+            "$ref": "#/components/schemas/NullableOfQuoteRequestReasonValue"
+          },
+          "currentRevisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentQuoteId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "closedQuoteId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revisionStatus": {
+            "$ref": "#/components/schemas/RevisionStatusValue"
+          },
+          "contactOwnerId": {
+            "type": "string"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "standardSettlementDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "salesAndTradingMessage": {
+            "type": "string"
+          },
+          "salesMemo": {
+            "type": "string"
+          },
+          "salesMemoVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "draftRevisionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "draftVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "draftSettlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "draftNotional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "draftSalesAndTradingMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SaveAmendmentRequest": {
+        "required": [
+          "notional",
+          "settlementDate",
+          "message",
+          "expectedCurrentVersion",
+          "expectedDraftVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedDraftVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "SecurityCandidateResponse": {
+        "required": [
+          "securityId",
+          "japaneseName",
+          "bbgDisplay",
+          "internalCode",
+          "isin",
+          "categoryId",
+          "categoryName"
+        ],
+        "type": "object",
+        "properties": {
+          "securityId": {
+            "type": "string"
+          },
+          "japaneseName": {
+            "type": "string"
+          },
+          "bbgDisplay": {
+            "type": "string"
+          },
+          "internalCode": {
+            "type": "string"
+          },
+          "isin": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string"
+          }
+        }
+      },
+      "TraderMemoResponse": {
+        "required": [
+          "caseId",
+          "memo",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "memo": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "TraderRfqResponse": {
+        "required": [
+          "caseId",
+          "clientId",
+          "clientName",
+          "securityId",
+          "securityJapaneseName",
+          "securityBbgDisplay",
+          "categoryId",
+          "rfqStatus",
+          "quoteStatus",
+          "quoteRequestReason",
+          "currentRevisionId",
+          "currentQuoteId",
+          "closedQuoteId",
+          "confirmedAt",
+          "expiresAt",
+          "quoteSeedRevisionId",
+          "contactOwnerId",
+          "assignedTraderId",
+          "owned",
+          "currentVersion",
+          "settlementDate",
+          "notional",
+          "workingQuoteMode",
+          "calculated",
+          "manual",
+          "workingQuoteVersion",
+          "traderMemo",
+          "traderMemoVersion",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientName": {
+            "type": "string"
+          },
+          "securityId": {
+            "type": "string"
+          },
+          "securityJapaneseName": {
+            "type": "string"
+          },
+          "securityBbgDisplay": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "rfqStatus": {
+            "$ref": "#/components/schemas/RfqStatusValue"
+          },
+          "quoteStatus": {
+            "$ref": "#/components/schemas/NullableOfQuoteStatusValue"
+          },
+          "quoteRequestReason": {
+            "$ref": "#/components/schemas/NullableOfQuoteRequestReasonValue"
+          },
+          "currentRevisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentQuoteId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "closedQuoteId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "quoteSeedRevisionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "contactOwnerId": {
+            "type": "string"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "owned": {
+            "type": "boolean"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "workingQuoteMode": {
+            "$ref": "#/components/schemas/QuoteMode"
+          },
+          "calculated": {
+            "$ref": "#/components/schemas/CalculatedQuoteResponse"
+          },
+          "manual": {
+            "$ref": "#/components/schemas/ManualQuoteResponse"
+          },
+          "workingQuoteVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "traderMemo": {
+            "type": "string"
+          },
+          "traderMemoVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UpdateCategoryRoutingRequest": {
+        "required": [
+          "defaultTraderId"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultTraderId": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateDraftRequest": {
+        "required": [
+          "notional",
+          "settlementDate",
+          "standardSettlementDate",
+          "salesAndTradingMessage",
+          "assignedTraderId",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "notional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "settlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "standardSettlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "salesAndTradingMessage": {
+            "type": "string"
+          },
+          "assignedTraderId": {
+            "type": "string"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "UpdateManualWorkingQuoteRequest": {
+        "required": [
+          "price",
+          "finalSimpleYield",
+          "expectedCurrentVersion",
+          "expectedWorkingQuoteVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "finalSimpleYield": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedWorkingQuoteVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "UpdateMemoRequest": {
+        "required": [
+          "memo",
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "memo": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "UserCandidateResponse": {
+        "required": [
+          "userId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UserRoleValue": {
+        "type": "integer"
+      },
+      "VersionRequest": {
+        "required": [
+          "expectedVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "WorkingQuoteResponse": {
+        "required": [
+          "caseId",
+          "revisionId",
+          "mode",
+          "calculated",
+          "manual",
+          "version",
+          "currentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/QuoteMode"
+          },
+          "calculated": {
+            "$ref": "#/components/schemas/CalculatedQuoteResponse"
+          },
+          "manual": {
+            "$ref": "#/components/schemas/ManualQuoteResponse"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "WorkingQuotes"
+    },
+    {
+      "name": "TraderRfqs"
+    },
+    {
+      "name": "SalesRfqs"
+    },
+    {
+      "name": "RfqSearch"
+    },
+    {
+      "name": "RfqRevisions"
+    },
+    {
+      "name": "RfqResponsibility"
+    },
+    {
+      "name": "RfqQuotes"
+    },
+    {
+      "name": "RfqOwnership"
+    },
+    {
+      "name": "RfqMemos"
+    },
+    {
+      "name": "RfqLifecycle"
+    },
+    {
+      "name": "RfqDrafts"
+    },
+    {
+      "name": "RfqCreationContext"
+    },
+    {
+      "name": "RfqAmendments"
+    },
+    {
+      "name": "Pricer"
+    },
+    {
+      "name": "Me"
+    },
+    {
+      "name": "Events"
+    },
+    {
+      "name": "Eod"
+    },
+    {
+      "name": "Health"
+    },
+    {
+      "name": "CategoryRoutings"
+    },
+    {
+      "name": "Candidates"
+    },
+    {
+      "name": "BusinessDate"
+    }
+  ]
+}
