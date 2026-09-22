@@ -3,18 +3,13 @@ import {
   Alert,
   Badge,
   Button,
-  Descriptions,
-  Empty,
   Input,
-  InputNumber,
   Modal,
-  Popconfirm,
   Segmented,
   Select,
   Space,
   Spin,
   Tabs,
-  Tag,
   Tooltip,
   Typography,
 } from 'antd'
@@ -54,17 +49,12 @@ import {
   isPickUpEligible,
   isConfirmable,
   patchConfirmedQuote,
-  patchContactOwner,
-  patchLifecycle,
   patchMemo,
-  patchOwnership,
-  patchPresentation,
   patchWorkingQuote,
   sameSourceTerms,
   searchDateRange,
   traderRouting,
   traderState,
-  requiresPickUpConfirmation,
   type CalcState,
   type PricerProvenance,
   type SearchDatePreset,
@@ -78,37 +68,22 @@ import {
   initializeGridLayout,
   type GridColumnGroupState,
 } from '@/features/grid/gridLayout'
+import { TraderOperationsPane } from '@/features/trader/TraderOperationsPane'
+import {
+  TraderPricerPane,
+  type ScratchState,
+} from '@/features/trader/TraderPricerPane'
+import {
+  TraderResultBar,
+  type TraderResultState,
+} from '@/features/trader/TraderResultBar'
 
 type UserOption = { userId: string; name: string }
 type RfqOutcome = 'Hit' | 'Away'
 type GridConfigKey = 'main' | 'search' | 'confirm'
-type ResultState = { label: string; items: BulkItemResult[] }
-type ScratchState = {
-  securityId: string
-  notional: number | null
-  settlementDate: string
-  driver: CalculatedQuotePayload['driver']
-  value: number
-  slide: number
-}
-
 const million = 1_000_000
 const calcTimeoutMs = 10_000
 const datePresets: SearchDatePreset[] = ['1M', '3M', '6M', '1Y', '2Y', '5Y']
-const driverOptions: {
-  value: CalculatedQuotePayload['driver']
-  label: string
-}[] = [
-  { value: 'Price', label: 'Price' },
-  { value: 'BbgYield', label: 'BBG Yield' },
-  { value: 'SimpleYield', label: 'Simple Yield' },
-  { value: 'Ysc', label: 'YSC' },
-  { value: 'GSpread', label: 'G-Spread' },
-  { value: 'Asw', label: 'ASW' },
-  { value: 'ISpread', label: 'I-Spread' },
-  { value: 'ZSpread', label: 'Z-Spread' },
-]
-
 const formatNumber = (value: unknown) =>
   value == null
     ? ''
@@ -307,7 +282,7 @@ export function TraderScreen(props: TraderScreenProps) {
   })
   const [searching, setSearching] = useState(false)
   const [confirmRows, setConfirmRows] = useState<TraderRfq[] | null>(null)
-  const [result, setResult] = useState<ResultState | null>(null)
+  const [result, setResult] = useState<TraderResultState | null>(null)
   const [resultExpanded, setResultExpanded] = useState(false)
   const [targetTraderId, setTargetTraderId] = useState<string>()
   const [targetContactOwnerId, setTargetContactOwnerId] = useState<string>()
@@ -554,6 +529,7 @@ export function TraderScreen(props: TraderScreenProps) {
           calcTimeoutMs,
         )
       }
+      // A newer edit or refresh owns the row now; its result must win.
       if (
         requestByCase.current[row.caseId] !== requestId ||
         generationRef.current !== generation
@@ -1364,7 +1340,7 @@ export function TraderScreen(props: TraderScreenProps) {
                   key: 'operations',
                   label: 'Operations',
                   children: (
-                    <OperationsPane
+                    <TraderOperationsPane
                       selected={selected}
                       selectedRows={selectedRows}
                       currentUserId={currentUserId}
@@ -1397,7 +1373,7 @@ export function TraderScreen(props: TraderScreenProps) {
                   key: 'pricer',
                   label: 'Pricer',
                   children: (
-                    <PricerPane
+                    <TraderPricerPane
                       selected={selected}
                       scratch={scratch}
                       setScratch={setScratch}
@@ -1440,7 +1416,7 @@ export function TraderScreen(props: TraderScreenProps) {
       </div>
 
       {result && (
-        <ResultBar
+        <TraderResultBar
           result={result}
           expanded={resultExpanded}
           onToggle={() => setResultExpanded((value) => !value)}
@@ -1493,622 +1469,5 @@ export function TraderScreen(props: TraderScreenProps) {
         </div>
       </Modal>
     </div>
-  )
-}
-
-function OperationsPane({
-  selected,
-  selectedRows,
-  currentUserId,
-  traders,
-  users,
-  isMutating,
-  targetTraderId,
-  setTargetTraderId,
-  targetContactOwnerId,
-  setTargetContactOwnerId,
-  onRun,
-  onBulk,
-  onPickUp,
-  onRelease,
-  onAssign,
-  onTakeOver,
-  onChangeMode,
-  onPresent,
-  onUnpresent,
-  onWithdraw,
-  onClose,
-  onCancel,
-  onReopen,
-  onCorrectOutcome,
-  onChangeContactOwner,
-}: {
-  selected?: TraderRfq
-  selectedRows: TraderRfq[]
-  currentUserId: string
-  traders: UserOption[]
-  users: UserOption[]
-  isMutating: boolean
-  targetTraderId?: string
-  setTargetTraderId: (value?: string) => void
-  targetContactOwnerId?: string
-  setTargetContactOwnerId: (value?: string) => void
-  onRun: <T>(
-    action: () => Promise<T | void>,
-    patch?: (row: TraderRfq, value: T) => TraderRfq,
-    row?: TraderRfq,
-  ) => Promise<T | void>
-  onBulk: (
-    label: string,
-    command: TraderBulkCommand,
-    rows: TraderRfq[],
-    trader?: string,
-  ) => Promise<void>
-  onPickUp: TraderScreenProps['onPickUp']
-  onRelease: TraderScreenProps['onRelease']
-  onAssign: TraderScreenProps['onAssign']
-  onTakeOver: TraderScreenProps['onTakeOver']
-  onChangeMode: TraderScreenProps['onChangeMode']
-  onPresent?: TraderScreenProps['onPresent']
-  onUnpresent?: TraderScreenProps['onUnpresent']
-  onWithdraw?: TraderScreenProps['onWithdraw']
-  onClose: TraderScreenProps['onClose']
-  onCancel?: TraderScreenProps['onCancel']
-  onReopen?: TraderScreenProps['onReopen']
-  onCorrectOutcome: TraderScreenProps['onCorrectOutcome']
-  onChangeContactOwner: TraderScreenProps['onChangeContactOwner']
-}) {
-  if (!selected)
-    return (
-      <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="Select an Active RFQ"
-      />
-    )
-  const open = ['Active', 'Presented'].includes(selected.rfqStatus)
-  const owner = selected.contactOwnerId === currentUserId
-  const mine = selected.assignedTraderId === currentUserId
-  const quoted = selected.quoteStatus === 'Quoted'
-  const multi = selectedRows.length > 1
-  const pickUpRequiresConfirmation = requiresPickUpConfirmation(
-    selected,
-    currentUserId,
-  )
-  const bulkPickRows = selectedRows.filter(isPickUpEligible)
-  const otherAssignedBulkPickCount = bulkPickRows.filter((row) =>
-    requiresPickUpConfirmation(row, currentUserId),
-  ).length
-  const runPickUp = () =>
-    void onRun(
-      () => onPickUp(selected, pickUpRequiresConfirmation),
-      patchOwnership,
-      selected,
-    )
-  const runBulkPick = () => void onBulk('Bulk Pick', 'pick', bulkPickRows)
-  return (
-    <div className="trader-operations">
-      <Descriptions
-        size="small"
-        column={1}
-        colon={false}
-        items={[
-          { key: 'case', label: 'Case', children: `#${selected.caseId}` },
-          {
-            key: 'security',
-            label: 'Security',
-            children: selected.securityJapaneseName,
-          },
-          {
-            key: 'state',
-            label: 'State',
-            children: <Tag>{traderState(selected)}</Tag>,
-          },
-          {
-            key: 'routing',
-            label: 'Routing',
-            children: traderRouting(selected, currentUserId),
-          },
-        ]}
-      />
-      <Typography.Text type="secondary">Ownership / routing</Typography.Text>
-      <Space wrap>
-        <Popconfirm
-          title={`Pick up Case ${selected.caseId} assigned to another trader?`}
-          disabled={!pickUpRequiresConfirmation}
-          onConfirm={runPickUp}
-        >
-          <Button
-            size="small"
-            disabled={!open || selected.owned || isMutating}
-            onClick={() => {
-              if (!pickUpRequiresConfirmation) runPickUp()
-            }}
-          >
-            Pick Up
-          </Button>
-        </Popconfirm>
-        <Button
-          size="small"
-          disabled={!open || !selected.owned || !mine || isMutating}
-          onClick={() =>
-            void onRun(() => onRelease(selected), patchOwnership, selected)
-          }
-        >
-          Release
-        </Button>
-        <Select
-          size="small"
-          aria-label="Assign to trader"
-          placeholder="Assign"
-          value={targetTraderId}
-          onChange={setTargetTraderId}
-          options={traders.map((user) => ({
-            value: user.userId,
-            label: user.name,
-          }))}
-          disabled={!open || selected.owned || isMutating}
-        />
-        <Button
-          size="small"
-          disabled={!targetTraderId || !open || selected.owned || isMutating}
-          onClick={() =>
-            targetTraderId &&
-            void onRun(
-              () => onAssign(selected, targetTraderId),
-              patchOwnership,
-              selected,
-            )
-          }
-        >
-          Assign
-        </Button>
-        <Popconfirm
-          title={`Take over Case ${selected.caseId}?`}
-          onConfirm={() =>
-            void onRun(() => onTakeOver(selected), patchOwnership, selected)
-          }
-        >
-          <Button
-            size="small"
-            danger
-            disabled={!open || !selected.owned || mine || isMutating}
-          >
-            Take Over
-          </Button>
-        </Popconfirm>
-      </Space>
-      <Typography.Text type="secondary">Quote</Typography.Text>
-      <Space wrap>
-        <Select
-          size="small"
-          aria-label="Quote mode"
-          value={selected.workingQuoteMode}
-          disabled={!canEditQuote(selected, currentUserId) || isMutating}
-          options={['Calculated', 'Manual'].map((value) => ({
-            value,
-            label: value,
-          }))}
-          onChange={(mode) =>
-            void onRun(
-              () => onChangeMode(selected, mode),
-              patchWorkingQuote,
-              selected,
-            )
-          }
-        />
-        <Button
-          size="small"
-          disabled={
-            !onWithdraw ||
-            selected.rfqStatus === 'Presented' ||
-            !quoted ||
-            !mine ||
-            !selected.owned ||
-            isMutating
-          }
-          onClick={() =>
-            onWithdraw &&
-            void onRun(() => onWithdraw(selected), patchLifecycle, selected)
-          }
-        >
-          Withdraw
-        </Button>
-      </Space>
-      {owner && (
-        <>
-          <Typography.Text type="secondary">
-            Contact Owner lifecycle
-          </Typography.Text>
-          <Space wrap>
-            <Button
-              size="small"
-              disabled={
-                !onPresent || selected.rfqStatus !== 'Active' || !quoted
-              }
-              onClick={() =>
-                onPresent &&
-                void onRun(
-                  () => onPresent(selected),
-                  patchPresentation,
-                  selected,
-                )
-              }
-            >
-              Present
-            </Button>
-            <Button
-              size="small"
-              disabled={!onUnpresent || selected.rfqStatus !== 'Presented'}
-              onClick={() =>
-                onUnpresent &&
-                void onRun(
-                  () => onUnpresent(selected),
-                  patchPresentation,
-                  selected,
-                )
-              }
-            >
-              Unpresent
-            </Button>
-            {(['Hit', 'Away'] as const).map((outcome) => (
-              <Popconfirm
-                key={outcome}
-                title={`${outcome} Case ${selected.caseId}?`}
-                onConfirm={() =>
-                  void onRun(
-                    () => onClose(selected, outcome),
-                    undefined,
-                    selected,
-                  )
-                }
-              >
-                <Button size="small" disabled={!open || !quoted}>
-                  {outcome}
-                </Button>
-              </Popconfirm>
-            ))}
-            <Popconfirm
-              title={`Cancel Case ${selected.caseId}?`}
-              onConfirm={() =>
-                onCancel &&
-                void onRun(() => onCancel(selected), patchLifecycle, selected)
-              }
-            >
-              <Button size="small" danger disabled={!onCancel || !open}>
-                Cancel
-              </Button>
-            </Popconfirm>
-            <Button
-              size="small"
-              disabled={!onReopen || selected.rfqStatus !== 'Cancelled'}
-              onClick={() =>
-                onReopen &&
-                void onRun(() => onReopen(selected), patchLifecycle, selected)
-              }
-            >
-              Reopen
-            </Button>
-            <Popconfirm
-              title="Correct closed outcome?"
-              onConfirm={() => {
-                const reason = window.prompt('Correction Reason')
-                if (!reason?.trim()) return
-                void onRun(
-                  () =>
-                    onCorrectOutcome(
-                      selected,
-                      selected.rfqStatus === 'Hit' ? 'Away' : 'Hit',
-                      reason.trim(),
-                    ),
-                  undefined,
-                  selected,
-                )
-              }}
-            >
-              <Button
-                size="small"
-                disabled={!['Hit', 'Away'].includes(selected.rfqStatus)}
-              >
-                Correct
-              </Button>
-            </Popconfirm>
-          </Space>
-          <Space.Compact block>
-            <Select
-              size="small"
-              aria-label="Contact Owner"
-              placeholder="Contact Owner"
-              value={targetContactOwnerId}
-              onChange={setTargetContactOwnerId}
-              options={users
-                .filter((user) => user.userId !== selected.contactOwnerId)
-                .map((user) => ({ value: user.userId, label: user.name }))}
-            />
-            <Button
-              size="small"
-              disabled={!targetContactOwnerId}
-              onClick={() =>
-                targetContactOwnerId &&
-                void onRun(
-                  () => onChangeContactOwner(selected, targetContactOwnerId),
-                  patchContactOwner,
-                  selected,
-                )
-              }
-            >
-              Change
-            </Button>
-          </Space.Compact>
-        </>
-      )}
-      {multi && (
-        <>
-          <Typography.Text type="secondary">
-            Selected ({selectedRows.length})
-          </Typography.Text>
-          <Space wrap>
-            <Popconfirm
-              title={`Pick up ${bulkPickRows.length} selected RFQs, including ${otherAssignedBulkPickCount} assigned to another trader?`}
-              disabled={otherAssignedBulkPickCount === 0}
-              onConfirm={runBulkPick}
-            >
-              <Button
-                size="small"
-                disabled={!bulkPickRows.length || isMutating}
-                onClick={() => {
-                  if (otherAssignedBulkPickCount === 0) runBulkPick()
-                }}
-              >
-                Pick
-              </Button>
-            </Popconfirm>
-            <Button
-              size="small"
-              onClick={() =>
-                void onBulk('Bulk Release', 'release', selectedRows)
-              }
-            >
-              Release
-            </Button>
-            <Button
-              size="small"
-              disabled={!targetTraderId}
-              onClick={() =>
-                void onBulk(
-                  'Bulk Assign',
-                  'assign',
-                  selectedRows,
-                  targetTraderId,
-                )
-              }
-            >
-              Assign
-            </Button>
-            <Button
-              size="small"
-              onClick={() =>
-                void onBulk('Bulk Withdraw', 'withdraw', selectedRows)
-              }
-            >
-              Withdraw
-            </Button>
-            <Popconfirm
-              title={`Away ${selectedRows.length} selected Cases?`}
-              onConfirm={() => void onBulk('Bulk Away', 'away', selectedRows)}
-            >
-              <Button size="small">Away</Button>
-            </Popconfirm>
-            <Popconfirm
-              title={`Cancel ${selectedRows.length} selected Cases?`}
-              onConfirm={() =>
-                void onBulk('Bulk Cancel', 'cancel', selectedRows)
-              }
-            >
-              <Button size="small" danger>
-                Cancel
-              </Button>
-            </Popconfirm>
-          </Space>
-        </>
-      )}
-    </div>
-  )
-}
-
-function PricerPane({
-  selected,
-  scratch,
-  setScratch,
-  setScratchIdentity,
-  result,
-  provenance,
-  sourceRow,
-  canApply,
-  busy,
-  onLoad,
-  onCalculate,
-  onApply,
-  onClear,
-}: {
-  selected?: TraderRfq
-  scratch: ScratchState
-  setScratch: React.Dispatch<React.SetStateAction<ScratchState>>
-  setScratchIdentity: (
-    key: 'securityId' | 'notional' | 'settlementDate',
-    value: string | number | null,
-  ) => void
-  result: CalculatedQuotePayload | null
-  provenance: PricerProvenance | null
-  sourceRow?: TraderRfq
-  canApply: boolean
-  busy: boolean
-  onLoad: () => void
-  onCalculate: () => void
-  onApply: () => void
-  onClear: () => void
-}) {
-  return (
-    <div className="trader-pricer">
-      <Space>
-        <Button size="small" disabled={!selected} onClick={onLoad}>
-          Load Selected RFQ
-        </Button>
-        <Button size="small" onClick={onClear}>
-          Clear
-        </Button>
-      </Space>
-      <Typography.Text type={provenance ? 'success' : 'secondary'}>
-        {provenance ? `Source #${provenance.sourceCaseId}` : 'Detached scratch'}
-      </Typography.Text>
-      {provenance && sourceRow && !sameSourceTerms(sourceRow, provenance) && (
-        <Alert
-          type="warning"
-          showIcon
-          message="Source RFQ terms changed; Apply is disabled."
-        />
-      )}
-      <Input
-        size="small"
-        aria-label="Pricer Security"
-        placeholder="Security"
-        value={scratch.securityId}
-        onChange={(event) =>
-          setScratchIdentity('securityId', event.target.value)
-        }
-      />
-      <InputNumber
-        size="small"
-        aria-label="Pricer Notional MM"
-        placeholder="Notl (MM)"
-        value={scratch.notional == null ? null : scratch.notional / million}
-        onChange={(value) =>
-          setScratchIdentity(
-            'notional',
-            value == null ? null : Number(value) * million,
-          )
-        }
-      />
-      <Input
-        size="small"
-        aria-label="Pricer Settlement"
-        type="date"
-        value={scratch.settlementDate}
-        onChange={(event) =>
-          setScratchIdentity('settlementDate', event.target.value)
-        }
-      />
-      <Select
-        size="small"
-        aria-label="Pricer Calc Type"
-        value={scratch.driver}
-        options={driverOptions}
-        onChange={(driver) => setScratch((value) => ({ ...value, driver }))}
-      />
-      <InputNumber
-        size="small"
-        aria-label="Pricer Parameter"
-        value={scratch.value}
-        onChange={(value) =>
-          setScratch((state) => ({ ...state, value: Number(value ?? 0) }))
-        }
-      />
-      <InputNumber
-        size="small"
-        aria-label="Pricer Slide"
-        value={scratch.slide}
-        onChange={(value) =>
-          setScratch((state) => ({ ...state, slide: Number(value ?? 0) }))
-        }
-      />
-      <Button
-        size="small"
-        type="primary"
-        loading={busy}
-        disabled={!scratch.securityId || !scratch.settlementDate}
-        onClick={onCalculate}
-      >
-        Calculate
-      </Button>
-      {result && (
-        <div className="pricer-results">
-          {[
-            ['Px', result.price],
-            ['Yld', `${result.bbgYield}%`],
-            ['SY', `${result.finalSimpleYield}%`],
-            ['YSC', `${result.ysc} bp`],
-            ['GSpd', `${result.gSpread} bp`],
-            ['ASW', `${result.asw} bp`],
-            ['ISpd', `${result.iSpread} bp`],
-            ['ZSpd', `${result.zSpread} bp`],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-      <Button size="small" disabled={!canApply} onClick={onApply}>
-        {provenance ? `Apply to #${provenance.sourceCaseId}` : 'Apply'}
-      </Button>
-      <Typography.Paragraph type="secondary">
-        Apply updates Manual Px and Final SY only. It does not Confirm.
-      </Typography.Paragraph>
-    </div>
-  )
-}
-
-function ResultBar({
-  result,
-  expanded,
-  onToggle,
-}: {
-  result: ResultState
-  expanded: boolean
-  onToggle: () => void
-}) {
-  const ok = result.items.filter((item) => item.status === 'Succeeded').length
-  const skipped = result.items.filter(
-    (item) => item.status === 'Skipped',
-  ).length
-  const failed = result.items.filter((item) => item.status === 'Failed').length
-  const detailRows = result.items.filter((item) => item.status !== 'Succeeded')
-  return (
-    <section
-      className={`bulk-result-bar ${failed ? 'bulk-result-error' : skipped ? 'bulk-result-warning' : 'bulk-result-success'}`}
-    >
-      {expanded && (
-        <div className="bulk-result-details">
-          <table>
-            <thead>
-              <tr>
-                <th>Case</th>
-                <th>Result</th>
-                <th>Code</th>
-                <th>Message</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(detailRows.length ? detailRows : result.items).map((item) => (
-                <tr key={item.caseId}>
-                  <td>{item.caseId}</td>
-                  <td>{item.status}</td>
-                  <td>{item.code}</td>
-                  <td>{item.message}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="bulk-result-summary">
-        <span>
-          {result.label}: {ok} ok / {skipped} skipped / {failed} failed
-        </span>
-        <Button type="text" size="small" onClick={onToggle}>
-          {expanded ? 'Collapse' : 'Details'}
-        </Button>
-      </div>
-    </section>
   )
 }
