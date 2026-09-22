@@ -7,7 +7,7 @@ import { useGetEodQuery, useSearchRfqsQuery } from '../../services/api'
 export function DailyReviewWorkspace() {
   const { businessDate, events } = useOutletContext<AppOutletContext>()
   const eodQuery = useGetEodQuery(businessDate ?? '2026-09-21')
-  const pastQuery = useSearchRfqsQuery()
+  const pastQuery = useSearchRfqsQuery({})
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>

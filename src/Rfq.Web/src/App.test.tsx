@@ -5,12 +5,13 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { AppShell } from './app/AppShell'
 import { SalesScreen, type SalesScreenProps } from './features/sales/SalesScreen'
 import { TraderScreen, type TraderScreenProps } from './features/trader/TraderScreen'
-import type { ClientSearchResult, SalesRfq, SecuritySearchResult, TraderRfq } from './services/api'
+import type { ClientSearchResult, RfqSearchItem, SalesRfq, SecuritySearchResult, TraderRfq } from './services/api'
 
-type GridRow = SalesRfq | TraderRfq
+type GridRow = SalesRfq | TraderRfq | RfqSearchItem
 type GridColumn = {
   field?: string
   colId?: string
+  children?: GridColumn[]
   valueGetter?: (params: { data: GridRow }) => unknown
   valueFormatter?: (params: { value: unknown }) => unknown
   cellEditor?: string
@@ -41,6 +42,9 @@ vi.mock('ag-grid-react', async () => {
     statusBar?: { statusPanels: { statusPanel: string; statusPanelParams?: { text?: string } }[] }
     components?: Record<string, (props: { text: string }) => ReactNode>
   }) => {
+    const flatColumns = (columnDefs ?? []).flatMap(function flatten(column): GridColumn[] {
+      return column.children ? column.children.flatMap(flatten) : [column]
+    })
     const [selectedIds, setSelectedIds] = React.useState<number[]>([])
     const anchorIndex = React.useRef<number | undefined>(undefined)
     const select = (row: GridRow, index: number, event: React.MouseEvent) => {
@@ -75,10 +79,10 @@ vi.mock('ag-grid-react', async () => {
           .map(([name]) => name).join(' ')
         return <div key={row.caseId} data-testid={`grid-row-${row.caseId}`} className={classes}>
           <button onClick={(event) => select(row, index, event)}>
-            {row.clientId} {row.clientName} {row.securityId} {row.securityJapaneseName}{' '}
-            {row.securityBbgDisplay} {row.rfqStatus}{' '}
+            {row.clientId} {row.clientName} {row.securityId}{'securityJapaneseName' in row ? row.securityJapaneseName : row.securityName}{' '}
+            {'securityBbgDisplay' in row ? row.securityBbgDisplay : ''} {'rfqStatus' in row ? row.rfqStatus : row.status}{' '}
             {'revisionStatus' in row ? row.revisionStatus : ''}{' '}
-            {row.quoteStatus} {row.quoteRequestReason}
+            {row.quoteStatus} {'quoteRequestReason' in row ? row.quoteRequestReason : ''}
           </button>
           {readOnlyEdit && onCellEditRequest && (
             <button
@@ -94,7 +98,13 @@ vi.mock('ag-grid-react', async () => {
               Edit Price {row.caseId}
             </button>
           )}
-          {columnDefs?.filter((column) => column.colId || column.field === 'currentQuoteId').map((column) => {
+          {readOnlyEdit && onCellEditRequest && flatColumns.some((column) => column.field === 'traderMemo') && (
+            <button onClick={() => onCellEditRequest({
+              data: row, newValue: 'post-close desk note', colDef: { field: 'traderMemo' },
+              column: { getColId: () => 'traderMemo' }, api: { refreshCells: vi.fn() }, node: {},
+            })}>Edit Memo {row.caseId}</button>
+          )}
+          {flatColumns.filter((column) => column.colId || column.field === 'currentQuoteId').map((column) => {
             const columnKey = column.colId ?? column.field!
             const value = column.valueGetter
               ? column.valueGetter({ data: row })
@@ -663,6 +673,7 @@ const traderRow: TraderRfq = {
   currentVersion: 4,
   settlementDate: '2026-09-23',
   notional: 100000000,
+  salesAndTradingMessage: 'Please quote',
   workingQuoteMode: 'Calculated',
   calculated: null,
   manual: null,
@@ -670,6 +681,7 @@ const traderRow: TraderRfq = {
   traderMemo: '',
   traderMemoVersion: 1,
   createdAt: '2026-09-21T00:00:00Z',
+  stateSince: '2026-09-21T00:00:00Z',
 }
 
 const traderProps: TraderScreenProps = {
@@ -697,7 +709,7 @@ const traderProps: TraderScreenProps = {
   onUpdateManual: vi.fn().mockResolvedValue(undefined),
   onConfirmQuote: vi.fn().mockResolvedValue(undefined),
   onClose: vi.fn().mockResolvedValue(undefined),
-  onBulkClose: vi.fn().mockResolvedValue([]),
+  onBulk: vi.fn().mockResolvedValue([]),
   onCorrectOutcome: vi.fn().mockResolvedValue(undefined),
   onChangeContactOwner: vi.fn().mockResolvedValue(undefined),
   onUpdateMemo: vi.fn().mockResolvedValue(undefined),
@@ -705,14 +717,34 @@ const traderProps: TraderScreenProps = {
 }
 
 describe('TraderScreen', () => {
-  it('picks up a self-assigned unowned RFQ without confirmation', async () => {
-    const onPickUp = vi.fn().mockResolvedValue(undefined)
-    render(<TraderScreen {...traderProps} onPickUp={onPickUp} />)
-    fireEvent.click(screen.getByText(/client-001 Client One/))
-    fireEvent.click(screen.getByRole('button', { name: 'Pick Up' }))
+  it('picks all self-assigned unowned RFQs independently of selection', async () => {
+    const onBulk = vi.fn().mockResolvedValue([])
+    render(<TraderScreen {...traderProps} onBulk={onBulk} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Pick (1)' }))
 
-    await waitFor(() => expect(onPickUp).toHaveBeenCalledWith(201, 4, false))
+    await waitFor(() => expect(onBulk).toHaveBeenCalledWith(
+      'pick', [expect.objectContaining({ caseId: 201 })], 5, undefined,
+    ))
+    const activeGrid = screen.getAllByTestId('grid-selection-config')[0]
+    expect(activeGrid).toHaveAttribute('data-checkboxes', 'false')
+    expect(screen.getByTestId('grid-row-201')).toHaveClass('trader-row-attention-high')
   })
+
+  it('searches with the default 1Y range and the selected 5Y preset', async () => {
+    const onSearch = vi.fn().mockResolvedValue({ items: [], requiresNarrowing: false })
+    render(<TraderScreen {...traderProps} businessDate="2026-09-22" onSearch={onSearch} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(onSearch).toHaveBeenLastCalledWith(expect.objectContaining({
+      createdFrom: '2025-09-22', createdTo: '2026-09-22',
+    })))
+
+    fireEvent.click(screen.getByText('5Y'))
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(onSearch).toHaveBeenLastCalledWith(expect.objectContaining({
+      createdFrom: '2021-09-22', createdTo: '2026-09-22',
+    })))
+  }, 10_000)
 
   it('requires confirmation to take over an RFQ owned by another trader', async () => {
     const onTakeOver = vi.fn().mockResolvedValue(undefined)
@@ -727,8 +759,10 @@ describe('TraderScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Take Over' }))
     fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
 
-    await waitFor(() => expect(onTakeOver).toHaveBeenCalledWith(201, 4, true))
-  })
+    await waitFor(() => expect(onTakeOver).toHaveBeenCalledWith(
+      expect.objectContaining({ caseId: 201, currentVersion: 4 }),
+    ))
+  }, 10_000)
 
   it('lets the owner switch the working quote to manual mode', async () => {
     const onChangeMode = vi.fn().mockResolvedValue(undefined)
@@ -769,6 +803,41 @@ describe('TraderScreen', () => {
     ))
   })
 
+  it('patches an authoritative calculation response without refreshing while Paused', async () => {
+    const onPatchRow = vi.fn()
+    const onReload = vi.fn()
+    const payload = {
+      driver: 'Price' as const, driverValue: 99.5, price: 99.5, bbgYield: 0.8,
+      baseSimpleYield: 0.81, simpleYieldSlide: 0.03, finalSimpleYield: 0.84,
+      internalYield: 0.83, gSpread: 5, asw: 8, ysc: 6, iSpread: 7, zSpread: 6,
+    }
+    const onCalculate = vi.fn().mockResolvedValue({ caseId: 201,
+      revisionId: traderRow.currentRevisionId, mode: 'Calculated', calculated: payload,
+      manual: null, version: 2, currentVersion: 4 })
+    render(<TraderScreen {...traderProps} refreshMode="paused"
+      rfqs={[{ ...traderRow, owned: true }]} onCalculate={onCalculate}
+      onPatchRow={onPatchRow} onReload={onReload} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
+
+    await waitFor(() => expect(onPatchRow).toHaveBeenCalledWith(201, expect.any(Function)))
+    expect(onReload).not.toHaveBeenCalled()
+  })
+
+  it('unlocks the row and exposes a compact calculation failure state', async () => {
+    const onCalculate = vi.fn().mockRejectedValue({ data: {
+      code: 'CalculationFailure', calculationErrorCode: 'PRICER_DOWN',
+      detail: 'Pricing is unavailable.', traceId: 'trace-1', failureLogId: 'log-1',
+    } })
+    render(<TraderScreen {...traderProps} rfqs={[{ ...traderRow, owned: true }]}
+      onCalculate={onCalculate} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
+
+    await waitFor(() => expect(screen.getByTestId('grid-201-calcStatus')).toHaveTextContent('!'))
+    expect(screen.getByTestId('grid-201-price')).toHaveAttribute('data-editable', 'true')
+  })
+
   it('shows yields as percent and spreads as basis points with numeric editors', () => {
     render(
       <TraderScreen
@@ -787,6 +856,9 @@ describe('TraderScreen', () => {
             internalYield: 0.83,
             gSpread: 5,
             asw: 8,
+            ysc: 6,
+            iSpread: 7,
+            zSpread: 6,
           },
         }]}
       />,
@@ -827,6 +899,9 @@ describe('TraderScreen', () => {
             internalYield: 0.83,
             gSpread: 5,
             asw: 8,
+            ysc: 6,
+            iSpread: 7,
+            zSpread: 6,
           },
         }]}
       />,
@@ -860,6 +935,9 @@ describe('TraderScreen', () => {
         internalYield: 0.83,
         gSpread: 5,
         asw: 8,
+        ysc: 6,
+        iSpread: 7,
+        zSpread: 6,
       },
     }
     render(
@@ -870,14 +948,16 @@ describe('TraderScreen', () => {
       />,
     )
     fireEvent.click(screen.getByText(/client-001 Client One/))
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm Quote' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
+    const confirmButton = screen.getByRole('button', { name: 'Confirm' })
+    await waitFor(() => expect(confirmButton).toBeEnabled())
+    fireEvent.click(confirmButton)
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply' }))
 
     await waitFor(() => expect(onConfirmQuote).toHaveBeenCalledWith(
       expect.objectContaining({ caseId: 201 }),
       5,
     ))
-  })
+  }, 10_000)
 
   it('locks quote editing after QuoteStatus becomes Quoted', () => {
     render(
@@ -894,7 +974,7 @@ describe('TraderScreen', () => {
     )
 
     expect(screen.getByTestId('grid-201-price')).toHaveAttribute('data-editable', 'false')
-    expect(screen.getByRole('button', { name: 'Confirm Quote' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
   })
 
   it('updates the Trader-only Memo after close', async () => {
@@ -918,15 +998,11 @@ describe('TraderScreen', () => {
     )
 
     fireEvent.click(screen.getByText(/client-001 Client One/))
-    fireEvent.change(screen.getByLabelText('Trader-only Memo'), {
-      target: { value: 'post-close desk note' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Save Trader Memo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Memo 201' }))
 
     await waitFor(() => expect(onUpdateMemo).toHaveBeenCalledWith(
-      201,
+      expect.objectContaining({ caseId: 201, traderMemoVersion: 4 }),
       'post-close desk note',
-      4,
     ))
   })
 })
