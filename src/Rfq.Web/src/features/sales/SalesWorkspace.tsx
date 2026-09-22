@@ -50,6 +50,16 @@ import {
   type SalesRowCommand,
 } from '@/features/sales/salesModel'
 import type { SalesRefreshMode } from '@/features/sales/salesModel'
+import type {
+  SalesAmendmentActions,
+  SalesBulkActions,
+  SalesContactOwnerActions,
+  SalesDraftActions,
+  SalesGridLayoutActions,
+  SalesLifecycleActions,
+  SalesLookupActions,
+  SalesMemoActions,
+} from '@/features/sales/salesContracts'
 
 export function SalesWorkspace() {
   const { currentUserId, remoteChangeVersion, acknowledgeRemoteChanges } =
@@ -303,6 +313,137 @@ export function SalesWorkspace() {
     bulkConfirmAmendmentsState,
     bulkDiscardAmendmentsState,
   ]
+  const lookup: SalesLookupActions = {
+    searchClients: async (query) =>
+      setClients(query.trim() ? await searchClients(query).unwrap() : []),
+    searchSecurities: async (query) =>
+      setSecurities(query.trim() ? await searchSecurities(query).unwrap() : []),
+    resolveDefaults: (securityId) => resolveDefaults({ securityId }).unwrap(),
+  }
+  const draft: SalesDraftActions = {
+    create: (request) =>
+      createDraft(request)
+        .unwrap()
+        .then(() => undefined),
+    update: (caseId, body) =>
+      updateDraft({ caseId, body })
+        .unwrap()
+        .then(() => undefined),
+    confirmNew: (request) =>
+      confirmNewRfq(request)
+        .unwrap()
+        .then(() => undefined),
+    confirm: (caseId, body) =>
+      confirmDraft({ caseId, body })
+        .unwrap()
+        .then(() => undefined),
+    discard: (caseId, expectedVersion) =>
+      discardDraft({ caseId, expectedVersion }).unwrap(),
+  }
+  const lifecycle: SalesLifecycleActions = {
+    present: (caseId, expectedCurrentVersion) =>
+      presentQuote({ caseId, expectedCurrentVersion })
+        .unwrap()
+        .then(() => undefined),
+    unpresent: (caseId, expectedCurrentVersion) =>
+      unpresentQuote({ caseId, expectedCurrentVersion })
+        .unwrap()
+        .then(() => undefined),
+    close: (caseId, outcome, expectedCurrentVersion) =>
+      (outcome === 'Hit' ? closeHitRfq : closeAwayRfq)({
+        caseId,
+        expectedCurrentVersion,
+      })
+        .unwrap()
+        .then(() => undefined),
+    correctOutcome: (caseId, outcome, expectedCurrentVersion, reason) =>
+      (outcome === 'Hit' ? correctToHit : correctToAway)({
+        caseId,
+        expectedCurrentVersion,
+        reason,
+      })
+        .unwrap()
+        .then(() => undefined),
+    cancel: (row) =>
+      cancelRfq({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+      })
+        .unwrap()
+        .then(() => undefined),
+    reopen: (row) =>
+      reopenRfq({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+      })
+        .unwrap()
+        .then(() => undefined),
+    createFromExisting: (caseId) =>
+      createFromExisting(caseId)
+        .unwrap()
+        .then(() => undefined),
+  }
+  const contactOwner: SalesContactOwnerActions = {
+    change: (caseId, targetUserId, expectedCurrentVersion) =>
+      changeContactOwner({
+        caseId,
+        targetUserId,
+        expectedCurrentVersion,
+        confirmed: true,
+      })
+        .unwrap()
+        .then(() => undefined),
+  }
+  const memo: SalesMemoActions = {
+    update: (caseId, value, expectedVersion) =>
+      updateSalesMemo({ caseId, memo: value, expectedVersion })
+        .unwrap()
+        .then(() => undefined),
+  }
+  const amendment: SalesAmendmentActions = {
+    save: (row, notional, settlementDate, text) =>
+      saveAmendment({
+        caseId: row.caseId,
+        notional,
+        settlementDate,
+        salesAndTradingMessage: text,
+        expectedCurrentVersion: row.currentVersion,
+        expectedDraftVersion: row.draftVersion ?? null,
+      })
+        .unwrap()
+        .then(() => undefined),
+    confirm: (row) =>
+      confirmAmendment({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+        expectedDraftVersion: row.draftVersion!,
+      })
+        .unwrap()
+        .then(() => undefined),
+    discard: (row) =>
+      discardAmendment({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+        expectedDraftVersion: row.draftVersion!,
+      })
+        .unwrap()
+        .then(() => undefined),
+  }
+  const bulk: SalesBulkActions = { execute: runBulk }
+  const gridLayout: SalesGridLayoutActions = {
+    configJson: gridConfigQuery.data
+      ? JSON.stringify(gridConfigQuery.data.config)
+      : undefined,
+    save: (configJson) =>
+      saveGridConfig({
+        screenId: 'sales',
+        configKey: 'main',
+        version: (gridConfigQuery.data?.version ?? 0) + 1,
+        config: JSON.parse(configJson),
+      })
+        .unwrap()
+        .then(() => undefined),
+  }
 
   return (
     <SalesScreen
@@ -332,152 +473,15 @@ export function SalesWorkspace() {
       onManualRefresh={catchUp}
       onRowActionApplied={applyRowAction}
       onTransientStateChange={setProtectedState}
-      onClientSearch={async (query) =>
-        setClients(query.trim() ? await searchClients(query).unwrap() : [])
-      }
-      onSecuritySearch={async (query) =>
-        setSecurities(
-          query.trim() ? await searchSecurities(query).unwrap() : [],
-        )
-      }
-      onResolveDefaults={(securityId) =>
-        resolveDefaults({ securityId }).unwrap()
-      }
-      onCreate={(request) =>
-        createDraft(request)
-          .unwrap()
-          .then(() => undefined)
-      }
-      onUpdate={(caseId, body) =>
-        updateDraft({ caseId, body })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onConfirmNew={(request) =>
-        confirmNewRfq(request)
-          .unwrap()
-          .then(() => undefined)
-      }
-      onConfirmDraft={(caseId, body) =>
-        confirmDraft({ caseId, body })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onDiscard={(caseId, expectedVersion) =>
-        discardDraft({ caseId, expectedVersion }).unwrap()
-      }
-      onPresent={(caseId, expectedCurrentVersion) =>
-        presentQuote({ caseId, expectedCurrentVersion })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onUnpresent={(caseId, expectedCurrentVersion) =>
-        unpresentQuote({ caseId, expectedCurrentVersion })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onClose={(caseId, outcome, expectedCurrentVersion) =>
-        (outcome === 'Hit' ? closeHitRfq : closeAwayRfq)({
-          caseId,
-          expectedCurrentVersion,
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onCorrectOutcome={(caseId, outcome, expectedCurrentVersion, reason) =>
-        (outcome === 'Hit' ? correctToHit : correctToAway)({
-          caseId,
-          expectedCurrentVersion,
-          reason,
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onCancel={(row) =>
-        cancelRfq({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onChangeContactOwner={(caseId, targetUserId, expectedCurrentVersion) =>
-        changeContactOwner({
-          caseId,
-          targetUserId,
-          expectedCurrentVersion,
-          confirmed: true,
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onReopen={(row) =>
-        reopenRfq({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onCreateFromExisting={(caseId) =>
-        createFromExisting(caseId)
-          .unwrap()
-          .then(() => undefined)
-      }
-      onUpdateMemo={(caseId, memo, expectedVersion) =>
-        updateSalesMemo({ caseId, memo, expectedVersion })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onSaveAmendment={(row, notional, settlementDate, text) =>
-        saveAmendment({
-          caseId: row.caseId,
-          notional,
-          settlementDate,
-          salesAndTradingMessage: text,
-          expectedCurrentVersion: row.currentVersion,
-          expectedDraftVersion: row.draftVersion ?? null,
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onConfirmAmendment={(row) =>
-        confirmAmendment({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-          expectedDraftVersion: row.draftVersion!,
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onDiscardAmendment={(row) =>
-        discardAmendment({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-          expectedDraftVersion: row.draftVersion!,
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
-      onBulk={async (command, rows) => {
-        return runBulk(command, rows)
-      }}
+      lookup={lookup}
+      draft={draft}
+      lifecycle={lifecycle}
+      amendment={amendment}
+      contactOwner={contactOwner}
+      memo={memo}
+      bulk={bulk}
       onReload={catchUp}
-      gridConfigJson={
-        gridConfigQuery.data
-          ? JSON.stringify(gridConfigQuery.data.config)
-          : undefined
-      }
-      onSaveGridConfig={(configJson) =>
-        saveGridConfig({
-          screenId: 'sales',
-          configKey: 'main',
-          version: (gridConfigQuery.data?.version ?? 0) + 1,
-          config: JSON.parse(configJson),
-        })
-          .unwrap()
-          .then(() => undefined)
-      }
+      gridLayout={gridLayout}
     />
   )
 }

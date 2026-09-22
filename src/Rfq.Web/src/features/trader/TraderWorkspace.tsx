@@ -47,6 +47,17 @@ import type {
   TraderRefreshMode,
 } from '@/features/trader/traderModel'
 import { requiresPickUpConfirmation } from '@/features/trader/traderModel'
+import type {
+  TraderBulkActions,
+  TraderContactOwnerActions,
+  TraderGridLayoutActions,
+  TraderLifecycleActions,
+  TraderMemoActions,
+  TraderOwnershipActions,
+  TraderPricerActions,
+  TraderSearchActions,
+  TraderWorkingQuoteActions,
+} from '@/features/trader/traderContracts'
 
 export function TraderWorkspace() {
   const {
@@ -256,6 +267,134 @@ export function TraderWorkspace() {
     bulkAwayState,
     bulkCancelState,
   ]
+  const ownership: TraderOwnershipActions = {
+    pickUp: (row, confirmed) =>
+      pickUp({
+        caseId: row.caseId,
+        expectedVersion: row.currentVersion,
+        confirmed,
+      }).unwrap(),
+    release: (row) =>
+      release({
+        caseId: row.caseId,
+        expectedVersion: row.currentVersion,
+      }).unwrap(),
+    assign: (row, targetTraderId) =>
+      assign({
+        caseId: row.caseId,
+        targetTraderId,
+        expectedVersion: row.currentVersion,
+      }).unwrap(),
+    takeOver: (row) =>
+      takeOver({
+        caseId: row.caseId,
+        expectedVersion: row.currentVersion,
+        confirmed: true,
+      }).unwrap(),
+  }
+  const workingQuote: TraderWorkingQuoteActions = {
+    calculate: (row, driver, value, slide) =>
+      calculate({
+        caseId: row.caseId,
+        driver,
+        value,
+        simpleYieldSlide: slide,
+        expectedCurrentVersion: row.currentVersion,
+        expectedWorkingQuoteVersion: row.workingQuoteVersion,
+      }).unwrap(),
+    changeMode: (row, mode) =>
+      changeMode({
+        caseId: row.caseId,
+        mode,
+        expectedCurrentVersion: row.currentVersion,
+        expectedWorkingQuoteVersion: row.workingQuoteVersion,
+      }).unwrap(),
+    updateManual: (row, price, finalSimpleYield) =>
+      updateManual({
+        caseId: row.caseId,
+        price,
+        finalSimpleYield,
+        expectedCurrentVersion: row.currentVersion,
+        expectedWorkingQuoteVersion: row.workingQuoteVersion,
+      }).unwrap(),
+    confirm: (row, expiryMinutes) =>
+      confirmQuote({
+        caseId: row.caseId,
+        expiry: expiryFor(expiryMinutes),
+        expectedCurrentVersion: row.currentVersion,
+        expectedWorkingQuoteVersion: row.workingQuoteVersion,
+      }).unwrap(),
+  }
+  const lifecycle: TraderLifecycleActions = {
+    present: (row) =>
+      present({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+      }).unwrap(),
+    unpresent: (row) =>
+      unpresent({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+      }).unwrap(),
+    withdraw: (row) =>
+      withdraw({
+        caseId: row.caseId,
+        expectedVersion: row.currentVersion,
+      }).unwrap(),
+    close: (row, outcome) =>
+      (outcome === 'Hit' ? closeHit : closeAway)({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+      }).unwrap(),
+    cancel: (row) =>
+      cancel({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+      }).unwrap(),
+    reopen: (row) =>
+      reopen({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+      }).unwrap(),
+    correctOutcome: (row, outcome, reason) =>
+      (outcome === 'Hit' ? correctHit : correctAway)({
+        caseId: row.caseId,
+        expectedCurrentVersion: row.currentVersion,
+        reason,
+      }).unwrap(),
+  }
+  const contactOwner: TraderContactOwnerActions = {
+    change: (row, targetUserId) =>
+      changeOwner({
+        caseId: row.caseId,
+        targetUserId,
+        expectedCurrentVersion: row.currentVersion,
+        confirmed: true,
+      }).unwrap(),
+  }
+  const memo: TraderMemoActions = {
+    update: (row, value) =>
+      updateMemo({
+        caseId: row.caseId,
+        memo: value,
+        expectedVersion: row.traderMemoVersion,
+      }).unwrap(),
+  }
+  const bulk: TraderBulkActions = { execute: runBulk }
+  const search: TraderSearchActions = {
+    execute: (params: RfqSearchParams) => searchRfqs(params).unwrap(),
+  }
+  const pricer: TraderPricerActions = {
+    calculate: (input) => scratch(input).unwrap(),
+  }
+  const gridLayout: TraderGridLayoutActions = {
+    configs: {
+      main: configJson(mainConfigQuery.data?.config),
+      search: configJson(searchConfigQuery.data?.config),
+      confirm: configJson(confirmConfigQuery.data?.config),
+    },
+    save: saveConfig,
+  }
 
   return (
     <TraderScreen
@@ -288,133 +427,15 @@ export function TraderWorkspace() {
       onManualRefresh={catchUp}
       onTransientStateChange={setProtectedState}
       onPatchRow={patchRow}
-      onPickUp={(row, confirmed) =>
-        pickUp({
-          caseId: row.caseId,
-          expectedVersion: row.currentVersion,
-          confirmed,
-        }).unwrap()
-      }
-      onRelease={(row) =>
-        release({
-          caseId: row.caseId,
-          expectedVersion: row.currentVersion,
-        }).unwrap()
-      }
-      onAssign={(row, targetTraderId) =>
-        assign({
-          caseId: row.caseId,
-          targetTraderId,
-          expectedVersion: row.currentVersion,
-        }).unwrap()
-      }
-      onTakeOver={(row) =>
-        takeOver({
-          caseId: row.caseId,
-          expectedVersion: row.currentVersion,
-          confirmed: true,
-        }).unwrap()
-      }
-      onCalculate={(row, driver, value, slide) =>
-        calculate({
-          caseId: row.caseId,
-          driver,
-          value,
-          simpleYieldSlide: slide,
-          expectedCurrentVersion: row.currentVersion,
-          expectedWorkingQuoteVersion: row.workingQuoteVersion,
-        }).unwrap()
-      }
-      onChangeMode={(row, mode) =>
-        changeMode({
-          caseId: row.caseId,
-          mode,
-          expectedCurrentVersion: row.currentVersion,
-          expectedWorkingQuoteVersion: row.workingQuoteVersion,
-        }).unwrap()
-      }
-      onUpdateManual={(row, price, finalSimpleYield) =>
-        updateManual({
-          caseId: row.caseId,
-          price,
-          finalSimpleYield,
-          expectedCurrentVersion: row.currentVersion,
-          expectedWorkingQuoteVersion: row.workingQuoteVersion,
-        }).unwrap()
-      }
-      onConfirmQuote={(row, expiryMinutes) =>
-        confirmQuote({
-          caseId: row.caseId,
-          expiry: expiryFor(expiryMinutes),
-          expectedCurrentVersion: row.currentVersion,
-          expectedWorkingQuoteVersion: row.workingQuoteVersion,
-        }).unwrap()
-      }
-      onPresent={(row) =>
-        present({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-        }).unwrap()
-      }
-      onUnpresent={(row) =>
-        unpresent({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-        }).unwrap()
-      }
-      onWithdraw={(row) =>
-        withdraw({
-          caseId: row.caseId,
-          expectedVersion: row.currentVersion,
-        }).unwrap()
-      }
-      onClose={(row, outcome) =>
-        (outcome === 'Hit' ? closeHit : closeAway)({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-        }).unwrap()
-      }
-      onCancel={(row) =>
-        cancel({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-        }).unwrap()
-      }
-      onReopen={(row) =>
-        reopen({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-        }).unwrap()
-      }
-      onCorrectOutcome={(row, outcome, reason) =>
-        (outcome === 'Hit' ? correctHit : correctAway)({
-          caseId: row.caseId,
-          expectedCurrentVersion: row.currentVersion,
-          reason,
-        }).unwrap()
-      }
-      onChangeContactOwner={(row, targetUserId) =>
-        changeOwner({
-          caseId: row.caseId,
-          targetUserId,
-          expectedCurrentVersion: row.currentVersion,
-          confirmed: true,
-        }).unwrap()
-      }
-      onUpdateMemo={(row, memo) =>
-        updateMemo({
-          caseId: row.caseId,
-          memo,
-          expectedVersion: row.traderMemoVersion,
-        }).unwrap()
-      }
-      onBulk={runBulk}
-      onSearch={(params: RfqSearchParams) => searchRfqs(params).unwrap()}
-      onScratchPrice={(input) => scratch(input).unwrap()}
-      mainGridConfigJson={configJson(mainConfigQuery.data?.config)}
-      searchGridConfigJson={configJson(searchConfigQuery.data?.config)}
-      confirmGridConfigJson={configJson(confirmConfigQuery.data?.config)}
-      onSaveGridConfig={saveConfig}
+      ownership={ownership}
+      workingQuote={workingQuote}
+      lifecycle={lifecycle}
+      contactOwner={contactOwner}
+      memo={memo}
+      bulk={bulk}
+      search={search}
+      pricer={pricer}
+      gridLayout={gridLayout}
       onReload={catchUp}
     />
   )

@@ -57,26 +57,46 @@ const traderProps: TraderScreenProps = {
   isLoading: false,
   isError: false,
   isMutating: false,
-  onPickUp: vi.fn().mockResolvedValue(undefined),
-  onRelease: vi.fn().mockResolvedValue(undefined),
-  onAssign: vi.fn().mockResolvedValue(undefined),
-  onTakeOver: vi.fn().mockResolvedValue(undefined),
-  onCalculate: vi.fn().mockResolvedValue(undefined),
-  onChangeMode: vi.fn().mockResolvedValue(undefined),
-  onUpdateManual: vi.fn().mockResolvedValue(undefined),
-  onConfirmQuote: vi.fn().mockResolvedValue(undefined),
-  onClose: vi.fn().mockResolvedValue(undefined),
-  onBulk: vi.fn().mockResolvedValue([]),
-  onCorrectOutcome: vi.fn().mockResolvedValue(undefined),
-  onChangeContactOwner: vi.fn().mockResolvedValue(undefined),
-  onUpdateMemo: vi.fn().mockResolvedValue(undefined),
+  ownership: {
+    pickUp: vi.fn().mockResolvedValue(undefined),
+    release: vi.fn().mockResolvedValue(undefined),
+    assign: vi.fn().mockResolvedValue(undefined),
+    takeOver: vi.fn().mockResolvedValue(undefined),
+  },
+  workingQuote: {
+    calculate: vi.fn().mockResolvedValue(undefined),
+    changeMode: vi.fn().mockResolvedValue(undefined),
+    updateManual: vi.fn().mockResolvedValue(undefined),
+    confirm: vi.fn().mockResolvedValue(undefined),
+  },
+  lifecycle: {
+    close: vi.fn().mockResolvedValue(undefined),
+    correctOutcome: vi.fn().mockResolvedValue(undefined),
+  },
+  contactOwner: { change: vi.fn().mockResolvedValue(undefined) },
+  memo: { update: vi.fn().mockResolvedValue(undefined) },
+  bulk: { execute: vi.fn().mockResolvedValue([]) },
   onReload: vi.fn(),
 }
+
+const withOwnership = (
+  actions: Partial<TraderScreenProps['ownership']>,
+): Pick<TraderScreenProps, 'ownership'> => ({
+  ownership: { ...traderProps.ownership, ...actions },
+})
+const withWorkingQuote = (
+  actions: Partial<TraderScreenProps['workingQuote']>,
+): Pick<TraderScreenProps, 'workingQuote'> => ({
+  workingQuote: { ...traderProps.workingQuote, ...actions },
+})
+const withBulk = (
+  execute: NonNullable<TraderScreenProps['bulk']>['execute'],
+): Pick<TraderScreenProps, 'bulk'> => ({ bulk: { execute } })
 
 describe('TraderScreen', () => {
   it('picks all self-assigned unowned RFQs independently of selection', async () => {
     const onBulk = vi.fn().mockResolvedValue([])
-    render(<TraderScreen {...traderProps} onBulk={onBulk} />)
+    render(<TraderScreen {...traderProps} {...withBulk(onBulk)} />)
     fireEvent.click(screen.getByRole('button', { name: 'Pick (1)' }))
 
     await waitFor(() =>
@@ -102,7 +122,7 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         businessDate="2026-09-22"
-        onSearch={onSearch}
+        search={{ execute: onSearch }}
       />,
     )
 
@@ -134,7 +154,7 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         rfqs={[{ ...traderRow, assignedTraderId: 'trader-b', owned: true }]}
-        onTakeOver={onTakeOver}
+        {...withOwnership({ takeOver: onTakeOver })}
       />,
     )
     fireEvent.click(screen.getByText(/client-001 Client One/))
@@ -150,7 +170,12 @@ describe('TraderScreen', () => {
 
   it('picks up a self-assigned unowned RFQ without confirmation', async () => {
     const onPickUp = vi.fn().mockResolvedValue(undefined)
-    render(<TraderScreen {...traderProps} onPickUp={onPickUp} />)
+    render(
+      <TraderScreen
+        {...traderProps}
+        {...withOwnership({ pickUp: onPickUp })}
+      />,
+    )
 
     fireEvent.click(screen.getByText(/client-001 Client One/))
     fireEvent.click(screen.getByRole('button', { name: 'Pick Up' }))
@@ -172,7 +197,7 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         rfqs={[{ ...traderRow, assignedTraderId: 'trader-b' }]}
-        onPickUp={onPickUp}
+        {...withOwnership({ pickUp: onPickUp })}
       />,
     )
 
@@ -228,7 +253,7 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         rfqs={[traderRow, otherAssigned, otherOwned]}
-        onBulk={onBulk}
+        {...withBulk(onBulk)}
       />,
     )
 
@@ -266,7 +291,7 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         rfqs={[{ ...traderRow, owned: true }]}
-        onChangeMode={onChangeMode}
+        {...withWorkingQuote({ changeMode: onChangeMode })}
       />,
     )
     fireEvent.click(screen.getByText(/client-001 Client One/))
@@ -287,7 +312,7 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         rfqs={[{ ...traderRow, owned: true }]}
-        onCalculate={onCalculate}
+        {...withWorkingQuote({ calculate: onCalculate })}
       />,
     )
 
@@ -322,8 +347,8 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         rfqs={[caseA, caseB]}
-        onCalculate={onCalculate}
-        onRelease={onRelease}
+        {...withWorkingQuote({ calculate: onCalculate })}
+        {...withOwnership({ release: onRelease })}
       />,
     )
 
@@ -388,7 +413,7 @@ describe('TraderScreen', () => {
         {...traderProps}
         rfqs={[{ ...traderRow, owned: true }]}
         refreshGeneration={0}
-        onCalculate={() => calculation}
+        {...withWorkingQuote({ calculate: () => calculation })}
         onPatchRow={onPatchRow}
         onReload={onReload}
       />,
@@ -400,7 +425,7 @@ describe('TraderScreen', () => {
         {...traderProps}
         rfqs={[{ ...traderRow, owned: true }]}
         refreshGeneration={1}
-        onCalculate={() => calculation}
+        {...withWorkingQuote({ calculate: () => calculation })}
         onPatchRow={onPatchRow}
         onReload={onReload}
       />,
@@ -429,7 +454,9 @@ describe('TraderScreen', () => {
         <TraderScreen
           {...traderProps}
           rfqs={[{ ...traderRow, owned: true }]}
-          onCalculate={() => new Promise(() => undefined)}
+          {...withWorkingQuote({
+            calculate: () => new Promise(() => undefined),
+          })}
         />,
       )
 
@@ -480,7 +507,7 @@ describe('TraderScreen', () => {
         {...traderProps}
         refreshMode="paused"
         rfqs={[{ ...traderRow, owned: true }]}
-        onCalculate={onCalculate}
+        {...withWorkingQuote({ calculate: onCalculate })}
         onPatchRow={onPatchRow}
         onReload={onReload}
       />,
@@ -508,7 +535,7 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         rfqs={[{ ...traderRow, owned: true }]}
-        onCalculate={onCalculate}
+        {...withWorkingQuote({ calculate: onCalculate })}
       />,
     )
 
@@ -639,7 +666,7 @@ describe('TraderScreen', () => {
       <TraderScreen
         {...traderProps}
         rfqs={[populated]}
-        onConfirmQuote={onConfirmQuote}
+        {...withWorkingQuote({ confirm: onConfirmQuote })}
       />,
     )
     fireEvent.click(screen.getByText(/client-001 Client One/))
@@ -684,7 +711,7 @@ describe('TraderScreen', () => {
     render(
       <TraderScreen
         {...traderProps}
-        onUpdateMemo={onUpdateMemo}
+        memo={{ update: onUpdateMemo }}
         rfqs={[
           {
             ...traderRow,

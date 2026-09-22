@@ -55,22 +55,53 @@ const baseProps: SalesScreenProps = {
   isLoading: false,
   isError: false,
   isMutating: false,
-  onClientSearch: vi.fn(),
-  onSecuritySearch: vi.fn(),
-  onResolveDefaults: vi.fn().mockResolvedValue(defaults),
-  onCreate: vi.fn().mockResolvedValue(undefined),
-  onUpdate: vi.fn().mockResolvedValue(undefined),
-  onConfirmNew: vi.fn().mockResolvedValue(undefined),
-  onConfirmDraft: vi.fn().mockResolvedValue(undefined),
-  onDiscard: vi.fn().mockResolvedValue(undefined),
-  onPresent: vi.fn().mockResolvedValue(undefined),
-  onUnpresent: vi.fn().mockResolvedValue(undefined),
-  onClose: vi.fn().mockResolvedValue(undefined),
-  onCorrectOutcome: vi.fn().mockResolvedValue(undefined),
-  onChangeContactOwner: vi.fn().mockResolvedValue(undefined),
-  onUpdateMemo: vi.fn().mockResolvedValue(undefined),
+  lookup: {
+    searchClients: vi.fn(),
+    searchSecurities: vi.fn(),
+    resolveDefaults: vi.fn().mockResolvedValue(defaults),
+  },
+  draft: {
+    create: vi.fn().mockResolvedValue(undefined),
+    update: vi.fn().mockResolvedValue(undefined),
+    confirmNew: vi.fn().mockResolvedValue(undefined),
+    confirm: vi.fn().mockResolvedValue(undefined),
+    discard: vi.fn().mockResolvedValue(undefined),
+  },
+  lifecycle: {
+    present: vi.fn().mockResolvedValue(undefined),
+    unpresent: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    cancel: vi.fn().mockResolvedValue(undefined),
+    reopen: vi.fn().mockResolvedValue(undefined),
+    createFromExisting: vi.fn().mockResolvedValue(undefined),
+    correctOutcome: vi.fn().mockResolvedValue(undefined),
+  },
+  amendment: {
+    save: vi.fn().mockResolvedValue(undefined),
+    confirm: vi.fn().mockResolvedValue(undefined),
+    discard: vi.fn().mockResolvedValue(undefined),
+  },
+  contactOwner: { change: vi.fn().mockResolvedValue(undefined) },
+  memo: { update: vi.fn().mockResolvedValue(undefined) },
+  bulk: { execute: vi.fn().mockResolvedValue([]) },
   onReload: vi.fn(),
 }
+
+const withDraft = (
+  actions: Partial<SalesScreenProps['draft']>,
+): Pick<SalesScreenProps, 'draft'> => ({
+  draft: { ...baseProps.draft, ...actions },
+})
+const withLifecycle = (
+  actions: Partial<SalesScreenProps['lifecycle']>,
+): Pick<SalesScreenProps, 'lifecycle'> => ({
+  lifecycle: { ...baseProps.lifecycle, ...actions },
+})
+const withAmendment = (
+  actions: Partial<SalesScreenProps['amendment']>,
+): Pick<SalesScreenProps, 'amendment'> => ({
+  amendment: { ...baseProps.amendment, ...actions },
+})
 
 const draftRow: SalesRfq = {
   caseId: 101,
@@ -212,7 +243,11 @@ describe('SalesScreen', () => {
     const onCreate = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
     render(
-      <SalesScreen {...baseProps} onCreate={onCreate} onReload={onReload} />,
+      <SalesScreen
+        {...baseProps}
+        {...withDraft({ create: onCreate })}
+        onReload={onReload}
+      />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
     await selectRequiredMasters()
@@ -234,7 +269,12 @@ describe('SalesScreen', () => {
 
   it('confirms a new RFQ directly without saving first', async () => {
     const onConfirmNew = vi.fn().mockResolvedValue(undefined)
-    render(<SalesScreen {...baseProps} onConfirmNew={onConfirmNew} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        {...withDraft({ confirmNew: onConfirmNew })}
+      />,
+    )
     fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
     await selectRequiredMasters()
     fireEvent.change(screen.getByLabelText('Notl (MM)'), {
@@ -260,7 +300,12 @@ describe('SalesScreen', () => {
 
   it('uses Alt+Enter to confirm the active New RFQ form', async () => {
     const onConfirmNew = vi.fn().mockResolvedValue(undefined)
-    render(<SalesScreen {...baseProps} onConfirmNew={onConfirmNew} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        {...withDraft({ confirmNew: onConfirmNew })}
+      />,
+    )
     fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
     await selectRequiredMasters()
     fireEvent.change(screen.getByLabelText('Notl (MM)'), {
@@ -285,7 +330,7 @@ describe('SalesScreen', () => {
       <SalesScreen
         {...baseProps}
         rfqs={[draftRow]}
-        onConfirmDraft={onConfirmDraft}
+        {...withDraft({ confirm: onConfirmDraft })}
       />,
     )
     fireEvent.click(screen.getByText(/client-grid 顧客表示名/))
@@ -316,7 +361,13 @@ describe('SalesScreen', () => {
       currentQuoteId: '00000000-0000-0000-0000-000000000301',
       currentVersion: 7,
     }
-    render(<SalesScreen {...baseProps} rfqs={[quoted]} onPresent={onPresent} />)
+    render(
+      <SalesScreen
+        {...baseProps}
+        rfqs={[quoted]}
+        {...withLifecycle({ present: onPresent })}
+      />,
+    )
     fireEvent.click(screen.getByText(/client-grid/))
     fireEvent.click(screen.getByRole('button', { name: 'Present' }))
 
@@ -335,7 +386,7 @@ describe('SalesScreen', () => {
           {...baseProps}
           refreshMode="paused"
           rfqs={[quotedRow(101)]}
-          onClose={onClose}
+          {...withLifecycle({ close: onClose })}
         />,
       )
 
@@ -353,7 +404,7 @@ describe('SalesScreen', () => {
         {...baseProps}
         refreshMode="paused"
         rfqs={[quotedRow(101)]}
-        onCancel={onCancel}
+        {...withLifecycle({ cancel: onCancel })}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Row 101 Cancel' }))
@@ -404,7 +455,7 @@ describe('SalesScreen', () => {
             quoteRequestReason: 'Initial',
           },
         ]}
-        onBulk={onBulk}
+        bulk={{ execute: onBulk }}
       />,
     )
     fireEvent.click(
@@ -486,7 +537,7 @@ describe('SalesScreen', () => {
         {...baseProps}
         rfqs={[quotedRow(101)]}
         onRefreshModeChange={onRefreshModeChange}
-        onClose={onClose}
+        {...withLifecycle({ close: onClose })}
       />,
     )
     fireEvent.click(
@@ -519,7 +570,7 @@ describe('SalesScreen', () => {
         {...baseProps}
         refreshMode="paused"
         rfqs={[quoted]}
-        onChangeContactOwner={onChangeContactOwner}
+        contactOwner={{ change: onChangeContactOwner }}
         onReload={onReload}
       />,
     )
@@ -565,7 +616,7 @@ describe('SalesScreen', () => {
     render(
       <SalesScreen
         {...baseProps}
-        onClose={onClose}
+        {...withLifecycle({ close: onClose })}
         rfqs={[
           {
             ...draftRow,
@@ -593,7 +644,7 @@ describe('SalesScreen', () => {
       <SalesScreen
         {...baseProps}
         refreshMode="paused"
-        onUpdateMemo={onUpdateMemo}
+        memo={{ update: onUpdateMemo }}
         onReload={onReload}
         rfqs={[
           {
@@ -634,7 +685,7 @@ describe('SalesScreen', () => {
         {...baseProps}
         refreshMode="paused"
         rfqs={[{ ...quotedRow(101), rfqStatus: 'Hit', quoteStatus: null }]}
-        onCorrectOutcome={onCorrectOutcome}
+        {...withLifecycle({ correctOutcome: onCorrectOutcome })}
         onReload={onReload}
       />,
     )
@@ -662,7 +713,7 @@ describe('SalesScreen', () => {
         {...baseProps}
         refreshMode="paused"
         rfqs={[quotedRow(101)]}
-        onSaveAmendment={onSaveAmendment}
+        {...withAmendment({ save: onSaveAmendment })}
         onReload={onReload}
       />,
     )

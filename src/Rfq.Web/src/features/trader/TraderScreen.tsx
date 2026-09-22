@@ -12,74 +12,54 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
-import type { InputRef } from 'antd'
 import type {
   CellEditRequestEvent,
-  GridApi,
   RowClassParams,
   RowClickedEvent,
   SelectionChangedEvent,
 } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
-import type {
-  ApiProblemDetails,
-  BulkItemResult,
-  CalculatedQuotePayload,
-  CloseRfqResult,
-  ConfirmQuoteResult,
-  ContactOwnerResult,
-  LifecycleResult,
-  MemoResult,
-  OwnershipResult,
-  PresentationResult,
-  RfqSearchItem,
-  RfqSearchParams,
-  RfqSearchResult,
-  TraderRfq,
-  WorkingQuoteResult,
-} from '@/services/api'
+import type { ApiProblemDetails, TraderRfq } from '@/services/api'
 import {
   attentionClass,
-  calculatedValue,
   isPickUpEligible,
   isConfirmable,
   patchConfirmedQuote,
   patchMemo,
   patchWorkingQuote,
-  sameSourceTerms,
-  searchDateRange,
-  type PricerProvenance,
-  type SearchDatePreset,
   type TraderBulkCommand,
   type TraderPaneTab,
   type TraderRefreshMode,
 } from '@/features/trader/traderModel'
 import {
-  applyGridLayout,
-  gridLayoutMenu,
-  initializeGridLayout,
-  type GridColumnGroupState,
-} from '@/features/grid/gridLayout'
-import {
   useTraderActiveColumns,
   useTraderConfirmColumns,
   useTraderSearchColumns,
 } from '@/features/trader/traderColumns'
-import { TraderOperationsPane } from '@/features/trader/TraderOperationsPane'
+import { TraderOperationsPane } from '@/features/trader/operations/TraderOperationsPane'
+import { useTraderOperationIntents } from '@/features/trader/operations/useTraderOperationIntents'
 import { TraderSearchSection } from '@/features/trader/TraderSearchSection'
 import { useWorkingQuoteCalculation } from '@/features/trader/useWorkingQuoteCalculation'
-import {
-  TraderPricerPane,
-  type ScratchState,
-} from '@/features/trader/TraderPricerPane'
+import { TraderPricerPane } from '@/features/trader/TraderPricerPane'
 import {
   TraderResultBar,
   type TraderResultState,
 } from '@/features/trader/TraderResultBar'
-
-type UserOption = { userId: string; name: string }
-type RfqOutcome = 'Hit' | 'Away'
-type GridConfigKey = 'main' | 'search' | 'confirm'
+import type {
+  TraderBulkActions,
+  TraderContactOwnerActions,
+  TraderGridLayoutActions,
+  TraderLifecycleActions,
+  TraderMemoActions,
+  TraderOwnershipActions,
+  TraderPricerActions,
+  TraderSearchActions,
+  TraderWorkingQuoteActions,
+  UserOption,
+} from '@/features/trader/traderContracts'
+import { useTraderGridLayouts } from '@/features/trader/useTraderGridLayouts'
+import { useTraderScratchPricer } from '@/features/trader/useTraderScratchPricer'
+import { useTraderSearch } from '@/features/trader/useTraderSearch'
 
 function isTextInput(target: EventTarget | null): boolean {
   const element = target instanceof HTMLElement ? target : null
@@ -111,72 +91,15 @@ export interface TraderScreenProps {
   onManualRefresh?: () => void | Promise<void>
   onTransientStateChange?: (active: boolean) => void
   onPatchRow?: (caseId: number, update: (row: TraderRfq) => TraderRfq) => void
-  onPickUp: (
-    row: TraderRfq,
-    confirmed: boolean,
-  ) => Promise<OwnershipResult | void>
-  onRelease: (row: TraderRfq) => Promise<OwnershipResult | void>
-  onAssign: (
-    row: TraderRfq,
-    targetTraderId: string,
-  ) => Promise<OwnershipResult | void>
-  onTakeOver: (row: TraderRfq) => Promise<OwnershipResult | void>
-  onCalculate: (
-    row: TraderRfq,
-    driver: CalculatedQuotePayload['driver'],
-    value: number,
-    simpleYieldSlide: number,
-  ) => Promise<WorkingQuoteResult | void>
-  onChangeMode: (
-    row: TraderRfq,
-    mode: 'Calculated' | 'Manual',
-  ) => Promise<WorkingQuoteResult | void>
-  onUpdateManual: (
-    row: TraderRfq,
-    price: number | null,
-    finalSimpleYield: number | null,
-  ) => Promise<WorkingQuoteResult | void>
-  onConfirmQuote: (
-    row: TraderRfq,
-    expiryMinutes: number | null,
-  ) => Promise<ConfirmQuoteResult | void>
-  onPresent?: (row: TraderRfq) => Promise<PresentationResult | void>
-  onUnpresent?: (row: TraderRfq) => Promise<PresentationResult | void>
-  onWithdraw?: (row: TraderRfq) => Promise<LifecycleResult | void>
-  onClose: (
-    row: TraderRfq,
-    outcome: RfqOutcome,
-  ) => Promise<CloseRfqResult | void>
-  onCancel?: (row: TraderRfq) => Promise<LifecycleResult | void>
-  onReopen?: (row: TraderRfq) => Promise<LifecycleResult | void>
-  onCorrectOutcome: (
-    row: TraderRfq,
-    outcome: RfqOutcome,
-    reason: string,
-  ) => Promise<CloseRfqResult | void>
-  onChangeContactOwner: (
-    row: TraderRfq,
-    targetUserId: string,
-  ) => Promise<ContactOwnerResult | void>
-  onUpdateMemo: (row: TraderRfq, memo: string) => Promise<MemoResult | void>
-  onBulk?: (
-    command: TraderBulkCommand,
-    rows: TraderRfq[],
-    expiryMinutes: number | null,
-    targetTraderId?: string,
-  ) => Promise<BulkItemResult[]>
-  onSearch?: (params: RfqSearchParams) => Promise<RfqSearchResult>
-  onScratchPrice?: (input: {
-    securityId: string
-    settlementDate: string
-    driver: CalculatedQuotePayload['driver']
-    value: number
-    simpleYieldSlide: number
-  }) => Promise<CalculatedQuotePayload>
-  mainGridConfigJson?: string
-  searchGridConfigJson?: string
-  confirmGridConfigJson?: string
-  onSaveGridConfig?: (key: GridConfigKey, configJson: string) => Promise<void>
+  ownership: TraderOwnershipActions
+  workingQuote: TraderWorkingQuoteActions
+  lifecycle: TraderLifecycleActions
+  contactOwner: TraderContactOwnerActions
+  memo: TraderMemoActions
+  bulk?: TraderBulkActions
+  search?: TraderSearchActions
+  pricer?: TraderPricerActions
+  gridLayout?: TraderGridLayoutActions
   onReload: () => void | Promise<unknown>
 }
 
@@ -199,77 +122,33 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
     onManualRefresh,
     onTransientStateChange,
     onPatchRow = () => undefined,
-    onPickUp,
-    onRelease,
-    onAssign,
-    onTakeOver,
-    onCalculate,
-    onChangeMode,
-    onUpdateManual,
-    onConfirmQuote,
-    onPresent,
-    onUnpresent,
-    onWithdraw,
-    onClose,
-    onCancel,
-    onReopen,
-    onCorrectOutcome,
-    onChangeContactOwner,
-    onUpdateMemo,
-    onBulk = async () => [],
-    onSearch = async () => ({ items: [], requiresNarrowing: false }),
-    onScratchPrice,
-    mainGridConfigJson,
-    searchGridConfigJson,
-    confirmGridConfigJson,
-    onSaveGridConfig,
+    ownership,
+    workingQuote,
+    lifecycle,
+    contactOwner,
+    memo,
+    bulk = { execute: async () => [] },
+    search = {
+      execute: async () => ({ items: [], requiresNarrowing: false }),
+    },
+    pricer: pricerActions,
+    gridLayout = { configs: {} },
     onReload,
   } = props
   const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([])
   const [activeCaseId, setActiveCaseId] = useState<number>()
   const [rightPaneOpen, setRightPaneOpen] = useState(true)
   const [rightTab, setRightTab] = useState<TraderPaneTab>('operations')
-  const [searchOpen, setSearchOpen] = useState(true)
-  const [searchFiltersOpen, setSearchFiltersOpen] = useState(true)
-  const [searchPreset, setSearchPreset] = useState<SearchDatePreset>('1Y')
-  const [searchFilters, setSearchFilters] = useState<Record<string, string>>({})
-  const [searchResult, setSearchResult] = useState<RfqSearchResult>({
-    items: [],
-    requiresNarrowing: false,
-  })
-  const [searching, setSearching] = useState(false)
   const [confirmRows, setConfirmRows] = useState<TraderRfq[] | null>(null)
   const [result, setResult] = useState<TraderResultState | null>(null)
   const [resultExpanded, setResultExpanded] = useState(false)
-  const [targetTraderId, setTargetTraderId] = useState<string>()
-  const [targetContactOwnerId, setTargetContactOwnerId] = useState<string>()
   const [expiryMinutes, setExpiryMinutes] = useState<number | null>(
     defaultExpiryMinutes,
   )
   const [actionError, setActionError] = useState<string | null>(null)
-  const [scratch, setScratch] = useState<ScratchState>({
-    securityId: '',
-    notional: null,
-    settlementDate: '',
-    driver: 'Price',
-    value: 100,
-    slide: 0,
-  })
-  const [scratchResult, setScratchResult] =
-    useState<CalculatedQuotePayload | null>(null)
-  const [pricerProvenance, setPricerProvenance] =
-    useState<PricerProvenance | null>(null)
-  const [pricerBusy, setPricerBusy] = useState(false)
   const [editingCells, setEditingCells] = useState(0)
   const [now, setNow] = useState(() => Date.now())
-  const mainGrid = useRef<GridApi<TraderRfq> | null>(null)
-  const searchGrid = useRef<GridApi<RfqSearchItem> | null>(null)
-  const confirmGrid = useRef<GridApi<TraderRfq> | null>(null)
-  const defaultColumnGroupStates = useRef<
-    Record<GridConfigKey, GridColumnGroupState>
-  >({ main: [], search: [], confirm: [] })
   const activeGridRegion = useRef<HTMLDivElement>(null)
-  const searchCaseInput = useRef<InputRef>(null)
 
   const selectedRows = selectedCaseIds
     .map((id) => rfqs.find((row) => row.caseId === id))
@@ -297,49 +176,12 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
       setActiveCaseId(undefined)
   }, [activeCaseId, rfqs])
 
-  const configFor = (key: GridConfigKey) =>
-    key === 'main'
-      ? mainGridConfigJson
-      : key === 'search'
-        ? searchGridConfigJson
-        : confirmGridConfigJson
-
-  const layoutMenu = <T,>(key: GridConfigKey, api: GridApi<T>) =>
-    gridLayoutMenu({
-      api,
-      configJson: configFor(key),
-      defaultColumnGroupState: defaultColumnGroupStates.current[key],
-      onSave: onSaveGridConfig
-        ? (configJson) => onSaveGridConfig(key, configJson)
-        : undefined,
-    })
-
-  useEffect(() => {
-    if (mainGrid.current)
-      applyGridLayout(
-        mainGrid.current,
-        mainGridConfigJson,
-        defaultColumnGroupStates.current.main,
-      )
-  }, [mainGridConfigJson])
-
-  useEffect(() => {
-    if (searchGrid.current)
-      applyGridLayout(
-        searchGrid.current,
-        searchGridConfigJson,
-        defaultColumnGroupStates.current.search,
-      )
-  }, [searchGridConfigJson])
-
-  useEffect(() => {
-    if (confirmGrid.current)
-      applyGridLayout(
-        confirmGrid.current,
-        confirmGridConfigJson,
-        defaultColumnGroupStates.current.confirm,
-      )
-  }, [confirmGridConfigJson])
+  const gridLayouts = useTraderGridLayouts(gridLayout)
+  const searchController = useTraderSearch({
+    businessDate,
+    actions: search,
+    onError: setActionError,
+  })
 
   const reconcileAfterSuccess = async () => {
     if (refreshMode === 'live') await onReload()
@@ -352,18 +194,11 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
   } = useWorkingQuoteCalculation({
     currentUserId,
     refreshGeneration,
-    onCalculate,
-    onUpdateManual,
+    onCalculate: workingQuote.calculate,
+    onUpdateManual: workingQuote.updateManual,
     onPatchRow,
     onSuccess: reconcileAfterSuccess,
   })
-  const protectedState =
-    calculating || editingCells > 0 || confirmRows !== null || pricerBusy
-
-  useEffect(
-    () => onTransientStateChange?.(protectedState),
-    [onTransientStateChange, protectedState],
-  )
 
   const runSingle = async <T,>(
     action: () => Promise<T | void>,
@@ -398,7 +233,12 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
   ) => {
     setActionError(null)
     try {
-      const items = await onBulk(command, rows, expiryMinutes, assignedTraderId)
+      const items = await bulk.execute(
+        command,
+        rows,
+        expiryMinutes,
+        assignedTraderId,
+      )
       setResult({ label, items })
       setResultExpanded(false)
       await reconcileAfterSuccess()
@@ -419,7 +259,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
 
     const attempted = String(event.newValue ?? '')
     const response = await runSingle(
-      () => onUpdateMemo(row, attempted),
+      () => memo.update(row, attempted),
       patchMemo,
       row,
     )
@@ -444,7 +284,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
     if (rows.length === 1) {
       const row = rows[0]
       const response = await runSingle(
-        () => onConfirmQuote(row, expiryMinutes),
+        () => workingQuote.confirm(row, expiryMinutes),
         patchConfirmedQuote,
         row,
       )
@@ -466,95 +306,40 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
     if (rows.length > 1) await runBulk('Bulk Confirm', 'confirm', rows)
   }
 
-  const executeSearch = async () => {
-    setSearching(true)
-    setActionError(null)
-    try {
-      const range = searchDateRange(businessDate, searchPreset)
-      const params: RfqSearchParams = { ...range }
-      for (const [key, value] of Object.entries(searchFilters)) {
-        if (!value.trim()) continue
-        if (key === 'caseId') params.caseId = Number(value)
-        else (params as Record<string, unknown>)[key] = value.trim()
-      }
-      setSearchResult(await onSearch(params))
-    } catch {
-      setActionError('RFQ Search could not be completed.')
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  const setScratchIdentity = (
-    key: 'securityId' | 'notional' | 'settlementDate',
-    value: string | number | null,
-  ) => {
-    setScratch((current) => ({ ...current, [key]: value }))
-    setPricerProvenance(null)
-  }
-  const loadSelected = () => {
-    if (!selected) return
-    const driver = selected.calculated?.driver ?? 'Price'
-    setScratch({
-      securityId: selected.securityId,
-      notional: selected.notional,
-      settlementDate: selected.settlementDate ?? '',
-      driver,
-      value:
-        calculatedValue(selected.calculated, driver) ??
-        selected.manual?.price ??
-        100,
-      slide: selected.calculated?.simpleYieldSlide ?? 0,
-    })
-    setScratchResult(null)
-    setPricerProvenance({
-      sourceCaseId: selected.caseId,
-      securityId: selected.securityId,
-      notional: selected.notional,
-      settlementDate: selected.settlementDate,
-    })
-  }
-  const sourceRow = pricerProvenance
-    ? rfqs.find((row) => row.caseId === pricerProvenance.sourceCaseId)
-    : undefined
-  const canApplyPricer = Boolean(
-    sourceRow &&
-    sourceRow.workingQuoteMode === 'Manual' &&
-    sameSourceTerms(sourceRow, pricerProvenance) &&
-    scratchResult,
-  )
-  const calculateScratch = async () => {
-    if (!onScratchPrice) return
-    setPricerBusy(true)
-    try {
-      setScratchResult(
-        await onScratchPrice({
-          securityId: scratch.securityId,
-          settlementDate: scratch.settlementDate,
-          driver: scratch.driver,
-          value: scratch.value,
-          simpleYieldSlide: scratch.slide,
-        }),
+  const operationController = useTraderOperationIntents({
+    selected,
+    selectedRows,
+    currentUserId,
+    run: runSingle,
+    runBulk,
+    ownership,
+    workingQuote,
+    lifecycle,
+    contactOwner,
+  })
+  const pricerController = useTraderScratchPricer({
+    rfqs,
+    selected,
+    actions: pricerActions,
+    onApply: async (row, price, finalSimpleYield) => {
+      await runSingle(
+        () => workingQuote.updateManual(row, price, finalSimpleYield),
+        patchWorkingQuote,
+        row,
       )
-    } catch {
-      setActionError('Scratch calculation failed.')
-    } finally {
-      setPricerBusy(false)
-    }
-  }
-  const applyPricer = async () => {
-    if (!sourceRow || !scratchResult || !canApplyPricer) return
-    await runSingle(
-      () =>
-        onUpdateManual(
-          sourceRow,
-          scratchResult.price,
-          scratchResult.finalSimpleYield,
-        ),
-      patchWorkingQuote,
-      sourceRow,
-    )
-  }
+    },
+    onError: setActionError,
+  })
+  const protectedState =
+    calculating ||
+    editingCells > 0 ||
+    confirmRows !== null ||
+    pricerController.busy
+
+  useEffect(
+    () => onTransientStateChange?.(protectedState),
+    [onTransientStateChange, protectedState],
+  )
 
   const manualRefresh = async (): Promise<void> => {
     invalidateCalculations()
@@ -575,15 +360,14 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
         void onRefreshModeChange(refreshMode === 'live' ? 'paused' : 'live')
       } else if (event.key.toLowerCase() === 's') {
         event.preventDefault()
-        setSearchOpen(true)
-        window.setTimeout(() => searchCaseInput.current?.focus(), 0)
+        searchController.openAndFocus()
       } else if (event.key.toLowerCase() === 'a') {
         event.preventDefault()
         activeGridRegion.current?.focus()
       } else if (
         event.key === 'Enter' &&
         !isTextInput(event.target) &&
-        document.activeElement !== searchCaseInput.current
+        document.activeElement !== searchController.caseInputRef.current
       ) {
         event.preventDefault()
         openConfirmation()
@@ -737,17 +521,14 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
                   headerHeight={30}
                   groupHeaderHeight={26}
                   tooltipShowDelay={350}
-                  onGridReady={({ api }) => {
-                    mainGrid.current = api
-                    defaultColumnGroupStates.current.main =
-                      initializeGridLayout(api, mainGridConfigJson)
-                  }}
-                  getContextMenuItems={({ api }) => [layoutMenu('main', api)]}
+                  onGridReady={({ api }) => gridLayouts.initialize('main', api)}
+                  getContextMenuItems={({ api }) => [
+                    gridLayouts.menu('main', api),
+                  ]}
                   onRowClicked={({ data }: RowClickedEvent<TraderRfq>) => {
                     if (data) {
                       setActiveCaseId(data.caseId)
-                      setTargetTraderId(undefined)
-                      setTargetContactOwnerId(undefined)
+                      operationController.clearTargets()
                     }
                   }}
                   onSelectionChanged={({
@@ -763,27 +544,21 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
           </section>
 
           <TraderSearchSection
-            open={searchOpen}
-            filtersOpen={searchFiltersOpen}
-            caseInputRef={searchCaseInput}
-            preset={searchPreset}
-            filters={searchFilters}
-            searching={searching}
-            result={searchResult}
+            open={searchController.open}
+            filtersOpen={searchController.filtersOpen}
+            caseInputRef={searchController.caseInputRef}
+            preset={searchController.preset}
+            filters={searchController.filters}
+            searching={searchController.searching}
+            result={searchController.result}
             columns={searchColumns}
-            onToggle={() => setSearchOpen((value) => !value)}
-            onToggleFilters={() => setSearchFiltersOpen((value) => !value)}
-            onPresetChange={setSearchPreset}
-            onFiltersChange={setSearchFilters}
-            onSearch={executeSearch}
-            onGridReady={(api) => {
-              searchGrid.current = api
-              defaultColumnGroupStates.current.search = initializeGridLayout(
-                api,
-                searchGridConfigJson,
-              )
-            }}
-            getLayoutMenu={(api) => layoutMenu('search', api)}
+            onToggle={searchController.toggle}
+            onToggleFilters={searchController.toggleFilters}
+            onPresetChange={searchController.setPreset}
+            onFiltersChange={searchController.setFilters}
+            onSearch={searchController.execute}
+            onGridReady={(api) => gridLayouts.initialize('search', api)}
+            getLayoutMenu={(api) => gridLayouts.menu('search', api)}
           />
         </div>
 
@@ -814,31 +589,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
                       traders={traders}
                       users={users}
                       isMutating={isMutating}
-                      targetTraderId={targetTraderId}
-                      setTargetTraderId={setTargetTraderId}
-                      targetContactOwnerId={targetContactOwnerId}
-                      setTargetContactOwnerId={setTargetContactOwnerId}
-                      run={runSingle}
-                      runBulk={runBulk}
-                      ownership={{
-                        pickUp: onPickUp,
-                        release: onRelease,
-                        assign: onAssign,
-                        takeOver: onTakeOver,
-                      }}
-                      quote={{
-                        changeMode: onChangeMode,
-                        withdraw: onWithdraw,
-                      }}
-                      lifecycle={{
-                        present: onPresent,
-                        unpresent: onUnpresent,
-                        close: onClose,
-                        cancel: onCancel,
-                        reopen: onReopen,
-                        correctOutcome: onCorrectOutcome,
-                      }}
-                      contactOwner={{ change: onChangeContactOwner }}
+                      controller={operationController}
                     />
                   ),
                 },
@@ -848,29 +599,18 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
                   children: (
                     <TraderPricerPane
                       selected={selected}
-                      scratch={scratch}
-                      setScratch={setScratch}
-                      setScratchIdentity={setScratchIdentity}
-                      result={scratchResult}
-                      provenance={pricerProvenance}
-                      sourceRow={sourceRow}
-                      canApply={canApplyPricer}
-                      busy={pricerBusy}
-                      onLoad={loadSelected}
-                      onCalculate={() => void calculateScratch()}
-                      onApply={() => void applyPricer()}
-                      onClear={() => {
-                        setScratch({
-                          securityId: '',
-                          notional: null,
-                          settlementDate: '',
-                          driver: 'Price',
-                          value: 100,
-                          slide: 0,
-                        })
-                        setScratchResult(null)
-                        setPricerProvenance(null)
-                      }}
+                      scratch={pricerController.scratch}
+                      setScratch={pricerController.setScratch}
+                      setScratchIdentity={pricerController.setIdentity}
+                      result={pricerController.result}
+                      provenance={pricerController.provenance}
+                      sourceRow={pricerController.sourceRow}
+                      canApply={pricerController.canApply}
+                      busy={pricerController.busy}
+                      onLoad={pricerController.loadSelected}
+                      onCalculate={() => void pricerController.calculate()}
+                      onApply={() => void pricerController.apply()}
+                      onClear={pricerController.clear}
                     />
                   ),
                 },
@@ -930,14 +670,10 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
             rowHeight={28}
             headerHeight={30}
             defaultColDef={{ resizable: true }}
-            onGridReady={({ api }) => {
-              confirmGrid.current = api
-              defaultColumnGroupStates.current.confirm = initializeGridLayout(
-                api,
-                confirmGridConfigJson,
-              )
-            }}
-            getContextMenuItems={({ api }) => [layoutMenu('confirm', api)]}
+            onGridReady={({ api }) => gridLayouts.initialize('confirm', api)}
+            getContextMenuItems={({ api }) => [
+              gridLayouts.menu('confirm', api),
+            ]}
           />
         </div>
       </Modal>

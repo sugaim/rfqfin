@@ -2,20 +2,12 @@ import type { ReactElement } from 'react'
 import { Descriptions, Empty, Tag } from 'antd'
 import type { TraderRfq } from '@/services/api'
 import { traderRouting, traderState } from '@/features/trader/traderModel'
-import {
-  BulkActions,
-  ContactOwnerActions,
-  OwnershipActions,
-  QuoteActions,
-  type TraderBulkRunner,
-  type TraderContactOwnerActions,
-  type TraderLifecycleActions,
-  type TraderOperationRunner,
-  type TraderOwnershipActions,
-  type TraderQuoteActions,
-} from '@/features/trader/TraderOperationSections'
-
-type UserOption = { userId: string; name: string }
+import type { UserOption } from '@/features/trader/traderContracts'
+import { OwnershipActions } from '@/features/trader/operations/OwnershipActions'
+import { QuoteActions } from '@/features/trader/operations/QuoteActions'
+import { ContactOwnerActions } from '@/features/trader/operations/ContactOwnerActions'
+import { BulkActions } from '@/features/trader/operations/BulkActions'
+import type { TraderOperationController } from '@/features/trader/operations/useTraderOperationIntents'
 
 interface TraderOperationsPaneProps {
   selected?: TraderRfq
@@ -24,16 +16,7 @@ interface TraderOperationsPaneProps {
   traders: UserOption[]
   users: UserOption[]
   isMutating: boolean
-  targetTraderId?: string
-  setTargetTraderId: (value?: string) => void
-  targetContactOwnerId?: string
-  setTargetContactOwnerId: (value?: string) => void
-  run: TraderOperationRunner
-  runBulk: TraderBulkRunner
-  ownership: TraderOwnershipActions
-  quote: TraderQuoteActions
-  lifecycle: TraderLifecycleActions
-  contactOwner: TraderContactOwnerActions
+  controller: TraderOperationController
 }
 
 export function TraderOperationsPane({
@@ -43,16 +26,7 @@ export function TraderOperationsPane({
   traders,
   users,
   isMutating,
-  targetTraderId,
-  setTargetTraderId,
-  targetContactOwnerId,
-  setTargetContactOwnerId,
-  run,
-  runBulk,
-  ownership,
-  quote,
-  lifecycle,
-  contactOwner,
+  controller,
 }: TraderOperationsPaneProps): ReactElement {
   if (!selected)
     return (
@@ -92,27 +66,24 @@ export function TraderOperationsPane({
         currentUserId={currentUserId}
         traders={traders}
         isMutating={isMutating}
-        targetTraderId={targetTraderId}
-        onTargetTraderChange={setTargetTraderId}
-        run={run}
-        actions={ownership}
+        targetTraderId={controller.targetTraderId}
+        onTargetTraderChange={controller.setTargetTraderId}
+        intents={controller.ownership}
       />
       <QuoteActions
         row={selected}
         currentUserId={currentUserId}
         isMutating={isMutating}
-        run={run}
-        actions={quote}
+        intents={controller.quote}
       />
       {selected.contactOwnerId === currentUserId && (
         <ContactOwnerActions
           row={selected}
           users={users}
-          targetContactOwnerId={targetContactOwnerId}
-          onTargetContactOwnerChange={setTargetContactOwnerId}
-          run={run}
-          lifecycle={lifecycle}
-          contactOwner={contactOwner}
+          targetContactOwnerId={controller.targetContactOwnerId}
+          onTargetContactOwnerChange={controller.setTargetContactOwnerId}
+          lifecycle={controller.lifecycle}
+          contactOwner={controller.contactOwner}
         />
       )}
       {selectedRows.length > 1 && (
@@ -120,8 +91,8 @@ export function TraderOperationsPane({
           rows={selectedRows}
           currentUserId={currentUserId}
           isMutating={isMutating}
-          targetTraderId={targetTraderId}
-          runBulk={runBulk}
+          targetTraderId={controller.targetTraderId}
+          intents={controller.bulk}
         />
       )}
     </div>
