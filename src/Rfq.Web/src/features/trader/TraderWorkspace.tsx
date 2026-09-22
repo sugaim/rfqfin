@@ -48,6 +48,7 @@ import type {
   TraderBulkCommand,
   TraderRefreshMode,
 } from '@/features/trader/traderModel'
+import { requiresPickUpConfirmation } from '@/features/trader/traderModel'
 
 export function TraderWorkspace() {
   const {
@@ -80,10 +81,9 @@ export function TraderWorkspace() {
   const [release, releaseState] = useReleaseRfqMutation()
   const [assign, assignState] = useAssignTraderMutation()
   const [takeOver, takeOverState] = useTakeOverRfqMutation()
-  const [calculate, calculateState] = useCalculateWorkingQuoteMutation()
+  const [calculate] = useCalculateWorkingQuoteMutation()
   const [changeMode, changeModeState] = useChangeWorkingQuoteModeMutation()
-  const [updateManual, updateManualState] =
-    useUpdateManualWorkingQuoteMutation()
+  const [updateManual] = useUpdateManualWorkingQuoteMutation()
   const [confirmQuote, confirmState] = useConfirmQuoteMutation()
   const [present, presentState] = usePresentQuoteMutation()
   const [unpresent, unpresentState] = useUnpresentQuoteMutation()
@@ -186,7 +186,7 @@ export function TraderWorkspace() {
           items: rows.map((row) => ({
             caseId: row.caseId,
             expectedVersion: row.currentVersion,
-            confirmed: false,
+            confirmed: requiresPickUpConfirmation(row, currentUserId),
           })),
         }).unwrap()
       case 'release':
@@ -238,9 +238,7 @@ export function TraderWorkspace() {
     releaseState,
     assignState,
     takeOverState,
-    calculateState,
     changeModeState,
-    updateManualState,
     confirmState,
     presentState,
     unpresentState,

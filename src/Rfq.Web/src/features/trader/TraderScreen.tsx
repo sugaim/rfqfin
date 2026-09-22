@@ -51,6 +51,7 @@ import {
   calculatedValue,
   canEditQuote,
   elapsedLabel,
+  isPickUpEligible,
   isConfirmable,
   patchConfirmedQuote,
   patchContactOwner,
@@ -63,6 +64,7 @@ import {
   searchDateRange,
   traderRouting,
   traderState,
+  requiresPickUpConfirmation,
   type CalcState,
   type PricerProvenance,
   type SearchDatePreset,
@@ -346,10 +348,7 @@ export function TraderScreen(props: TraderScreenProps) {
     isConfirmable(row, currentUserId),
   )
   const pickTargets = rfqs.filter(
-    (row) =>
-      row.assignedTraderId === currentUserId &&
-      !row.owned &&
-      ['Active', 'Presented'].includes(row.rfqStatus),
+    (row) => row.assignedTraderId === currentUserId && isPickUpEligible(row),
   )
   const calculating = Object.values(calcStates).some(
     (state) => state.status === 'calculating',
@@ -1600,6 +1599,21 @@ function OperationsPane({
   const mine = selected.assignedTraderId === currentUserId
   const quoted = selected.quoteStatus === 'Quoted'
   const multi = selectedRows.length > 1
+  const pickUpRequiresConfirmation = requiresPickUpConfirmation(
+    selected,
+    currentUserId,
+  )
+  const bulkPickRows = selectedRows.filter(isPickUpEligible)
+  const otherAssignedBulkPickCount = bulkPickRows.filter((row) =>
+    requiresPickUpConfirmation(row, currentUserId),
+  ).length
+  const runPickUp = () =>
+    void onRun(
+      () => onPickUp(selected, pickUpRequiresConfirmation),
+      patchOwnership,
+      selected,
+    )
+  const runBulkPick = () => void onBulk('Bulk Pick', 'pick', bulkPickRows)
   return (
     <div className="trader-operations">
       <Descriptions
@@ -1627,20 +1641,21 @@ function OperationsPane({
       />
       <Typography.Text type="secondary">Ownership / routing</Typography.Text>
       <Space wrap>
-        <Button
-          size="small"
-          disabled={!open || selected.owned || isMutating}
-          onClick={() =>
-            void onRun(
-              () =>
-                onPickUp(selected, selected.assignedTraderId !== currentUserId),
-              patchOwnership,
-              selected,
-            )
-          }
+        <Popconfirm
+          title={`Pick up Case ${selected.caseId} assigned to another trader?`}
+          disabled={!pickUpRequiresConfirmation}
+          onConfirm={runPickUp}
         >
-          Pick Up
-        </Button>
+          <Button
+            size="small"
+            disabled={!open || selected.owned || isMutating}
+            onClick={() => {
+              if (!pickUpRequiresConfirmation) runPickUp()
+            }}
+          >
+            Pick Up
+          </Button>
+        </Popconfirm>
         <Button
           size="small"
           disabled={!open || !selected.owned || !mine || isMutating}
@@ -1858,12 +1873,21 @@ function OperationsPane({
             Selected ({selectedRows.length})
           </Typography.Text>
           <Space wrap>
-            <Button
-              size="small"
-              onClick={() => void onBulk('Bulk Pick', 'pick', selectedRows)}
+            <Popconfirm
+              title={`Pick up ${bulkPickRows.length} selected RFQs, including ${otherAssignedBulkPickCount} assigned to another trader?`}
+              disabled={otherAssignedBulkPickCount === 0}
+              onConfirm={runBulkPick}
             >
-              Pick
-            </Button>
+              <Button
+                size="small"
+                disabled={!bulkPickRows.length || isMutating}
+                onClick={() => {
+                  if (otherAssignedBulkPickCount === 0) runBulkPick()
+                }}
+              >
+                Pick
+              </Button>
+            </Popconfirm>
             <Button
               size="small"
               onClick={() =>

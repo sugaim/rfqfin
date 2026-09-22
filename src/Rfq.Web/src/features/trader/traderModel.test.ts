@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { TraderRfq } from '@/services/api'
 import {
   attentionClass,
+  isPickUpEligible,
   isConfirmable,
+  requiresPickUpConfirmation,
   sameSourceTerms,
   searchDateRange,
   traderState,
@@ -80,6 +82,19 @@ describe('Trader presentation model', () => {
         'trader-a',
       ),
     ).toBe(true)
+  })
+
+  it('classifies Pick Up eligibility and confirmation by assignment', () => {
+    expect(isPickUpEligible(row())).toBe(true)
+    expect(requiresPickUpConfirmation(row(), 'trader-a')).toBe(false)
+    expect(
+      requiresPickUpConfirmation(
+        row({ assignedTraderId: 'trader-b' }),
+        'trader-a',
+      ),
+    ).toBe(true)
+    expect(isPickUpEligible(row({ owned: true }))).toBe(false)
+    expect(isPickUpEligible(row({ rfqStatus: 'Hit' }))).toBe(false)
   })
 
   it('builds preset-only desk date ranges and validates Pricer provenance', () => {

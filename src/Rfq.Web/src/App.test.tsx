@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -1094,6 +1095,118 @@ describe('TraderScreen', () => {
     )
   }, 10_000)
 
+  it('picks up a self-assigned unowned RFQ without confirmation', async () => {
+    const onPickUp = vi.fn().mockResolvedValue(undefined)
+    render(<TraderScreen {...traderProps} onPickUp={onPickUp} />)
+
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Up' }))
+
+    await waitFor(() =>
+      expect(onPickUp).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 201 }),
+        false,
+      ),
+    )
+    expect(
+      screen.queryByText(/assigned to another trader/),
+    ).not.toBeInTheDocument()
+  })
+
+  it('confirms before picking up another trader assigned unowned RFQ', async () => {
+    const onPickUp = vi.fn().mockResolvedValue(undefined)
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{ ...traderRow, assignedTraderId: 'trader-b' }]}
+        onPickUp={onPickUp}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Up' }))
+
+    expect(onPickUp).not.toHaveBeenCalled()
+    expect(
+      await screen.findByText(/assigned to another trader/),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    await waitFor(() =>
+      expect(onPickUp).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 201 }),
+        true,
+      ),
+    )
+  }, 10_000)
+
+  it('keeps Pick Up unavailable for another trader owned RFQ', () => {
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{ ...traderRow, assignedTraderId: 'trader-b', owned: true }]}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+
+    expect(screen.getByRole('button', { name: 'Pick Up' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Take Over' })).toBeEnabled()
+  })
+
+  it('confirms a mixed bulk Pick and submits only eligible unowned rows', async () => {
+    const onBulk = vi.fn().mockResolvedValue([])
+    const otherAssigned = {
+      ...traderRow,
+      caseId: 202,
+      clientId: 'client-002',
+      clientName: 'Client Two',
+      assignedTraderId: 'trader-b',
+    }
+    const otherOwned = {
+      ...traderRow,
+      caseId: 203,
+      clientId: 'client-003',
+      clientName: 'Client Three',
+      assignedTraderId: 'trader-b',
+      owned: true,
+    }
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[traderRow, otherAssigned, otherOwned]}
+        onBulk={onBulk}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(/client-001 Client One/))
+    fireEvent.click(screen.getByText(/client-002 Client Two/), {
+      ctrlKey: true,
+    })
+    fireEvent.click(screen.getByText(/client-003 Client Three/), {
+      ctrlKey: true,
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Pick$/ }))
+
+    expect(onBulk).not.toHaveBeenCalled()
+    expect(
+      await screen.findByText(/including 1 assigned to another trader/),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    await waitFor(() =>
+      expect(onBulk).toHaveBeenCalledWith(
+        'pick',
+        [
+          expect.objectContaining({ caseId: 201 }),
+          expect.objectContaining({ caseId: 202 }),
+        ],
+        5,
+        undefined,
+      ),
+    )
+  }, 10_000)
+
   it('lets the owner switch the working quote to manual mode', async () => {
     const onChangeMode = vi.fn().mockResolvedValue(undefined)
     render(
@@ -1135,6 +1248,151 @@ describe('TraderScreen', () => {
         0,
       ),
     )
+  })
+
+  it('locks only the calculating Case while unrelated RFQs remain operable', async () => {
+    let resolveCalculation!: () => void
+    const calculation = new Promise<void>((resolve) => {
+      resolveCalculation = resolve
+    })
+    const onCalculate = vi.fn().mockReturnValue(calculation)
+    const onRelease = vi.fn().mockResolvedValue(undefined)
+    const caseA = { ...traderRow, owned: true }
+    const caseB = {
+      ...traderRow,
+      caseId: 202,
+      clientId: 'client-002',
+      clientName: 'Client Two',
+      owned: true,
+    }
+    render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[caseA, caseB]}
+        onCalculate={onCalculate}
+        onRelease={onRelease}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
+
+    expect(onCalculate).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('grid-201-price')).toHaveAttribute(
+      'data-editable',
+      'false',
+    )
+    expect(screen.getByTestId('grid-202-price')).toHaveAttribute(
+      'data-editable',
+      'true',
+    )
+    expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
+
+    fireEvent.click(screen.getByText(/client-002 Client Two/))
+    const release = screen.getByRole('button', { name: 'Release' })
+    expect(release).toBeEnabled()
+    fireEvent.click(release)
+    await waitFor(() =>
+      expect(onRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ caseId: 202 }),
+      ),
+    )
+
+    resolveCalculation()
+    await waitFor(() =>
+      expect(screen.getByTestId('grid-201-price')).toHaveAttribute(
+        'data-editable',
+        'true',
+      ),
+    )
+  }, 10_000)
+
+  it('ignores a calculation response from an obsolete refresh generation', async () => {
+    let resolveCalculation!: (value: {
+      caseId: number
+      revisionId: string
+      mode: 'Calculated'
+      calculated: null
+      manual: null
+      version: number
+      currentVersion: number
+    }) => void
+    const calculation = new Promise<{
+      caseId: number
+      revisionId: string
+      mode: 'Calculated'
+      calculated: null
+      manual: null
+      version: number
+      currentVersion: number
+    }>((resolve) => {
+      resolveCalculation = resolve
+    })
+    const onPatchRow = vi.fn()
+    const onReload = vi.fn()
+    const { rerender } = render(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{ ...traderRow, owned: true }]}
+        refreshGeneration={0}
+        onCalculate={() => calculation}
+        onPatchRow={onPatchRow}
+        onReload={onReload}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
+    rerender(
+      <TraderScreen
+        {...traderProps}
+        rfqs={[{ ...traderRow, owned: true }]}
+        refreshGeneration={1}
+        onCalculate={() => calculation}
+        onPatchRow={onPatchRow}
+        onReload={onReload}
+      />,
+    )
+    resolveCalculation({
+      caseId: 201,
+      revisionId: traderRow.currentRevisionId,
+      mode: 'Calculated',
+      calculated: null,
+      manual: null,
+      version: 2,
+      currentVersion: 4,
+    })
+
+    await act(async () => {
+      await calculation
+    })
+    expect(onPatchRow).not.toHaveBeenCalled()
+    expect(onReload).not.toHaveBeenCalled()
+  })
+
+  it('unlocks the Case after a calculation timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <TraderScreen
+          {...traderProps}
+          rfqs={[{ ...traderRow, owned: true }]}
+          onCalculate={() => new Promise(() => undefined)}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_001)
+      })
+
+      expect(screen.getByTestId('grid-201-calcStatus')).toHaveTextContent('!')
+      expect(screen.getByTestId('grid-201-price')).toHaveAttribute(
+        'data-editable',
+        'true',
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('patches an authoritative calculation response without refreshing while Paused', async () => {

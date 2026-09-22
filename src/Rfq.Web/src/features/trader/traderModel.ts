@@ -83,6 +83,17 @@ export function canEditQuote(
   )
 }
 
+export function isPickUpEligible(row: TraderRfq) {
+  return !row.owned && ['Active', 'Presented'].includes(row.rfqStatus)
+}
+
+export function requiresPickUpConfirmation(
+  row: TraderRfq,
+  currentUserId: string,
+) {
+  return row.assignedTraderId !== currentUserId
+}
+
 export function isConfirmable(row: TraderRfq, currentUserId: string) {
   if (!canEditQuote(row, currentUserId)) return false
   return row.workingQuoteMode === 'Calculated'
