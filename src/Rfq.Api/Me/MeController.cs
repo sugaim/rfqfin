@@ -11,6 +11,7 @@ namespace Rfq.Api.Me;
 public sealed class MeController(
     ICurrentUser currentUser,
     IQuoteExpirySettings expirySettings,
+    IQuoteModeSettings quoteModeSettings,
     IGridConfigStore gridConfigs) : ControllerBase
 {
     [HttpGet]
@@ -29,6 +30,18 @@ public sealed class MeController(
             await expirySettings.SaveAsync(currentUser.User.UserId,
                 QuoteApiMapper.ToDomain(request), cancellationToken));
 
+    [HttpGet("settings/default-quote-mode")]
+    public async Task<QuoteModeResponse> GetDefaultQuoteMode(
+        CancellationToken cancellationToken) => new(QuoteApiMapper.ToApi(
+            await quoteModeSettings.GetAsync(currentUser.User.UserId, cancellationToken)));
+
+    [HttpPut("settings/default-quote-mode")]
+    public async Task<QuoteModeResponse> PutDefaultQuoteMode(
+        QuoteModeRequest request,
+        CancellationToken cancellationToken) => new(QuoteApiMapper.ToApi(
+            await quoteModeSettings.SaveAsync(currentUser.User.UserId,
+                QuoteApiMapper.ToDomain(request.Mode), cancellationToken)));
+
     [HttpGet("grid-configs/{screenId}/{configKey}")]
     public async Task<ActionResult<GridConfigResponse>> GetGridConfig(
         string screenId, string configKey, CancellationToken cancellationToken)
@@ -46,6 +59,8 @@ public sealed class MeController(
 
 public enum UserRoleValue { Sales, Trader }
 public sealed record MeResponse(string UserId, IReadOnlyList<UserRoleValue> Roles, string DeskId);
+public sealed record QuoteModeRequest([Required] QuoteMode Mode);
+public sealed record QuoteModeResponse(QuoteMode Mode);
 public sealed record GridConfigRequest(
     [Range(1, int.MaxValue)] int Version,
     JsonElement Config);

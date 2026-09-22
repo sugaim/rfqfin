@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Rfq.Application;
 using Rfq.Domain;
 
 namespace Rfq.Api;
@@ -37,8 +38,7 @@ public sealed class ApiErrorMiddleware(
             var detail = !isExpected
                 ? "An unexpected error occurred."
                 : exception.Message;
-            context.Response.StatusCode = status;
-            await context.Response.WriteAsJsonAsync(new ProblemDetails
+            var problem = new ProblemDetails
             {
                 Status = status,
                 Title = code,
@@ -48,7 +48,15 @@ public sealed class ApiErrorMiddleware(
                     ["code"] = code,
                     ["traceId"] = context.TraceIdentifier,
                 },
-            });
+            };
+            if (isExpected && exception is CalculationFailureException calculationFailure)
+            {
+                problem.Extensions["calculationErrorCode"] = calculationFailure.Code;
+                problem.Extensions["failureLogId"] = calculationFailure.FailureLogId;
+            }
+
+            context.Response.StatusCode = status;
+            await context.Response.WriteAsJsonAsync(problem);
         }
     }
 

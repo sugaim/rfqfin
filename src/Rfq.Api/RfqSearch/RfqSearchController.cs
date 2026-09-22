@@ -26,7 +26,8 @@ public sealed record RfqSearchItemResponse(long CaseId, DateTimeOffset CreatedAt
     string ClientId, string ClientName, string SecurityId, string SecurityName,
     string CategoryId, RfqStatusValue Status, QuoteStatusValue? QuoteStatus,
     string ContactOwnerId, string? SalesId, string AssignedTraderId,
-    decimal? Notional, DateOnly? SettlementDate);
+    decimal? Notional, DateOnly? SettlementDate,
+    decimal? Price, decimal? FinalSimpleYield, decimal? Ysc);
 
 public static class RfqSearchApiMapper
 {
@@ -48,5 +49,5 @@ public static class RfqSearchApiMapper
         Enum.Parse<RfqStatusValue>(value.Status.ToString()),
         value.QuoteStatus is null ? null : Enum.Parse<QuoteStatusValue>(value.QuoteStatus.Value.ToString()),
         value.ContactOwnerId.Value, value.SalesId?.Value, value.AssignedTraderId.Value,
-        value.Notional, value.SettlementDate);
+        value.Notional, value.SettlementDate, value.Price, value.FinalSimpleYield, value.Ysc);
 }

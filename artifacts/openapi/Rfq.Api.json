@@ -2963,6 +2963,82 @@
         }
       }
     },
+    "/api/me/settings/default-quote-mode": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteModeResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteModeResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteModeResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteModeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteModeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteModeResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteModeResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteModeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me/grid-configs/{screenId}/{configKey}": {
       "get": {
         "tags": [
@@ -3824,7 +3900,10 @@
           "finalSimpleYield",
           "internalYield",
           "gSpread",
-          "asw"
+          "asw",
+          "ysc",
+          "iSpread",
+          "zSpread"
         ],
         "type": "object",
         "properties": {
@@ -3864,6 +3943,18 @@
             "format": "double"
           },
           "asw": {
+            "type": "number",
+            "format": "double"
+          },
+          "ysc": {
+            "type": "number",
+            "format": "double"
+          },
+          "iSpread": {
+            "type": "number",
+            "format": "double"
+          },
+          "zSpread": {
             "type": "number",
             "format": "double"
           }
@@ -3881,7 +3972,10 @@
           "finalSimpleYield",
           "internalYield",
           "gSpread",
-          "asw"
+          "asw",
+          "ysc",
+          "iSpread",
+          "zSpread"
         ],
         "type": "object",
         "properties": {
@@ -3921,6 +4015,18 @@
             "format": "double"
           },
           "asw": {
+            "type": "number",
+            "format": "double"
+          },
+          "ysc": {
+            "type": "number",
+            "format": "double"
+          },
+          "iSpread": {
+            "type": "number",
+            "format": "double"
+          },
+          "zSpread": {
             "type": "number",
             "format": "double"
           }
@@ -5495,6 +5601,28 @@
       "QuoteMode": {
         "type": "integer"
       },
+      "QuoteModeRequest": {
+        "required": [
+          "mode"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/QuoteMode"
+          }
+        }
+      },
+      "QuoteModeResponse": {
+        "required": [
+          "mode"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/QuoteMode"
+          }
+        }
+      },
       "QuoteRequestReasonValue": {
         "type": "integer"
       },
@@ -5607,7 +5735,10 @@
           "salesId",
           "assignedTraderId",
           "notional",
-          "settlementDate"
+          "settlementDate",
+          "price",
+          "finalSimpleYield",
+          "ysc"
         ],
         "type": "object",
         "properties": {
@@ -5658,6 +5789,21 @@
           "settlementDate": {
             "type": "string",
             "format": "date",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "finalSimpleYield": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "ysc": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         }
@@ -6101,13 +6247,15 @@
           "currentVersion",
           "settlementDate",
           "notional",
+          "salesAndTradingMessage",
           "workingQuoteMode",
           "calculated",
           "manual",
           "workingQuoteVersion",
           "traderMemo",
           "traderMemoVersion",
-          "createdAt"
+          "createdAt",
+          "stateSince"
         ],
         "type": "object",
         "properties": {
@@ -6194,6 +6342,9 @@
             "format": "double",
             "nullable": true
           },
+          "salesAndTradingMessage": {
+            "type": "string"
+          },
           "workingQuoteMode": {
             "$ref": "#/components/schemas/QuoteMode"
           },
@@ -6215,6 +6366,10 @@
             "format": "int64"
           },
           "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "stateSince": {
             "type": "string",
             "format": "date-time"
           }

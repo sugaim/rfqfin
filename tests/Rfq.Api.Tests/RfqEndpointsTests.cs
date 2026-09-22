@@ -141,6 +141,8 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         var row = Assert.Single(rows!, item => item.CaseId == created.CaseId);
         Assert.False(row.Owned);
         Assert.Equal("trader-a", row.AssignedTraderId);
+        Assert.Equal(string.Empty, row.SalesAndTradingMessage);
+        Assert.NotEqual(default, row.StateSince);
 
         var pickUp = await traderA.PostAsJsonAsync(
             $"/api/rfqs/{created.CaseId}/ownership/pick-up",
@@ -165,6 +167,9 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal(
             calculated.Calculated?.BaseSimpleYield + 0.03m,
             calculated.Calculated?.FinalSimpleYield);
+        Assert.NotNull(calculated.Calculated?.Ysc);
+        Assert.NotNull(calculated.Calculated?.ISpread);
+        Assert.NotNull(calculated.Calculated?.ZSpread);
 
         var failedCalculation = await traderA.PutAsJsonAsync(
             $"/api/rfqs/{created.CaseId}/working-quote/calculate",
@@ -177,6 +182,18 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
                 ExpectedWorkingQuoteVersion = calculated.Version,
             });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, failedCalculation.StatusCode);
+        using (var failureDocument = JsonDocument.Parse(
+            await failedCalculation.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal("CalculationFailure",
+                failureDocument.RootElement.GetProperty("code").GetString());
+            Assert.False(string.IsNullOrWhiteSpace(failureDocument.RootElement
+                .GetProperty("calculationErrorCode").GetString()));
+            Assert.False(string.IsNullOrWhiteSpace(failureDocument.RootElement
+                .GetProperty("failureLogId").GetString()));
+            Assert.False(string.IsNullOrWhiteSpace(failureDocument.RootElement
+                .GetProperty("traceId").GetString()));
+        }
         await using (var failureScope = fixture.Factory.Services.CreateAsyncScope())
         {
             var dbContext = failureScope.ServiceProvider.GetRequiredService<RfqDbContext>();
@@ -502,6 +519,14 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         Assert.Equal("None", expiry?.Type);
         Assert.Null(expiry?.Minutes);
 
+        var modeResponse = await client.PutAsJsonAsync(
+            "/api/me/settings/default-quote-mode", new { Mode = "Manual" });
+        Assert.Equal(HttpStatusCode.OK, modeResponse.StatusCode);
+        Assert.Equal("Manual", (await modeResponse.Content
+            .ReadFromJsonAsync<QuoteModeBody>())?.Mode);
+        Assert.Equal("Manual", (await client.GetFromJsonAsync<QuoteModeBody>(
+            "/api/me/settings/default-quote-mode"))?.Mode);
+
         var gridResponse = await client.PutAsJsonAsync(
             "/api/me/grid-configs/sales/main",
             new { Version = 1, Config = new { Columns = Array.Empty<object>() } });
@@ -695,7 +720,9 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         string AssignedTraderId,
         bool Owned,
         long CurrentVersion,
-        long WorkingQuoteVersion)
+        long WorkingQuoteVersion,
+        string SalesAndTradingMessage,
+        DateTimeOffset StateSince)
     {
         public long ExpectedVersion => CurrentVersion;
     }
@@ -725,13 +752,17 @@ public sealed class RfqEndpointsTests(RfqApiFixture fixture)
         decimal FinalSimpleYield,
         decimal InternalYield,
         decimal GSpread,
-        decimal Asw);
+        decimal Asw,
+        decimal Ysc,
+        decimal ISpread,
+        decimal ZSpread);
 
     private sealed record ManualQuoteBody(
         decimal? Price,
         decimal? FinalSimpleYield);
 
     private sealed record QuoteExpiryBody(string Type, int? Minutes);
+    private sealed record QuoteModeBody(string Mode);
     private sealed record RfqSearchBody(IReadOnlyList<RfqSearchItemBody> Items,
         bool RequiresNarrowing);
     private sealed record RfqSearchItemBody(long CaseId);

@@ -52,7 +52,10 @@ public sealed record CalculatedQuotePayload
         decimal finalSimpleYield,
         decimal internalYield,
         decimal gSpread,
-        decimal asw)
+        decimal asw,
+        decimal ysc = 0m,
+        decimal iSpread = 0m,
+        decimal zSpread = 0m)
     {
         Driver = driver;
         DriverValue = driverValue;
@@ -64,6 +67,9 @@ public sealed record CalculatedQuotePayload
         InternalYield = internalYield;
         GSpread = gSpread;
         Asw = asw;
+        Ysc = ysc;
+        ISpread = iSpread;
+        ZSpread = zSpread;
     }
 
     public CalculationDriver Driver { get; }
@@ -76,6 +82,9 @@ public sealed record CalculatedQuotePayload
     public decimal InternalYield { get; }
     public decimal GSpread { get; }
     public decimal Asw { get; }
+    public decimal Ysc { get; }
+    public decimal ISpread { get; }
+    public decimal ZSpread { get; }
 }
 
 public sealed record ManualQuotePayload
@@ -90,4 +99,14 @@ public sealed record ManualQuotePayload
     public decimal? FinalSimpleYield { get; }
 }
 
-public enum CalculationDriver { Price, BbgYield, SimpleYield, GSpread }
+public enum CalculationDriver
+{
+    Price,
+    BbgYield,
+    SimpleYield,
+    Ysc,
+    GSpread,
+    Asw,
+    ISpread,
+    ZSpread,
+}

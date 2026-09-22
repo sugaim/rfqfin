@@ -11,7 +11,8 @@ public sealed class ConfirmNewRfq(
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
-    IRfqEventSink eventSink)
+    IRfqEventSink eventSink,
+    IQuoteModeSettings? quoteModeSettings = null)
 {
     public async Task<InitialRfqResult> ExecuteAsync(
         CreateDraftCommand command,
@@ -26,8 +27,11 @@ public sealed class ConfirmNewRfq(
             businessDate, currentUser.User.UserId, now, rfqCase.CurrentRevision.Version);
 
         rfqCases.Add(rfqCase);
+        var defaultMode = quoteModeSettings is null
+            ? WorkingQuoteMode.Calculated
+            : await quoteModeSettings.GetAsync(rfqCase.AssignedTraderId, cancellationToken);
         workingQuotes.Add(WorkingQuoteFactory.CreateInitialFor(
-            rfqCase, currentUser.User.UserId, now));
+            rfqCase, currentUser.User.UserId, now, defaultMode));
         eventSink.Record(new RfqTransition(
             RfqTransitionKind.RevisionConfirmed,
             rfqCase.CaseId,

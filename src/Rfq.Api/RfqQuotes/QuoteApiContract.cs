@@ -6,7 +6,10 @@ namespace Rfq.Api.RfqQuotes;
 
 public enum QuoteExpiryType { None, After }
 public enum QuoteMode { Calculated, Manual }
-public enum CalculationDriverValue { Price, BbgYield, SimpleYield, GSpread }
+public enum CalculationDriverValue
+{
+    Price, BbgYield, SimpleYield, Ysc, GSpread, Asw, ISpread, ZSpread
+}
 
 public sealed record QuoteExpiryRequest(
     [Required] QuoteExpiryType? Type,
@@ -17,7 +20,8 @@ public sealed record QuoteExpiryResponse(QuoteExpiryType Type, int? Minutes);
 public sealed record CalculatedQuoteResponse(
     CalculationDriverValue Driver, decimal DriverValue, decimal Price,
     decimal BbgYield, decimal BaseSimpleYield, decimal SimpleYieldSlide,
-    decimal FinalSimpleYield, decimal InternalYield, decimal GSpread, decimal Asw);
+    decimal FinalSimpleYield, decimal InternalYield, decimal GSpread, decimal Asw,
+    decimal Ysc, decimal ISpread, decimal ZSpread);
 
 public sealed record ManualQuoteResponse(decimal? Price, decimal? FinalSimpleYield);
 
@@ -50,12 +54,16 @@ public static class QuoteApiMapper
                 CalculationDriver.Price => CalculationDriverValue.Price,
                 CalculationDriver.BbgYield => CalculationDriverValue.BbgYield,
                 CalculationDriver.SimpleYield => CalculationDriverValue.SimpleYield,
+                CalculationDriver.Ysc => CalculationDriverValue.Ysc,
                 CalculationDriver.GSpread => CalculationDriverValue.GSpread,
+                CalculationDriver.Asw => CalculationDriverValue.Asw,
+                CalculationDriver.ISpread => CalculationDriverValue.ISpread,
+                CalculationDriver.ZSpread => CalculationDriverValue.ZSpread,
                 _ => throw new InvalidOperationException("Unknown Calculation Driver."),
             },
             payload.DriverValue, payload.Price, payload.BbgYield, payload.BaseSimpleYield,
             payload.SimpleYieldSlide, payload.FinalSimpleYield, payload.InternalYield,
-            payload.GSpread, payload.Asw);
+            payload.GSpread, payload.Asw, payload.Ysc, payload.ISpread, payload.ZSpread);
 
     public static ManualQuoteResponse? ToApi(ManualQuotePayload? payload) =>
         payload is null ? null : new(payload.Price, payload.FinalSimpleYield);
@@ -65,7 +73,11 @@ public static class QuoteApiMapper
         CalculationDriverValue.Price => CalculationDriver.Price,
         CalculationDriverValue.BbgYield => CalculationDriver.BbgYield,
         CalculationDriverValue.SimpleYield => CalculationDriver.SimpleYield,
+        CalculationDriverValue.Ysc => CalculationDriver.Ysc,
         CalculationDriverValue.GSpread => CalculationDriver.GSpread,
+        CalculationDriverValue.Asw => CalculationDriver.Asw,
+        CalculationDriverValue.ISpread => CalculationDriver.ISpread,
+        CalculationDriverValue.ZSpread => CalculationDriver.ZSpread,
         _ => throw new RfqRequestValidationException("Unknown Calculation Driver."),
     };
 

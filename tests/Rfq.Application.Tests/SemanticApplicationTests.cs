@@ -48,6 +48,27 @@ public sealed class SemanticApplicationTests
         Assert.Equal(result.RevisionId, working.Added[0].RevisionId);
         Assert.Equal(result.RevisionId, cases.Added!.CurrentRevision.RevisionId);
         Assert.Equal(1, uow.Saves);
+        Assert.Equal(WorkingQuoteMode.Calculated, working.Added[0].Mode);
+    }
+
+    [Fact]
+    public async Task Confirm_new_uses_the_assigned_traders_default_quote_mode()
+    {
+        var current = Current(Sales, UserRole.Sales);
+        var working = new WorkingRepository();
+        var settings = new QuoteModeSettings(WorkingQuoteMode.Manual);
+        var useCase = new ConfirmNewRfq(
+            Factory(current), new CaseRepository(null), working, new BusinessDate(),
+            new RfqAuthorization(), current, new UnitOfWork(), TimeProvider.System,
+            new RfqEvents(), settings);
+
+        await useCase.ExecuteAsync(Command());
+
+        Assert.Equal(Trader, settings.RequestedUserId);
+        var quote = Assert.Single(working.Added);
+        Assert.Equal(WorkingQuoteMode.Manual, quote.Mode);
+        Assert.NotNull(quote.Manual);
+        Assert.Null(quote.Manual.Price);
     }
 
     [Fact]
@@ -412,6 +433,14 @@ public sealed class SemanticApplicationTests
         public int Discards { get; private set; }
         public Task SaveChangesAsync(CancellationToken token = default) { Saves++; return Task.CompletedTask; }
         public void DiscardChanges() { Discards++; }
+    }
+    private sealed class QuoteModeSettings(WorkingQuoteMode mode) : IQuoteModeSettings
+    {
+        public UserId? RequestedUserId { get; private set; }
+        public Task<WorkingQuoteMode> GetAsync(UserId userId, CancellationToken token = default)
+        { RequestedUserId = userId; return Task.FromResult(mode); }
+        public Task<WorkingQuoteMode> SaveAsync(UserId userId, WorkingQuoteMode value,
+            CancellationToken token = default) => Task.FromResult(value);
     }
     private sealed class QuoteEvents : IQuoteEventSink { public void Record(QuoteTransition transition) { } }
     private sealed class RfqEvents : IRfqEventSink { public void Record(RfqTransition transition) { } }

@@ -10,7 +10,8 @@ public sealed class ConfirmAmendment(
     ICurrentUser currentUser,
     IRfqEventSink events,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IQuoteModeSettings? quoteModeSettings = null)
 {
     public async Task<AmendmentResult> ExecuteAsync(
         AmendmentItem command,
@@ -33,8 +34,11 @@ public sealed class ConfirmAmendment(
             ? null
             : await workingQuotes.GetAsync(
                 rfq.CurrentRevision.QuoteSeedRevisionId.Value, cancellationToken);
+        var defaultMode = quoteModeSettings is null
+            ? WorkingQuoteMode.Calculated
+            : await quoteModeSettings.GetAsync(rfq.AssignedTraderId, cancellationToken);
         workingQuotes.Add(WorkingQuoteFactory.CreateForAmendment(
-            rfq, seed, currentUser.User.UserId, now));
+            rfq, seed, currentUser.User.UserId, now, defaultMode));
         events.Record(new RfqTransition(
             RfqTransitionKind.RevisionConfirmed,
             rfq.CaseId,

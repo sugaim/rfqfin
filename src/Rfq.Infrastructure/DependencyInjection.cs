@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<IUserDirectory, PostgreSqlUserDirectory>();
         services.AddScoped<IUserCandidateQueries, EfCoreUserCandidateQueries>();
         services.AddScoped<IQuoteExpirySettings, EfCoreQuoteExpirySettings>();
+        services.AddScoped<IQuoteModeSettings, EfCoreQuoteModeSettings>();
         services.AddScoped<ICategoryRouting, EfCoreCategoryRouting>();
         services.AddScoped<IBusinessDateProvider, EfCoreBusinessDateProvider>();
         services.AddScoped<IDeskLocalDateResolver, EfCoreDeskLocalDateResolver>();

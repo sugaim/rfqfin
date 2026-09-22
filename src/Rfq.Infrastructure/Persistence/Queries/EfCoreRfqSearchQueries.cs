@@ -55,9 +55,56 @@ public sealed class EfCoreRfqSearchQueries(
                 UserId.Create(item.Current.ContactOwnerId),
                 item.SalesId == null ? null : UserId.Create(item.SalesId),
                 UserId.Create(item.Current.AssignedTraderId),
-                item.Current.CurrentRevision.Notional, item.Current.CurrentRevision.SettlementDate))
+                item.Current.CurrentRevision.Notional, item.Current.CurrentRevision.SettlementDate,
+                null, null, null))
             .ToListAsync(cancellationToken);
-        return new(rows.Take(ResultCap).ToArray(), rows.Count > ResultCap);
+        var cappedRows = rows.Take(ResultCap).ToArray();
+        var caseIds = cappedRows.Select(item => item.CaseId.Value).ToArray();
+        var quoteRefs = await dbContext.RfqCases.AsNoTracking()
+            .Where(item => caseIds.Contains(item.CaseId))
+            .Select(item => new SearchQuoteRef(item.CaseId,
+                item.Current.CurrentRevisionId,
+                item.Current.CurrentQuoteId ?? item.Current.ClosedQuoteId))
+            .ToListAsync(cancellationToken);
+        var revisionIds = quoteRefs.Select(item => item.RevisionId).Distinct().ToArray();
+        var quoteIds = quoteRefs.Where(item => item.QuoteId != null)
+            .Select(item => item.QuoteId!.Value).Distinct().ToArray();
+        var workingQuotes = await dbContext.WorkingQuotes.AsNoTracking()
+            .Where(item => revisionIds.Contains(item.RevisionId))
+            .ToDictionaryAsync(item => item.RevisionId, cancellationToken);
+        var confirmedQuotes = await dbContext.ConfirmedQuotes.AsNoTracking()
+            .Where(item => quoteIds.Contains(item.QuoteId))
+            .ToDictionaryAsync(item => item.QuoteId, cancellationToken);
+        var quoteRefsByCase = quoteRefs.ToDictionary(item => item.CaseId);
+
+        var projected = cappedRows.Select(row =>
+        {
+            var reference = quoteRefsByCase[row.CaseId.Value];
+            QuoteSummary summary;
+            if (reference.QuoteId is { } quoteId
+                && confirmedQuotes.TryGetValue(quoteId, out var confirmed))
+            {
+                summary = ToSummary(confirmed.Mode, confirmed.CalculatedPayloadJson,
+                    confirmed.ManualPayloadJson);
+            }
+            else if (workingQuotes.TryGetValue(reference.RevisionId, out var working))
+            {
+                summary = ToSummary(working.Mode, working.CalculatedPayloadJson,
+                    working.ManualPayloadJson);
+            }
+            else
+            {
+                summary = new QuoteSummary(null, null, null);
+            }
+
+            return row with
+            {
+                Price = summary.Price,
+                FinalSimpleYield = summary.FinalSimpleYield,
+                Ysc = summary.Ysc,
+            };
+        }).ToArray();
+        return new(projected, rows.Count > ResultCap);
     }
 
     private async Task<TimeZoneInfo> ResolveDeskTimeZoneAsync(
@@ -71,4 +118,25 @@ public sealed class EfCoreRfqSearchQueries(
             ?? throw new RfqInvariantException($"Desk '{deskId}' was not found.");
         return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
     }
+
+    private static QuoteSummary ToSummary(
+        WorkingQuoteMode mode,
+        string? calculatedJson,
+        string? manualJson)
+    {
+        if (mode == WorkingQuoteMode.Manual)
+        {
+            var manual = QuotePayloadPersistence.DeserializeManual(manualJson
+                ?? throw new DomainInvariantException("Manual quote payload is missing."));
+            return new QuoteSummary(manual.Price, manual.FinalSimpleYield, null);
+        }
+
+        if (calculatedJson is null)
+            return new QuoteSummary(null, null, null);
+        var calculated = QuotePayloadPersistence.DeserializeCalculated(calculatedJson);
+        return new QuoteSummary(calculated.Price, calculated.FinalSimpleYield, calculated.Ysc);
+    }
+
+    private sealed record SearchQuoteRef(long CaseId, Guid RevisionId, Guid? QuoteId);
+    private sealed record QuoteSummary(decimal? Price, decimal? FinalSimpleYield, decimal? Ysc);
 }

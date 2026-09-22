@@ -34,3 +34,15 @@ public sealed record SimpleYieldCalculationParameter(decimal Yield)
 
 public sealed record GSpreadCalculationParameter(decimal Spread)
     : CalculationParameter(Spread);
+
+public sealed record YscCalculationParameter(decimal Spread)
+    : CalculationParameter(Spread);
+
+public sealed record AswCalculationParameter(decimal Spread)
+    : CalculationParameter(Spread);
+
+public sealed record ISpreadCalculationParameter(decimal Spread)
+    : CalculationParameter(Spread);
+
+public sealed record ZSpreadCalculationParameter(decimal Spread)
+    : CalculationParameter(Spread);

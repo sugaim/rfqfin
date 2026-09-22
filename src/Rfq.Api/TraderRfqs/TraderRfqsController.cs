@@ -23,9 +23,10 @@ public sealed record TraderRfqResponse(long CaseId, string ClientId, string Clie
     Guid? CurrentQuoteId, Guid? ClosedQuoteId, DateTimeOffset? ConfirmedAt,
     DateTimeOffset? ExpiresAt, Guid? QuoteSeedRevisionId, string ContactOwnerId,
     string AssignedTraderId, bool Owned, long CurrentVersion, DateOnly? SettlementDate,
-    decimal? Notional, QuoteMode WorkingQuoteMode, CalculatedQuoteResponse? Calculated,
+    decimal? Notional, string SalesAndTradingMessage,
+    QuoteMode WorkingQuoteMode, CalculatedQuoteResponse? Calculated,
     ManualQuoteResponse? Manual, long WorkingQuoteVersion, string TraderMemo,
-    long TraderMemoVersion, DateTimeOffset CreatedAt);
+    long TraderMemoVersion, DateTimeOffset CreatedAt, DateTimeOffset StateSince);
 
 public static class TraderRfqsApiMapper
 {
@@ -38,9 +39,10 @@ public static class TraderRfqsApiMapper
         value.ConfirmedAt, value.ExpiresAt, value.QuoteSeedRevisionId?.Value,
         value.ContactOwnerId.Value, value.AssignedTraderId.Value, value.Owned,
         value.CurrentVersion.Value, value.SettlementDate, value.Notional,
+        value.SalesAndTradingMessage,
         QuoteApiMapper.ToApi(value.WorkingQuoteMode), QuoteApiMapper.ToApi(value.Calculated),
         QuoteApiMapper.ToApi(value.Manual), value.WorkingQuoteVersion.Value,
-        value.TraderMemo, value.TraderMemoVersion.Value, value.CreatedAt);
+        value.TraderMemo, value.TraderMemoVersion.Value, value.CreatedAt, value.StateSince);
     private static T Map<T>(Enum value) where T : struct, Enum => Enum.Parse<T>(value.ToString());
     private static T? MapNullable<T>(Enum? value) where T : struct, Enum =>
         value is null ? null : Map<T>(value);

@@ -1,3 +1,5 @@
+using Rfq.Domain;
+
 namespace Rfq.Infrastructure;
 
 internal sealed class MasterUserEntity
@@ -7,5 +9,5 @@ internal sealed class MasterUserEntity
     public string DeskId { get; set; } = string.Empty;
     public string[] Roles { get; set; } = [];
     public int? DefaultQuoteExpiryMinutes { get; set; }
+    public WorkingQuoteMode? DefaultQuoteMode { get; set; }
 }
-

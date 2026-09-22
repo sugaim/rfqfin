@@ -41,10 +41,26 @@ public sealed class MockCalculationClient : ICalculationClient
                 100m - (request.Parameter.Value - referenceYield) * 20m,
                 request.Parameter.Value,
                 (request.Parameter.Value - referenceYield) * 100m),
+            CalculationDriver.Ysc => (
+                100m - request.Parameter.Value / 5m,
+                referenceYield + (request.Parameter.Value - 1m) / 100m,
+                request.Parameter.Value - 1m),
             CalculationDriver.GSpread => (
                 100m - request.Parameter.Value / 5m,
                 referenceYield + request.Parameter.Value / 100m,
                 request.Parameter.Value),
+            CalculationDriver.Asw => (
+                100m - (request.Parameter.Value - 3m) / 5m,
+                referenceYield + (request.Parameter.Value - 3m) / 100m,
+                request.Parameter.Value - 3m),
+            CalculationDriver.ISpread => (
+                100m - (request.Parameter.Value - 2m) / 5m,
+                referenceYield + (request.Parameter.Value - 2m) / 100m,
+                request.Parameter.Value - 2m),
+            CalculationDriver.ZSpread => (
+                100m - (request.Parameter.Value - 1m) / 5m,
+                referenceYield + (request.Parameter.Value - 1m) / 100m,
+                request.Parameter.Value - 1m),
             _ => throw new ArgumentOutOfRangeException(nameof(request)),
         };
         var payload = new CalculatedQuotePayload(
@@ -57,7 +73,10 @@ public sealed class MockCalculationClient : ICalculationClient
             Round(baseSimpleYield + request.SimpleYieldSlide),
             Round(baseSimpleYield + 0.02m),
             Round(gSpread),
-            Round(gSpread + 3m));
+            Round(gSpread + 3m),
+            Round(gSpread + 1m),
+            Round(gSpread + 2m),
+            Round(gSpread + 1m));
         return new CalculationSuccess(request.RequestId, payload);
     }
 

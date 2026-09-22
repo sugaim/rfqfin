@@ -21,6 +21,9 @@ internal static class QuotePayloadPersistence
             InternalYield = payload.InternalYield,
             GSpread = payload.GSpread,
             Asw = payload.Asw,
+            Ysc = payload.Ysc,
+            ISpread = payload.ISpread,
+            ZSpread = payload.ZSpread,
         });
 
     internal static string Serialize(ManualQuotePayload payload) =>
@@ -61,14 +64,18 @@ internal static class QuotePayloadPersistence
     private static CalculatedQuotePayload From(CalculatedQuotePayloadDtoV1 dto) => new(
         ParseDriver(dto.Driver), dto.DriverValue, dto.Price, dto.BbgYield,
         dto.BaseSimpleYield, dto.SimpleYieldSlide, dto.FinalSimpleYield,
-        dto.InternalYield, dto.GSpread, dto.Asw);
+        dto.InternalYield, dto.GSpread, dto.Asw, dto.Ysc, dto.ISpread, dto.ZSpread);
 
     private static string DriverCode(CalculationDriver driver) => driver switch
     {
         CalculationDriver.Price => "price",
         CalculationDriver.BbgYield => "bbg-yield",
         CalculationDriver.SimpleYield => "simple-yield",
+        CalculationDriver.Ysc => "ysc",
         CalculationDriver.GSpread => "g-spread",
+        CalculationDriver.Asw => "asw",
+        CalculationDriver.ISpread => "i-spread",
+        CalculationDriver.ZSpread => "z-spread",
         _ => throw new DomainInvariantException($"Unsupported calculation driver '{driver}'."),
     };
 
@@ -77,7 +84,11 @@ internal static class QuotePayloadPersistence
         "price" => CalculationDriver.Price,
         "bbg-yield" => CalculationDriver.BbgYield,
         "simple-yield" => CalculationDriver.SimpleYield,
+        "ysc" => CalculationDriver.Ysc,
         "g-spread" => CalculationDriver.GSpread,
+        "asw" => CalculationDriver.Asw,
+        "i-spread" => CalculationDriver.ISpread,
+        "z-spread" => CalculationDriver.ZSpread,
         _ => throw new DomainInvariantException(
             $"Persisted calculated quote driver '{value}' is invalid."),
     };
@@ -97,6 +108,9 @@ internal sealed class CalculatedQuotePayloadDtoV1
     public required decimal InternalYield { get; init; }
     public required decimal GSpread { get; init; }
     public required decimal Asw { get; init; }
+    public required decimal Ysc { get; init; }
+    public required decimal ISpread { get; init; }
+    public required decimal ZSpread { get; init; }
 }
 
 internal sealed class ManualQuotePayloadDtoV1

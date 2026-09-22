@@ -13,7 +13,11 @@ public sealed class ScratchPricer(ICalculationClient calculationClient)
             CalculationDriver.Price => new PriceCalculationParameter(input.Value),
             CalculationDriver.BbgYield => new BbgYieldCalculationParameter(input.Value),
             CalculationDriver.SimpleYield => new SimpleYieldCalculationParameter(input.Value),
+            CalculationDriver.Ysc => new YscCalculationParameter(input.Value),
             CalculationDriver.GSpread => new GSpreadCalculationParameter(input.Value),
+            CalculationDriver.Asw => new AswCalculationParameter(input.Value),
+            CalculationDriver.ISpread => new ISpreadCalculationParameter(input.Value),
+            CalculationDriver.ZSpread => new ZSpreadCalculationParameter(input.Value),
             _ => throw new ArgumentOutOfRangeException(nameof(input)),
         };
         var result = (await calculationClient.CalculateBulkAsync([

@@ -76,6 +76,23 @@ public sealed class ApiErrorMiddlewareTests
     }
 
     [Fact]
+    public async Task Calculation_failure_includes_structured_diagnostics()
+    {
+        var failureLogId = Guid.NewGuid();
+
+        var response = await InvokeAsync(
+            new CalculationFailureException(failureLogId, "CALC-42", "calculation"),
+            new IncidentReporter());
+
+        using var document = JsonDocument.Parse(response.Json);
+        Assert.Equal("CALC-42", document.RootElement
+            .GetProperty("calculationErrorCode").GetString());
+        Assert.Equal(failureLogId.ToString(), document.RootElement
+            .GetProperty("failureLogId").GetString());
+        Assert.Equal("trace-07", document.RootElement.GetProperty("traceId").GetString());
+    }
+
+    [Fact]
     public async Task Unmapped_error_kind_is_unexpected_and_reported()
     {
         var exception = new UnmappedExpectedException();

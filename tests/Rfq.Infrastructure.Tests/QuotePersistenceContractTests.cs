@@ -8,14 +8,14 @@ public sealed class QuotePersistenceContractTests
 {
     private static readonly CalculatedQuotePayload Calculated = new(
         CalculationDriver.GSpread, 12.5m, 100.25m, .8m, .81m, .02m,
-        .83m, .84m, 12.5m, 15m);
+        .83m, .84m, 12.5m, 15m, 13.5m, 14.5m, 13.5m);
     private static readonly ManualQuotePayload Manual = new(100.25m, .83m);
 
     [Fact]
     public void Current_v1_calculated_json_reads_into_current_domain_payload()
     {
         const string json = """
-            {"type":"calculated-v1","driver":"g-spread","driverValue":12.5,"price":100.25,"bbgYield":0.8,"baseSimpleYield":0.81,"simpleYieldSlide":0.02,"finalSimpleYield":0.83,"internalYield":0.84,"gSpread":12.5,"asw":15}
+            {"type":"calculated-v1","driver":"g-spread","driverValue":12.5,"price":100.25,"bbgYield":0.8,"baseSimpleYield":0.81,"simpleYieldSlide":0.02,"finalSimpleYield":0.83,"internalYield":0.84,"gSpread":12.5,"asw":15,"ysc":13.5,"iSpread":14.5,"zSpread":13.5}
             """;
 
         Assert.Equal(Calculated, QuotePayloadPersistence.DeserializeCalculated(json));

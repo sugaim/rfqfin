@@ -14,4 +14,5 @@ public sealed record RfqSearchItem(
     CaseId CaseId, DateTimeOffset CreatedAt, ClientId ClientId, string ClientName,
     SecurityId SecurityId, string SecurityName, CategoryId CategoryId, RfqStatus Status,
     QuoteStatus? QuoteStatus, UserId ContactOwnerId, UserId? SalesId, UserId AssignedTraderId,
-    decimal? Notional, DateOnly? SettlementDate);
+    decimal? Notional, DateOnly? SettlementDate,
+    decimal? Price = null, decimal? FinalSimpleYield = null, decimal? Ysc = null);

@@ -40,10 +40,12 @@ public sealed record TraderRfqListItem(
     StateVersion CurrentVersion,
     DateOnly? SettlementDate,
     decimal? Notional,
+    string SalesAndTradingMessage,
     WorkingQuoteMode WorkingQuoteMode,
     CalculatedQuotePayload? Calculated,
     ManualQuotePayload? Manual,
     StateVersion WorkingQuoteVersion,
     string TraderMemo,
     StateVersion TraderMemoVersion,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset StateSince);

@@ -2276,6 +2276,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/settings/default-quote-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["QuoteModeResponse"];
+                        "application/json": components["schemas"]["QuoteModeResponse"];
+                        "text/json": components["schemas"]["QuoteModeResponse"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["QuoteModeRequest"];
+                    "text/json": components["schemas"]["QuoteModeRequest"];
+                    "application/*+json": components["schemas"]["QuoteModeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["QuoteModeResponse"];
+                        "application/json": components["schemas"]["QuoteModeResponse"];
+                        "text/json": components["schemas"]["QuoteModeResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/grid-configs/{screenId}/{configKey}": {
         parameters: {
             query?: never;
@@ -2871,6 +2935,12 @@ export interface components {
             gSpread: number;
             /** Format: double */
             asw: number;
+            /** Format: double */
+            ysc: number;
+            /** Format: double */
+            iSpread: number;
+            /** Format: double */
+            zSpread: number;
         } | null;
         CalculatedQuoteResponse2: {
             driver: components["schemas"]["CalculationDriverValue"];
@@ -2892,6 +2962,12 @@ export interface components {
             gSpread: number;
             /** Format: double */
             asw: number;
+            /** Format: double */
+            ysc: number;
+            /** Format: double */
+            iSpread: number;
+            /** Format: double */
+            zSpread: number;
         };
         CalculateWorkingQuoteRequest: {
             driver: components["schemas"]["CalculationDriverValue"];
@@ -3382,6 +3458,12 @@ export interface components {
             requestReason: components["schemas"]["QuoteRequestReasonValue"];
         };
         QuoteMode: number;
+        QuoteModeRequest: {
+            mode: components["schemas"]["QuoteMode"];
+        };
+        QuoteModeResponse: {
+            mode: components["schemas"]["QuoteMode"];
+        };
         QuoteRequestReasonValue: number;
         QuoteStatusValue: number;
         RevisionResponse: {
@@ -3432,6 +3514,12 @@ export interface components {
             notional: number | null;
             /** Format: date */
             settlementDate: string | null;
+            /** Format: double */
+            price: number | null;
+            /** Format: double */
+            finalSimpleYield: number | null;
+            /** Format: double */
+            ysc: number | null;
         };
         RfqSearchResponse: {
             items: components["schemas"]["RfqSearchItemResponse"][];
@@ -3590,6 +3678,7 @@ export interface components {
             settlementDate: string | null;
             /** Format: double */
             notional: number | null;
+            salesAndTradingMessage: string;
             workingQuoteMode: components["schemas"]["QuoteMode"];
             calculated: components["schemas"]["CalculatedQuoteResponse"];
             manual: components["schemas"]["ManualQuoteResponse"];
@@ -3600,6 +3689,8 @@ export interface components {
             traderMemoVersion: number;
             /** Format: date-time */
             createdAt: string;
+            /** Format: date-time */
+            stateSince: string;
         };
         UpdateCategoryRoutingRequest: {
             defaultTraderId: string;

@@ -110,7 +110,11 @@ public sealed class CalculateWorkingQuote(
             CalculationDriver.Price => new PriceCalculationParameter(value),
             CalculationDriver.BbgYield => new BbgYieldCalculationParameter(value),
             CalculationDriver.SimpleYield => new SimpleYieldCalculationParameter(value),
+            CalculationDriver.Ysc => new YscCalculationParameter(value),
             CalculationDriver.GSpread => new GSpreadCalculationParameter(value),
+            CalculationDriver.Asw => new AswCalculationParameter(value),
+            CalculationDriver.ISpread => new ISpreadCalculationParameter(value),
+            CalculationDriver.ZSpread => new ZSpreadCalculationParameter(value),
             _ => throw new ArgumentOutOfRangeException(nameof(driver)),
         };
 

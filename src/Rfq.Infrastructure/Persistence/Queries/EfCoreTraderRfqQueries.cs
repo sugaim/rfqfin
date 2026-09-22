@@ -6,6 +6,25 @@ namespace Rfq.Infrastructure;
 
 public sealed class EfCoreTraderRfqQueries(RfqDbContext dbContext) : ITraderRfqQueries
 {
+    private static readonly string[] StateRfqEvents =
+    [
+        nameof(RfqTransitionKind.RevisionConfirmed),
+        nameof(RfqTransitionKind.Cancelled),
+        nameof(RfqTransitionKind.Reopened),
+        nameof(RfqTransitionKind.ClosedHit),
+        nameof(RfqTransitionKind.ClosedAway),
+        nameof(RfqTransitionKind.OutcomeCorrected),
+    ];
+
+    private static readonly string[] StateQuoteEvents =
+    [
+        nameof(QuoteTransitionKind.Confirmed),
+        nameof(QuoteTransitionKind.Presented),
+        nameof(QuoteTransitionKind.Unpresented),
+        nameof(QuoteTransitionKind.Withdrawn),
+        nameof(QuoteTransitionKind.Expired),
+    ];
+
     public async Task<IReadOnlyList<TraderRfqListItem>> GetAsync(
         DeskId deskId,
         CancellationToken cancellationToken = default)
@@ -39,6 +58,23 @@ public sealed class EfCoreTraderRfqQueries(RfqDbContext dbContext) : ITraderRfqQ
         var confirmedQuotes = await dbContext.ConfirmedQuotes.AsNoTracking()
             .Where(item => displayQuoteIds.Contains(item.QuoteId))
             .ToDictionaryAsync(item => item.QuoteId, cancellationToken);
+        var caseIds = cases.Select(item => item.CaseId).ToArray();
+        var rfqStateEvents = await dbContext.RfqEvents.AsNoTracking()
+            .Where(item => caseIds.Contains(item.CaseId) && StateRfqEvents.Contains(item.Type))
+            .Select(item => new StateEvent(item.CaseId, item.Event.OccurredAt))
+            .ToListAsync(cancellationToken);
+        var quoteStateEvents = await dbContext.QuoteEvents.AsNoTracking()
+            .Where(item => StateQuoteEvents.Contains(item.Type)
+                && dbContext.ConfirmedQuotes.Any(quote => quote.QuoteId == item.QuoteId
+                    && caseIds.Contains(quote.Revision.CaseId)))
+            .Select(item => new StateEvent(
+                dbContext.ConfirmedQuotes.Where(quote => quote.QuoteId == item.QuoteId)
+                    .Select(quote => quote.Revision.CaseId).Single(),
+                item.Event.OccurredAt))
+            .ToListAsync(cancellationToken);
+        var stateSince = rfqStateEvents.Concat(quoteStateEvents)
+            .GroupBy(item => item.CaseId)
+            .ToDictionary(group => group.Key, group => group.Max(item => item.OccurredAt));
 
         return cases.Select(entity =>
         {
@@ -70,9 +106,17 @@ public sealed class EfCoreTraderRfqQueries(RfqDbContext dbContext) : ITraderRfqQ
                 UserId.Create(entity.Current.AssignedTraderId), entity.Current.Owned,
                 new StateVersion(entity.Current.Version),
                 entity.Current.CurrentRevision.SettlementDate,
-                entity.Current.CurrentRevision.Notional, quote.Mode, quote.Calculated,
+                entity.Current.CurrentRevision.Notional,
+                entity.Current.CurrentRevision.SalesAndTradingMessage,
+                quote.Mode, quote.Calculated,
                 quote.Manual, quote.Version, entity.TraderMemo.Value,
-                new StateVersion(entity.TraderMemo.Version), entity.CreatedAt);
+                new StateVersion(entity.TraderMemo.Version), entity.CreatedAt,
+                stateSince.GetValueOrDefault(entity.CaseId,
+                    confirmedQuote?.ConfirmedAt
+                    ?? entity.Current.CurrentRevision.ConfirmedAt
+                    ?? entity.Current.CurrentRevision.CreatedAt));
         }).ToArray();
     }
+
+    private sealed record StateEvent(long CaseId, DateTimeOffset OccurredAt);
 }
