@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactElement, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Badge,
   Button,
-  Input,
   Modal,
   Segmented,
   Select,
@@ -16,8 +15,6 @@ import {
 import type { InputRef } from 'antd'
 import type {
   CellEditRequestEvent,
-  ColDef,
-  ColGroupDef,
   GridApi,
   RowClassParams,
   RowClickedEvent,
@@ -44,8 +41,6 @@ import type {
 import {
   attentionClass,
   calculatedValue,
-  canEditQuote,
-  elapsedLabel,
   isPickUpEligible,
   isConfirmable,
   patchConfirmedQuote,
@@ -53,9 +48,6 @@ import {
   patchWorkingQuote,
   sameSourceTerms,
   searchDateRange,
-  traderRouting,
-  traderState,
-  type CalcState,
   type PricerProvenance,
   type SearchDatePreset,
   type TraderBulkCommand,
@@ -68,7 +60,14 @@ import {
   initializeGridLayout,
   type GridColumnGroupState,
 } from '@/features/grid/gridLayout'
+import {
+  useTraderActiveColumns,
+  useTraderConfirmColumns,
+  useTraderSearchColumns,
+} from '@/features/trader/traderColumns'
 import { TraderOperationsPane } from '@/features/trader/TraderOperationsPane'
+import { TraderSearchSection } from '@/features/trader/TraderSearchSection'
+import { useWorkingQuoteCalculation } from '@/features/trader/useWorkingQuoteCalculation'
 import {
   TraderPricerPane,
   type ScratchState,
@@ -81,20 +80,10 @@ import {
 type UserOption = { userId: string; name: string }
 type RfqOutcome = 'Hit' | 'Away'
 type GridConfigKey = 'main' | 'search' | 'confirm'
-const million = 1_000_000
-const calcTimeoutMs = 10_000
-const datePresets: SearchDatePreset[] = ['1M', '3M', '6M', '1Y', '2Y', '5Y']
-const formatNumber = (value: unknown) =>
-  value == null
-    ? ''
-    : Number(value).toLocaleString(undefined, { maximumFractionDigits: 8 })
-const formatPercent = (value: unknown) =>
-  value == null ? '' : `${formatNumber(value)}%`
-const formatBp = (value: unknown) =>
-  value == null ? '' : `${formatNumber(value)} bp`
 
-function isTextInput(target: EventTarget | null) {
+function isTextInput(target: EventTarget | null): boolean {
   const element = target instanceof HTMLElement ? target : null
+
   return Boolean(
     element &&
     (element.isContentEditable ||
@@ -102,38 +91,6 @@ function isTextInput(target: EventTarget | null) {
         'input, textarea, select, [contenteditable="true"], .ant-select',
       )),
   )
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(
-      () => reject(new Error('Calculation timed out.')),
-      timeoutMs,
-    )
-    promise.then(
-      (value) => {
-        window.clearTimeout(timer)
-        resolve(value)
-      },
-      (error) => {
-        window.clearTimeout(timer)
-        reject(error)
-      },
-    )
-  })
-}
-
-function failureFrom(error: unknown, requestId: number): CalcState {
-  const apiError = error as { data?: ApiProblemDetails; message?: string }
-  const detail = apiError.data
-  return {
-    status: 'failed',
-    requestId,
-    code: detail?.calculationErrorCode ?? detail?.code,
-    message: detail?.detail ?? apiError.message ?? 'Calculation failed.',
-    traceId: detail?.traceId,
-    failureLogId: detail?.failureLogId,
-  }
 }
 
 export interface TraderScreenProps {
@@ -223,7 +180,7 @@ export interface TraderScreenProps {
   onReload: () => void | Promise<unknown>
 }
 
-export function TraderScreen(props: TraderScreenProps) {
+export function TraderScreen(props: TraderScreenProps): ReactElement {
   const {
     rfqs,
     traders,
@@ -290,7 +247,6 @@ export function TraderScreen(props: TraderScreenProps) {
     defaultExpiryMinutes,
   )
   const [actionError, setActionError] = useState<string | null>(null)
-  const [calcStates, setCalcStates] = useState<Record<number, CalcState>>({})
   const [scratch, setScratch] = useState<ScratchState>({
     securityId: '',
     notional: null,
@@ -314,10 +270,6 @@ export function TraderScreen(props: TraderScreenProps) {
   >({ main: [], search: [], confirm: [] })
   const activeGridRegion = useRef<HTMLDivElement>(null)
   const searchCaseInput = useRef<InputRef>(null)
-  const requestSequence = useRef(0)
-  const requestByCase = useRef<Record<number, number>>({})
-  const inFlightCases = useRef(new Set<number>())
-  const generationRef = useRef(refreshGeneration)
 
   const selectedRows = selectedCaseIds
     .map((id) => rfqs.find((row) => row.caseId === id))
@@ -329,25 +281,9 @@ export function TraderScreen(props: TraderScreenProps) {
   const pickTargets = rfqs.filter(
     (row) => row.assignedTraderId === currentUserId && isPickUpEligible(row),
   )
-  const calculating = Object.values(calcStates).some(
-    (state) => state.status === 'calculating',
-  )
-  const protectedState =
-    calculating || editingCells > 0 || confirmRows !== null || pricerBusy
-
-  useEffect(() => {
-    generationRef.current = refreshGeneration
-    requestSequence.current += 1
-    requestByCase.current = {}
-    inFlightCases.current.clear()
-    setCalcStates({})
-  }, [refreshGeneration])
-  useEffect(
-    () => onTransientStateChange?.(protectedState),
-    [onTransientStateChange, protectedState],
-  )
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+
     return () => window.clearInterval(timer)
   }, [])
   useEffect(() => {
@@ -408,6 +344,27 @@ export function TraderScreen(props: TraderScreenProps) {
   const reconcileAfterSuccess = async () => {
     if (refreshMode === 'live') await onReload()
   }
+  const {
+    calcStates,
+    calculating,
+    editQuote: editWorkingQuote,
+    invalidate: invalidateCalculations,
+  } = useWorkingQuoteCalculation({
+    currentUserId,
+    refreshGeneration,
+    onCalculate,
+    onUpdateManual,
+    onPatchRow,
+    onSuccess: reconcileAfterSuccess,
+  })
+  const protectedState =
+    calculating || editingCells > 0 || confirmRows !== null || pricerBusy
+
+  useEffect(
+    () => onTransientStateChange?.(protectedState),
+    [onTransientStateChange, protectedState],
+  )
+
   const runSingle = async <T,>(
     action: () => Promise<T | void>,
     patch?: (row: TraderRfq, value: T) => TraderRfq,
@@ -419,10 +376,12 @@ export function TraderScreen(props: TraderScreenProps) {
       if (refreshMode === 'paused' && row && value !== undefined && patch)
         onPatchRow(row.caseId, (current) => patch(current, value as T))
       await reconcileAfterSuccess()
+
       return value
     } catch (error) {
       const detail = (error as { data?: ApiProblemDetails }).data?.detail
       setActionError(detail ?? 'The Trader operation could not be completed.')
+
       return undefined
     }
   }
@@ -448,404 +407,33 @@ export function TraderScreen(props: TraderScreenProps) {
     }
   }
 
-  const editQuote = async (event: CellEditRequestEvent<TraderRfq>) => {
+  const editQuote = async (
+    event: CellEditRequestEvent<TraderRfq>,
+  ): Promise<void> => {
     const row = event.data
-    const column = event.column.getColId()
-    if (column === 'traderMemo') {
-      const attempted = String(event.newValue ?? '')
-      const response = await runSingle(
-        () => onUpdateMemo(row, attempted),
-        patchMemo,
-        row,
-      )
-      if (!response)
-        event.api.refreshCells({ rowNodes: [event.node], force: true })
+    if (event.column.getColId() !== 'traderMemo') {
+      await editWorkingQuote(event)
+
       return
     }
-    if (
-      !canEditQuote(row, currentUserId) ||
-      inFlightCases.current.has(row.caseId)
-    ) {
+
+    const attempted = String(event.newValue ?? '')
+    const response = await runSingle(
+      () => onUpdateMemo(row, attempted),
+      patchMemo,
+      row,
+    )
+    if (!response)
       event.api.refreshCells({ rowNodes: [event.node], force: true })
-      return
-    }
-    const value = Number(event.newValue)
-    if (!Number.isFinite(value)) {
-      event.api.refreshCells({ rowNodes: [event.node], force: true })
-      return
-    }
-    const requestId = ++requestSequence.current
-    requestByCase.current[row.caseId] = requestId
-    inFlightCases.current.add(row.caseId)
-    const generation = generationRef.current
-    setCalcStates((state) => ({
-      ...state,
-      [row.caseId]: { status: 'calculating', requestId },
-    }))
-    try {
-      let response: WorkingQuoteResult | void
-      if (row.workingQuoteMode === 'Manual') {
-        response = await withTimeout(
-          onUpdateManual(
-            row,
-            column === 'price' ? value : (row.manual?.price ?? null),
-            column === 'finalSimpleYield'
-              ? value
-              : (row.manual?.finalSimpleYield ?? null),
-          ),
-          calcTimeoutMs,
-        )
-      } else {
-        const drivers: Record<string, CalculatedQuotePayload['driver']> = {
-          price: 'Price',
-          bbgYield: 'BbgYield',
-          baseSimpleYield: 'SimpleYield',
-          ysc: 'Ysc',
-          gSpread: 'GSpread',
-          asw: 'Asw',
-          iSpread: 'ISpread',
-          zSpread: 'ZSpread',
-        }
-        const driver =
-          column === 'simpleYieldSlide'
-            ? row.calculated?.driver
-            : drivers[column]
-        const driverValue =
-          column === 'simpleYieldSlide'
-            ? row.calculated &&
-              calculatedValue(row.calculated, row.calculated.driver)
-            : value
-        if (!driver || driverValue == null)
-          throw new Error('A calculation driver is required.')
-        response = await withTimeout(
-          onCalculate(
-            row,
-            driver,
-            driverValue,
-            column === 'simpleYieldSlide'
-              ? value
-              : (row.calculated?.simpleYieldSlide ?? 0),
-          ),
-          calcTimeoutMs,
-        )
-      }
-      // A newer edit or refresh owns the row now; its result must win.
-      if (
-        requestByCase.current[row.caseId] !== requestId ||
-        generationRef.current !== generation
-      )
-        return
-      if (response)
-        onPatchRow(row.caseId, (current) =>
-          patchWorkingQuote(current, response!),
-        )
-      inFlightCases.current.delete(row.caseId)
-      setCalcStates((state) => {
-        const next = { ...state }
-        delete next[row.caseId]
-        return next
-      })
-      await reconcileAfterSuccess()
-    } catch (error) {
-      if (
-        requestByCase.current[row.caseId] !== requestId ||
-        generationRef.current !== generation
-      )
-        return
-      inFlightCases.current.delete(row.caseId)
-      setCalcStates((state) => ({
-        ...state,
-        [row.caseId]: failureFrom(error, requestId),
-      }))
-      event.api.refreshCells({ rowNodes: [event.node], force: true })
-    }
   }
 
-  const activeColumns = useMemo<
-    (ColDef<TraderRfq> | ColGroupDef<TraderRfq>)[]
-  >(() => {
-    const calculated = (
-      id: keyof CalculatedQuotePayload,
-      headerName: string,
-      formatter = formatNumber,
-    ): ColDef<TraderRfq> => ({
-      colId: id,
-      headerName,
-      minWidth: 78,
-      valueGetter: ({ data }) =>
-        data?.workingQuoteMode === 'Calculated'
-          ? data.calculated?.[id]
-          : undefined,
-      valueFormatter: ({ value }) => formatter(value),
-      editable: ({ data }) =>
-        Boolean(
-          data &&
-          canEditQuote(data, currentUserId) &&
-          data.workingQuoteMode === 'Calculated' &&
-          calcStates[data.caseId]?.status !== 'calculating',
-        ),
-      cellEditor: 'agNumberCellEditor',
-    })
-    return [
-      {
-        headerName: 'RFQ',
-        children: [
-          { field: 'caseId', headerName: 'Case', width: 78, pinned: 'left' },
-          { field: 'clientName', headerName: 'Client', minWidth: 140 },
-          {
-            field: 'securityJapaneseName',
-            headerName: 'Security',
-            minWidth: 180,
-            tooltipField: 'securityBbgDisplay',
-          },
-          {
-            field: 'notional',
-            headerName: 'Notl (MM)',
-            width: 105,
-            valueFormatter: ({ value }) =>
-              value == null ? '' : formatNumber(Number(value) / million),
-          },
-          { field: 'settlementDate', headerName: 'Settle', width: 105 },
-        ],
-      },
-      {
-        headerName: 'Routing / State',
-        children: [
-          {
-            colId: 'routing',
-            headerName: 'Trader',
-            minWidth: 125,
-            valueGetter: ({ data }) =>
-              data ? traderRouting(data, currentUserId) : '',
-          },
-          {
-            colId: 'state',
-            headerName: 'State',
-            width: 92,
-            valueGetter: ({ data }) => (data ? traderState(data) : ''),
-          },
-        ],
-      },
-      {
-        headerName: 'Quote',
-        children: [
-          {
-            field: 'workingQuoteMode',
-            headerName: 'Mode',
-            width: 70,
-            valueFormatter: ({ value }) =>
-              value === 'Manual' ? 'Man' : 'Calc',
-          },
-          {
-            colId: 'price',
-            headerName: 'Px',
-            width: 78,
-            valueGetter: ({ data }) =>
-              data?.workingQuoteMode === 'Manual'
-                ? data.manual?.price
-                : data?.calculated?.price,
-            valueFormatter: ({ value }) => formatNumber(value),
-            editable: ({ data }) =>
-              Boolean(
-                data &&
-                canEditQuote(data, currentUserId) &&
-                calcStates[data.caseId]?.status !== 'calculating',
-              ),
-            cellEditor: 'agNumberCellEditor',
-          },
-          calculated('bbgYield', 'Yld', formatPercent),
-          calculated('baseSimpleYield', 'SY', formatPercent),
-          {
-            colId: 'finalSimpleYield',
-            headerName: 'Final SY',
-            width: 92,
-            valueGetter: ({ data }) =>
-              data?.workingQuoteMode === 'Manual'
-                ? data.manual?.finalSimpleYield
-                : data?.calculated?.finalSimpleYield,
-            valueFormatter: ({ value }) => formatPercent(value),
-            editable: ({ data }) =>
-              Boolean(
-                data &&
-                canEditQuote(data, currentUserId) &&
-                data.workingQuoteMode === 'Manual' &&
-                calcStates[data.caseId]?.status !== 'calculating',
-              ),
-            cellEditor: 'agNumberCellEditor',
-          },
-          calculated('ysc', 'YSC', formatBp),
-          calculated('gSpread', 'GSpd', formatBp),
-          calculated('asw', 'ASW', formatBp),
-          calculated('iSpread', 'ISpd', formatBp),
-          calculated('zSpread', 'ZSpd', formatBp),
-          {
-            colId: 'simpleYieldSlide',
-            headerName: 'Slide',
-            width: 82,
-            valueGetter: ({ data }) =>
-              data?.workingQuoteMode === 'Calculated'
-                ? data.calculated?.simpleYieldSlide
-                : undefined,
-            valueFormatter: ({ value }) => formatPercent(value),
-            editable: ({ data }) =>
-              Boolean(
-                data &&
-                canEditQuote(data, currentUserId) &&
-                data.workingQuoteMode === 'Calculated' &&
-                data.calculated &&
-                calcStates[data.caseId]?.status !== 'calculating',
-              ),
-            cellEditor: 'agNumberCellEditor',
-          },
-        ],
-      },
-      {
-        headerName: 'Info',
-        children: [
-          {
-            colId: 'elapsed',
-            headerName: 'Elapsed',
-            width: 82,
-            valueGetter: ({ data }) =>
-              data ? elapsedLabel(data.stateSince, now) : '',
-          },
-          {
-            field: 'salesAndTradingMessage',
-            headerName: 'Msg',
-            minWidth: 140,
-            tooltipField: 'salesAndTradingMessage',
-          },
-          {
-            field: 'traderMemo',
-            headerName: 'Trader Memo',
-            minWidth: 150,
-            tooltipField: 'traderMemo',
-            editable: true,
-            cellEditor: 'agLargeTextCellEditor',
-            cellEditorParams: { rows: 4, cols: 30 },
-          },
-          {
-            colId: 'calcStatus',
-            headerName: 'Calc',
-            width: 70,
-            cellRenderer: ({ data }: { data?: TraderRfq }) => {
-              const state = data ? calcStates[data.caseId] : undefined
-              if (!state) return null
-              if (state.status === 'calculating') return <Spin size="small" />
-              const details = [
-                state.code,
-                state.message,
-                state.traceId && `Trace ${state.traceId}`,
-                state.failureLogId && `Log ${state.failureLogId}`,
-              ]
-                .filter(Boolean)
-                .join(' · ')
-              return (
-                <Tooltip title={details}>
-                  <span className="calc-failed">!</span>
-                </Tooltip>
-              )
-            },
-          },
-        ],
-      },
-    ]
-  }, [calcStates, currentUserId, now])
-
-  const searchColumns = useMemo<ColDef<RfqSearchItem>[]>(
-    () => [
-      { field: 'caseId', headerName: 'Case', width: 78 },
-      {
-        field: 'createdAt',
-        headerName: 'Date',
-        width: 105,
-        valueFormatter: ({ value }) => String(value ?? '').slice(0, 10),
-      },
-      { field: 'clientName', headerName: 'Client', minWidth: 130 },
-      { field: 'securityName', headerName: 'Security', minWidth: 165 },
-      {
-        field: 'notional',
-        headerName: 'Notl',
-        width: 85,
-        valueFormatter: ({ value }) =>
-          value == null ? '' : formatNumber(Number(value) / million),
-      },
-      { field: 'contactOwnerId', headerName: 'Owner', width: 105 },
-      { field: 'assignedTraderId', headerName: 'Trader', width: 105 },
-      { field: 'status', headerName: 'Status', width: 90 },
-      { field: 'price', headerName: 'Px', width: 75 },
-      {
-        field: 'finalSimpleYield',
-        headerName: 'SY',
-        width: 75,
-        valueFormatter: ({ value }) => formatPercent(value),
-      },
-      {
-        field: 'ysc',
-        headerName: 'YSC',
-        width: 75,
-        valueFormatter: ({ value }) => formatBp(value),
-      },
-    ],
-    [],
-  )
-
-  const confirmColumns = useMemo<ColDef<TraderRfq>[]>(
-    () => [
-      { field: 'caseId', headerName: 'Case', width: 75 },
-      { field: 'clientName', headerName: 'Client', minWidth: 125 },
-      { field: 'securityJapaneseName', headerName: 'Security', minWidth: 160 },
-      {
-        field: 'notional',
-        headerName: 'Notl',
-        width: 85,
-        valueFormatter: ({ value }) =>
-          value == null ? '' : formatNumber(Number(value) / million),
-      },
-      { field: 'workingQuoteMode', headerName: 'Mode', width: 75 },
-      {
-        colId: 'confirmPrice',
-        headerName: 'Px',
-        width: 75,
-        valueGetter: ({ data }) =>
-          data?.workingQuoteMode === 'Manual'
-            ? data.manual?.price
-            : data?.calculated?.price,
-      },
-      {
-        colId: 'confirmYield',
-        headerName: 'SY / Final SY',
-        width: 105,
-        valueGetter: ({ data }) =>
-          data?.workingQuoteMode === 'Manual'
-            ? data.manual?.finalSimpleYield
-            : data?.calculated?.finalSimpleYield,
-        valueFormatter: ({ value }) => formatPercent(value),
-      },
-      {
-        colId: 'confirmYsc',
-        headerName: 'YSC',
-        width: 75,
-        valueGetter: ({ data }) => data?.calculated?.ysc,
-        valueFormatter: ({ value }) => formatBp(value),
-      },
-      {
-        colId: 'confirmSlide',
-        headerName: 'Slide',
-        width: 75,
-        valueGetter: ({ data }) => data?.calculated?.simpleYieldSlide,
-        valueFormatter: ({ value }) => formatPercent(value),
-      },
-      {
-        colId: 'expiry',
-        headerName: 'Expiry',
-        width: 85,
-        valueGetter: () =>
-          expiryMinutes === null ? 'None' : `${expiryMinutes}m`,
-      },
-    ],
-    [expiryMinutes],
-  )
+  const activeColumns = useTraderActiveColumns({
+    calcStates,
+    currentUserId,
+    now,
+  })
+  const searchColumns = useTraderSearchColumns()
+  const confirmColumns = useTraderConfirmColumns(expiryMinutes)
 
   const openConfirmation = () => {
     if (confirmableRows.length) setConfirmRows(confirmableRows)
@@ -872,6 +460,7 @@ export function TraderScreen(props: TraderScreenProps) {
             },
           ],
         })
+
       return
     }
     if (rows.length > 1) await runBulk('Bulk Confirm', 'confirm', rows)
@@ -967,12 +556,8 @@ export function TraderScreen(props: TraderScreenProps) {
     )
   }
 
-  const manualRefresh = async () => {
-    generationRef.current += 1
-    requestSequence.current += 1
-    requestByCase.current = {}
-    inFlightCases.current.clear()
-    setCalcStates({})
+  const manualRefresh = async (): Promise<void> => {
+    invalidateCalculations()
     await (onManualRefresh ?? onReload)()
   }
 
@@ -982,6 +567,7 @@ export function TraderScreen(props: TraderScreenProps) {
         if (event.key === 'Escape') {
           setConfirmRows(null)
         }
+
         return
       }
       if (event.key.toLowerCase() === 'l') {
@@ -1004,6 +590,7 @@ export function TraderScreen(props: TraderScreenProps) {
       }
     }
     window.addEventListener('keydown', handler)
+
     return () => window.removeEventListener('keydown', handler)
   })
 
@@ -1175,149 +762,29 @@ export function TraderScreen(props: TraderScreenProps) {
             </Spin>
           </section>
 
-          <section
-            className={`trader-search-section ${searchOpen ? '' : 'collapsed'}`}
-            aria-label="RFQ Search"
-          >
-            <header>
-              <Button
-                type="text"
-                size="small"
-                onClick={() => setSearchOpen((value) => !value)}
-              >
-                {searchOpen ? '▾' : '▸'} RFQ Search
-              </Button>
-              {searchOpen && (
-                <Space size={4}>
-                  <Button
-                    type="text"
-                    size="small"
-                    onClick={() => setSearchFiltersOpen((value) => !value)}
-                  >
-                    {searchFiltersOpen ? 'Hide filters' : 'Filters'}
-                  </Button>
-                </Space>
-              )}
-            </header>
-            {searchOpen && (
-              <div
-                className={`trader-search-body ${searchFiltersOpen ? '' : 'filters-collapsed'}`}
-              >
-                {searchFiltersOpen && (
-                  <div
-                    className="trader-search-filters"
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') void executeSearch()
-                    }}
-                  >
-                    <Input
-                      ref={searchCaseInput}
-                      size="small"
-                      aria-label="Search Case"
-                      placeholder="Case"
-                      value={searchFilters.caseId ?? ''}
-                      onChange={(event) =>
-                        setSearchFilters((value) => ({
-                          ...value,
-                          caseId: event.target.value,
-                        }))
-                      }
-                    />
-                    <Segmented
-                      size="small"
-                      aria-label="Search date preset"
-                      value={searchPreset}
-                      options={datePresets}
-                      onChange={(value) =>
-                        setSearchPreset(value as SearchDatePreset)
-                      }
-                    />
-                    {[
-                      'clientId',
-                      'securityId',
-                      'categoryId',
-                      'contactOwnerId',
-                      'salesId',
-                      'assignedTraderId',
-                    ].map((key) => (
-                      <Input
-                        key={key}
-                        size="small"
-                        aria-label={`Search ${key}`}
-                        placeholder={key}
-                        value={searchFilters[key] ?? ''}
-                        onChange={(event) =>
-                          setSearchFilters((value) => ({
-                            ...value,
-                            [key]: event.target.value,
-                          }))
-                        }
-                      />
-                    ))}
-                    <Select
-                      size="small"
-                      aria-label="Search RFQ Status"
-                      placeholder="RFQ Status"
-                      allowClear
-                      value={searchFilters.status || undefined}
-                      onChange={(status) =>
-                        setSearchFilters((value) => ({
-                          ...value,
-                          status: status ?? '',
-                        }))
-                      }
-                      options={[
-                        'Draft',
-                        'Active',
-                        'Presented',
-                        'Cancelled',
-                        'Hit',
-                        'Away',
-                      ].map((value) => ({ value, label: value }))}
-                    />
-                    <Button
-                      size="small"
-                      type="primary"
-                      loading={searching}
-                      onClick={() => void executeSearch()}
-                    >
-                      Search
-                    </Button>
-                  </div>
-                )}
-                <div className="trader-search-results">
-                  {searchResult.requiresNarrowing && (
-                    <Alert
-                      banner
-                      type="warning"
-                      message="Result cap reached. Narrow the search."
-                    />
-                  )}
-                  <AgGridReact<RfqSearchItem>
-                    rowData={searchResult.items}
-                    columnDefs={searchColumns}
-                    getRowId={({ data }) => String(data.caseId)}
-                    defaultColDef={{
-                      sortable: true,
-                      filter: true,
-                      resizable: true,
-                    }}
-                    rowSelection={undefined}
-                    rowHeight={27}
-                    headerHeight={29}
-                    onGridReady={({ api }) => {
-                      searchGrid.current = api
-                      defaultColumnGroupStates.current.search =
-                        initializeGridLayout(api, searchGridConfigJson)
-                    }}
-                    getContextMenuItems={({ api }) => [
-                      layoutMenu('search', api),
-                    ]}
-                  />
-                </div>
-              </div>
-            )}
-          </section>
+          <TraderSearchSection
+            open={searchOpen}
+            filtersOpen={searchFiltersOpen}
+            caseInputRef={searchCaseInput}
+            preset={searchPreset}
+            filters={searchFilters}
+            searching={searching}
+            result={searchResult}
+            columns={searchColumns}
+            onToggle={() => setSearchOpen((value) => !value)}
+            onToggleFilters={() => setSearchFiltersOpen((value) => !value)}
+            onPresetChange={setSearchPreset}
+            onFiltersChange={setSearchFilters}
+            onSearch={executeSearch}
+            onGridReady={(api) => {
+              searchGrid.current = api
+              defaultColumnGroupStates.current.search = initializeGridLayout(
+                api,
+                searchGridConfigJson,
+              )
+            }}
+            getLayoutMenu={(api) => layoutMenu('search', api)}
+          />
         </div>
 
         {rightPaneOpen ? (
@@ -1351,21 +818,27 @@ export function TraderScreen(props: TraderScreenProps) {
                       setTargetTraderId={setTargetTraderId}
                       targetContactOwnerId={targetContactOwnerId}
                       setTargetContactOwnerId={setTargetContactOwnerId}
-                      onRun={runSingle}
-                      onBulk={runBulk}
-                      onPickUp={onPickUp}
-                      onRelease={onRelease}
-                      onAssign={onAssign}
-                      onTakeOver={onTakeOver}
-                      onChangeMode={onChangeMode}
-                      onPresent={onPresent}
-                      onUnpresent={onUnpresent}
-                      onWithdraw={onWithdraw}
-                      onClose={onClose}
-                      onCancel={onCancel}
-                      onReopen={onReopen}
-                      onCorrectOutcome={onCorrectOutcome}
-                      onChangeContactOwner={onChangeContactOwner}
+                      run={runSingle}
+                      runBulk={runBulk}
+                      ownership={{
+                        pickUp: onPickUp,
+                        release: onRelease,
+                        assign: onAssign,
+                        takeOver: onTakeOver,
+                      }}
+                      quote={{
+                        changeMode: onChangeMode,
+                        withdraw: onWithdraw,
+                      }}
+                      lifecycle={{
+                        present: onPresent,
+                        unpresent: onUnpresent,
+                        close: onClose,
+                        cancel: onCancel,
+                        reopen: onReopen,
+                        correctOutcome: onCorrectOutcome,
+                      }}
+                      contactOwner={{ change: onChangeContactOwner }}
                     />
                   ),
                 },

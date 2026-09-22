@@ -74,6 +74,7 @@ describe('Post Process API cache reconciliation', () => {
         const url = new URL(request.url)
         if (request.method === 'POST') {
           closed = true
+
           return json([
             {
               caseId: 101,
@@ -87,6 +88,7 @@ describe('Post Process API cache reconciliation', () => {
         const preset = url.searchParams.get('preset') as PostProcessPreset
         const scope = url.searchParams.get('scope') as PostProcessScope
         gets.push({ preset, scope })
+
         return json(preset === 'Unclosed' && closed ? [] : [item])
       }),
     )
@@ -164,6 +166,7 @@ describe('Post Process API cache reconciliation', () => {
           input instanceof Request ? input : new Request(input, init)
         if (request.method === 'POST') {
           currentItem = authoritativeItem
+
           return json([
             {
               caseId: 101,
@@ -181,6 +184,7 @@ describe('Post Process API cache reconciliation', () => {
         }
 
         getCount += 1
+
         return json([currentItem])
       }),
     )

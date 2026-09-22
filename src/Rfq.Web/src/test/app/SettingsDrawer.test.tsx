@@ -20,6 +20,7 @@ function renderShell(
       <AppShell {...props} />
     </MemoryRouter>,
   )
+
   return { ...view, props }
 }
 

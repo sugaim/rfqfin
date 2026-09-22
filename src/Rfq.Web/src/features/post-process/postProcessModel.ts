@@ -63,5 +63,6 @@ export function rowClass(row: PostProcessItem, pending: boolean): string[] {
     classes.push('post-process-row-unclosed')
   if (row.rfqStatus === 'Cancelled') classes.push('post-process-row-cancelled')
   if (pending) classes.push('post-process-row-pending')
+
   return classes
 }

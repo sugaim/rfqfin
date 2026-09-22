@@ -49,7 +49,7 @@ import {
   type SalesBulkCommand,
   type SalesRowCommand,
 } from '@/features/sales/salesModel'
-import type { SalesRefreshMode } from '@/features/sales/SalesScreen'
+import type { SalesRefreshMode } from '@/features/sales/salesModel'
 
 export function SalesWorkspace() {
   const { currentUserId, remoteChangeVersion, acknowledgeRemoteChanges } =
@@ -157,6 +157,7 @@ export function SalesWorkspace() {
     setVisibleRfqs((current) => {
       if (command === 'discard-draft')
         return current.filter((row) => row.caseId !== target.caseId)
+
       return current.map((row) => {
         if (row.caseId !== target.caseId) return row
         const version = row.currentVersion + 1

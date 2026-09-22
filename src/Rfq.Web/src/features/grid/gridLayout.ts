@@ -35,9 +35,11 @@ export function applyGridLayout(
     api.setColumnGroupState(
       Array.isArray(config.columnGroupState) ? config.columnGroupState : [],
     )
+
     return true
   } catch {
     resetGridLayout(api, defaultColumnGroupState)
+
     return false
   }
 }
@@ -48,6 +50,7 @@ export function initializeGridLayout(
 ) {
   const defaultColumnGroupState = api.getColumnGroupState()
   applyGridLayout(api, configJson, defaultColumnGroupState)
+
   return defaultColumnGroupState
 }
 

@@ -219,6 +219,7 @@ export function TraderWorkspace() {
         : key === 'search'
           ? searchConfigQuery
           : confirmConfigQuery
+
     return saveGridConfig({
       screenId: 'trader',
       configKey: key,

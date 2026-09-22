@@ -63,6 +63,7 @@ vi.mock('ag-grid-react', () => ({
               typeof column.editable === 'function'
                 ? column.editable({ data: row })
                 : Boolean(column.editable)
+
             return (
               <span
                 key={key}
@@ -155,6 +156,7 @@ function renderScreen(
     onCommit: vi.fn().mockResolvedValue([]),
     ...overrides,
   }
+
   return { ...render(<PostProcessScreen {...props} />), props }
 }
 
@@ -315,6 +317,7 @@ describe('Post Process reconciliation', () => {
     const [preset, setPreset] = useState(initialPreset)
     const [scope, setScope] = useState<PostProcessScope>('Mine')
     const [items, setItems] = useState([baseItem])
+
     return (
       <PostProcessScreen
         items={items}
@@ -336,6 +339,7 @@ describe('Post Process reconciliation', () => {
                   currentVersion: item.currentVersion + 1,
                 })),
           )
+
           return Promise.resolve([
             {
               caseId: 101,

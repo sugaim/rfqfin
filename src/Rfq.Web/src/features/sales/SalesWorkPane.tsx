@@ -30,15 +30,18 @@ function compactText(value: string, empty = '—') {
   return value.trim() || empty
 }
 
+interface WorkPaneHeaderProps {
+  mode: string
+  row?: SalesRfq
+}
+
 export function WorkPaneHeader({
   mode,
   row,
-}: {
-  mode: string
-  row?: SalesRfq
-}) {
+}: WorkPaneHeaderProps): ReactElement {
   const title =
     mode === 'new' ? 'New RFQ' : row ? `Case ${row.caseId}` : 'Work Pane'
+
   return (
     <div className="work-pane-header">
       <div>
@@ -54,9 +57,14 @@ export function WorkPaneHeader({
   )
 }
 
-function QuoteSummary({ row }: { row: SalesRfq }) {
+interface QuoteSummaryProps {
+  row: SalesRfq
+}
+
+function QuoteSummary({ row }: QuoteSummaryProps): ReactElement | null {
   const quote = row.confirmedQuote
   if (!quote) return null
+
   return (
     <div className="quote-summary">
       <div>
@@ -79,43 +87,59 @@ function QuoteSummary({ row }: { row: SalesRfq }) {
   )
 }
 
-export function LifecyclePane({
-  row,
-  mode,
-  now,
-  isMutating,
-  users,
-  currentUserId,
-  targetContactOwnerId,
-  onTargetContactOwnerChange,
-  onChangeContactOwner,
-  memoEditing,
-  memoDraft,
-  onMemoEdit,
-  onMemoChange,
-  onMemoCancel,
-  onMemoSave,
-  onCorrectOutcome,
-  onCommand,
-}: {
-  row: SalesRfq
-  mode: string
-  now: number
-  isMutating: boolean
+interface ContactOwnerControl {
   users: UserOption[]
   currentUserId: string
   targetContactOwnerId?: string
   onTargetContactOwnerChange: (value: string) => void
   onChangeContactOwner: () => void
+}
+
+interface MemoEditorControl {
   memoEditing: boolean
   memoDraft: string
   onMemoEdit: () => void
   onMemoChange: (value: string) => void
   onMemoCancel: () => void
   onMemoSave: () => void
+}
+
+interface LifecyclePaneProps {
+  row: SalesRfq
+  mode: string
+  now: number
+  isMutating: boolean
+  contactOwner: ContactOwnerControl
+  memo: MemoEditorControl
   onCorrectOutcome: () => void
   onCommand: (command: SalesCommand) => void
-}) {
+}
+
+export function LifecyclePane({
+  row,
+  mode,
+  now,
+  isMutating,
+  contactOwner,
+  memo,
+  onCorrectOutcome,
+  onCommand,
+}: LifecyclePaneProps): ReactElement {
+  const {
+    users,
+    currentUserId,
+    targetContactOwnerId,
+    onTargetContactOwnerChange,
+    onChangeContactOwner,
+  } = contactOwner
+  const {
+    memoEditing,
+    memoDraft,
+    onMemoEdit,
+    onMemoChange,
+    onMemoCancel,
+    onMemoSave,
+  } = memo
   const amendment = row.draftRevisionId
     ? [
         row.draftNotional !== null &&
@@ -134,6 +158,7 @@ export function LifecyclePane({
           : null,
       ].filter(Boolean)
     : []
+
   return (
     <>
       <Descriptions
@@ -357,3 +382,4 @@ export function LifecyclePane({
     </>
   )
 }
+import type { ReactElement } from 'react'

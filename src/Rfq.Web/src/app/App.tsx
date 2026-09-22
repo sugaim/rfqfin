@@ -102,6 +102,7 @@ export function App() {
       setRemoteChangeVersion((current) => current + 1)
       void eventsQuery.refetch()
     })
+
     return () => source.close()
   }, [refreshEventId, eventsQuery.refetch])
 

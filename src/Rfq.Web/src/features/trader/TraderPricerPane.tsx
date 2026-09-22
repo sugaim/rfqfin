@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react'
+import type { Dispatch, ReactElement, SetStateAction } from 'react'
 import {
   Alert,
   Button,
@@ -38,21 +38,7 @@ const driverOptions: {
   { value: 'ZSpread', label: 'Z-Spread' },
 ]
 
-export function TraderPricerPane({
-  selected,
-  scratch,
-  setScratch,
-  setScratchIdentity,
-  result,
-  provenance,
-  sourceRow,
-  canApply,
-  busy,
-  onLoad,
-  onCalculate,
-  onApply,
-  onClear,
-}: {
+interface TraderPricerPaneProps {
   selected?: TraderRfq
   scratch: ScratchState
   setScratch: Dispatch<SetStateAction<ScratchState>>
@@ -69,7 +55,23 @@ export function TraderPricerPane({
   onCalculate: () => void
   onApply: () => void
   onClear: () => void
-}) {
+}
+
+export function TraderPricerPane({
+  selected,
+  scratch,
+  setScratch,
+  setScratchIdentity,
+  result,
+  provenance,
+  sourceRow,
+  canApply,
+  busy,
+  onLoad,
+  onCalculate,
+  onApply,
+  onClear,
+}: TraderPricerPaneProps): ReactElement {
   return (
     <div className="trader-pricer">
       <Space>

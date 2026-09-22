@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
-  AutoComplete,
   Badge,
   Button,
   Drawer,
   Empty,
   Form,
-  Input,
-  InputNumber,
   List,
   Modal,
   Segmented,
@@ -22,12 +19,9 @@ import {
 } from 'antd'
 import type {
   CellEditRequestEvent,
-  ColDef,
-  ColGroupDef,
   GetContextMenuItemsParams,
   GridApi,
   DefaultMenuItem,
-  ICellRendererParams,
   IRowNode,
   MenuItemDef,
   RowClickedEvent,
@@ -50,8 +44,6 @@ import {
   bulkEligibility,
   commandEligible,
   derivePaneMode,
-  displayState,
-  elapsedLabel,
   isTextEditingTarget,
   matchesSalesPreset,
   requiresConfirmation,
@@ -60,6 +52,7 @@ import {
   type SalesCommand,
   type SalesRowCommand,
   type SalesFilterPreset,
+  type SalesRefreshMode,
 } from '@/features/sales/salesModel'
 import {
   applyGridLayout,
@@ -67,10 +60,14 @@ import {
   initializeGridLayout,
   type GridColumnGroupState,
 } from '@/features/grid/gridLayout'
+import { buildSalesColumns } from '@/features/sales/salesColumns'
+import {
+  SalesRfqEditor,
+  type RfqFormValues,
+} from '@/features/sales/SalesRfqEditor'
 import {
   BulkPane,
-  BulkResultBar,
-  RowActions,
+  SalesBulkResultBar,
   type SalesBulkResult,
 } from '@/features/sales/SalesBulkUi'
 import { LifecyclePane, WorkPaneHeader } from '@/features/sales/SalesWorkPane'
@@ -79,7 +76,7 @@ type UserOption = { userId: string; name: string }
 type BulkSnapshotItem = { row: SalesRfq; eligible: boolean; reason?: string }
 type BulkDialog = { command: SalesBulkCommand; items: BulkSnapshotItem[] }
 type SingleDialog = { command: SalesCommand; row: SalesRfq }
-export type SalesRefreshMode = 'live' | 'paused'
+export type { SalesRefreshMode } from '@/features/sales/salesModel'
 
 const million = 1_000_000
 const filterOptions: { value: SalesFilterPreset; label: string }[] = [
@@ -89,17 +86,6 @@ const filterOptions: { value: SalesFilterPreset; label: string }[] = [
   { value: 'owner-and-sales', label: 'Owner & Sales = Me' },
   { value: 'owner-or-sales', label: 'Owner | Sales = Me' },
 ]
-
-interface RfqFormValues {
-  clientId: string
-  securityId: string
-  categoryName: string
-  assignedTraderId: string
-  settlementDate: string
-  standardSettlementDate: string
-  notional?: number
-  salesAndTradingMessage: string
-}
 
 export interface SalesScreenProps {
   rfqs: SalesRfq[]
@@ -171,7 +157,7 @@ export interface SalesScreenProps {
   onSaveGridConfig?: (configJson: string) => Promise<void>
 }
 
-export function SalesScreen(props: SalesScreenProps) {
+export function SalesScreen(props: SalesScreenProps): ReactElement {
   const {
     rfqs,
     clients,
@@ -272,6 +258,7 @@ export function SalesScreen(props: SalesScreenProps) {
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+
     return () => window.clearInterval(timer)
   }, [])
 
@@ -358,6 +345,7 @@ export function SalesScreen(props: SalesScreenProps) {
       setMemoEditing(false)
       setTargetContactOwnerId(undefined)
       if (reload) await onReload()
+
       return true
     } catch (error) {
       const status = (error as { status?: number })?.status
@@ -367,6 +355,7 @@ export function SalesScreen(props: SalesScreenProps) {
           ? 'This RFQ was updated elsewhere. Your local input is preserved; review and reload explicitly.'
           : 'The RFQ action could not be completed.',
       )
+
       return false
     }
   }
@@ -396,6 +385,7 @@ export function SalesScreen(props: SalesScreenProps) {
       setActionError(
         'Select a Security so routing and settlement defaults are resolved.',
       )
+
       return
     }
     await run(async () => {
@@ -614,6 +604,7 @@ export function SalesScreen(props: SalesScreenProps) {
         onSave: onSaveGridConfig,
       }),
     )
+
     return items
   }
 
@@ -625,6 +616,7 @@ export function SalesScreen(props: SalesScreenProps) {
         setDrawerOpen(false)
         setMemoEditing(false)
         if (newIntent) setNewIntent(false)
+
         return
       }
       if (!event.altKey) return
@@ -634,11 +626,13 @@ export function SalesScreen(props: SalesScreenProps) {
       if (key === 'l') {
         event.preventDefault()
         void onRefreshModeChange(refreshMode === 'live' ? 'paused' : 'live')
+
         return
       }
       if (key === 'n') {
         event.preventDefault()
         startNew()
+
         return
       }
       if (key === 'enter') {
@@ -646,275 +640,24 @@ export function SalesScreen(props: SalesScreenProps) {
         if (newIntent || mode === 'draft') void saveDraft(true)
         else if (selected?.draftRevisionId)
           void executeCommand('confirm-amendment', selected)
+
         return
       }
     }
     window.addEventListener('keydown', onKey)
+
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const columns = useMemo<(ColDef<SalesRfq> | ColGroupDef<SalesRfq>)[]>(
-    () => [
-      { field: 'caseId', headerName: 'Case', pinned: 'left', width: 78 },
-      {
-        colId: 'action',
-        headerName: 'Action',
-        pinned: 'left',
-        width: 188,
-        sortable: false,
-        filter: false,
-        suppressMovable: true,
-        cellRenderer: ({ data }: ICellRendererParams<SalesRfq>) =>
-          data ? (
-            <RowActions
-              row={data}
-              userId={currentUserId}
-              disabled={refreshMode === 'live' || isMutating}
-              onCommand={(command) => void executeRowCommand(command, data)}
-            />
-          ) : null,
-      },
-      {
-        groupId: 'client',
-        headerName: 'Client',
-        marryChildren: true,
-        children: [
-          {
-            colId: 'client',
-            headerName: 'Client',
-            field: 'clientName',
-            pinned: 'left',
-            width: 140,
-            tooltipField: 'clientName',
-          },
-          {
-            colId: 'client-detail',
-            headerName: 'Client Name',
-            field: 'clientName',
-            columnGroupShow: 'open',
-            width: 180,
-          },
-          {
-            colId: 'client-id',
-            headerName: 'Client ID',
-            field: 'clientId',
-            columnGroupShow: 'open',
-            width: 120,
-          },
-        ],
-      },
-      {
-        groupId: 'security',
-        headerName: 'Security',
-        marryChildren: true,
-        children: [
-          {
-            colId: 'security',
-            headerName: 'Security',
-            field: 'securityJapaneseName',
-            pinned: 'left',
-            width: 160,
-            tooltipField: 'securityBbgDisplay',
-          },
-          {
-            colId: 'security-ja',
-            headerName: 'Japanese Name',
-            field: 'securityJapaneseName',
-            columnGroupShow: 'open',
-            width: 190,
-          },
-          {
-            colId: 'security-bbg',
-            headerName: 'BBG Display',
-            field: 'securityBbgDisplay',
-            columnGroupShow: 'open',
-            width: 200,
-          },
-          {
-            colId: 'security-id',
-            headerName: 'Security ID',
-            field: 'securityId',
-            columnGroupShow: 'open',
-            width: 130,
-          },
-        ],
-      },
-      {
-        groupId: 'terms',
-        headerName: 'Terms',
-        children: [
-          {
-            field: 'notional',
-            headerName: 'Notl',
-            width: 95,
-            editable: ({ data }) =>
-              Boolean(
-                data &&
-                data.revisionStatus !== 'Draft' &&
-                ['Active', 'Presented'].includes(data.rfqStatus),
-              ),
-            valueGetter: ({ data }) => data?.draftNotional ?? data?.notional,
-            valueFormatter: ({ value }) =>
-              value == null
-                ? ''
-                : `${(Number(value) / million).toLocaleString()} MM`,
-            cellClass: ({ data }) =>
-              data?.draftNotional != null
-                ? 'amendment-changed-cell'
-                : undefined,
-          },
-          {
-            field: 'settlementDate',
-            headerName: 'Settle',
-            width: 105,
-            editable: ({ data }) =>
-              Boolean(
-                data &&
-                data.revisionStatus !== 'Draft' &&
-                ['Active', 'Presented'].includes(data.rfqStatus),
-              ),
-            valueGetter: ({ data }) =>
-              data?.draftSettlementDate ?? data?.settlementDate,
-            cellClass: ({ data }) =>
-              data?.draftSettlementDate != null
-                ? 'amendment-changed-cell'
-                : undefined,
-          },
-          { field: 'assignedTraderId', headerName: 'Trader', width: 105 },
-        ],
-      },
-      {
-        groupId: 'state',
-        headerName: 'State',
-        children: [
-          {
-            colId: 'state',
-            headerName: 'State',
-            width: 100,
-            valueGetter: ({ data }) => (data ? displayState(data) : ''),
-          },
-          {
-            field: 'rfqStatus',
-            headerName: 'RFQ Status',
-            columnGroupShow: 'open',
-            width: 110,
-          },
-          {
-            field: 'quoteStatus',
-            headerName: 'Quote Status',
-            columnGroupShow: 'open',
-            width: 110,
-          },
-          {
-            field: 'quoteRequestReason',
-            headerName: 'Reason',
-            columnGroupShow: 'open',
-            width: 105,
-          },
-        ],
-      },
-      {
-        colId: 'amend',
-        headerName: 'Work',
-        width: 78,
-        valueGetter: ({ data }) =>
-          data?.draftRevisionId
-            ? 'AMEND'
-            : data?.revisionStatus === 'Draft'
-              ? 'DRAFT'
-              : '',
-      },
-      {
-        groupId: 'time',
-        headerName: 'Time',
-        children: [
-          {
-            colId: 'elapsed',
-            headerName: 'Elapsed',
-            width: 90,
-            valueGetter: ({ data }) =>
-              data ? elapsedLabel(data.stateSince, now) : '',
-          },
-          {
-            field: 'createdAt',
-            headerName: 'Created',
-            columnGroupShow: 'open',
-            width: 155,
-            valueFormatter: ({ value }) =>
-              value ? new Date(String(value)).toLocaleString() : '',
-          },
-          {
-            field: 'stateSince',
-            headerName: 'State Since',
-            columnGroupShow: 'open',
-            width: 155,
-            valueFormatter: ({ value }) =>
-              value ? new Date(String(value)).toLocaleString() : '',
-          },
-        ],
-      },
-      {
-        groupId: 'quote',
-        headerName: 'Quote',
-        children: [
-          {
-            colId: 'price',
-            headerName: 'Price',
-            width: 90,
-            valueGetter: ({ data }) => data?.confirmedQuote?.price ?? null,
-          },
-          {
-            colId: 'yield',
-            headerName: 'Yield',
-            columnGroupShow: 'open',
-            width: 85,
-            valueGetter: ({ data }) => data?.confirmedQuote?.bbgYield ?? null,
-            valueFormatter: ({ value }) => (value == null ? '' : `${value}%`),
-          },
-          {
-            colId: 'simple',
-            headerName: 'Simple',
-            columnGroupShow: 'open',
-            width: 85,
-            valueGetter: ({ data }) =>
-              data?.confirmedQuote?.finalSimpleYield ?? null,
-            valueFormatter: ({ value }) => (value == null ? '' : `${value}%`),
-          },
-          {
-            colId: 'g-spread',
-            headerName: 'G-Spread',
-            columnGroupShow: 'open',
-            width: 90,
-            valueGetter: ({ data }) => data?.confirmedQuote?.gSpread ?? null,
-            valueFormatter: ({ value }) => (value == null ? '' : `${value} bp`),
-          },
-        ],
-      },
-      {
-        field: 'salesAndTradingMessage',
-        headerName: 'Message',
-        width: 180,
-        tooltipField: 'salesAndTradingMessage',
-        editable: ({ data }) =>
-          Boolean(
-            data &&
-            data.revisionStatus !== 'Draft' &&
-            ['Active', 'Presented'].includes(data.rfqStatus),
-          ),
-        valueGetter: ({ data }) =>
-          data?.draftSalesAndTradingMessage ?? data?.salesAndTradingMessage,
-        cellClass: ({ data }) =>
-          data?.draftSalesAndTradingMessage != null
-            ? 'amendment-changed-cell'
-            : undefined,
-      },
-      {
-        field: 'currentQuoteId',
-        headerName: 'Quote ID',
-        hide: true,
-        valueFormatter: ({ value }) => (value ? String(value).slice(0, 8) : ''),
-      },
-    ],
+  const columns = useMemo(
+    () =>
+      buildSalesColumns({
+        currentUserId,
+        isMutating,
+        now,
+        refreshMode,
+        onRowCommand: (command, row) => void executeRowCommand(command, row),
+      }),
     [currentUserId, isMutating, now, refreshMode],
   )
 
@@ -934,6 +677,7 @@ export function SalesScreen(props: SalesScreenProps) {
     if (newIntent || mode === 'draft' || selected?.draftRevisionId)
       parts.push('Alt+Enter Confirm')
     parts.push('Alt+L Live/Pause', 'Alt+N New', 'Right-click for actions')
+
     return parts.join(' · ')
   })()
   const statusBar = useMemo<{ statusPanels: StatusPanelDef[] }>(
@@ -1096,107 +840,23 @@ export function SalesScreen(props: SalesScreenProps) {
                   <>
                     <WorkPaneHeader mode={mode} row={selected} />
                     {(mode === 'new' || mode === 'draft') && (
-                      <Spin spinning={defaultsLoading}>
-                        <Form<RfqFormValues>
-                          form={form}
-                          layout="vertical"
-                          size="small"
-                          className="sales-form"
-                        >
-                          <Form.Item
-                            name="clientId"
-                            label="Client"
-                            rules={[{ required: true }]}
-                          >
-                            <AutoComplete
-                              disabled={mode === 'draft'}
-                              filterOption={false}
-                              onSearch={(value) => void onClientSearch(value)}
-                              options={clients.map((client) => ({
-                                value: client.clientId,
-                                label: `${client.name} · ${client.code}`,
-                              }))}
-                            />
-                          </Form.Item>
-                          <Form.Item
-                            name="securityId"
-                            label="Security"
-                            rules={[{ required: true }]}
-                          >
-                            <AutoComplete
-                              disabled={mode === 'draft'}
-                              filterOption={false}
-                              onSearch={(value) => void onSecuritySearch(value)}
-                              onSelect={(value) => void applyDefaults(value)}
-                              options={securities.map((security) => ({
-                                value: security.securityId,
-                                label: `${security.japaneseName} · ${security.bbgDisplay}`,
-                              }))}
-                            />
-                          </Form.Item>
-                          <div className="sales-form-subfields">
-                            <Form.Item name="categoryName" label="Category">
-                              <Input disabled />
-                            </Form.Item>
-                            <Form.Item name="assignedTraderId" label="Trader">
-                              <Select
-                                options={traders.map((trader) => ({
-                                  value: trader.userId,
-                                  label: trader.name,
-                                }))}
-                              />
-                            </Form.Item>
-                          </div>
-                          <Form.Item name="settlementDate" label="Settle">
-                            <Input type="date" />
-                          </Form.Item>
-                          <Form.Item name="standardSettlementDate" hidden>
-                            <Input />
-                          </Form.Item>
-                          <Form.Item name="notional" label="Notl (MM)">
-                            <InputNumber min={0} precision={2} />
-                          </Form.Item>
-                          <Form.Item
-                            name="salesAndTradingMessage"
-                            label="Message"
-                          >
-                            <Input />
-                          </Form.Item>
-                          <Space wrap>
-                            <Button
-                              size="small"
-                              loading={isMutating}
-                              onClick={() => void saveDraft(false)}
-                            >
-                              Save Draft
-                            </Button>
-                            <Button
-                              size="small"
-                              type="primary"
-                              loading={isMutating}
-                              onClick={() => void saveDraft(true)}
-                            >
-                              Confirm
-                            </Button>
-                            {mode === 'draft' && selected && (
-                              <Button
-                                size="small"
-                                danger
-                                onClick={() =>
-                                  void run(() =>
-                                    onDiscard(
-                                      selected.caseId,
-                                      selected.version,
-                                    ),
-                                  )
-                                }
-                              >
-                                Discard
-                              </Button>
-                            )}
-                          </Space>
-                        </Form>
-                      </Spin>
+                      <SalesRfqEditor
+                        form={form}
+                        mode={mode}
+                        selected={selected}
+                        clients={clients}
+                        securities={securities}
+                        traders={traders}
+                        defaultsLoading={defaultsLoading}
+                        isMutating={isMutating}
+                        onClientSearch={onClientSearch}
+                        onSecuritySearch={onSecuritySearch}
+                        onSecuritySelect={applyDefaults}
+                        onSave={saveDraft}
+                        onDiscard={async (row) => {
+                          await run(() => onDiscard(row.caseId, row.version))
+                        }}
+                      />
                     )}
                     {mode === 'neutral' && (
                       <Empty
@@ -1211,40 +871,42 @@ export function SalesScreen(props: SalesScreenProps) {
                           mode={mode}
                           now={now}
                           isMutating={isMutating}
-                          users={users}
-                          currentUserId={currentUserId}
-                          targetContactOwnerId={targetContactOwnerId}
-                          onTargetContactOwnerChange={setTargetContactOwnerId}
-                          onChangeContactOwner={() =>
-                            targetContactOwnerId &&
-                            void run(async () => {
-                              await onChangeContactOwner(
-                                selected.caseId,
-                                targetContactOwnerId,
-                                selected.currentVersion,
-                              )
-                              setTargetContactOwnerId(undefined)
-                            }, refreshMode === 'live')
-                          }
-                          memoEditing={memoEditing}
-                          memoDraft={memoDraft}
-                          onMemoEdit={() => {
-                            setMemoDraft(selected.salesMemo)
-                            setMemoEditing(true)
-                          }}
-                          onMemoChange={setMemoDraft}
-                          onMemoCancel={() => setMemoEditing(false)}
-                          onMemoSave={() =>
-                            void run(
-                              () =>
-                                onUpdateMemo(
+                          contactOwner={{
+                            users,
+                            currentUserId,
+                            targetContactOwnerId,
+                            onTargetContactOwnerChange: setTargetContactOwnerId,
+                            onChangeContactOwner: () =>
+                              targetContactOwnerId &&
+                              void run(async () => {
+                                await onChangeContactOwner(
                                   selected.caseId,
-                                  memoDraft,
-                                  selected.salesMemoVersion,
-                                ),
-                              refreshMode === 'live',
-                            )
-                          }
+                                  targetContactOwnerId,
+                                  selected.currentVersion,
+                                )
+                                setTargetContactOwnerId(undefined)
+                              }, refreshMode === 'live'),
+                          }}
+                          memo={{
+                            memoEditing,
+                            memoDraft,
+                            onMemoEdit: () => {
+                              setMemoDraft(selected.salesMemo)
+                              setMemoEditing(true)
+                            },
+                            onMemoChange: setMemoDraft,
+                            onMemoCancel: () => setMemoEditing(false),
+                            onMemoSave: () =>
+                              void run(
+                                () =>
+                                  onUpdateMemo(
+                                    selected.caseId,
+                                    memoDraft,
+                                    selected.salesMemoVersion,
+                                  ),
+                                refreshMode === 'live',
+                              ),
+                          }}
                           onCorrectOutcome={() => {
                             const reason = window.prompt('Correction Reason')
                             if (!reason?.trim()) return
@@ -1284,7 +946,7 @@ export function SalesScreen(props: SalesScreenProps) {
       </div>
 
       {bulkResult && (
-        <BulkResultBar
+        <SalesBulkResultBar
           result={bulkResult}
           expanded={resultExpanded}
           onToggle={() => setResultExpanded((current) => !current)}

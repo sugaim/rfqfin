@@ -16,6 +16,7 @@ type GridColumn = {
 
 vi.mock('ag-grid-react', async () => {
   const React = await import('react')
+
   return {
     AgGridReact: ({
       rowData,
@@ -99,6 +100,7 @@ vi.mock('ag-grid-react', async () => {
           },
         })
       }
+
       return (
         <div
           data-testid="grid-selection-config"
@@ -118,6 +120,7 @@ vi.mock('ag-grid-react', async () => {
               )
               .map(([name]) => name)
               .join(' ')
+
             return (
               <div
                 key={row.caseId}
@@ -183,6 +186,7 @@ vi.mock('ag-grid-react', async () => {
                       : (row as unknown as Record<string, unknown>)[columnKey]
                     const display =
                       column.valueFormatter?.({ value }) ?? value ?? ''
+
                     return (
                       <output
                         key={columnKey}
@@ -203,6 +207,7 @@ vi.mock('ag-grid-react', async () => {
           })}
           {statusBar?.statusPanels.map((panel, index) => {
             const Component = components?.[panel.statusPanel]
+
             return Component ? (
               <div key={index}>
                 {Component({

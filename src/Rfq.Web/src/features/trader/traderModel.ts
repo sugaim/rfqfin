@@ -46,6 +46,7 @@ export function traderState(row: TraderRfq) {
     Expired: 'Exp',
     Reopened: 'Reopen',
   }
+
   return row.quoteStatus === 'Requested'
     ? `Req/${reasons[row.quoteRequestReason ?? ''] ?? row.quoteRequestReason ?? '—'}`
     : row.rfqStatus
@@ -54,6 +55,7 @@ export function traderState(row: TraderRfq) {
 export function traderRouting(row: TraderRfq, currentUserId: string) {
   const trader =
     row.assignedTraderId === currentUserId ? 'Me' : row.assignedTraderId
+
   return `${trader} · ${row.owned ? 'Owned' : 'New'}`
 }
 
@@ -68,6 +70,7 @@ export function attentionClass(row: TraderRfq, currentUserId: string) {
     return 'trader-row-attention-work'
   if (['Cancelled', 'Hit', 'Away'].includes(row.rfqStatus))
     return 'trader-row-terminal'
+
   return ''
 }
 
@@ -96,6 +99,7 @@ export function requiresPickUpConfirmation(
 
 export function isConfirmable(row: TraderRfq, currentUserId: string) {
   if (!canEditQuote(row, currentUserId)) return false
+
   return row.workingQuoteMode === 'Calculated'
     ? row.calculated !== null
     : row.manual?.price != null && row.manual.finalSimpleYield != null
@@ -108,6 +112,7 @@ export function elapsedLabel(stateSince: string, now = Date.now()) {
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h ${minutes % 60}m`
+
   return `${Math.floor(hours / 24)}d ${hours % 24}h`
 }
 
@@ -117,6 +122,7 @@ export function searchDateRange(date: string, preset: SearchDatePreset) {
   const count = Number(preset.slice(0, -1))
   if (preset.endsWith('M')) from.setUTCMonth(from.getUTCMonth() - count)
   else from.setUTCFullYear(from.getUTCFullYear() - count)
+
   return { createdFrom: from.toISOString().slice(0, 10), createdTo: date }
 }
 
@@ -233,5 +239,6 @@ export function calculatedValue(
     ISpread: payload.iSpread,
     ZSpread: payload.zSpread,
   }
+
   return values[driver]
 }

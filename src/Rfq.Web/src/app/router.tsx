@@ -13,6 +13,7 @@ import { App } from '@/app/App'
 export function defaultWorkspacePath() {
   const identity =
     window.localStorage.getItem('rfq-development-user') ?? 'sales-dev'
+
   return identity.startsWith('trader-') ? '/trader' : '/sales'
 }
 

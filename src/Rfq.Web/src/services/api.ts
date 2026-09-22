@@ -428,6 +428,7 @@ export const api = createApi({
     prepareHeaders: (headers) => {
       const identity = window.localStorage.getItem('rfq-development-user')
       if (identity) headers.set('X-Development-User', identity)
+
       return headers
     },
   }),

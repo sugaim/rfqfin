@@ -1,5 +1,7 @@
 import type { SalesRfq } from '@/services/api'
 
+export type SalesRefreshMode = 'live' | 'paused'
+
 export type SalesFilterPreset =
   'all' | 'owner' | 'sales' | 'owner-and-sales' | 'owner-or-sales'
 export type SalesPaneMode =
@@ -66,6 +68,7 @@ export function derivePaneMode(
   if (selected.rfqStatus === 'Cancelled') return 'cancelled'
   if (selected.rfqStatus === 'Hit') return 'hit'
   if (selected.rfqStatus === 'Away') return 'away'
+
   return selected.quoteStatus === 'Quoted' ? 'quoted' : 'waiting'
 }
 
@@ -88,11 +91,13 @@ export function rowActionCommands(
   ] as const) {
     if (commandEligible(command, row, userId)) commands.push(command)
   }
+
   return commands
 }
 
 export function reconcileSelection(caseIds: number[], rows: SalesRfq[]) {
   const existing = new Set(rows.map((row) => row.caseId))
+
   return caseIds.filter((caseId) => existing.has(caseId))
 }
 
@@ -123,6 +128,7 @@ export function displayState(row: SalesRfq) {
   if (row.rfqStatus === 'Cancelled') return 'CANCELLED'
   if (row.rfqStatus === 'Hit') return 'HIT'
   if (row.rfqStatus === 'Away') return 'AWAY'
+
   return row.quoteStatus === 'Quoted' ? 'QUOTED' : 'WAITING'
 }
 
@@ -132,6 +138,7 @@ export function elapsedLabel(stateSince: string, now = Date.now()) {
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h ${minutes % 60}m`
+
   return `${Math.floor(hours / 24)}d ${hours % 24}h`
 }
 
@@ -195,6 +202,7 @@ export function bulkEligibility(
 
 export function isTextEditingTarget(target: EventTarget | null) {
   const element = target instanceof HTMLElement ? target : null
+
   return Boolean(
     element &&
     (element.isContentEditable ||
