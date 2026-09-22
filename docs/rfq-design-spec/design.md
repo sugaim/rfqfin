@@ -22,7 +22,7 @@ It deliberately does **not** prescribe a historical implementation sequence. Imp
 1. [01-domain-model.md](01-domain-model.md) — entities, immutable domain data, lifecycle states, revisions, quotes, ownership, category, memos, versions.
 2. [02-state-transitions.md](02-state-transitions.md) — business transition categories and transition rules.
 3. [03-use-cases-and-authorization.md](03-use-cases-and-authorization.md) — Application/Domain split, authorization, commands/queries, concurrency, errors.
-4. [04-ui-ux.md](04-ui-ux.md) — Sales/Trader/EOD screens, grid behavior, refresh/change tracking, search, pricer, and draft UX.
+4. [04-ui-ux.md](04-ui-ux.md) — Sales/Trader/Post Process workspaces, grid behavior, refresh/change tracking, search, pricer, settings, and draft UX.
 5. [05-persistence-and-events.md](05-persistence-and-events.md) — logical schema, mapping, event persistence, transactions, constraints.
 6. [06-calculation-and-search.md](06-calculation-and-search.md) — calculation boundary, WorkingQuote update flow, security/client search, defaults.
 7. [07-runtime-and-notifications.md](07-runtime-and-notifications.md) — ASP.NET runtime, SSE wake-up, event retrieval, expiry worker, observability.
@@ -902,13 +902,17 @@ Domain precondition:
 - Open RFQ has a current confirmed quote
 - Presentation is not required
 
-Effects:
+Effects are operation-specific:
 
 ```text
-OpenRfq -> ClosedRfq
-ClosedQuoteId = current quote
-Outcome = Hit | Away
+CloseHit(OpenRfq, BusinessDate)  -> HitRfq
+CloseAway(OpenRfq, BusinessDate) -> AwayRfq
 ```
+
+Both concrete closed states retain:
+
+- `ClosedQuoteId = current quote`
+- `ClosedBusinessDate = current Business Date`
 
 Also:
 
@@ -918,6 +922,8 @@ Also:
 - Case-level Assigned Trader retained
 - Case-level Contact Owner retained
 
+Public Application/API operations are explicit `CloseHitRfq` / `CloseAwayRfq`. An internal shared orchestration helper may still dispatch the two operations, but Hit/Away is not modeled as a generic public lifecycle payload.
+
 ### Bulk Close
 
 Bulk Hit/Away closes only Cases that are still eligible/open.
@@ -926,13 +932,19 @@ Already Hit/Away Cases are skipped; bulk Close never silently changes an existin
 
 ### Outcome correction
 
-Explicit transition only:
+Explicit Domain transitions only:
 
 ```text
-Closed(Hit) <-> Closed(Away)
+CorrectToAway(HitRfq) -> AwayRfq
+CorrectToHit(AwayRfq) -> HitRfq
 ```
 
-Case remains Closed; append outcome-correction history/event.
+Application additionally requires:
+
+- current Business Date equals the original `ClosedBusinessDate`
+- a non-empty trimmed correction reason
+
+The original `ClosedBusinessDate` is preserved. Append an `OutcomeCorrected` event carrying the correction reason and current Business Date.
 
 ---
 
@@ -2087,7 +2099,7 @@ Required persisted facts include:
 
 These values are written by Application use cases using the authoritative business-date provider.
 
-Do not implement Today/EOD/Post Process semantics by converting timestamps in SQL or by assuming UTC date equals desk date.
+Do not implement Today/Post Process semantics by converting timestamps in SQL or by assuming UTC date equals desk date.
 
 Outcome correction preserves the original `ClosedBusinessDate`; the correction event carries the current Business Date.
 
@@ -2141,8 +2153,11 @@ A DB-serialized cursor allocator held through transaction commit is acceptable. 
 EventId -> Event
 CaseId
 Type
+BusinessDate?
 Payload jsonb
 ```
+
+`BusinessDate` belongs on the RFQ-event child row because it is an RFQ business-day fact used by Post Process/operational queries. Quote events do not acquire a Business Date merely because they share the parent Event row.
 
 ### `QuoteEvent`
 
