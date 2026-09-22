@@ -27,7 +27,7 @@ static async Task<int> RunAsync(string[] args)
         });
         builder.Logging.ClearProviders();
         builder.Logging.AddSimpleConsole(options => options.SingleLine = true);
-        builder.Services.AddRfqInfrastructure(builder.Configuration);
+        builder.Services.AddRfqDatabaseOperations(builder.Configuration);
 
         using var host = builder.Build();
         using var scope = host.Services.CreateScope();

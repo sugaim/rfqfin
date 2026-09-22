@@ -10,13 +10,7 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString(PostgreSqlDatabaseConfiguration.ConnectionStringName)
-            ?? throw new InvalidOperationException(
-                $"Connection string '{PostgreSqlDatabaseConfiguration.ConnectionStringName}' is not configured.");
-
-        services.AddDbContext<RfqDbContext>(options =>
-            PostgreSqlDatabaseConfiguration.Configure(options, connectionString));
-        services.AddSingleton(TimeProvider.System);
+        services.AddRfqDatabaseOperations(configuration);
         services.AddScoped<ICaseIdGenerator, PostgreSqlCaseIdGenerator>();
         services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
         services.AddScoped<ISalesRfqQueries, EfCoreSalesRfqQueries>();
@@ -45,6 +39,21 @@ public static class DependencyInjection
         services.AddScoped<IGridConfigStore, EfCoreGridConfigStore>();
         services.AddSingleton<IStandardSettlementResolver, MockStandardSettlementResolver>();
         services.AddScoped<IUnitOfWork, PostgreSqlUnitOfWork>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddRfqDatabaseOperations(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString(PostgreSqlDatabaseConfiguration.ConnectionStringName)
+            ?? throw new InvalidOperationException(
+                $"Connection string '{PostgreSqlDatabaseConfiguration.ConnectionStringName}' is not configured.");
+
+        services.AddDbContext<RfqDbContext>(options =>
+            PostgreSqlDatabaseConfiguration.Configure(options, connectionString));
+        services.AddSingleton(TimeProvider.System);
         services.AddScoped<DevelopmentDataSeeder>();
         services.AddScoped<DatabaseOperations>();
 
