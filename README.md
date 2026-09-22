@@ -2,6 +2,10 @@
 
 Bond RFQ application.
 
+## Design
+
+The single canonical design document is [docs/design.md](docs/design.md). Git history is the design-document version history; historical implementation instructions are not kept as active documentation.
+
 ## Prerequisites
 
 - Visual Studio 2022 with the .NET 9 SDK
@@ -69,7 +73,7 @@ Suggested journeys:
    sees the confirmed revision, then Confirm the amendment and requote.
 3. Withdraw a non-presented quote, or Cancel then Reopen it. Expiring quotes are
    detected by the development worker every two seconds.
-4. Use Past RFQ, history, EOD and the independent Pricer to inspect the seeded set.
+4. Use Past RFQ, Post Process and the independent Pricer to inspect and clean up the seeded set.
 
 The local stack deliberately uses development identity headers, mock pricing,
 one application server, and no external market-data integration.

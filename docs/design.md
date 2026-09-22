@@ -1,58 +1,87 @@
 # JPY Corporate Bond RFQ System — Canonical Design
 
-This directory is the canonical design specification for the internal JPY corporate bond RFQ system.
+This file is the **single canonical design document** for the internal JPY corporate bond RFQ system.
 
-It records:
+It is updated in place. There is no independent document version number: **Git history is the version history**. Historical implementation instructions, refactoring plans, and change notes are intentionally not part of the active documentation set.
 
-- domain data and invariants
-- business state transitions
-- application/use-case boundaries
-- authorization boundaries
-- UI behavior
-- persistence/event design
-- calculation/search boundaries
-- runtime assumptions
-- test/seed strategy
-- explicit non-goals and rationale
+This document records current intended behavior and the design rules that should survive implementation changes. It is not an implementation diary and does not prescribe a historical sequence of changes.
 
-It deliberately does **not** prescribe a historical implementation sequence. Implementation instructions may describe how to reach this design, but if an implementation instruction conflicts with this canonical design, **this canonical design wins unless the design is explicitly revised**.
+## 1. System purpose and business boundary
 
-## Document map
+This application supports an internal JPY corporate-bond RFQ workflow.
 
-1. [01-domain-model.md](01-domain-model.md) — entities, immutable domain data, lifecycle states, revisions, quotes, ownership, category, memos, versions.
-2. [02-state-transitions.md](02-state-transitions.md) — business transition categories and transition rules.
-3. [03-use-cases-and-authorization.md](03-use-cases-and-authorization.md) — Application/Domain split, authorization, commands/queries, concurrency, errors.
-4. [04-ui-ux.md](04-ui-ux.md) — Sales/Trader/Post Process workspaces, grid behavior, refresh/change tracking, search, pricer, settings, and draft UX.
-5. [05-persistence-and-events.md](05-persistence-and-events.md) — logical schema, mapping, event persistence, transactions, constraints.
-6. [06-calculation-and-search.md](06-calculation-and-search.md) — calculation boundary, WorkingQuote update flow, security/client search, defaults.
-7. [07-runtime-and-notifications.md](07-runtime-and-notifications.md) — ASP.NET runtime, SSE wake-up, event retrieval, expiry worker, observability.
-8. [08-testing-and-seed.md](08-testing-and-seed.md) — domain/application/infrastructure tests and seed data.
-9. [09-scope-and-deferred.md](09-scope-and-deferred.md) — explicit non-goals and future design space.
-10. [10-design-decisions.md](10-design-decisions.md) — rationale for non-obvious choices.
+At a high level:
 
-A concatenated convenience copy is also provided as [design.md](design.md).
+- Sales creates/manages the customer inquiry and customer-contact workflow.
+- Trader owns quote work and calculation/confirmation operations when authorized.
+- Contact Owner owns customer-facing presentation and normal Hit/Away closure.
+- Post Process supports operational cleanup, same-Business-Date outcome correction, and own-side memo maintenance.
+- The RFQ workflow ends at RFQ outcomes such as Hit, Away, or Cancelled.
+- **Hit is not Booking.** Booking/ticket creation and booking reconciliation are separate downstream concerns.
+- Detailed bond pricing, curve/convention logic, and standard-settlement calculation belong behind the Calculation boundary rather than inside the RFQ workflow application.
 
-## Design principles
+The system is intentionally an RFQ workflow application, not a generic workflow engine, OMS, booking system, or pricing library.
 
-- Domain data is immutable from callers and represents valid business state.
-- Use types to make important invalid RFQ/quote state combinations unrepresentable where practical.
-- Classify Domain transitions by **business transition category**, not by the number of objects they touch.
-- Application is the Use Case layer: it loads, authorizes, allocates IDs/time, invokes Domain transitions/factories, persists, emits events, and commits atomically.
-- Actor/role authorization is centralized in Application; state validity belongs to Domain transitions.
-- Confirmed business facts are immutable snapshots.
-- Persistence shape may be flattened and does not need to mirror the typed Domain hierarchy.
-- Use typed IDs and value objects inside Domain/Application; convert to raw transport/persistence primitives at boundaries.
-- Use optimistic concurrency and transactional use cases rather than long-lived locks.
-- Do not make the browser silently replace actively edited data.
-- Preserve history/provenance sufficient for reconciliation and investigation.
-- Prefer replaceable boundaries over speculative generalization.
+## 2. Architecture at a glance
 
+```text
+React / TypeScript browser
+        |
+        v
+ASP.NET Core API
+        |
+        v
+Rfq.Application  (Use Cases)
+        |
+        +----> Rfq.Domain
+        |
+        +----> ports / abstractions
+                 |
+                 +----> PostgreSQL / EF Core infrastructure
+                 +----> Calculation service/client
+                 +----> event / time / identity infrastructure
+```
+
+Dependency direction and responsibility matter more than the physical diagram:
+
+- Domain contains valid business state and deterministic business transformations.
+- Application orchestrates use cases around Domain and external/system concerns.
+- API maps transport contracts to/from Application.
+- Infrastructure implements persistence and other external ports.
+- React owns presentation and FE-local interaction state, not business authority.
+
+## 3. Non-negotiable design rules
+
+These rules are the fastest way to understand what must not be casually refactored away.
+
+1. **Domain data represents valid business state.** Important invalid RFQ/quote combinations should be unrepresentable through public construction where practical.
+2. **Business state is immutable from callers.** State changes return new state through explicit Domain transitions/factories.
+3. **Domain/Application boundary is decided by invariants and coherency, not by object count.** An operation belongs in Domain when splitting it into independently callable pieces would permit an invalid business state. Touching multiple objects does not by itself make something Application logic.
+4. **Data and business operations are deliberately separated.** Business transitions are generally explicit operation/transition functions rather than mutable entity member methods. Factories, validation, and natural value-object operations may still live on the type.
+5. **Application is the Use Case layer.** It owns loading, authorization, ID/time/Business-Date resolution, external calls, persistence, event append, and transaction orchestration.
+6. **State validity and actor authorization are different concerns.** Domain owns state validity; Application owns current-user/role/desk policy.
+7. **Business Date is a first-class business fact.** Persist it where semantics depend on the desk day; do not reconstruct operational day from UTC timestamps.
+8. **Use optimistic concurrency.** Do not hold long-lived DB locks around user work or external calculation; re-read/revalidate after external work before applying results.
+9. **Bulk APIs remain operation-specific and reuse single-item business logic.** Bulk is normally per-Case atomic with explicit partial success; unexpected/invariant failures are not silently converted into ordinary item failures.
+10. **Persistence shape may differ from Domain shape.** Current operational state is stored directly; persisted Events are audit/notification/history, not event sourcing.
+11. **SSE is a wake-up mechanism, not authoritative state.** Authoritative state comes from normal queries/persisted data.
+12. **Calculation does pricing; RFQ Application owns RFQ workflow.** Calculation must not become the owner of lifecycle, ownership, WorkingQuote persistence, or RFQ concurrency.
+13. **Do not silently replace actively edited operator state.** Remote change awareness and authoritative refresh/reconciliation are explicit.
+14. **This is a dense operational desktop tool.** Information density, inline/grid editing, keyboard efficiency, and low-friction repeated actions are product requirements; confirmations should be proportional to risk rather than applied everywhere.
+15. **Semantic personal settings are typed.** Theme, Default Quote Mode, and Quote Expiry use typed contracts; grid layout alone is intentionally frontend-owned opaque JSON.
+16. **Source organization is feature-first.** Group by business/use-case ownership; use technical/framework buckets only for genuinely cross-cutting concepts.
+
+## 4. Documentation rule
+
+Only this file under `docs/` is active design documentation.
+
+Code remains authoritative for mechanical implementation details that carry no design meaning, such as a private helper name. This document is authoritative for business meaning, invariants, responsibility boundaries, and deliberate architectural/UX rules. If code and this document diverge on those matters, reconcile the inconsistency rather than treating an old implementation instruction as authority.
 
 ---
 
 # 01. Domain Model
 
-## 1. RFQ Case identity
+## 1. RFQ Case identity and current shape
 
 An **RFQ Case** represents one customer inquiry that ultimately closes with one Hit/Away outcome.
 
@@ -62,27 +91,51 @@ Boundary rule:
 - if two conditions can coexist and independently result in Hit/Away, they are separate Cases
 - future List / Thread / Portfolio grouping lives outside the Case
 
-Stable Case identity:
-
-- `CaseId`
-- `ClientId`
-- `SecurityId`
-
 Changing Client or Security means creating a new Case, not a Revision.
 
-Case-level facts/current responsibility include:
+Current Domain shape:
 
-- `CreatedAt`
-- `CreatedBy`
-- `SalesId?`
-- `CategorySnapshot : CategoryId`
-- `CopiedFromCaseId?`
-- `ContactOwnerId`
-- `AssignedTraderId`
-- `Version : StateVersion`
-- source metadata if external sources are added later
+```text
+RfqCase
+- CaseId
+- ClientId
+- SecurityId
+- CategorySnapshot : CategoryId
+- CreatedAt
+- CreatedBusinessDate?
+- CreatedBy
+- SalesId?
+- ContactOwnerId
+- AssignedTraderId
+- Version : StateVersion
+- CurrentRevision : RfqRevision
+- Lifecycle : RfqLifecycle
+- PendingDraftRevision?
+- CopiedFromCaseId?
+```
+
+Useful status/quote/close/ownership properties are derived from the typed lifecycle rather than maintained as a second mutable source of truth:
+
+- `Status`
+- `QuoteStatus?`
+- `QuoteRequestReason?`
+- `CurrentQuoteId?`
+- `ClosedQuoteId?`
+- `ClosedBusinessDate?`
+- `Ownership?`
 
 `ContactOwnerId` and `AssignedTraderId` are Case-level values. Do not duplicate them inside lifecycle subtypes.
+
+### CaseId semantics
+
+`CaseId` is an internal typed identity backed by PostgreSQL `bigint identity`.
+
+It is **not** a gapless business sequence or a human-facing business number:
+
+- gaps are allowed after failed/rolled-back allocation and normal DB behavior
+- the value must not be interpreted as an exact count of Cases
+- internal ordering/identity convenience does not make it a contractual display number
+- a separate human-facing case/reference number may be added later without replacing the internal CaseId
 
 ---
 
@@ -96,7 +149,8 @@ In particular:
 - `RfqRevision`
 - `WorkingQuote`
 - `ConfirmedQuote`
-- `CaseMemo`
+- `SalesMemo`
+- `TraderMemo`
 - lifecycle/state values
 
 must not expose mutating public methods/setters.
@@ -246,12 +300,27 @@ Persistence may store this as a boolean projection.
 
 ## 6. Revision model
 
-A Revision owns the customer condition set. A useful value object is:
+A Revision owns the customer condition set.
+
+Current Domain shape:
 
 ```text
+RfqRevision
+- RevisionId
+- CaseId
+- Status
+- Terms : RevisionTerms
+- CopiedFromRevisionId?
+- QuoteSeedRevisionId?
+- Version : StateVersion
+- CreatedAt
+- CreatedBy
+- ConfirmedAt?
+- ConfirmedBy?
+
 RevisionTerms
-- Notional
-- SettlementDate
+- Notional?
+- SettlementDate?
 - StandardSettlementDate
 - SalesAndTradingMessage
 ```
@@ -280,10 +349,10 @@ Rules:
 - discarding a Draft -> `Discarded`
 - old Revisions are never reactivated
 
-Revision provenance may include:
+Revision provenance:
 
-- `CopiedFromRevisionId?`
-- `QuoteSeedRevisionId?`
+- `CopiedFromRevisionId?` records copied conditions
+- `QuoteSeedRevisionId?` explicitly identifies a historical quote seed where applicable
 
 The Case property must be named according to its semantics: use `CurrentRevision`, not a mutable property called `InitialRevision` that later contains amendments.
 
@@ -301,6 +370,61 @@ Revision -> 0..1 WorkingQuote
 
 Persisted operational intent is that a confirmed/current Revision has one WorkingQuote.
 
+Current Domain shape:
+
+```text
+WorkingQuote
+- RevisionId
+- Mode : Calculated | Manual
+- Calculated?
+- Manual?
+- Version : StateVersion
+- CreatedAt
+- CreatedBy
+- UpdatedAt
+- UpdatedBy
+```
+
+Calculated payload:
+
+```text
+CalculatedQuotePayload
+- Driver
+- DriverValue
+- Price
+- BbgYield
+- BaseSimpleYield
+- SimpleYieldSlide
+- FinalSimpleYield
+- InternalYield
+- GSpread
+- Asw
+- Ysc
+- ISpread
+- ZSpread
+```
+
+Manual payload:
+
+```text
+ManualQuotePayload
+- Price?
+- FinalSimpleYield?
+```
+
+Current calculation drivers are:
+
+```text
+Price
+BbgYield
+SimpleYield
+Ysc
+GSpread
+Asw
+ISpread
+ZSpread
+```
+
 `WorkingQuote` is immutable Domain data and is changed only through `WorkingQuoteTransitions`.
 
 It remains:
@@ -310,26 +434,18 @@ It remains:
 - retained across Withdraw, Expire, Cancel, and Reopen
 - attached to its historical Revision
 
-Payloads:
-
-- Calculated payload
-- Manual payload
-- active mode
-
 Switch Calculated -> Manual:
 
-- Manual values start empty
+- Manual values start empty for the mode switch semantics
 - Calculated values remain retained separately
 
-Switch back:
-
-- previous Calculated state is restored as active
+Switch Manual -> Calculated restores the retained Calculated state.
 
 ### WorkingQuote factory
 
 WorkingQuote creation is performed by a Domain factory, not by mutating a repository row.
 
-For initial Confirm, Application calls the RFQ lifecycle transition, then creates the initial WorkingQuote for the confirmed/current Revision, and persists both in one transaction.
+For initial Confirm, Application calls the lifecycle transition, then creates the initial WorkingQuote for the confirmed/current Revision, and persists both in one transaction.
 
 For amendment Confirm, create a new WorkingQuote for the new Revision; seed from `QuoteSeedRevisionId` when specified. Never reuse/reactivate the old Revision's WorkingQuote as the new Revision object.
 
@@ -347,25 +463,31 @@ Logical cardinality:
 Revision -> 0..N ConfirmedQuote
 ```
 
-It contains, as applicable:
+Current Domain shape:
 
-- `QuoteId`
-- `RevisionId`
-- `SecurityId`
-- `SettlementDate`
-- `ConfirmedBy` / `ConfirmedAt`
-- quote mode (`Calculated` or `Manual`)
-- driver/input values
-- simple-yield slide for close-based calculated quotes
-- output values such as price, yields, spreads, accrued, settlement amount, A/L, delta
-- calculation context / market context
-- expiry policy
-- resolved `ExpiresAt?`
-- request reason being answered, where useful for audit/search
+```text
+ConfirmedQuote
+- QuoteId
+- RevisionId
+- SecurityId
+- SettlementDate
+- ConfirmedBy
+- ConfirmedAt
+- Mode : Calculated | Manual
+- Calculated?
+- Manual?
+- ExpiryMinutes?
+- ExpiresAt?
+- RequestReasonAnswered
+```
+
+The calculated/manual payloads are snapshot copies of the corresponding WorkingQuote payload.
+
+The confirmation input uses typed expiry semantics; the ConfirmedQuote keeps the resolved/current representation required for historical quote behavior (`ExpiryMinutes?` and `ExpiresAt?`).
 
 `ConfirmedQuote` is not independently made current by Application code. Quote confirmation must create the snapshot and update RFQ current quote state as one coherent Domain operation.
 
-It does not mutate when later Presented, Withdrawn, or Expired.
+It does not mutate when later Presented, Withdrawn, Expired, Hit, or Away.
 
 ---
 
@@ -495,15 +617,31 @@ Domain/Application use typed `CategoryId`, never arbitrary category-name strings
 - visible to Sales and Trader
 - changing it on a confirmed RFQ creates/updates an amendment Draft
 
-### Sales-only Memo / Trader-only Memo
+### Sales Memo / Trader Memo
 
-- Case-owned
+They are separate Case-owned versioned Domain objects:
+
+```text
+SalesMemo
+- CaseId
+- Value
+- Version
+
+TraderMemo
+- CaseId
+- Value
+- Version
+```
+
+Rules:
+
 - independent of Revision
-- editable after Close
-- `CaseMemo` is immutable Domain data
-- updates are performed by `CaseMemoTransitions`
+- editable after Close where authorization allows
+- immutable from callers
+- updated through `SalesMemoTransitions` / `TraderMemoTransitions`
+- memo changes are not RFQ lifecycle transitions
 
-Memo changes are not RFQ lifecycle transitions.
+This separation preserves own-side semantics without a generic mutable memo bag.
 
 ---
 
@@ -543,7 +681,7 @@ Rules:
 - value >= 1
 - checked `Next()`
 
-Use for Case current state, Revision, WorkingQuote, and CaseMemo.
+Use for Case current state, Revision, WorkingQuote, SalesMemo, and TraderMemo.
 
 Infrastructure/API may map to raw `long` at boundaries.
 
@@ -617,16 +755,21 @@ Domain transitions are grouped by **business transition category**.
 
 The classification is not based on how many Domain objects are read or returned.
 
-Canonical transition groups:
+Representative transition groups:
 
 ```text
+InitialDraftTransitions
 RfqLifecycleTransitions
 RfqOwnershipTransitions
+RfqResponsibilityTransitions
 QuoteTransitions
 AmendmentTransitions
 WorkingQuoteTransitions
-CaseMemoTransitions
+SalesMemoTransitions
+TraderMemoTransitions
 ```
+
+The grouping follows business transition meaning. It is not determined by how many Domain objects the transition consumes or returns.
 
 Use an explicit transition for Contact Owner handoff and for initial-Draft editing; do not fall back to public mutable setters or a generic public Revision transition that bypasses Case rules.
 
@@ -1038,13 +1181,13 @@ Updates Price / Final Simple Yield and audit metadata.
 
 ---
 
-## 13. CaseMemo transitions
+## 13. Memo transitions
 
-`CaseMemoTransitions.UpdateSales` and `.UpdateTrader`:
+`SalesMemoTransitions` and `TraderMemoTransitions`:
 
 - validate expected `StateVersion`
 - normalize memo text consistently
-- return new `CaseMemo`
+- return a new SalesMemo / TraderMemo
 - increment version
 
 Memo transitions do not affect RFQ lifecycle.
@@ -1072,38 +1215,69 @@ This preserves chronological history.
 
 # 03. Use Cases and Authorization
 
-## 1. Layer meaning
+## 1. Domain / Application boundary
 
 `Rfq.Application` is the Use Case layer. Do not create a separate `Rfq.UseCases` project.
 
-A useful distinction is:
+The primary distinction is:
 
 ```text
 Domain transition/factory
-= given business data and explicit inputs, what valid business state results?
+= given business data and explicit values, what valid business state results?
 
 Application use case
-= how does the system obtain inputs, authorize the actor, call Domain logic,
-  persist outputs, record events, and commit?
+= how does the system obtain those values, authorize the actor, call Domain logic,
+  persist outputs, record events, interact with external services, and commit?
 ```
 
-Application owns:
+### Boundary decision rule
+
+Do **not** decide Domain vs Application by asking whether an operation touches one object or multiple objects.
+
+Ask instead:
+
+> If these business changes were exposed as independently callable operations, could a caller create an invalid or incoherent business state?
+
+If yes, the coherent transformation belongs in Domain even when it consumes/returns several Domain objects.
+
+Example: Quote Confirm coherently creates both the new RFQ quote state and the immutable ConfirmedQuote snapshot. Exposing those as unrelated public Domain operations would permit "RFQ says Quoted but no snapshot" or "snapshot exists but RFQ remains Requested".
+
+By contrast, obtaining current user/time/Business Date, loading objects, invoking a Domain transition, appending an Event, and persisting all outputs atomically is Application orchestration. The intermediate Domain values can still be valid even though the **use case** must commit them together.
+
+### Application owns
 
 - repository/query access
 - current-user lookup
-- role/desk authorization
+- role/desk authorization and visibility policy
 - Case/Revision/Quote ID allocation orchestration
-- current instant / business-date resolution
+- current instant / Business-Date resolution
 - external calculation calls
 - event recording
-- transaction/unit of work
+- transaction/unit-of-work orchestration
+- retry/reconciliation policy at system boundaries
 
-Domain owns:
+### Domain owns
 
 - construction invariants
-- state preconditions
-- state transition rules
-- coherent creation of related Domain outputs where separate public operations would permit an invalid business state
+- business-state preconditions
+- business-state transition rules
+- coherent creation/transformation of related Domain outputs when splitting them would permit invalid business state
+
+### Data and operations
+
+The Domain deliberately follows a "data represents state; operations transform state" style.
+
+Prefer:
+
+```text
+RfqLifecycleTransitions.CloseHit(...)
+RfqOwnershipTransitions.TakeOver(...)
+WorkingQuoteTransitions.SwitchMode(...)
+```
+
+over mutable entity APIs whose primary effect is to change internal fields in place.
+
+This is not a ban on member methods. Factories, validation, derived properties, version checks, and natural value-object behavior may live on their owning types. The important rule is that public mutable entity methods must not become an escape hatch around explicit business transitions.
 
 ---
 
@@ -1491,7 +1665,37 @@ Do not expose the internal lifecycle class hierarchy directly merely because it 
 
 ---
 
-## 14. Roles and overlap
+## 14. Source organization
+
+Source folders express **business/feature ownership first**.
+
+Prefer feature-local organization such as:
+
+```text
+RfqDrafts/
+WorkingQuotes/
+RfqLifecycle/
+PostProcess/
+RfqSearch/
+```
+
+where the feature owns its controller/request/response/mapping or use-case types.
+
+Avoid making framework artifact type the primary top-level organization merely because all files are controllers, requests, responses, mappers, or services.
+
+Technical grouping remains appropriate for concepts that are genuinely cross-cutting, for example:
+
+- `Abstractions/`
+- `Authorization/`
+- `Errors/`
+- persistence infrastructure/configuration
+- application-wide incidents/observability
+
+Folder structure is an ownership/discoverability rule, not a namespace migration requirement. Stable layer namespaces may remain even when folders are feature-oriented.
+
+---
+
+## 15. Roles and overlap
 
 Roles are not necessarily mutually exclusive.
 
@@ -1514,14 +1718,21 @@ Manager is not automatically an RFQ owner. Future Manager overrides belong in ce
 
 ## 1. General principles
 
+This is a high-frequency internal operational desktop tool. Operator throughput and clarity are product requirements, not cosmetic preferences.
+
 - Sales, Trader, and Post Process are distinct workspaces with different operating goals.
-- Grid interaction is a first-class workflow.
-- Dense desktop operation is preferred over vertically expensive decorative UI.
-- Do not silently replace actively edited data when server changes arrive.
-- Separate "there are remote updates" from "apply those updates".
-- Business-state color has semantic meaning and must remain readable in both Light and Dark themes.
+- Grid interaction and inline editing are first-class workflows.
+- Prefer information density over vertically expensive decorative chrome.
+- Repeated operations should remain low-friction and keyboard-friendly where practical.
+- Do not introduce modal confirmation for every action; confirmation strength should follow operational risk.
+- Strongly destructive/ownership-changing actions may require stronger confirmation than ordinary reversible work.
+- Do not silently replace actively edited or staged data when remote changes arrive.
+- Separate "there are remote updates" from "apply/reconcile those updates".
+- Bulk selection and result reporting must make partial success visible.
+- Business-state color has semantic meaning and must remain readable in both Light and Dark themes; important state should not rely on color alone.
 - Personal settings are persisted per current user.
 - Grid layout persistence is explicit and separate from general Settings.
+- Avoid adding generic panels, dashboards, or workflow chrome without a concrete desk use case.
 
 Top-level routes are:
 
@@ -1852,7 +2063,7 @@ Do not implement separate inconsistent theme toggles per component library.
 
 Trader preference for the next Working Quote/quote-confirm flow.
 
-The UI may offer a small curated set such as:
+The current UI offers:
 
 - None
 - 15 minutes
@@ -1941,6 +2152,8 @@ Filter persistence should be deliberate rather than accidental.
 
 Grid layout remains frontend-owned opaque JSON at the backend boundary.
 
+The current frontend payload contains AG Grid column state plus column-group state. The backend does not interpret those fields.
+
 ### Interaction
 
 Do not consume a dedicated vertical toolbar row merely for layout controls.
@@ -1957,7 +2170,14 @@ or equivalent concise wording.
 
 Save is explicit; do not autosave layout.
 
-Known independent configurations include Sales main grid and Trader main/search/confirm grids; Post Process may maintain its own main-grid config as the screen matures.
+Current interaction semantics:
+
+- Save captures the current column and column-group layout and persists it.
+- Load reapplies the last persisted layout.
+- Reset restores the code/default layout locally.
+- Reset does not implicitly overwrite the persisted saved layout; Save after Reset if the default should become the new saved layout.
+
+Independent grids use independent config keys. Sales main, Trader main/search/confirm, and Post Process main layouts must not accidentally share one layout payload.
 
 ---
 
@@ -2058,11 +2278,17 @@ Current supported expiry persistence may remain:
 
 while Domain uses a typed expiry policy.
 
-### `CaseMemo`
+### `SalesMemo` / `TraderMemo`
 
-1:1 per Case initially.
+Separate 1:1 rows per Case.
 
-Contains SalesMemo, TraderMemo, Version, and any needed audit metadata.
+Each stores:
+
+- CaseId
+- Value
+- Version
+
+The two rows reflect the separate Domain objects and own-side semantics. They are not one generic CaseMemo row.
 
 ### `Category`
 
@@ -2222,7 +2448,7 @@ Authoritative business data includes:
 - RfqRevision
 - WorkingQuote
 - ConfirmedQuote
-- CaseMemo
+- SalesMemo / TraderMemo
 - Event / RfqEvent / QuoteEvent
 - configuration/master data
 - calculation failure log
@@ -2369,7 +2595,28 @@ Do not duplicate every display field prematurely or default to materialized view
 
 ## 1. Calculation service boundary
 
-The RFQ application does not own detailed pricing conventions, curve resolution, or security convention logic.
+The RFQ application does not own detailed pricing conventions, curve resolution, security convention logic, or standard-settlement calculation.
+
+The Calculation boundary owns pricing/calculation semantics. The RFQ application owns workflow semantics.
+
+### RFQ Application remains authoritative for
+
+- RFQ lifecycle
+- Revision/amendment workflow
+- Contact Owner / Assigned Trader / trader ownership
+- WorkingQuote persistence and versioning
+- ConfirmedQuote lifecycle relationship
+- actor authorization
+- RFQ-level optimistic concurrency
+- business transaction/event orchestration
+
+### Calculation service/client owns
+
+- price/yield/spread calculations
+- security pricing/convention interpretation
+- curve/reference-data-dependent calculation
+- standard-settlement resolution
+- calculation-specific error/result semantics
 
 Calculation receives typed business/application inputs per item, conceptually:
 
@@ -2389,6 +2636,8 @@ CalculateBulk(requests[]) -> results[]
 Do not rely on array ordering alone.
 
 External transport may map typed IDs to strings/Guids at the adapter boundary.
+
+The Calculation service must not become a hidden RFQ aggregate or persistent workflow owner merely because it is invoked during quote editing.
 
 ---
 
@@ -2925,7 +3174,7 @@ At minimum cover:
 - Amendment Save/Confirm/Discard
 - old current Revision -> Superseded on amendment Confirm
 - WorkingQuote transition behavior
-- CaseMemo transitions
+- memo transitions
 - ownership PickUp/Release/Assign/TakeOver
 - `StateVersion` validation / checked Next
 - representative Domain exception categories
@@ -3116,6 +3365,12 @@ The mock may use one deterministic formula across arbitrary securities and shoul
 # 09. Scope, Non-goals, and Deferred Work
 
 ## 1. Explicitly out of initial/current scope
+
+### Booking / ticket workflow
+
+Hit/Away are RFQ workflow outcomes.
+
+A Hit may later trigger or feed booking, but Booking is a separate downstream workflow/integration boundary. Do not make `CloseHitRfq` itself the owner of a booking aggregate, booking lifecycle, or booking reconciliation state.
 
 ### External inbound channels
 
@@ -3499,7 +3754,7 @@ Rationale:
 
 ## 17. StateVersion is a Domain value object over signed long
 
-Use one common `StateVersion` for Case current state, Revision, WorkingQuote, and CaseMemo.
+Use one common `StateVersion` for Case current state, Revision, WorkingQuote, and SalesMemo / TraderMemo.
 
 Requirements:
 
@@ -3850,3 +4105,94 @@ Rationale:
 - a VersionConflict means the displayed server row may already be stale
 - retaining failed pending intent is useful to the operator
 - refreshing authoritative data must not imply clearing the operator's unresolved intent
+
+
+---
+
+## 45. Domain boundary follows invariant ownership, not object count
+
+Whether an operation belongs in Domain is determined by business invariants and coherent state transformation, not by whether it touches one object or several.
+
+Rationale:
+
+- multiple objects may form one business invariant
+- a one-object operation may still require Application-only concerns such as current-user authorization or external I/O
+- counting objects produces unstable boundaries as the model evolves
+- the useful question is whether independently callable pieces could create an invalid business state
+
+---
+
+## 46. Business state data and business operations are deliberately separated
+
+Entities/state objects primarily represent valid state; explicit transition/factory operations transform that state and return new values.
+
+Rationale:
+
+- business transitions remain discoverable and reviewable
+- mutable member methods do not gradually become an uncontrolled public mutation surface
+- transition grouping follows business vocabulary
+- the model stays compatible with immutable state and optimistic concurrency
+
+Member methods are not forbidden when they naturally belong to a value/factory/validation concern.
+
+---
+
+## 47. Organize source by feature ownership before framework artifact type
+
+Business/use-case features own their relevant API/Application files. Global technical folders are reserved for genuinely cross-cutting concerns.
+
+Rationale:
+
+- a change to one business feature is easier to discover in one place
+- controller/request/mapper/service buckets scatter one feature across the tree
+- feature ownership survives framework refactors better than artifact-type organization
+
+---
+
+## 48. CaseId is internal identity, not a business sequence
+
+CaseId uses PostgreSQL bigint identity semantics and may have gaps.
+
+Rationale:
+
+- DB identity gives simple stable internal identity
+- rollback/allocation gaps are normal and harmless
+- humans may later need a separate formatted/reference number with different guarantees
+- business meaning should not be inferred from an infrastructure identity
+
+---
+
+## 49. Hit is an RFQ outcome; Booking is downstream
+
+Closing Hit terminates the RFQ workflow but does not make the RFQ aggregate a booking aggregate.
+
+Rationale:
+
+- quote/customer-decision workflow and trade booking have different lifecycle/integration concerns
+- Booking may fail/reconcile independently after a legitimate RFQ Hit
+- keeping the boundary explicit prevents booking concerns from distorting RFQ lifecycle types
+
+---
+
+## 50. Calculation does not own RFQ workflow state
+
+Calculation may be a separate service and may own sophisticated pricing/reference-data logic, but RFQ Application remains authoritative for RFQ state, quote work persistence, authorization, and concurrency.
+
+Rationale:
+
+- pricing and workflow evolve for different reasons
+- a calculation runtime should remain reusable outside this RFQ UI
+- RFQ lifecycle must not become dependent on hidden state inside the pricing service
+
+---
+
+## 51. Operational usability is a design requirement
+
+The UI is optimized for repeated desk operation rather than generic form-entry conventions.
+
+Rationale:
+
+- high-frequency Sales/Trader workflows benefit from dense grids, inline editing, keyboard access, and low-friction actions
+- unnecessary modal confirmations and extra vertical chrome directly reduce throughput
+- remote-update safety matters because silently replacing active work is operationally dangerous
+- usability rules therefore belong in system design, not only in component styling
