@@ -147,6 +147,7 @@ const draftRow: SalesRfq = {
   closedQuoteId: null,
   currentVersion: 3,
   revisionStatus: 'Draft',
+  salesId: 'sales-dev',
   contactOwnerId: 'sales-dev',
   assignedTraderId: 'trader-a',
   settlementDate: '2026-09-23',
@@ -157,14 +158,16 @@ const draftRow: SalesRfq = {
   salesMemoVersion: 1,
   version: 3,
   createdAt: '2026-09-21T00:00:00Z',
+  stateSince: '2026-09-21T00:00:00Z',
+  confirmedQuote: null,
 }
 
 async function selectRequiredMasters() {
   fireEvent.change(screen.getByLabelText('Client'), { target: { value: 'C001' } })
-  fireEvent.click(screen.getByText('C001 — 青空銀行'))
+  fireEvent.click(screen.getByText(/青空銀行 · C001/))
   fireEvent.change(screen.getByLabelText('Security'), { target: { value: '375' } })
   fireEvent.click(screen.getByText(/利付国債 第375回/))
-  await waitFor(() => expect(screen.getByLabelText('Settlement Date')).toHaveValue('2026-09-23'))
+  await waitFor(() => expect(screen.getByLabelText('Settle')).toHaveValue('2026-09-23'))
 }
 
 describe('AppShell', () => {
@@ -210,6 +213,7 @@ describe('SalesScreen', () => {
     const onCreate = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
     render(<SalesScreen {...baseProps} onCreate={onCreate} onReload={onReload} />)
+    fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
     await selectRequiredMasters()
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }))
 
@@ -228,9 +232,10 @@ describe('SalesScreen', () => {
   it('confirms a new RFQ directly without saving first', async () => {
     const onConfirmNew = vi.fn().mockResolvedValue(undefined)
     render(<SalesScreen {...baseProps} onConfirmNew={onConfirmNew} />)
+    fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
     await selectRequiredMasters()
-    fireEvent.change(screen.getByLabelText('Notional (MM)'), { target: { value: '250' } })
-    fireEvent.change(screen.getByLabelText('Sales / Trading Message'), { target: { value: 'please quote' } })
+    fireEvent.change(screen.getByLabelText('Notl (MM)'), { target: { value: '250' } })
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'please quote' } })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
 
     await waitFor(() => expect(onConfirmNew).toHaveBeenCalledWith({
@@ -248,8 +253,8 @@ describe('SalesScreen', () => {
     const onConfirmDraft = vi.fn().mockResolvedValue(undefined)
     render(<SalesScreen {...baseProps} rfqs={[draftRow]} onConfirmDraft={onConfirmDraft} />)
     fireEvent.click(screen.getByText(/client-grid 顧客表示名/))
-    expect(screen.getByText('Draft Case 101')).toBeInTheDocument()
-    expect(screen.getByLabelText('Notional (MM)')).toHaveValue('100.00')
+    expect(screen.getByText('Case 101')).toBeInTheDocument()
+    expect(screen.getByLabelText('Notl (MM)')).toHaveValue('100.00')
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
 
     await waitFor(() => expect(onConfirmDraft).toHaveBeenCalledWith(101, {
@@ -321,7 +326,6 @@ describe('SalesScreen', () => {
 
     fireEvent.click(screen.getByText(/client-grid/))
     fireEvent.click(screen.getByRole('button', { name: 'Hit' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
 
     await waitFor(() => expect(onClose).toHaveBeenCalledWith(101, 'Hit', 7))
   })
@@ -346,16 +350,35 @@ describe('SalesScreen', () => {
     )
 
     fireEvent.click(screen.getByText(/client-grid/))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     fireEvent.change(screen.getByLabelText('Sales-only Memo'), {
       target: { value: 'post-close follow-up' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save Sales Memo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(onUpdateMemo).toHaveBeenCalledWith(
       101,
       'post-close follow-up',
       3,
     ))
+  })
+
+  it('opens the typed Recent Revisions drawer with changed fields only', async () => {
+    render(<SalesScreen {...baseProps} recentRevisions={[{
+      kind: 'Quote',
+      occurredAt: '2026-09-22T01:42:00Z',
+      caseId: 101,
+      clientId: 'client-grid',
+      clientName: 'Client Grid',
+      securityId: 'security-grid',
+      securityName: 'Security Grid',
+      changes: [{ field: 'Price', before: '99.85', after: '99.72' }],
+    }]} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recent Revisions' }))
+
+    expect(await screen.findByText('Case 101')).toBeInTheDocument()
+    expect(screen.getByText(/99.85/)).toHaveTextContent('99.85 → 99.72')
   })
 })
 

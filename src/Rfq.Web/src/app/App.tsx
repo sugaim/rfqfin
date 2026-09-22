@@ -16,12 +16,15 @@ export interface AppOutletContext {
   businessDate?: string
   events: PersistedEvent[]
   refreshToken: number
+  remoteChangeVersion: number
+  acknowledgeRemoteChanges: () => Promise<void>
 }
 
 export function App() {
   const configuredIdentity = window.localStorage.getItem('rfq-development-user') ?? 'sales-dev'
   const [refreshEventId, setRefreshEventId] = useState(0)
   const [refreshToken, setRefreshToken] = useState(0)
+  const [remoteChangeVersion, setRemoteChangeVersion] = useState(0)
   const healthQuery = useGetHealthQuery()
   const businessDateQuery = useGetBusinessDateQuery()
   const currentUserQuery = useGetMeQuery()
@@ -39,16 +42,22 @@ export function App() {
     window.location.assign(userId.startsWith('trader-') ? '/trader' : '/sales')
   }
 
-  const refreshUpdates = () => {
-    const latest = Math.max(0, ...(eventsQuery.data ?? []).map((event) => event.eventId))
+  const acknowledgeRemoteChanges = async () => {
+    const result = await eventsQuery.refetch()
+    const latest = Math.max(0, ...(result.data ?? []).map((event) => event.eventId))
     setRefreshEventId(latest)
     setRefreshToken((current) => current + 1)
   }
 
+  const refreshUpdates = () => { void acknowledgeRemoteChanges() }
+
   useEffect(() => {
     if (typeof EventSource === 'undefined') return undefined
     const source = new EventSource(`/api/events/stream?after=${refreshEventId}`)
-    source.addEventListener('changed', () => { void eventsQuery.refetch() })
+    source.addEventListener('changed', () => {
+      setRemoteChangeVersion((current) => current + 1)
+      void eventsQuery.refetch()
+    })
     return () => source.close()
   }, [refreshEventId, eventsQuery.refetch])
 
@@ -57,6 +66,8 @@ export function App() {
     businessDate: businessDateQuery.data?.date,
     events: eventsQuery.data ?? [],
     refreshToken,
+    remoteChangeVersion,
+    acknowledgeRemoteChanges,
   }
 
   return (

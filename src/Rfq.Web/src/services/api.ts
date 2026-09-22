@@ -57,6 +57,7 @@ export interface SalesRfq {
   closedQuoteId: string | null
   currentVersion: number
   revisionStatus: string
+  salesId: string | null
   contactOwnerId: string
   assignedTraderId: string
   settlementDate: string | null
@@ -67,11 +68,40 @@ export interface SalesRfq {
   salesMemoVersion: number
   version: number
   createdAt: string
+  stateSince: string
+  confirmedQuote: SalesConfirmedQuoteSummary | null
   draftRevisionId?: string | null
   draftVersion?: number | null
   draftSettlementDate?: string | null
   draftNotional?: number | null
   draftSalesAndTradingMessage?: string | null
+}
+
+export interface SalesConfirmedQuoteSummary {
+  quoteId: string
+  mode: 'Calculated' | 'Manual'
+  price: number | null
+  bbgYield: number | null
+  finalSimpleYield: number | null
+  gSpread: number | null
+  confirmedAt: string
+}
+
+export interface SalesRecentRevisionChange {
+  field: 'Notional' | 'Settlement' | 'Message' | 'Price' | 'Yield' | 'Simple' | 'GSpread'
+  before: string | null
+  after: string | null
+}
+
+export interface SalesRecentRevision {
+  kind: 'Rfq' | 'Quote'
+  occurredAt: string
+  caseId: number
+  clientId: string
+  clientName: string
+  securityId: string
+  securityName: string
+  changes: SalesRecentRevisionChange[]
 }
 
 export interface AmendmentResult { caseId: number; currentRevisionId: string; draftRevisionId: string | null; currentVersion: number; draftVersion: number | null; rfqStatus: string; quoteStatus: string | null; quoteRequestReason: string | null }
@@ -258,6 +288,9 @@ export const api = createApi({
     }),
     getActiveSalesRfqs: builder.query<SalesRfq[], void>({
       query: () => '/sales-rfqs',
+    }),
+    getSalesRecentRevisions: builder.query<SalesRecentRevision[], number | void>({
+      query: (limit = 50) => ({ url: '/sales-rfqs/recent-revisions', params: { limit } }),
     }),
     getEvents: builder.query<PersistedEvent[], number>({ query: (after) => ({ url: '/events', params: { after } }) }),
     getEod: builder.query<EodSummary[], string>({ query: (date) => ({ url: '/eod', params: { date } }) }),
@@ -453,6 +486,29 @@ export const api = createApi({
     >({
       query: (body) => ({ url: '/rfqs/bulk-close-away', method: 'POST', body }),
     }),
+    bulkPresentRfqs: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number }[] }>({
+      query: (body) => ({ url: '/rfqs/bulk-present', method: 'POST', body }),
+    }),
+    bulkUnpresentRfqs: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number }[] }>({
+      query: (body) => ({ url: '/rfqs/bulk-unpresent', method: 'POST', body }),
+    }),
+    bulkCancelRfqs: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedCurrentVersion: number }[] }>({
+      query: (body) => ({ url: '/rfqs/bulk-cancel', method: 'POST', body }),
+    }),
+    bulkConfirmInitialDrafts: builder.mutation<BulkItemResult[], { items: {
+      caseId: number
+      notional: number | null
+      settlementDate: string
+      standardSettlementDate: string
+      salesAndTradingMessage: string
+      assignedTraderId: string
+      expectedVersion: number
+    }[] }>({
+      query: (body) => ({ url: '/rfqs/drafts/bulk-confirm', method: 'POST', body }),
+    }),
+    bulkDiscardInitialDrafts: builder.mutation<BulkItemResult[], { items: { caseId: number; expectedVersion: number }[] }>({
+      query: (body) => ({ url: '/rfqs/drafts/bulk-discard', method: 'POST', body }),
+    }),
     correctOutcomeToHit: builder.mutation<
       CloseRfqResult,
       { caseId: number; reason?: string; expectedCurrentVersion: number }
@@ -541,6 +597,11 @@ export const api = createApi({
 export const {
   useAssignTraderMutation,
   useBulkCloseAwayRfqsMutation,
+  useBulkPresentRfqsMutation,
+  useBulkUnpresentRfqsMutation,
+  useBulkCancelRfqsMutation,
+  useBulkConfirmInitialDraftsMutation,
+  useBulkDiscardInitialDraftsMutation,
   useBulkConfirmAmendmentsMutation,
   useBulkDiscardAmendmentsMutation,
   useCancelRfqMutation,
@@ -570,6 +631,7 @@ export const {
   useSaveGridConfigMutation,
   useGetActiveTraderRfqsQuery,
   useGetActiveSalesRfqsQuery,
+  useGetSalesRecentRevisionsQuery,
   useGetMeQuery,
   useGetHealthQuery,
   useGetBusinessDateQuery,
