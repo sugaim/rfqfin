@@ -471,10 +471,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: (result) =>
-        result?.some((item) => item.status === 'Succeeded')
-          ? ['PostProcess']
-          : [],
+      invalidatesTags: (result) => (result ? ['PostProcess'] : []),
     }),
     searchRfqs: builder.query<RfqSearchResult, RfqSearchParams>({
       query: (params) => ({ url: '/rfqs/search', params }),

@@ -44,24 +44,28 @@ function json(value: unknown) {
   })
 }
 
+function useAbsoluteRequests() {
+  const NativeRequest = Request
+  class AbsoluteRequest extends NativeRequest {
+    constructor(input: RequestInfo | URL, init?: RequestInit) {
+      super(
+        typeof input === 'string' && input.startsWith('/')
+          ? new URL(input, 'http://localhost')
+          : input,
+        init,
+      )
+    }
+  }
+  vi.stubGlobal('Request', AbsoluteRequest)
+}
+
 describe('Post Process API cache reconciliation', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('invalidates inactive preset and scope variants after a successful commit', async () => {
     let closed = false
     const gets: { preset: PostProcessPreset; scope: PostProcessScope }[] = []
-    const NativeRequest = Request
-    class AbsoluteRequest extends NativeRequest {
-      constructor(input: RequestInfo | URL, init?: RequestInit) {
-        super(
-          typeof input === 'string' && input.startsWith('/')
-            ? new URL(input, 'http://localhost')
-            : input,
-          init,
-        )
-      }
-    }
-    vi.stubGlobal('Request', AbsoluteRequest)
+    useAbsoluteRequests()
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -138,6 +142,85 @@ describe('Post Process API cache reconciliation', () => {
 
     revisited.unsubscribe()
     today.unsubscribe()
+    store.dispatch(api.util.resetApiState())
+  })
+
+  it('re-fetches authoritative state when every commit item fails or is skipped', async () => {
+    const queryArgs = { preset: 'Today', scope: 'Mine' } as const
+    const authoritativeItem: PostProcessItem = {
+      ...item,
+      rfqStatus: 'Presented',
+      currentVersion: 4,
+      lastChangedBy: 'other-sales',
+      lastChangedAt: '2026-09-22T02:00:00Z',
+    }
+    let currentItem = item
+    let getCount = 0
+    useAbsoluteRequests()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request =
+          input instanceof Request ? input : new Request(input, init)
+        if (request.method === 'POST') {
+          currentItem = authoritativeItem
+          return json([
+            {
+              caseId: 101,
+              status: 'Failed',
+              code: 'VersionConflict',
+              message: 'The RFQ changed before the commit was applied.',
+            },
+            {
+              caseId: 102,
+              status: 'Skipped',
+              code: null,
+              message: null,
+            },
+          ])
+        }
+
+        getCount += 1
+        return json([currentItem])
+      }),
+    )
+    const store = configureStore({
+      reducer: { [api.reducerPath]: api.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware().concat(api.middleware),
+    })
+    const query = store.dispatch(
+      api.endpoints.getPostProcess.initiate(queryArgs),
+    )
+    expect(await query.unwrap()).toEqual([item])
+
+    await store
+      .dispatch(
+        api.endpoints.commitPostProcess.initiate({
+          items: [
+            {
+              caseId: 101,
+              expectedCurrentVersion: 3,
+              lifecycleChange: { type: 'Away' },
+            },
+            {
+              caseId: 102,
+              expectedCurrentVersion: 1,
+              lifecycleChange: { type: 'Hit' },
+            },
+          ],
+        }),
+      )
+      .unwrap()
+
+    await vi.waitFor(() => {
+      expect(
+        api.endpoints.getPostProcess.select(queryArgs)(store.getState()).data,
+      ).toEqual([authoritativeItem])
+    })
+    expect(getCount).toBe(2)
+
+    query.unsubscribe()
     store.dispatch(api.util.resetApiState())
   })
 })
