@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
-import { AppShell, SalesScreen, TraderScreen, type SalesScreenProps, type TraderScreenProps } from './App'
+import { MemoryRouter, useLocation } from 'react-router'
+import { AppShell } from './app/AppShell'
+import { SalesScreen, type SalesScreenProps } from './features/sales/SalesScreen'
+import { TraderScreen, type TraderScreenProps } from './features/trader/TraderScreen'
 import type { ClientSearchResult, SalesRfq, SecuritySearchResult, TraderRfq } from './services/api'
 
 type GridRow = SalesRfq | TraderRfq
@@ -166,12 +169,27 @@ async function selectRequiredMasters() {
 
 describe('AppShell', () => {
   it('shows navigation, system date, and healthy API state', () => {
-    render(<AppShell health="ok" businessDate="2026-09-21" />)
+    render(<MemoryRouter initialEntries={['/sales']}>
+      <AppShell health="ok" businessDate="2026-09-21" />
+    </MemoryRouter>)
     expect(screen.getAllByText('Sales')).toHaveLength(2)
     expect(screen.getByText('Trader')).toBeInTheDocument()
-    expect(screen.getByText('EOD')).toBeInTheDocument()
+    expect(screen.getByText('Daily Review')).toBeInTheDocument()
     expect(screen.getByText('API healthy')).toBeInTheDocument()
     expect(screen.getByText('Business Date: 2026-09-21')).toBeInTheDocument()
+  })
+
+  it('changes the URL through top-level navigation', () => {
+    function LocationProbe() {
+      return <output>{useLocation().pathname}</output>
+    }
+
+    render(<MemoryRouter initialEntries={['/sales']}>
+      <AppShell health="ok"><LocationProbe /></AppShell>
+    </MemoryRouter>)
+
+    fireEvent.click(screen.getByText('Trader'))
+    expect(screen.getByText('/trader')).toBeInTheDocument()
   })
 })
 

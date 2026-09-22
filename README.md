@@ -8,38 +8,32 @@ Internal JPY corporate bond RFQ application.
 - Node.js 24 LTS and npm
 - Docker Desktop with Docker Compose
 
-## Local bootstrap
+## Local development
 
-Start PostgreSQL:
+Install the frontend dependencies once:
+
+```bash
+cd src/Rfq.Web
+npm install
+```
+
+First-time setup or an explicit database reset remains a separate, destructive step:
 
 ```bash
 docker compose up -d
-```
-
-Reset the guarded local development database, apply migrations, and seed it:
-
-```bash
 dotnet run --project src/Rfq.DbTool -- reset-dev
 ```
 
-Restore and build the backend:
+Start PostgreSQL and the API at `http://localhost:5100` with one command:
 
 ```bash
-dotnet restore
-dotnet build
-```
-
-Start the API at `http://localhost:5100`:
-
-```bash
-dotnet run --project src/Rfq.Api
+node scripts/dev-backend.js
 ```
 
 In another terminal, start the frontend at `http://localhost:5173`:
 
 ```bash
 cd src/Rfq.Web
-npm install
 npm run dev
 ```
 
