@@ -1846,6 +1846,13 @@ This inline-row restriction is an interaction-safety rule, not a general prohibi
 
 A Recent Revisions surface may summarize recent RFQ/quote revisions for operational awareness. It is not the audit source of truth.
 
+Recent Revisions is intentionally decoupled from the normal Sales Live catch-up path.
+
+- while the drawer is closed, normal Live catch-up does not refetch Recent Revisions; relevant revision/quote changes only mark the surface stale
+- opening the drawer fetches authoritative recent revisions when not yet loaded or stale
+- while the drawer is open, relevant invalidation may trigger a coalesced refresh
+- ordinary RFQ-list changes that do not affect Recent Revisions do not refresh it
+
 ---
 
 ## 3. Trader workspace
@@ -2091,7 +2098,7 @@ Mutation responses are not used to predict the resulting business state in the f
 - in Paused, successful single-Case mutations re-read that Case through the page-specific authoritative query/projection and replace only that Case in the Paused snapshot
 - in Paused bulk operations, only Succeeded Cases are authoritatively re-read and replaced; Failed/Skipped Cases and unrelated rows remain on the Paused snapshot
 
-Page-specific catch-up side effects may differ, for example Sales recent-revision refresh or Trader calculation invalidation, without changing these core semantics.
+Page-specific catch-up side effects may differ, for example Trader calculation invalidation, without changing these core semantics. Sales Recent Revisions is intentionally handled separately from normal page catch-up as described in the Sales workspace rules.
 
 Post Process remains separate: it uses explicit refresh plus mutation-triggered authoritative query reconciliation and does not need Sales/Trader Live/Pause behavior.
 
