@@ -3089,6 +3089,16 @@ Out of scope initially:
 - separate worker service
 - Kubernetes-specific orchestration
 
+Operational/read-model tuning values use typed host/infrastructure configuration rather than scattered constants. Initial defaults include:
+
+- Business Date poll interval: 10 minutes
+- snapshot refresh coalescing: 500 ms
+- snapshot refresh retry count/delay: configurable bounded values
+- Past RFQ search result cap: 20,000
+- Recent Revisions default limit: 50 (existing API maximum remains 100 unless deliberately changed)
+
+These are operational/product tuning values, not Domain constants.
+
 ---
 
 ## 2. OpenAPI
