@@ -2422,7 +2422,7 @@ OccurredAt
 ActorUserId?
 ```
 
-`EventId` is a global audit/history ordering identity.
+`EventId` is the stable identity of the persisted Event. Current realtime invalidation, reconnect catch-up, Recent Revisions, and current-worklist behavior do not rely on `EventId` ordering. Whether Event identity should also carry global ordering/cursor semantics is deferred to the later ID-model review.
 
 ### `RfqEvent`
 
@@ -3538,16 +3538,19 @@ Rationale:
 
 ---
 
-## 28. Event cursor order must follow commit visibility
+## 28. Current workflows do not depend on global EventId ordering
 
-`GetEventsAfter` must not use a cursor scheme that can skip a lower ID committed later.
+Persisted Events require stable identity, but the current application does not use `EventId` as a realtime/reconnect cursor.
 
-The infrastructure must keep a commit-order-safe mechanism and prove it with a real PostgreSQL reverse-commit concurrency test.
+The old public persisted-Event feed was removed when current-worklist synchronization moved to snapshot generation, relevant SSE wake-up, and authoritative GET reconciliation. Recent Revisions and current worklists likewise must not require a global EventId cursor.
+
+The representation, allocation timing, and any future ordering semantics of Event IDs are deliberately deferred to the later ID-model review. The existing global commit-order mechanism is therefore not a durable business requirement and must not be preserved solely for the retired feed contract.
 
 Rationale:
 
-- persisted events are reconnect recovery/source of truth for update notification
-- silent event loss is unacceptable
+- persisted Events remain semantic audit/business-history records
+- SSE reconnect catches up through authoritative current-state reads rather than Event replay
+- a future bulk-delta/downstream-integration requirement may justify a dedicated cursor, but that cursor should be designed for that requirement rather than inferred from identity
 
 ---
 

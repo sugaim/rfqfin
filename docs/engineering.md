@@ -136,6 +136,8 @@ Page-specific code stays under its page and is grouped by human-recognizable con
 
 The API is private to this application unless deliberately changed later.
 
+The application has not been released. Current internal contracts may be changed directly when a cleaner target contract is chosen. Do not add compatibility aliases, dual routes, legacy DTO fallbacks, or speculative defensive adapters solely for hypothetical older clients. Defensive checks remain appropriate where they protect current invariants or genuinely untrusted/external input.
+
 Therefore:
 
 - ASP.NET endpoint/DTO definitions are the HTTP source of truth.
@@ -351,39 +353,39 @@ generated RTK Query transport client + DTOs/hooks
         ↓
 Workspace adapter/composition boundary
         ↓
-page-local capability interfaces
-        ↓
-Screen
+page-local capability interfaces / Screen
 ```
 
 Policy:
 
 - use `@rtk-query/codegen-openapi` for the generated RTK Query transport client.
-- keep a small handwritten `baseApi` for `fetchBaseQuery` and truly transport-global setup.
+- generate one committed client file initially: `src/Rfq.Web/src/generated/rfqApi.ts`.
+- keep a small handwritten `src/Rfq.Web/src/services/baseApi.ts` containing only transport-global setup such as `fetchBaseQuery`, base URL, development identity header propagation, and genuinely global HTTP settings.
+- `baseApi` does not contain RFQ endpoints, business transforms, reconciliation policy, SSE, or business cache-invalidation policy.
 - generated request/response DTOs, endpoint definitions, and hooks are not handwritten duplicates.
 - generated artifacts are committed.
 - generation is an explicit command, not a hidden side effect of every normal build.
 - generator/tool versions are pinned through the repository package lock/toolchain.
 - regeneration must be deterministic enough that rerunning it yields zero diff when the server contract did not change.
-- a local drift-check command should be possible even if CI wiring is deferred.
-- automatic broad cache invalidation must not become a second business-state synchronization policy. Workspace-level authoritative reconciliation remains explicit.
+- OpenAPI tags remain useful for API classification/documentation, but code generation uses no tag-derived `providesTags` / `invalidatesTags` policy. Generated RTK Query cache invalidation must not become a second business-state synchronization mechanism.
+- generated code is never hand-edited or rewritten by a custom post-processing script. If generated output is awkward, first fix the ASP.NET/OpenAPI contract. If the generator shape still cannot be improved cleanly at the server boundary, adapt it at the Workspace boundary.
+- do not split the generated client by tag/capability until actual size or ownership pressure justifies it.
+- generated DTOs may be consumed directly by Screen when the transport shape and UI meaning are genuinely the same. Do not duplicate DTOs merely to hide that they are generated.
 
-The current intermediate `openapi-typescript` schema-only path may be removed once the generated RTK Query client replaces it.
+The current intermediate `openapi-typescript` schema-only path and `api-schema.ts` are removed once the generated RTK Query client replaces them.
 
 ---
 
 # 06. Frontend transport boundary
 
-Keep:
+Keep the behavioral boundary:
 
 ```text
 generated API client
         ↓
 Workspace
         ↓
-page-local capability interfaces
-        ↓
-Screen
+page-local capability interfaces / Screen
 ```
 
 Workspace absorbs:
@@ -393,14 +395,18 @@ Workspace absorbs:
 - transport request construction
 - API argument/route naming
 - mutation reconciliation
-- transport/read catch-up failures
+- top-level transport/API failure normalization
 - response-to-UI adaptation where required
 
-Screen remains transport-independent.
+Screen remains independent of RTK Query transport behavior, but it may use generated request/response data types directly when their meaning and lifecycle already match the UI concept. Introduce page-local types only when the UI concept genuinely differs.
+
+RTK Query-specific failure shapes such as `FetchBaseQueryError` / `SerializedError` do not cross the Workspace boundary. When the server returns the stable problem contract, Workspace exposes `ApiProblemDetails`; unknown network/parse failures are reduced to a generic transport failure appropriate to the page capability. Do not create another global `OperationError` layer merely to rename `ApiProblemDetails`.
+
+`CaseOperationResult.Status == Failed` is an ordinary HTTP-200 business item result. It is not transport/API error normalization.
+
+Handwritten SSE remains outside OpenAPI/RTK Query generation. Put EventSource lifecycle, development identity query propagation, category parsing, reconnect/close behavior, and callback delivery in a small transport module such as `services/worklistStream.ts`. `App` interprets those wake-up categories and updates the corresponding change versions.
 
 Do not create wrapper layers that merely forward generated calls without adapting anything.
-
-Do not duplicate generated DTOs solely to hide that they are generated. Introduce page-local types where the UI concept genuinely differs from the transport concept.
 
 ---
 
@@ -757,11 +763,11 @@ Focus on:
 
 Do not use EF InMemory/SQLite as a PostgreSQL substitute.
 
-### Required event-order concurrency test
+### Event identity/order tests
 
-If global semantic Event IDs are used as audit/history order, prove the allocation/transaction mechanism cannot expose misleading reverse-commit ordering assumptions.
+Current workflows do not depend on EventId as a global commit-order cursor, so no reverse-commit ordering test is required merely to preserve the retired Event-feed contract.
 
-Use real PostgreSQL and the actual allocation mechanism.
+When the later ID-model review decides Event identity/allocation semantics, add PostgreSQL integration tests for the semantics that are actually chosen. If a future dedicated delta cursor requires commit-visible ordering, test that cursor with real PostgreSQL and the actual allocation mechanism.
 
 ---
 
@@ -895,7 +901,7 @@ The mock may use one deterministic formula across arbitrary securities and shoul
 
 # 09. Generated artifacts and tooling
 
-Current/future generated contract artifacts are committed.
+Generated contract artifacts are committed.
 
 The server OpenAPI artifact remains:
 
@@ -903,21 +909,25 @@ The server OpenAPI artifact remains:
 artifacts/openapi/Rfq.Api.json
 ```
 
-During the pre-generated-client transition, `src/Rfq.Web/src/generated/api-schema.ts` may still exist. After generated RTK Query migration, the committed generated transport client becomes the Web contract artifact.
+After generated RTK Query migration, the Web contract artifact is:
 
-Generation must be explicit and reproducible.
+```text
+src/Rfq.Web/src/generated/rfqApi.ts
+```
 
-Typical workflow:
+`npm run generate:api` is the canonical local generation flow:
 
 ```text
 dotnet build / OpenAPI generation
-→ client/schema generation
+→ RTK Query OpenAPI code generation
 → formatter
-→ rerun generation
-→ zero unexpected diff
 ```
 
-CI integration may be added later; the repository must nevertheless make local drift checking straightforward.
+Generation must be explicit, reproducible, and deterministic enough that rerunning the canonical command with an unchanged server contract yields zero unexpected diff.
+
+Do not add a separate drift-check command now. There is no CI pipeline yet, and a meaningful drift check must regenerate before comparing. When CI is introduced, add generate + diff verification there.
+
+The intermediate `openapi-typescript` schema generation and `src/Rfq.Web/src/generated/api-schema.ts` are removed once no consumer remains.
 
 ---
 
@@ -948,3 +958,15 @@ If horizontal scaling is introduced, add reliable cross-process invalidation/not
 Persisted Events represent business/audit history. Snapshot generation/diff + relevant SSE wake-up represents realtime current-state discovery.
 
 Do not manufacture semantic Events merely to refresh another browser session.
+
+## 5. Generated transport is not a second state-synchronization policy
+
+OpenAPI drives endpoint/DTO/hook generation, but generated RTK Query tags do not own RFQ freshness. Current-state reconciliation remains explicit at the Workspace/read-model boundary.
+
+## 6. Generated data shapes may cross the Workspace boundary; transport failures may not
+
+Generated DTOs may reach Screen unchanged when UI and API semantics match. RTK Query-specific invocation/error mechanics remain behind Workspace.
+
+## 7. SSE remains handwritten transport
+
+EventSource lifecycle is intentionally separate from the generated HTTP client. SSE carries wake-up categories only; authoritative state still comes from normal queries.
