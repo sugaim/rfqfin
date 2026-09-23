@@ -1,10 +1,13 @@
-# JPY Corporate Bond RFQ System — Canonical Design
+# JPY Corporate Bond RFQ System — Design
 
-This file is the **single canonical design document** for the internal JPY corporate bond RFQ system.
+This file is one of the two active canonical documents for the internal JPY corporate-bond RFQ system:
 
-It is updated in place. There is no independent document version number: **Git history is the version history**. Historical implementation instructions, refactoring plans, and change notes are intentionally not part of the active documentation set.
+- `docs/design.md` — business meaning, Domain/Application boundaries, workflow semantics, authorization, UX semantics, persistence/business invariants, scope, and architectural decisions that should survive implementation changes.
+- `docs/engineering.md` — implementation policy, source organization, HTTP/OpenAPI contracts, generated-client policy, runtime/read-model mechanics, testing/tooling, and other engineering conventions.
 
-This document records current intended behavior and the design rules that should survive implementation changes. It is not an implementation diary and does not prescribe a historical sequence of changes.
+Both files are updated in place. **Git history is the version history.** Files under `docs/refactoring/` are implementation/refactoring history, not active authority.
+
+When implementation details change without changing business meaning, update `engineering.md`. When business meaning, invariants, workflow, or responsibility boundaries change, update `design.md` (and `engineering.md` as needed).
 
 ## 1. System purpose and business boundary
 
@@ -56,26 +59,25 @@ These rules are the fastest way to understand what must not be casually refactor
 
 1. **Domain data represents valid business state.** Important invalid RFQ/quote combinations should be unrepresentable through public construction where practical.
 2. **Business state is immutable from callers.** State changes return new state through explicit Domain transitions/factories.
-3. **Domain/Application boundary is decided by invariants and coherency, not by object count.** An operation belongs in Domain when splitting it into independently callable pieces would permit an invalid business state. Touching multiple objects does not by itself make something Application logic.
-4. **Data and business operations are deliberately separated.** Business transitions are generally explicit operation/transition functions rather than mutable entity member methods. Factories, validation, and natural value-object operations may still live on the type.
-5. **Application is the Use Case layer.** It owns loading, authorization, ID/time/Business-Date resolution, external calls, persistence, event append, and transaction orchestration.
+3. **Domain/Application boundary is decided by invariants and coherency, not by object count.** An operation belongs in Domain when splitting it into independently callable pieces would permit an invalid business state.
+4. **Data and business operations are deliberately separated.** Business transitions are generally explicit operations rather than mutable entity member methods.
+5. **Application is the Use Case layer.** It owns loading, authorization, ID/time/Business-Date resolution, external calls, persistence, semantic event append, and transaction orchestration.
 6. **State validity and actor authorization are different concerns.** Domain owns state validity; Application owns current-user/role/desk policy.
 7. **Business Date is a first-class business fact.** Persist it where semantics depend on the desk day; do not reconstruct operational day from UTC timestamps.
-8. **Use optimistic concurrency.** Do not hold long-lived DB locks around user work or external calculation; re-read/revalidate after external work before applying results.
-9. **Bulk APIs remain operation-specific and reuse single-item business logic.** Bulk is normally per-Case atomic with explicit partial success; unexpected/invariant failures are not silently converted into ordinary item failures.
-10. **Persistence shape may differ from Domain shape.** Current operational state is stored directly; persisted semantic Events are audit/business-history records, not event sourcing and not the complete realtime invalidation mechanism.
-11. **SSE is a wake-up mechanism, not authoritative state.** Authoritative state comes from normal queries/persisted data; realtime invalidation is derived from committed current-state changes rather than requiring every UI-visible mutation to create a semantic Event.
+8. **Use optimistic concurrency.** Do not hold long-lived DB locks around user work or external calculation.
+9. **Multi-item operations remain operation-specific and reuse single-item business behavior.** Where multi-item execution is supported, Cases are independent unless a business use case explicitly says otherwise.
+10. **Persistence shape may differ from Domain shape.** Current operational state is stored directly; persisted semantic Events are audit/business-history records rather than event sourcing.
+11. **SSE is a wake-up mechanism, not authoritative state.** Authoritative state comes from normal queries/persisted data.
 12. **Calculation does pricing; RFQ Application owns RFQ workflow.** Calculation must not become the owner of lifecycle, ownership, WorkingQuote persistence, or RFQ concurrency.
-13. **Server query state is authoritative; local interaction state is separate.** The frontend must not reconstruct business transitions after mutations. Live/Paused reconciliation uses authoritative page projections, while short-lived protected input is not silently overwritten.
-14. **This is a dense operational desktop tool.** Information density, inline/grid editing, keyboard efficiency, and low-friction repeated actions are product requirements; confirmations should be proportional to risk rather than applied everywhere.
+13. **Server query state is authoritative; local interaction state is separate.** The frontend must not reconstruct business transitions after mutations.
+14. **This is a dense operational desktop tool.** Information density, inline/grid editing, keyboard efficiency, and low-friction repeated actions are product requirements.
 15. **Semantic personal settings are typed.** Theme, Default Quote Mode, and Quote Expiry use typed contracts; grid layout alone is intentionally frontend-owned opaque JSON.
-16. **Source organization follows ownership, not framework artifact type.** Backend/Application code groups by business/use-case ownership. Frontend workspace code is page-owned under `pages/<page>`; `shared` is for genuinely cross-page concepts, and `features` is reserved for independent cross-page user features rather than being another name for a page.
 
 ## 4. Documentation rule
 
-Only this file under `docs/` is active design documentation.
+`docs/design.md` and `docs/engineering.md` are the active canonical documentation set.
 
-Code remains authoritative for mechanical implementation details that carry no design meaning, such as a private helper name. This document is authoritative for business meaning, invariants, responsibility boundaries, and deliberate architectural/UX rules. If code and this document diverge on those matters, reconcile the inconsistency rather than treating an old implementation instruction as authority.
+Code remains authoritative for mechanical details that carry no design or engineering-policy meaning, such as a private helper name. If code diverges from either canonical document on an intentional rule, reconcile the inconsistency rather than treating a historical refactoring instruction as authority.
 
 ---
 
@@ -1104,11 +1106,11 @@ Also:
 
 Public Application/API operations are explicit `CloseHitRfq` / `CloseAwayRfq`. An internal shared orchestration helper may still dispatch the two operations, but Hit/Away is not modeled as a generic public lifecycle payload.
 
-### Bulk Close
+### Multi-item Away Close
 
-Bulk Hit/Away closes only Cases that are still eligible/open.
+`CloseAwayRfqs` applies the normal Away-close behavior independently per eligible Case.
 
-Already Hit/Away Cases are skipped; bulk Close never silently changes an existing outcome.
+A Case already Away yields a no-change outcome; an incompatible/changed Case yields its normal expected failure. Hit remains a single-item close operation.
 
 ### Outcome correction
 
@@ -1324,18 +1326,29 @@ Public Application use cases are operation-specific. Do not expose a generic wor
 
 ### RFQ / Revision
 
+Single-item primitives include:
+
 - CreateDraft
+- ConfirmNewRfq
 - CreateFromExisting
 - UpdateInitialDraft
 - ConfirmInitialDraft
 - DiscardInitialDraft
+- StartAmendment
 - SaveAmendment
 - ConfirmAmendment
 - DiscardAmendment
-- BulkConfirmAmendments
-- BulkDiscardAmendments
+
+Supported multi-item capabilities include:
+
+- ConfirmInitialDrafts
+- DiscardInitialDrafts
+- ConfirmAmendments
+- DiscardAmendments
 
 ### Ownership / responsibility
+
+Single-item primitives:
 
 - PickUpRfq
 - ReleaseRfq
@@ -1343,28 +1356,50 @@ Public Application use cases are operation-specific. Do not expose a generic wor
 - TakeOverRfq
 - ChangeContactOwner
 
+Supported multi-item capabilities:
+
+- PickUpRfqs
+- ReleaseRfqs
+- AssignTraders
+- TakeOverRfqs
+- ChangeContactOwners
+
 ### Working Quote / Confirmed Quote
+
+Single-item primitives:
 
 - CalculateWorkingQuote
 - ChangeWorkingQuoteMode
 - UpdateManualWorkingQuote
 - ConfirmQuote
 - WithdrawQuote
-- BulkConfirmQuotes
-- BulkWithdrawQuotes
+- ExpireQuote
 
-### Lifecycle
+Supported multi-item capabilities:
 
-- PresentQuote
-- UnpresentQuote
+- ConfirmQuotes
+- WithdrawQuotes
+
+### RFQ lifecycle
+
+Single-item primitives:
+
+- PresentRfq
+- UnpresentRfq
 - CloseHitRfq
 - CloseAwayRfq
 - CorrectOutcomeToHit
 - CorrectOutcomeToAway
 - CancelRfq
 - ReopenRfq
-- ExpireQuote
-- relevant operation-specific Bulk use cases
+
+Supported multi-item capabilities:
+
+- PresentRfqs
+- UnpresentRfqs
+- CloseAwayRfqs
+- CancelRfqs
+- ReopenRfqs
 
 Public close/correction APIs are explicit. Do not expose a generic `CloseRfq(outcome)` or `CorrectOutcome(outcome)` selector.
 
@@ -1379,14 +1414,13 @@ Public close/correction APIs are explicit. Do not expose a generic `CloseRfq(out
 - GetPostProcessWorklist
 - CommitPostProcessChanges
 
-Post Process commit is a bulk transport/use-case boundary with per-Case atomicity:
+Post Process commit is a business-specific composite multi-item boundary:
 
 - all staged changes for one Case commit atomically
 - different Cases are independent
 - expected failure for one Case does not roll back successful Cases
-- successful Cases are removed from FE pending state
-- failed/skipped Cases remain pending
-- after any normal commit response, Post Process queries reconcile with authoritative server state
+- failed Cases retain unresolved FE intent
+- after a normal commit response, Post Process reconciles with authoritative server state
 
 Visibility is a replaceable Application policy boundary separate from edit authorization.
 
@@ -1396,18 +1430,16 @@ Examples include:
 
 - GetActiveSalesRfqs
 - GetActiveTraderRfqs
+- GetSalesRecentRevisions
 - SearchRfqs
 - GetPostProcessWorklist
-- GetEventsAfter
-- ScratchPricer
+- ScratchPrice
 - ResolveRfqCreationContext
 - security/client/master queries
 - Get/Save GridConfig
 - typed current-user settings
 
 Query-side readers may project directly from relational state; they do not need to rehydrate the full Domain graph.
-
----
 
 ## 3. Use-case orchestration pattern
 
@@ -1593,7 +1625,7 @@ External calculation flow must re-read/revalidate RFQ/WorkingQuote state after t
 
 ## 11. Error taxonomy and boundaries
 
-Expected operational failures use one semantic classification shared across Domain, Application, API, Bulk, and background-worker boundaries.
+Expected operational failures use one semantic classification shared across Domain and Application boundaries.
 
 ```text
 RfqException
@@ -1604,7 +1636,8 @@ RfqException
 │     ├─ VersionConflict
 │     ├─ NotFound
 │     ├─ Forbidden
-│     └─ CalculationFailure
+│     ├─ CalculationFailure
+│     └─ ServiceUnavailable
 └─ RfqInvariantException
    └─ DomainInvariantException
 ```
@@ -1616,30 +1649,9 @@ Existing Domain exceptions participate in that hierarchy:
 - `StateVersionMismatchException` -> VersionConflict
 - `DomainInvariantException` -> unexpected invariant
 
-Application-level expected errors include:
+BCL exception types are not the expected-error contract.
 
-- `RfqRequestValidationException`
-- `RfqNotFoundException`
-- `RfqForbiddenException`
-- `CalculationFailureException`
-
-BCL exception types are not the public expected-error contract. In particular, `InvalidOperationException`, `ArgumentException`, `KeyNotFoundException`, and `UnauthorizedAccessException` must not be globally interpreted as normal 4xx business failures.
-
-HTTP mapping is policy at the API boundary:
-
-- Validation -> 400
-- InvalidState -> 409
-- VersionConflict -> 409
-- NotFound -> 404
-- Forbidden -> 403
-- CalculationFailure -> 422
-- unexpected/unclassified/invariant failure -> 500 with generic detail
-
-Expected ProblemDetails may expose the semantic message and stable code. Unexpected ProblemDetails must not expose the underlying exception message.
-
-All API ProblemDetails include a trace/correlation ID.
-
-Bulk continuation policy also depends on `RfqErrorKind`, not on arbitrary BCL exception classes. Unsupported or unexpected errors abort the bulk operation rather than being silently converted into per-item failures.
+Transport mapping, multi-item failure mapping, ProblemDetails shape, and incident policy are engineering-boundary concerns documented in `docs/engineering.md`.
 
 ---
 
@@ -1659,80 +1671,7 @@ Do not call clock/repository services from Domain transitions.
 
 ---
 
-## 13. API contract approach
-
-ASP.NET Core remains code-first and authoritative.
-
-HTTP APIs are organized by business/use-case feature rather than large horizontal controller buckets. Requests, responses, and API mappers live beside the feature that owns them.
-
-At the HTTP boundary:
-
-- typed Domain/Application IDs become transport primitives
-- Domain enums/unions become API-owned typed contracts
-- API models do not expose Domain/Application types directly
-- concrete/static mapping is preferred over speculative mapper interfaces
-
-Do not introduce a generic JSON settings bag.
-
-Current-user settings use typed endpoints/contracts, including:
-
-```text
-GET/PUT /api/me/settings/quote-expiry
-GET/PUT /api/me/settings/default-quote-mode
-GET/PUT /api/me/settings/theme
-```
-
-Semantics:
-
-- Quote Expiry is a typed `None | After(duration)` policy
-- Default Quote Mode is typed `Calculated | Manual`
-- Theme is typed `Light | Dark`
-
-Persistence may store enum-like values as strings internally, but the frontend must not depend on raw persistence strings or untyped JSON for these settings.
-
-Grid configuration is intentionally different:
-
-```text
-GET/PUT /api/me/grid-configs/{screenId}/{configKey}
-```
-
-The backend treats grid configuration payload as opaque versioned JSON because layout shape is frontend-owned.
-
-Do not expose the internal lifecycle class hierarchy directly merely because it exists in Domain.
-
----
-
-## 14. Source organization
-
-Source folders express **business/feature ownership first**.
-
-Prefer feature-local organization such as:
-
-```text
-RfqDrafts/
-WorkingQuotes/
-RfqLifecycle/
-PostProcess/
-RfqSearch/
-```
-
-where the feature owns its controller/request/response/mapping or use-case types.
-
-Avoid making framework artifact type the primary top-level organization merely because all files are controllers, requests, responses, mappers, or services.
-
-Technical grouping remains appropriate for concepts that are genuinely cross-cutting, for example:
-
-- `Abstractions/`
-- `Authorization/`
-- `Errors/`
-- persistence infrastructure/configuration
-- application-wide incidents/observability
-
-Folder structure is an ownership/discoverability rule, not a namespace migration requirement. Stable layer namespaces may remain even when folders are feature-oriented.
-
----
-
-## 15. Roles and overlap
+## 13. Roles and overlap
 
 Roles are not necessarily mutually exclusive.
 
@@ -2122,7 +2061,7 @@ Mutation responses are not used to predict the resulting business state in the f
 
 - in Live, successful mutations are followed by authoritative page catch-up
 - in Paused, successful single-Case mutations re-read through the page-specific authoritative query/projection and reconcile only the successful target Case(s)
-- in Paused bulk operations, only Succeeded Cases are authoritatively re-read and replaced; Failed/Skipped Cases and unrelated rows remain on the Paused snapshot
+- in Paused multi-item operations, Applied/NoChange Cases may be authoritatively reconciled while Failed Cases retain unresolved intent; unrelated rows remain on the Paused snapshot
 - creation operations reconcile using the newly created CaseId returned by the server rather than treating the source Case as the changed target
 - a committed mutation and a failed subsequent read reconciliation are reported as different outcomes; never tell the operator that the mutation itself failed merely because authoritative catch-up failed afterward
 
@@ -2134,7 +2073,7 @@ Post Process remains separate: it uses explicit refresh plus mutation-triggered 
 
 ## 6. Result reporting
 
-Bulk/multi-item actions report per-Case results.
+Multi-item actions report per-Case results.
 
 Do not hide partial success.
 
@@ -2483,11 +2422,7 @@ OccurredAt
 ActorUserId?
 ```
 
-`EventId` is global for event retrieval/cursor purposes.
-
-The cursor must be **commit-order safe**. Plain identity/sequence allocation before commit is not sufficient by itself.
-
-A DB-serialized cursor allocator held through transaction commit is acceptable. Whatever mechanism is used must be proven by a real PostgreSQL concurrency test that no late-committing event can be permanently skipped.
+`EventId` is a global audit/history ordering identity.
 
 ### `RfqEvent`
 
@@ -2624,11 +2559,11 @@ Do not hold DB locks while performing external/heavy calculation or snapshot reb
 
 ---
 
-### Bulk transaction semantics
+### Multi-item transaction semantics
 
-A bulk HTTP request is not one atomic business transaction.
+A multi-item HTTP request is not one atomic business transaction.
 
-For operation-specific bulk use cases:
+For operation-specific multi-item use cases:
 
 - execute the corresponding single-item use case per Case
 - one Case succeeds/fails atomically
@@ -2636,7 +2571,7 @@ For operation-specific bulk use cases:
 - expected recoverable failure must discard/reset the current scoped EF changes before continuing
 - unexpected/unclassified errors abort rather than being silently converted into item failures
 
-Do not duplicate single-item transition logic inside bulk implementations.
+Do not duplicate single-item transition logic inside multi-item implementations.
 
 ---
 
@@ -2761,7 +2696,7 @@ Calculation receives typed business/application inputs per item, conceptually:
 and returns one result per request.
 
 ```text
-CalculateBulk(requests[]) -> results[]
+CalculateBatch(requests[]) -> results[]
 ```
 
 Do not rely on array ordering alone.
@@ -2772,7 +2707,7 @@ The Calculation service must not become a hidden RFQ aggregate or persistent wor
 
 ---
 
-## 2. Bulk result semantics
+## 2. Batch calculation result semantics
 
 One failed calculation does not fail the entire batch.
 
@@ -2795,7 +2730,7 @@ Mock requirements:
 - plausible-looking values
 - typed requests/results
 - controllable per-item failure
-- same broad bulk shape expected from future real service
+- same broad batch shape expected from future real service
 
 Pricing accuracy is not the purpose of this application.
 
@@ -3057,501 +2992,7 @@ This keeps FE simple while Application coordinates master/routing/calculation lo
 
 ---
 
-# 07. Runtime and Notifications
-
-## 1. Initial runtime layout
-
-Initial deployment assumes one App Server instance.
-
-```text
-Browser / React
-      |
-      v
-ASP.NET Core App
-  - RFQ APIs
-  - Search APIs
-  - OpenAPI
-  - process-local BusinessDateRfqSnapshot + refresh coordinator
-  - relevant-subscriber SSE wake-up endpoint
-  - Business Date / snapshot BackgroundService
-  - Expiry BackgroundService
-  - Mock CalculationClient
-      |
-      v
-PostgreSQL
-```
-
-Out of scope initially:
-
-- multiple application instances
-- Redis/pub-sub
-- leader election
-- separate worker service
-- Kubernetes-specific orchestration
-
-Operational/read-model tuning values use typed host/infrastructure configuration rather than scattered constants. Initial defaults include:
-
-- Business Date poll interval: 10 minutes
-- snapshot refresh coalescing: 500 ms
-- snapshot refresh retry count/delay: configurable bounded values
-- Past RFQ search result cap: 20,000
-- Recent Revisions default limit: 50 (existing API maximum remains 100 unless deliberately changed)
-
-These are operational/product tuning values, not Domain constants.
-
----
-
-## 2. OpenAPI
-
-Server implementation is authoritative.
-
-Generate OpenAPI from ASP.NET Core endpoint/DTO definitions.
-
-The generated contract may later drive FE client generation.
-
----
-
-## 3. Current-Business-Date read snapshot
-
-Sales/Trader current worklists use a bounded, process-local immutable snapshot:
-
-```text
-BusinessDateRfqSnapshot
-- BusinessDate
-- Generation
-- Sales projections
-- Trader projections
-- routing metadata needed for audience diff/filtering
-```
-
-The snapshot is built by a dedicated Infrastructure loader from PostgreSQL and atomically swapped only after a complete successful build.
-
-Reads:
-
-- Application resolves the current Business Date and passes it explicitly to the Sales/Trader query port
-- when snapshot Business Date/generation is current, query implementations filter in memory and return immediately
-- when the snapshot is dirty, a GET participates in/awaits the same single-flight refresh; it must not return the older generation as current data
-- if the requested Business Date and runtime snapshot disagree, re-check the authoritative DB Business Date and converge the runtime snapshot; a request that crossed Business-Date rollover may resolve/retry once rather than serving the wrong day
-
-Refresh/invalidation:
-
-```text
-successful RFQ/business commit
--> generation++
--> signal refresh coordinator
--> optional short coalescing window
--> one DB rebuild for the latest generation
--> atomic immutable swap
--> diff old/new snapshot
--> notify relevant local SSE subscribers
-```
-
-If generation advances from 10 to 20 before refresh starts, build once for the latest state rather than processing ten queued refresh jobs.
-
-If generation advances while a rebuild is running, the in-progress build must not be treated as final. Re-run/converge until the published snapshot corresponds to the latest observed generation. Intermediate stale builds may be retained internally but must not be served as current.
-
-The initial refresh-coalescing value is approximately **500 ms** and is configuration, not business semantics.
-
-## 4. Snapshot failure and retry behavior
-
-Snapshot refresh failure is operationally critical because authoritative Sales/Trader reads depend on a fresh snapshot.
-
-Rules:
-
-- retain the last successfully built immutable snapshot for diagnostics/recovery, but do not serve it as current when the coordinator knows a newer generation/Business Date is required
-- current-worklist GET returns a service-unavailable failure rather than silently returning the stale snapshot
-- snapshot refresh performs a bounded configurable retry count for transient failures/contention; retry settings live in host/infrastructure configuration rather than Domain/Application
-- after bounded retries are exhausted, the snapshot remains dirty/unavailable and later background retry continues
-- startup does not fail the whole process solely because the initial snapshot cannot be built; the process starts with the read model unavailable, reports the incident, exposes unhealthy/degraded readiness, and retries until recovered
-- normal shutdown cancellation is not an incident
-
-Background refresh/startup failures are reported through the existing Host-level `IIncidentReporter`; Infrastructure does not depend directly on the API incident abstraction. GET-triggered failures propagate through the normal API error boundary so the same incident mechanism can report them without duplicate/storm reporting.
-
-## 5. Business Date authority and rollover
-
-The database Business Date value is the source of truth.
-
-The runtime keeps only a derived current-Business-Date mirror for the snapshot.
-
-- startup reads the authoritative DB Business Date and attempts the initial snapshot build
-- a low-frequency background poll checks the authoritative Business Date; initial interval is **10 minutes**
-- ordinary Application/business use cases continue to resolve Business Date through the authoritative provider
-- a query-side Business-Date mismatch triggers an immediate authoritative re-check, so correctness does not depend on waiting for the next 10-minute poll
-- on detected rollover, build the new-Business-Date snapshot first and atomically swap only after success
-- if rollover build fails, retain the old snapshot object but do not present it as the new current Business Date; current-day reads remain unavailable until the new snapshot succeeds
-- successful rollover wakes relevant clients with a Business-Date-changed signal so they re-read Business Date and page state
-
-Do not infer rollover from system clock/calendar rules.
-
-## 6. Realtime change notification and SSE routing
-
-Persisted semantic Events and realtime invalidation are deliberately separate.
-
-Realtime flow:
-
-```text
-business mutation commit
--> process-local generation invalidation
--> latest snapshot rebuild
--> diff old/new snapshot
--> determine affected Sales users / Trader desks / invalidation categories
--> wake only relevant process-local SSE subscribers
--> FE performs authoritative page GET
-```
-
-The old design where every SSE connection polls the global persisted Event cursor is not the target architecture.
-
-Subscriber routing is process-local and may retain:
-
-- current user identity
-- desk
-- relevant role/page context
-- coarse invalidation interests
-
-Audience is derived from both old and new snapshot routing metadata so responsibility changes do not lose the previous audience. For example, Contact Owner or Assigned Trader changes may require waking both old and new audiences.
-
-Useful coarse invalidation categories include Sales list, Trader list, Recent Revisions stale, and Business Date changed. These are wake-up categories only; SSE must not become row-patch authority.
-
-Slow subscribers must be coalesced/bounded (for example capacity 1 / “change pending”) rather than receiving unbounded queues.
-
-SSE reconnect must cause authoritative catch-up so a transient connection loss cannot permanently hide a committed change. Persisted Event replay is not required for current-worklist correctness.
-
-Same-user multiple tabs are independent subscribers; do not suppress a wake-up merely because the mutation actor has the same user ID.
-
-## 7. Persisted Event retrieval remains separate
-
-Persisted `RfqEvent` / `QuoteEvent` records remain semantic audit/business-history data and may still support history/revision-aware query surfaces.
-
-If a `GetEventsAfter` endpoint remains, its cursor/order contract is independent from Sales/Trader Live correctness. The frontend current-worklist refresh path must not require a semantic Event for every Draft, memo, WorkingQuote, or other UI-visible mutation.
-
-## 8. Expiry BackgroundService
-
-Run an ASP.NET Core `BackgroundService` in the same App Server process.
-
-Initial interval:
-
-```text
-10 seconds
-```
-
-Worker finds current quoted items with:
-
-```text
-ExpiresAt <= now
-```
-
-and runs the normal `ExpireQuote` application use case, which invokes the Domain `QuoteTransitions.Expire` transition.
-
-Do not implement expiry as ad-hoc SQL state mutation disconnected from Domain/Application rules.
-
----
-
-## 9. Expiry idempotency and concurrency
-
-Initial deployment assumes one App Server, but ExpireQuote should be safe if attempted more than once.
-
-Use typed state and `StateVersion` preconditions so only a still-current confirmed quote can transition.
-
-If a human action already Withdrawn/Closed/Revised the RFQ, expiry should do nothing or return a harmless no-op/conflict outcome according to the use-case contract.
-
-Future multi-instance coordination is deferred.
-
----
-
-## 10. Logging, audit, observability
-
-Keep these concerns separate.
-
-### Domain/business audit
-
-Use persisted:
-
-- RfqEvent
-- QuoteEvent
-
-### Business calculation failure
-
-Use CalculationFailureLog for expected calculation-engine failures where required by workflow/audit.
-
-### Technical logging
-
-Use `ILogger<T>` for ordinary technical diagnostics.
-
-### Unexpected incidents
-
-Unexpected API/background-worker failures are reported through a Host-level `IIncidentReporter` abstraction.
-
-The reporter does not classify exceptions. Classification belongs to the caller/boundary.
-
-Initial implementation may simply log, but the boundary allows later integration with Sentry/Application Insights/OpenTelemetry/internal alerting without moving policy into Domain/Application.
-
-Incident reporting is best-effort:
-
-- reporter failure must not replace the original HTTP error
-- reporter failure must not terminate worker processing solely because alert delivery failed
-- avoid duplicate `LogError` between caller and reporter
-
-API unexpected errors:
-
-- return generic 500 detail
-- include `ProblemDetails.extensions.traceId`
-- report the same trace ID in the Incident
-- include concise operation identity such as HTTP method + path
-- do not include full request bodies or sensitive RFQ content by default
-
-### Background workers
-
-Normal shutdown cancellation is not an incident.
-
-Unexpected worker exceptions are reported through `IIncidentReporter`.
-
-Snapshot/Business-Date worker failures use the same incident boundary. Repeated retry failures for the same unavailable period should not create an unbounded incident storm; report the operational failure coherently and report/log recovery separately as appropriate.
-
-Business-state races that the use case already classifies as expected must not be reintroduced as broad swallowed `InvalidOperationException` catches.
-
-### Tracing / metrics
-
-Use standard .NET primitives such as `ActivitySource` and `Meter`.
-
----
-
-## 11. Event retention
-
-Initial implementation does not delete Events by count or age.
-
-Retain events; archive/partition later only if actual growth/compliance requires it.
-
----
-
-## 12. Realtime subscriber filtering
-
-Do not wake every connected client for every mutation.
-
-Server-side old/new snapshot diff and subscriber metadata decide which Sales users / Trader desks / coarse surfaces are affected. Filtering occurs before delivery; do not broadcast identity-rich changes to all clients and rely on frontend filtering.
-
----
-
-## 13. Authentication scope
-
-The environment identifies current user and roles somehow.
-
-Exact token/header/session mechanism is not part of this design.
-
-Application consumes `CurrentUser`; transport does not drive Domain design.
-
-
----
-
-# 08. Testing and Seed Data
-
-## 1. Domain unit tests
-
-Focus on typed state and transition invariants.
-
-At minimum cover:
-
-- initial Draft -> Active/Open confirm
-- Active -> Presented -> Active
-- Open -> Cancelled -> Active/Reopened
-- Open -> Closed Hit/Away
-- `QuoteRequested` / `QuoteConfirmed` construction and transitions
-- invalid state combinations cannot be constructed through public APIs
-- Quote Confirm coherently returns updated RFQ + immutable ConfirmedQuote
-- Quote Confirm validates WorkingQuote/current Revision association
-- Withdraw rejects Presented
-- Expire from Active and Presented
-- Amendment Save/Confirm/Discard
-- old current Revision -> Superseded on amendment Confirm
-- WorkingQuote transition behavior
-- memo transitions
-- ownership PickUp/Release/Assign/TakeOver
-- `StateVersion` validation / checked Next
-- representative Domain exception categories
-
-Test Domain transitions as pure business operations without repository/clock dependencies.
-
----
-
-## 2. Application/use-case tests
-
-Use repository mocks/fakes where appropriate.
-
-Focus on:
-
-- correct Domain transition/factory invoked
-- central authorization invoked
-- IDs/time/business date allocated outside Domain
-- initial Confirm creates WorkingQuote and persists atomically
-- amendment Confirm creates/seeds a new WorkingQuote for the new Revision
-- Quote Confirm allocates QuoteId outside Domain and persists both outputs
-- calculation success revalidates state after external calculation
-- calculation failure leaves WorkingQuote unchanged
-- bulk partial-success behavior
-- `CreateFromExisting` desk/business-date rule, including UTC/JST boundary regression
-
-Application tests should use typed IDs/state rather than string status comparisons.
-
----
-
-## 3. Infrastructure integration tests
-
-Use **real PostgreSQL**, preferably Testcontainers.
-
-Focus on:
-
-- EF mappings/rehydration of typed lifecycle state
-- migrations from the existing schema
-- transaction atomicity
-- one Draft partial unique index
-- one WorkingQuote per Revision
-- optimistic concurrency / `StateVersion` mapping
-- Category/Security/Routing FKs
-- JSONB event payloads
-- quote-event joins after removal of `QuoteEvent.CaseId`
-- expiry worker selection/transition behavior
-
-Do not use EF InMemory/SQLite as a PostgreSQL substitute.
-
-### Required event-cursor concurrency test
-
-Prove the global event feed cannot lose an event when concurrent event-producing transactions are ordered/committed oppositely.
-
-The test must exercise real PostgreSQL and the actual cursor-lock/allocation mechanism.
-
-The invariant to prove is:
-
-```text
-once a client advances lastSeenEventId after committed events,
-no event that later becomes visible may exist at a skipped lower cursor value
-```
-
----
-
-## 4. API tests
-
-Cover representative:
-
-- happy paths
-- 400 validation
-- 403 authorization
-- 404
-- 409 version conflict
-- calculation failure mapping
-- existing external DTO/JSON compatibility after internal typed refactor
-- OpenAPI smoke test
-
----
-
-## 5. FE tests
-
-Existing FE test scope remains unchanged; backend semantic refactor should not require FE changes.
-
----
-
-## 6. E2E journeys
-
-Keep representative journeys:
-
-1. Sales creates RFQ -> Trader quotes -> Sales presents -> Hit
-2. Sales revises RFQ -> Trader requotes -> Away
-3. Quote expires -> Requested/Expired -> requote
-4. Cancel -> Reopen -> requote
-5. WorkingQuote / Revision concurrency conflict
-
----
-
-## 7. Master/seed strategy
-
-Keep realistic but mock/seed master data.
-
-### Category
-
-Category is master data, not enum.
-
-Seed a small set such as JGB / Corporate / Other with:
-
-- stable CategoryId
-- display Name
-- CategoryRouting to default trader
-
-Security rows reference CategoryId by FK.
-
-### Other master data
-
-Retain current pragmatic User/Desk/Client/Security seeds.
-
-Security data should remain realistic enough to exercise search.
-
----
-
-## 8. Demo RFQ seed
-
-Generate enough RFQs to exercise:
-
-- Draft
-- Requested
-- Quoted
-- Presented
-- Cancelled
-- Hit
-- Away
-- Revised history
-- Expired/Withdrawn events
-- multiple Contact Owners / Assigned Traders / ownership states
-- Past RFQ search
-
-Seed data must be constructible through the new valid Domain model or equivalent trusted persistence setup; do not seed impossible field combinations that Domain could not rehydrate.
-
----
-
-## 9. Security seed from realistic Japanese bond data
-
-Where practical, use public Japanese bond reference-price/security-list data as a realistic source for demo/search seed.
-
-Useful extracted fields include:
-
-- bond/security code
-- name
-- coupon
-- maturity
-
-Generate application `SecurityId` and add mock fields where needed:
-
-- ISIN
-- ticker / BBG-style display
-- CategoryId
-
-The goal is realistic search/demo behavior, not a legally authoritative security master.
-
----
-
-## 10. Mock ISIN
-
-For demo seed, structurally valid JP-prefixed ISIN-like identifiers with valid check digits may be generated where convenient.
-
-They do not need to reproduce an issue's actual ISIN.
-
-Important test properties:
-
-- full 12-character lookup
-- prefix lookup
-- alphanumeric support
-- checksum path if implemented
-
----
-
-## 11. Calculation mock data
-
-Do not build fake holiday, curve, convention, or yield-spread master systems inside the RFQ app.
-
-Hide them behind MockCalculationClient.
-
-The mock may use one deterministic formula across arbitrary securities and should produce plausible price/yield/simple-yield/spread/accrued/settlement/delta values plus controlled errors.
-
-
----
-
-# 09. Scope, Non-goals, and Deferred Work
+# 07. Scope, Non-goals, and Deferred Work
 
 ## 1. Explicitly out of initial/current scope
 
@@ -3682,7 +3123,7 @@ The design intentionally fixes business invariants while leaving these implement
 
 ---
 
-# 10. Design Decisions and Rationale
+# 08. Design Decisions and Rationale
 
 This document records non-obvious choices that should survive implementation handoff.
 
@@ -4011,16 +3452,16 @@ Rationale:
 
 ## 21. Use one semantic RFQ error classification
 
-Expected operational failures share `ExpectedRfqException + RfqErrorKind` across Domain/Application/API/Bulk.
+Expected operational failures share `ExpectedRfqException + RfqErrorKind` across Domain/Application and boundary adapters.
 
 Unexpected invariants use `RfqInvariantException` / `DomainInvariantException`.
 
 Rationale:
 
 - HTTP status is transport policy, not exception-type policy
-- Bulk continuation is orchestration policy, not exception-type policy
+- multi-item continuation is orchestration policy, not exception-type policy
 - BCL exceptions must not accidentally become expected 4xx errors
-- one semantic classification prevents API and Bulk from disagreeing about the same failure
+- one semantic classification prevents different adapters/orchestrators from disagreeing about the same failure
 
 Do not put HTTP status, log level, retryability, alerting, or ContinueBulk flags on exception types.
 
@@ -4259,16 +3700,16 @@ Rationale:
 
 ---
 
-## 41. Bulk public APIs remain operation-specific
+## 41. Multi-item operations remain operation-specific
 
-Bulk use cases orchestrate single-item use cases and expose partial-success results, but there is no generic public bulk workflow engine.
+Multi-item use cases orchestrate the corresponding single-item business behavior and expose per-Case outcomes; there is no generic public workflow-command bus.
 
 Rationale:
 
 - operation names remain business-readable
-- single-item transitions stay the source of business rules
-- per-item Unit of Work cleanup is an orchestration concern
-- generic public bulk abstractions would erase useful business semantics
+- single-item transitions remain the source of business rules
+- per-Case execution/cleanup is orchestration policy
+- generic heterogeneous command envelopes erase useful business semantics
 
 ---
 
@@ -4304,16 +3745,15 @@ Selection indication and pending-change indication are therefore distinct tokens
 
 ## 44. Post Process query refresh and pending intent are separate state
 
-After a normal Post Process commit response, cached worklist queries reconcile with authoritative server state regardless of whether item results are Succeeded, Failed, or Skipped.
+After a normal Post Process commit response, cached worklist queries reconcile with authoritative server state regardless of per-Case outcome.
 
-Local pending changes are removed only for Succeeded Cases.
+Local unresolved intent is retained for failed Cases; intent already satisfied by an Applied/NoChange outcome may be cleared.
 
 Rationale:
 
 - a VersionConflict means the displayed server row may already be stale
 - retaining failed pending intent is useful to the operator
-- refreshing authoritative data must not imply clearing the operator's unresolved intent
-
+- refreshing authoritative data must not imply clearing unresolved operator intent
 
 ---
 
@@ -4345,43 +3785,7 @@ Member methods are not forbidden when they naturally belong to a value/factory/v
 
 ---
 
-## 47. Organize source by ownership before framework artifact type
-
-Backend/API/Application code remains grouped by business/use-case ownership. Global technical folders are reserved for genuinely cross-cutting concerns.
-
-Frontend organization is page-oriented:
-
-```text
-src/
-  app/
-  pages/
-    sales/
-    trader/
-    post-process/
-  shared/
-    ui/
-    grid/
-  services/
-  generated/
-  test/
-```
-
-Page-specific components, controllers/hooks, models, column definitions, and helpers remain under their owning page and should be grouped by human-recognizable concepts such as `operations`, `search`, `pricer`, `grid`, or `work-pane` when those concepts are substantial enough to justify a folder.
-
-Do not introduce page-local technical buckets such as generic `components/`, `hooks/`, `utils/`, and `types/` merely for classification.
-
-`shared` is for concepts genuinely reused across pages. A top-level `features` area is introduced only when an independent user-facing feature genuinely spans pages; Sales/Trader/Post Process page slices are not themselves called features.
-
-Rationale:
-
-- a change to one business/page concept is easier to discover in one place
-- framework-artifact buckets scatter one concept across the tree
-- page ownership is simpler than strict multi-layer feature slicing at the current application size
-- cross-page sharing should be earned by real reuse rather than shape similarity
-
----
-
-## 48. CaseId is internal identity, not a business sequence
+## 47. CaseId is internal identity, not a business sequence
 
 CaseId uses PostgreSQL bigint identity semantics and may have gaps.
 
@@ -4394,7 +3798,7 @@ Rationale:
 
 ---
 
-## 49. Hit is an RFQ outcome; Booking is downstream
+## 48. Hit is an RFQ outcome; Booking is downstream
 
 Closing Hit terminates the RFQ workflow but does not make the RFQ aggregate a booking aggregate.
 
@@ -4406,7 +3810,7 @@ Rationale:
 
 ---
 
-## 50. Calculation does not own RFQ workflow state
+## 49. Calculation does not own RFQ workflow state
 
 Calculation may be a separate service and may own sophisticated pricing/reference-data logic, but RFQ Application remains authoritative for RFQ state, quote work persistence, authorization, and concurrency.
 
@@ -4418,7 +3822,7 @@ Rationale:
 
 ---
 
-## 51. Operational usability is a design requirement
+## 50. Operational usability is a design requirement
 
 The UI is optimized for repeated desk operation rather than generic form-entry conventions.
 
@@ -4431,40 +3835,3 @@ Rationale:
 
 ---
 
-## 52. Current-Business-Date Sales/Trader reads use one immutable process-local snapshot
-
-A dedicated loader builds both Sales and Trader read projections for the current Business Date. Query implementations filter those projections in memory by user/desk.
-
-Mutation commits invalidate a generation cheaply; rebuild is single-flight/coalesced and converges to latest state rather than queuing one refresh per mutation.
-
-Rationale:
-
-- one DB rebuild per change burst is materially cheaper than one multi-query page load per connected client
-- immutable atomic swap keeps read paths simple
-- Sales and Trader projections may duplicate data without creating two business truths because PostgreSQL remains authoritative
-- GET after a committed mutation must not present a known-stale generation as current
-
----
-
-## 53. Database Business Date is authoritative; polling is only proactive detection
-
-The runtime snapshot mirrors the DB Business Date and polls it infrequently (initially about 10 minutes), while explicit Business-Date inputs/mismatch checks preserve correctness across rollover.
-
-Rationale:
-
-- desk Business Date is operational state, not a system-clock calculation
-- low-frequency polling is sufficient for proactive rollover because Business Date changes rarely
-- query mismatch and business use cases can detect authoritative change immediately rather than waiting for the poll
-
----
-
-## 54. Horizontal scaling requires cross-process invalidation
-
-The current snapshot generation and SSE registry are process-local and therefore assume one API process.
-
-If horizontal scaling is introduced, add DB-backed or otherwise reliable cross-process invalidation/notification so each node refreshes its local snapshot and wakes its local subscribers. Sticky routing alone is insufficient.
-
-Rationale:
-
-- a POST handled by node A followed by a GET/SSE client on node B must not observe an indefinitely stale local snapshot
-- preserving the local-snapshot boundary allows the cross-process transport to change without moving business authority out of PostgreSQL
