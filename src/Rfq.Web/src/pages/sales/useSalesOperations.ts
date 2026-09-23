@@ -130,7 +130,7 @@ export function useSalesOperations({
             standardSettlementDate: row.standardSettlementDate,
             salesAndTradingMessage: row.salesAndTradingMessage,
             assignedTraderId,
-            expectedVersion: row.version,
+            expectedCurrentVersion: row.version,
           }),
         [row.caseId],
       )

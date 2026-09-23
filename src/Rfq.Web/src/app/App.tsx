@@ -28,6 +28,10 @@ export interface AppOutletContext {
   recentRevisionsChangeVersion: number
 }
 
+export function worklistStreamUrl(developmentUser: string): string {
+  return `/api/worklists/stream?developmentUser=${encodeURIComponent(developmentUser)}`
+}
+
 export function App() {
   const configuredIdentity =
     window.localStorage.getItem('rfq-development-user') ?? 'sales-dev'
@@ -86,7 +90,7 @@ export function App() {
 
   useEffect(() => {
     if (typeof EventSource === 'undefined') return undefined
-    const source = new EventSource('/api/events/stream')
+    const source = new EventSource(worklistStreamUrl(configuredIdentity))
     source.addEventListener('invalidation', (event) => {
       const categories = new Set(
         (event as MessageEvent<string>).data.split(','),
@@ -105,7 +109,7 @@ export function App() {
     })
 
     return () => source.close()
-  }, [businessDateQuery.refetch])
+  }, [businessDateQuery.refetch, configuredIdentity])
 
   const outletContext: AppOutletContext = {
     currentUserId,

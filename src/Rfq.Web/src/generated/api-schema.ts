@@ -4,6 +4,70 @@
  */
 
 export interface paths {
+    "/api/worklists/trader": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetActiveTraderRfqs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worklists/sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetActiveSalesRfqs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worklists/sales/recent-revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSalesRecentRevisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search/rfqs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SearchRfqs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rfqs/{caseId}/working-quote/calculate": {
         parameters: {
             query?: never;
@@ -12,36 +76,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CalculateWorkingQuoteRequest"];
-                    "text/json": components["schemas"]["CalculateWorkingQuoteRequest"];
-                    "application/*+json": components["schemas"]["CalculateWorkingQuoteRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["WorkingQuoteResponse"];
-                        "application/json": components["schemas"]["WorkingQuoteResponse"];
-                        "text/json": components["schemas"]["WorkingQuoteResponse"];
-                    };
-                };
-            };
-        };
+        put: operations["CalculateWorkingQuote"];
         post?: never;
         delete?: never;
         options?: never;
@@ -57,36 +92,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ChangeWorkingQuoteModeRequest"];
-                    "text/json": components["schemas"]["ChangeWorkingQuoteModeRequest"];
-                    "application/*+json": components["schemas"]["ChangeWorkingQuoteModeRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["WorkingQuoteResponse"];
-                        "application/json": components["schemas"]["WorkingQuoteResponse"];
-                        "text/json": components["schemas"]["WorkingQuoteResponse"];
-                    };
-                };
-            };
-        };
+        put: operations["ChangeWorkingQuoteMode"];
         post?: never;
         delete?: never;
         options?: never;
@@ -102,36 +108,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["UpdateManualWorkingQuoteRequest"];
-                    "text/json": components["schemas"]["UpdateManualWorkingQuoteRequest"];
-                    "application/*+json": components["schemas"]["UpdateManualWorkingQuoteRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["WorkingQuoteResponse"];
-                        "application/json": components["schemas"]["WorkingQuoteResponse"];
-                        "text/json": components["schemas"]["WorkingQuoteResponse"];
-                    };
-                };
-            };
-        };
+        put: operations["UpdateManualWorkingQuote"];
         post?: never;
         delete?: never;
         options?: never;
@@ -139,252 +116,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/trader-rfqs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["TraderRfqResponse"][];
-                        "application/json": components["schemas"]["TraderRfqResponse"][];
-                        "text/json": components["schemas"]["TraderRfqResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sales-rfqs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SalesRfqResponse"][];
-                        "application/json": components["schemas"]["SalesRfqResponse"][];
-                        "text/json": components["schemas"]["SalesRfqResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sales-rfqs/recent-revisions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: {
-                    limit?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SalesRecentRevisionResponse"][];
-                        "application/json": components["schemas"]["SalesRecentRevisionResponse"][];
-                        "text/json": components["schemas"]["SalesRecentRevisionResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: {
-                    CreatedFrom?: string;
-                    CreatedTo?: string;
-                    ClientId?: string;
-                    SecurityId?: string;
-                    CategoryId?: string;
-                    ContactOwnerId?: string;
-                    SalesId?: string;
-                    AssignedTraderId?: string;
-                    Status?: string;
-                    CaseId?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["RfqSearchResponse"];
-                        "application/json": components["schemas"]["RfqSearchResponse"];
-                        "text/json": components["schemas"]["RfqSearchResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/revisions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["RevisionResponse"][];
-                        "application/json": components["schemas"]["RevisionResponse"][];
-                        "text/json": components["schemas"]["RevisionResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/contact-owner": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ChangeContactOwnerRequest"];
-                    "text/json": components["schemas"]["ChangeContactOwnerRequest"];
-                    "application/*+json": components["schemas"]["ChangeContactOwnerRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["ContactOwnerResponse"];
-                        "application/json": components["schemas"]["ContactOwnerResponse"];
-                        "text/json": components["schemas"]["ContactOwnerResponse"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/quote/confirm": {
+    "/api/rfqs/change-contact-owner": {
         parameters: {
             query?: never;
             header?: never;
@@ -393,43 +125,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ConfirmQuoteRequest"];
-                    "text/json": components["schemas"]["ConfirmQuoteRequest"];
-                    "application/*+json": components["schemas"]["ConfirmQuoteRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["ConfirmQuoteResponse"];
-                        "application/json": components["schemas"]["ConfirmQuoteResponse"];
-                        "text/json": components["schemas"]["ConfirmQuoteResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["ChangeContactOwners"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/{caseId}/quote/withdraw": {
+    "/api/rfqs/pick-up": {
         parameters: {
             query?: never;
             header?: never;
@@ -438,82 +141,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["VersionRequest"];
-                    "text/json": components["schemas"]["VersionRequest"];
-                    "application/*+json": components["schemas"]["VersionRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["LifecycleResponse"];
-                        "application/json": components["schemas"]["LifecycleResponse"];
-                        "text/json": components["schemas"]["LifecycleResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["PickUpRfqs"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/{caseId}/quotes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["QuoteHistoryResponse"][];
-                        "application/json": components["schemas"]["QuoteHistoryResponse"][];
-                        "text/json": components["schemas"]["QuoteHistoryResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/quotes/bulk-withdraw": {
+    "/api/rfqs/release": {
         parameters: {
             query?: never;
             header?: never;
@@ -522,41 +157,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkLifecycleRequest"];
-                    "text/json": components["schemas"]["BulkLifecycleRequest"];
-                    "application/*+json": components["schemas"]["BulkLifecycleRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["ReleaseRfqs"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/quotes/bulk-confirm": {
+    "/api/rfqs/assign-trader": {
         parameters: {
             query?: never;
             header?: never;
@@ -565,41 +173,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkConfirmQuoteRequest"];
-                    "text/json": components["schemas"]["BulkConfirmQuoteRequest"];
-                    "application/*+json": components["schemas"]["BulkConfirmQuoteRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["AssignTraders"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/{caseId}/ownership/pick-up": {
+    "/api/rfqs/take-over": {
         parameters: {
             query?: never;
             header?: never;
@@ -608,300 +189,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ConfirmedRequest"];
-                    "text/json": components["schemas"]["ConfirmedRequest"];
-                    "application/*+json": components["schemas"]["ConfirmedRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["OwnershipResponse"];
-                        "application/json": components["schemas"]["OwnershipResponse"];
-                        "text/json": components["schemas"]["OwnershipResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/ownership/release": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["VersionRequest"];
-                    "text/json": components["schemas"]["VersionRequest"];
-                    "application/*+json": components["schemas"]["VersionRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["OwnershipResponse"];
-                        "application/json": components["schemas"]["OwnershipResponse"];
-                        "text/json": components["schemas"]["OwnershipResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/ownership/take-over": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ConfirmedRequest"];
-                    "text/json": components["schemas"]["ConfirmedRequest"];
-                    "application/*+json": components["schemas"]["ConfirmedRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["OwnershipResponse"];
-                        "application/json": components["schemas"]["OwnershipResponse"];
-                        "text/json": components["schemas"]["OwnershipResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/assigned-trader": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["AssignTraderRequest"];
-                    "text/json": components["schemas"]["AssignTraderRequest"];
-                    "application/*+json": components["schemas"]["AssignTraderRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["OwnershipResponse"];
-                        "application/json": components["schemas"]["OwnershipResponse"];
-                        "text/json": components["schemas"]["OwnershipResponse"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/ownership/bulk-pick-up": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkPickUpRequest"];
-                    "text/json": components["schemas"]["BulkPickUpRequest"];
-                    "application/*+json": components["schemas"]["BulkPickUpRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/ownership/bulk-release": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkOwnershipRequest"];
-                    "text/json": components["schemas"]["BulkOwnershipRequest"];
-                    "application/*+json": components["schemas"]["BulkOwnershipRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/ownership/bulk-assign-trader": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkAssignTraderRequest"];
-                    "text/json": components["schemas"]["BulkAssignTraderRequest"];
-                    "application/*+json": components["schemas"]["BulkAssignTraderRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["TakeOverRfqs"];
         delete?: never;
         options?: never;
         head?: never;
@@ -916,36 +204,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["UpdateMemoRequest"];
-                    "text/json": components["schemas"]["UpdateMemoRequest"];
-                    "application/*+json": components["schemas"]["UpdateMemoRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SalesMemoResponse"];
-                        "application/json": components["schemas"]["SalesMemoResponse"];
-                        "text/json": components["schemas"]["SalesMemoResponse"];
-                    };
-                };
-            };
-        };
+        put: operations["UpdateSalesMemo"];
         post?: never;
         delete?: never;
         options?: never;
@@ -961,127 +220,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["UpdateMemoRequest"];
-                    "text/json": components["schemas"]["UpdateMemoRequest"];
-                    "application/*+json": components["schemas"]["UpdateMemoRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["TraderMemoResponse"];
-                        "application/json": components["schemas"]["TraderMemoResponse"];
-                        "text/json": components["schemas"]["TraderMemoResponse"];
-                    };
-                };
-            };
-        };
+        put: operations["UpdateTraderMemo"];
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/present": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["LifecycleRequest"];
-                    "text/json": components["schemas"]["LifecycleRequest"];
-                    "application/*+json": components["schemas"]["LifecycleRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["PresentationResponse"];
-                        "application/json": components["schemas"]["PresentationResponse"];
-                        "text/json": components["schemas"]["PresentationResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/unpresent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["LifecycleRequest"];
-                    "text/json": components["schemas"]["LifecycleRequest"];
-                    "application/*+json": components["schemas"]["LifecycleRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["PresentationResponse"];
-                        "application/json": components["schemas"]["PresentationResponse"];
-                        "text/json": components["schemas"]["PresentationResponse"];
-                    };
-                };
-            };
-        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1097,81 +237,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["LifecycleRequest"];
-                    "text/json": components["schemas"]["LifecycleRequest"];
-                    "application/*+json": components["schemas"]["LifecycleRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["CloseResponse"];
-                        "application/json": components["schemas"]["CloseResponse"];
-                        "text/json": components["schemas"]["CloseResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/close/away": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["LifecycleRequest"];
-                    "text/json": components["schemas"]["LifecycleRequest"];
-                    "application/*+json": components["schemas"]["LifecycleRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["CloseResponse"];
-                        "application/json": components["schemas"]["CloseResponse"];
-                        "text/json": components["schemas"]["CloseResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["CloseHitRfq"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1187,36 +253,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CorrectOutcomeRequest"];
-                    "text/json": components["schemas"]["CorrectOutcomeRequest"];
-                    "application/*+json": components["schemas"]["CorrectOutcomeRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["CloseResponse"];
-                        "application/json": components["schemas"]["CloseResponse"];
-                        "text/json": components["schemas"]["CloseResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["CorrectOutcomeToHit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1232,43 +269,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CorrectOutcomeRequest"];
-                    "text/json": components["schemas"]["CorrectOutcomeRequest"];
-                    "application/*+json": components["schemas"]["CorrectOutcomeRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["CloseResponse"];
-                        "application/json": components["schemas"]["CloseResponse"];
-                        "text/json": components["schemas"]["CloseResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["CorrectOutcomeToAway"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/{caseId}/cancel": {
+    "/api/rfqs/present": {
         parameters: {
             query?: never;
             header?: never;
@@ -1277,43 +285,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["LifecycleRequest"];
-                    "text/json": components["schemas"]["LifecycleRequest"];
-                    "application/*+json": components["schemas"]["LifecycleRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["LifecycleResponse"];
-                        "application/json": components["schemas"]["LifecycleResponse"];
-                        "text/json": components["schemas"]["LifecycleResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["PresentRfqs"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/{caseId}/reopen": {
+    "/api/rfqs/unpresent": {
         parameters: {
             query?: never;
             header?: never;
@@ -1322,43 +301,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["LifecycleRequest"];
-                    "text/json": components["schemas"]["LifecycleRequest"];
-                    "application/*+json": components["schemas"]["LifecycleRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["LifecycleResponse"];
-                        "application/json": components["schemas"]["LifecycleResponse"];
-                        "text/json": components["schemas"]["LifecycleResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["UnpresentRfqs"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/bulk-present": {
+    "/api/rfqs/close-away": {
         parameters: {
             query?: never;
             header?: never;
@@ -1367,41 +317,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkLifecycleRequest2"];
-                    "text/json": components["schemas"]["BulkLifecycleRequest2"];
-                    "application/*+json": components["schemas"]["BulkLifecycleRequest2"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["CloseAwayRfqs"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/bulk-unpresent": {
+    "/api/rfqs/cancel": {
         parameters: {
             query?: never;
             header?: never;
@@ -1410,41 +333,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkLifecycleRequest2"];
-                    "text/json": components["schemas"]["BulkLifecycleRequest2"];
-                    "application/*+json": components["schemas"]["BulkLifecycleRequest2"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["CancelRfqs"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/bulk-close-away": {
+    "/api/rfqs/reopen": {
         parameters: {
             query?: never;
             header?: never;
@@ -1453,77 +349,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkLifecycleRequest2"];
-                    "text/json": components["schemas"]["BulkLifecycleRequest2"];
-                    "application/*+json": components["schemas"]["BulkLifecycleRequest2"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/bulk-cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkLifecycleRequest2"];
-                    "text/json": components["schemas"]["BulkLifecycleRequest2"];
-                    "application/*+json": components["schemas"]["BulkLifecycleRequest2"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["ReopenRfqs"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1539,34 +365,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CreateDraftRequest"];
-                    "text/json": components["schemas"]["CreateDraftRequest"];
-                    "application/*+json": components["schemas"]["CreateDraftRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["InitialRfqResponse"];
-                        "application/json": components["schemas"]["InitialRfqResponse"];
-                        "text/json": components["schemas"]["InitialRfqResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["CreateDraft"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1582,34 +381,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CreateDraftRequest"];
-                    "text/json": components["schemas"]["CreateDraftRequest"];
-                    "application/*+json": components["schemas"]["CreateDraftRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["InitialRfqResponse"];
-                        "application/json": components["schemas"]["InitialRfqResponse"];
-                        "text/json": components["schemas"]["InitialRfqResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["ConfirmNewRfq"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1624,123 +396,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["UpdateDraftRequest"];
-                    "text/json": components["schemas"]["UpdateDraftRequest"];
-                    "application/*+json": components["schemas"]["UpdateDraftRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["InitialRfqResponse"];
-                        "application/json": components["schemas"]["InitialRfqResponse"];
-                        "text/json": components["schemas"]["InitialRfqResponse"];
-                    };
-                };
-            };
-        };
+        put: operations["UpdateInitialDraft"];
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/draft/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["UpdateDraftRequest"];
-                    "text/json": components["schemas"]["UpdateDraftRequest"];
-                    "application/*+json": components["schemas"]["UpdateDraftRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["InitialRfqResponse"];
-                        "application/json": components["schemas"]["InitialRfqResponse"];
-                        "text/json": components["schemas"]["InitialRfqResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/{caseId}/draft/discard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["VersionRequest"];
-                    "text/json": components["schemas"]["VersionRequest"];
-                    "application/*+json": components["schemas"]["VersionRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1756,37 +413,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["InitialRfqResponse"];
-                        "application/json": components["schemas"]["InitialRfqResponse"];
-                        "text/json": components["schemas"]["InitialRfqResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["CreateFromExisting"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/drafts/bulk-confirm": {
+    "/api/rfqs/confirm-initial-drafts": {
         parameters: {
             query?: never;
             header?: never;
@@ -1795,41 +429,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkConfirmDraftRequest"];
-                    "text/json": components["schemas"]["BulkConfirmDraftRequest"];
-                    "application/*+json": components["schemas"]["BulkConfirmDraftRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["ConfirmInitialDrafts"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/drafts/bulk-discard": {
+    "/api/rfqs/discard-initial-drafts": {
         parameters: {
             query?: never;
             header?: never;
@@ -1838,34 +445,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkDiscardDraftRequest"];
-                    "text/json": components["schemas"]["BulkDiscardDraftRequest"];
-                    "application/*+json": components["schemas"]["BulkDiscardDraftRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["DiscardInitialDrafts"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1879,30 +459,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query: {
-                    securityId: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["RfqCreationContextResponse"];
-                        "application/json": components["schemas"]["RfqCreationContextResponse"];
-                        "text/json": components["schemas"]["RfqCreationContextResponse"];
-                    };
-                };
-            };
-        };
+        get: operations["ResolveRfqCreationContext"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1920,36 +477,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["StartAmendmentRequest"];
-                    "text/json": components["schemas"]["StartAmendmentRequest"];
-                    "application/*+json": components["schemas"]["StartAmendmentRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["AmendmentResponse"];
-                        "application/json": components["schemas"]["AmendmentResponse"];
-                        "text/json": components["schemas"]["AmendmentResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["StartAmendment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1964,36 +492,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["SaveAmendmentRequest"];
-                    "text/json": components["schemas"]["SaveAmendmentRequest"];
-                    "application/*+json": components["schemas"]["SaveAmendmentRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["AmendmentResponse"];
-                        "application/json": components["schemas"]["AmendmentResponse"];
-                        "text/json": components["schemas"]["AmendmentResponse"];
-                    };
-                };
-            };
-        };
+        put: operations["SaveAmendment"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2001,7 +500,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/{caseId}/amendment/confirm": {
+    "/api/rfqs/confirm-amendments": {
         parameters: {
             query?: never;
             header?: never;
@@ -2010,43 +509,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["AmendmentActionRequest"];
-                    "text/json": components["schemas"]["AmendmentActionRequest"];
-                    "application/*+json": components["schemas"]["AmendmentActionRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["AmendmentResponse"];
-                        "application/json": components["schemas"]["AmendmentResponse"];
-                        "text/json": components["schemas"]["AmendmentResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["ConfirmAmendments"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/{caseId}/amendment/discard": {
+    "/api/rfqs/discard-amendments": {
         parameters: {
             query?: never;
             header?: never;
@@ -2055,86 +525,30 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    caseId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["AmendmentActionRequest"];
-                    "text/json": components["schemas"]["AmendmentActionRequest"];
-                    "application/*+json": components["schemas"]["AmendmentActionRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["AmendmentResponse"];
-                        "application/json": components["schemas"]["AmendmentResponse"];
-                        "text/json": components["schemas"]["AmendmentResponse"];
-                    };
-                };
-            };
-        };
+        post: operations["DiscardAmendments"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/amendment/bulk-confirm": {
+    "/api/rfqs/{caseId}/quotes": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["GetRfqQuoteHistory"];
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkAmendmentRequest"];
-                    "text/json": components["schemas"]["BulkAmendmentRequest"];
-                    "application/*+json": components["schemas"]["BulkAmendmentRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rfqs/amendment/bulk-discard": {
+    "/api/rfqs/withdraw-quotes": {
         parameters: {
             query?: never;
             header?: never;
@@ -2143,41 +557,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["BulkAmendmentRequest"];
-                    "text/json": components["schemas"]["BulkAmendmentRequest"];
-                    "application/*+json": components["schemas"]["BulkAmendmentRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
-        };
+        post: operations["WithdrawQuotes"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/pricer": {
+    "/api/rfqs/confirm-quotes": {
         parameters: {
             query?: never;
             header?: never;
@@ -2186,34 +573,87 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["PricerRequest"];
-                    "text/json": components["schemas"]["PricerRequest"];
-                    "application/*+json": components["schemas"]["PricerRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["CalculatedQuoteResponse2"];
-                        "application/json": components["schemas"]["CalculatedQuoteResponse2"];
-                        "text/json": components["schemas"]["CalculatedQuoteResponse2"];
-                    };
-                };
-            };
+        post: operations["ConfirmQuotes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reference-data/assignable-traders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
+        get: operations["GetAssignableTraders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reference-data/contact-owner-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetContactOwnerCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reference-data/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SearchClients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reference-data/securities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SearchSecurities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pricing/scratch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ScratchPrice"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2227,31 +667,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: {
-                    preset?: number;
-                    scope?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["PostProcessItemResponse"][];
-                        "application/json": components["schemas"]["PostProcessItemResponse"][];
-                        "text/json": components["schemas"]["PostProcessItemResponse"][];
-                    };
-                };
-            };
-        };
+        get: operations["GetPostProcess"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2269,34 +685,71 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["PostProcessCommitRequest"];
-                    "text/json": components["schemas"]["PostProcessCommitRequest"];
-                    "application/*+json": components["schemas"]["PostProcessCommitRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BulkItemResponse"][];
-                        "application/json": components["schemas"]["BulkItemResponse"][];
-                        "text/json": components["schemas"]["BulkItemResponse"][];
-                    };
-                };
-            };
+        post: operations["CommitPostProcessChanges"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worklists/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
+        get: operations["StreamWorklistInvalidations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/grid-configs/{screenId}/{configKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetGridConfig"];
+        put: operations["SaveGridConfig"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2310,28 +763,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["MeResponse"];
-                        "application/json": components["schemas"]["MeResponse"];
-                        "text/json": components["schemas"]["MeResponse"];
-                    };
-                };
-            };
-        };
+        get: operations["GetMe"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2347,56 +779,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["QuoteExpiryResponse"];
-                        "application/json": components["schemas"]["QuoteExpiryResponse"];
-                        "text/json": components["schemas"]["QuoteExpiryResponse"];
-                    };
-                };
-            };
-        };
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["QuoteExpiryRequest"];
-                    "text/json": components["schemas"]["QuoteExpiryRequest"];
-                    "application/*+json": components["schemas"]["QuoteExpiryRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["QuoteExpiryResponse"];
-                        "application/json": components["schemas"]["QuoteExpiryResponse"];
-                        "text/json": components["schemas"]["QuoteExpiryResponse"];
-                    };
-                };
-            };
-        };
+        get: operations["GetQuoteExpiry"];
+        put: operations["SaveQuoteExpiry"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2411,56 +795,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["QuoteModeResponse"];
-                        "application/json": components["schemas"]["QuoteModeResponse"];
-                        "text/json": components["schemas"]["QuoteModeResponse"];
-                    };
-                };
-            };
-        };
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["QuoteModeRequest"];
-                    "text/json": components["schemas"]["QuoteModeRequest"];
-                    "application/*+json": components["schemas"]["QuoteModeRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["QuoteModeResponse"];
-                        "application/json": components["schemas"]["QuoteModeResponse"];
-                        "text/json": components["schemas"]["QuoteModeResponse"];
-                    };
-                };
-            };
-        };
+        get: operations["GetDefaultQuoteMode"];
+        put: operations["SaveDefaultQuoteMode"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2475,545 +811,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["ThemeResponse"];
-                        "application/json": components["schemas"]["ThemeResponse"];
-                        "text/json": components["schemas"]["ThemeResponse"];
-                    };
-                };
-            };
-        };
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ThemeRequest"];
-                    "text/json": components["schemas"]["ThemeRequest"];
-                    "application/*+json": components["schemas"]["ThemeRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["ThemeResponse"];
-                        "application/json": components["schemas"]["ThemeResponse"];
-                        "text/json": components["schemas"]["ThemeResponse"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/me/grid-configs/{screenId}/{configKey}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    screenId: string;
-                    configKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["GridConfigResponse"];
-                        "application/json": components["schemas"]["GridConfigResponse"];
-                        "text/json": components["schemas"]["GridConfigResponse"];
-                    };
-                };
-            };
-        };
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    screenId: string;
-                    configKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["GridConfigRequest"];
-                    "text/json": components["schemas"]["GridConfigRequest"];
-                    "application/*+json": components["schemas"]["GridConfigRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["GridConfigResponse"];
-                        "application/json": components["schemas"]["GridConfigResponse"];
-                        "text/json": components["schemas"]["GridConfigResponse"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: {
-                    after?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["EventResponse"][];
-                        "application/json": components["schemas"]["EventResponse"][];
-                        "text/json": components["schemas"]["EventResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/events/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/eod": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: {
-                    date?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["EodResponse"][];
-                        "application/json": components["schemas"]["EodResponse"][];
-                        "text/json": components["schemas"]["EodResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["HealthResponse"];
-                        "application/json": components["schemas"]["HealthResponse"];
-                        "text/json": components["schemas"]["HealthResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/health/readiness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["HealthResponse"];
-                        "application/json": components["schemas"]["HealthResponse"];
-                        "text/json": components["schemas"]["HealthResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/category-routings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["CategoryRoutingResponse"][];
-                        "application/json": components["schemas"]["CategoryRoutingResponse"][];
-                        "text/json": components["schemas"]["CategoryRoutingResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/category-routings/{categoryId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    categoryId: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["UpdateCategoryRoutingRequest"];
-                    "text/json": components["schemas"]["UpdateCategoryRoutingRequest"];
-                    "application/*+json": components["schemas"]["UpdateCategoryRoutingRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["CategoryRoutingResponse"];
-                        "application/json": components["schemas"]["CategoryRoutingResponse"];
-                        "text/json": components["schemas"]["CategoryRoutingResponse"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/assignable-traders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["UserCandidateResponse"][];
-                        "application/json": components["schemas"]["UserCandidateResponse"][];
-                        "text/json": components["schemas"]["UserCandidateResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/contact-owner-candidates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["UserCandidateResponse"][];
-                        "application/json": components["schemas"]["UserCandidateResponse"][];
-                        "text/json": components["schemas"]["UserCandidateResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/candidates/clients": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query: {
-                    q: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["ClientCandidateResponse"][];
-                        "application/json": components["schemas"]["ClientCandidateResponse"][];
-                        "text/json": components["schemas"]["ClientCandidateResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rfqs/candidates/securities": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query: {
-                    q: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["SecurityCandidateResponse"][];
-                        "application/json": components["schemas"]["SecurityCandidateResponse"][];
-                        "text/json": components["schemas"]["SecurityCandidateResponse"][];
-                    };
-                };
-            };
-        };
-        put?: never;
+        get: operations["GetTheme"];
+        put: operations["SaveTheme"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3028,28 +827,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["BusinessDateResponse"];
-                        "application/json": components["schemas"]["BusinessDateResponse"];
-                        "text/json": components["schemas"]["BusinessDateResponse"];
-                    };
-                };
-            };
-        };
+        get: operations["GetBusinessDate"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3062,15 +840,23 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ApiProblemDetails: {
+            /** Format: int32 */
+            status: number;
+            title: string;
+            detail: string;
+            code: string;
+            traceId: string;
+            errors?: {
+                [key: string]: string[];
+            };
+            calculationErrorCode?: string | null;
+            /** Format: uuid */
+            failureLogId?: string | null;
+        };
         AmendmentActionItemRequest: {
             /** Format: int64 */
             caseId: number;
-            /** Format: int64 */
-            expectedCurrentVersion: number;
-            /** Format: int64 */
-            expectedDraftVersion: number;
-        };
-        AmendmentActionRequest: {
             /** Format: int64 */
             expectedCurrentVersion: number;
             /** Format: int64 */
@@ -3092,56 +878,13 @@ export interface components {
             /** Format: date */
             draftSettlementDate: string | null;
             draftSalesAndTradingMessage: string | null;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
-            quoteStatus: components["schemas"]["NullableOfQuoteStatusValue"];
-            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReasonValue"];
+            rfqStatus: components["schemas"]["RfqStatus"];
+            quoteStatus: components["schemas"]["NullableOfQuoteStatus"];
+            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReason"];
         };
-        AssignTraderRequest: {
-            assignedTraderId: string;
-            /** Format: int64 */
-            expectedVersion: number;
-        };
-        BulkAmendmentRequest: {
-            items: components["schemas"]["AmendmentActionItemRequest"][];
-        };
-        BulkAssignTraderRequest: {
-            targetAssignedTraderId: string;
+        AssignTradersRequest: {
+            targetTraderId: string;
             items: components["schemas"]["OwnershipItemRequest"][];
-        };
-        BulkConfirmDraftRequest: {
-            items: components["schemas"]["ConfirmDraftItemRequest"][];
-        };
-        BulkConfirmQuoteRequest: {
-            items: components["schemas"]["ConfirmQuoteItemRequest"][];
-        };
-        BulkDiscardDraftRequest: {
-            items: components["schemas"]["DiscardDraftItemRequest"][];
-        };
-        BulkItemResponse: {
-            /** Format: int64 */
-            caseId: number;
-            status: components["schemas"]["BulkItemStatusValue"];
-            code: components["schemas"]["NullableOfBulkFailureCodeValue"];
-            message: string | null;
-        };
-        BulkItemStatusValue: number;
-        BulkLifecycleItemRequest: {
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            expectedCurrentVersion: number;
-        };
-        BulkLifecycleRequest: {
-            items: components["schemas"]["LifecycleItemRequest"][];
-        };
-        BulkLifecycleRequest2: {
-            items: components["schemas"]["BulkLifecycleItemRequest"][];
-        };
-        BulkOwnershipRequest: {
-            items: components["schemas"]["OwnershipItemRequest"][];
-        };
-        BulkPickUpRequest: {
-            items: components["schemas"]["PickUpItemRequest"][];
         };
         BusinessDateResponse: {
             /** Format: date */
@@ -3212,18 +955,36 @@ export interface components {
             /** Format: int64 */
             expectedWorkingQuoteVersion: number;
         };
-        CalculationDriverValue: number;
-        CategoryRoutingResponse: {
-            categoryId: string;
-            categoryName: string;
-            defaultTraderId: string;
-            defaultTraderName: string;
+        /** @enum {string} */
+        CalculationDriverValue: "Price" | "BbgYield" | "SimpleYield" | "Ysc" | "GSpread" | "Asw" | "ISpread" | "ZSpread";
+        CancelRfqsRequest: {
+            items: components["schemas"]["CaseVersionItemRequest"][];
         };
-        ChangeContactOwnerRequest: {
-            contactOwnerId: string;
+        CaseOperationResponse: {
+            /** Format: int64 */
+            caseId: number;
+            status: components["schemas"]["CaseOperationStatus"];
+            failureCode: components["schemas"]["NullableOfCaseOperationFailureCode"];
+            message: string | null;
+        };
+        /** @enum {string} */
+        CaseOperationStatus: "Applied" | "NoChange" | "Failed";
+        CaseVersionItemRequest: {
+            /** Format: int64 */
+            caseId: number;
             /** Format: int64 */
             expectedCurrentVersion: number;
+        };
+        ChangeContactOwnerItemRequest: {
+            /** Format: int64 */
+            caseId: number;
+            /** Format: int64 */
+            expectedCurrentVersion: number;
+        };
+        ChangeContactOwnersRequest: {
+            targetContactOwnerId: string;
             confirmed: boolean;
+            items: components["schemas"]["ChangeContactOwnerItemRequest"][];
         };
         ChangeWorkingQuoteModeRequest: {
             mode: components["schemas"]["QuoteMode"];
@@ -3237,15 +998,25 @@ export interface components {
             code: string;
             name: string;
         };
+        CloseAwayRfqsRequest: {
+            items: components["schemas"]["CaseVersionItemRequest"][];
+        };
+        CloseHitRfqRequest: {
+            /** Format: int64 */
+            expectedCurrentVersion: number;
+        };
         CloseResponse: {
             /** Format: int64 */
             caseId: number;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
+            rfqStatus: components["schemas"]["RfqStatus"];
             /** Format: uuid */
             closedQuoteId: string;
             owned: boolean;
             /** Format: int64 */
             currentVersion: number;
+        };
+        ConfirmAmendmentsRequest: {
+            items: components["schemas"]["AmendmentActionItemRequest"][];
         };
         ConfirmDraftItemRequest: {
             /** Format: int64 */
@@ -3259,12 +1030,10 @@ export interface components {
             salesAndTradingMessage: string;
             assignedTraderId: string;
             /** Format: int64 */
-            expectedVersion: number;
+            expectedCurrentVersion: number;
         };
-        ConfirmedRequest: {
-            /** Format: int64 */
-            expectedVersion: number;
-            confirmed: boolean;
+        ConfirmInitialDraftsRequest: {
+            items: components["schemas"]["ConfirmDraftItemRequest"][];
         };
         ConfirmQuoteItemRequest: {
             /** Format: int64 */
@@ -3275,41 +1044,15 @@ export interface components {
             /** Format: int64 */
             expectedWorkingQuoteVersion: number;
         };
-        ConfirmQuoteRequest: {
-            expiry: components["schemas"]["QuoteExpiryRequest"];
+        ConfirmQuotesRequest: {
+            items: components["schemas"]["ConfirmQuoteItemRequest"][];
+        };
+        CorrectOutcomeToAwayRequest: {
+            reason: string;
             /** Format: int64 */
             expectedCurrentVersion: number;
-            /** Format: int64 */
-            expectedWorkingQuoteVersion: number;
         };
-        ConfirmQuoteResponse: {
-            /** Format: int64 */
-            caseId: number;
-            /** Format: uuid */
-            quoteId: string;
-            /** Format: uuid */
-            revisionId: string;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
-            quoteStatus: components["schemas"]["QuoteStatusValue"];
-            mode: components["schemas"]["QuoteMode"];
-            calculated: components["schemas"]["CalculatedQuoteResponse"];
-            manual: components["schemas"]["ManualQuoteResponse"];
-            /** Format: date-time */
-            confirmedAt: string;
-            expiry: components["schemas"]["QuoteExpiryResponse"];
-            /** Format: date-time */
-            expiresAt: string | null;
-            /** Format: int64 */
-            currentVersion: number;
-        };
-        ContactOwnerResponse: {
-            /** Format: int64 */
-            caseId: number;
-            contactOwnerId: string;
-            /** Format: int64 */
-            currentVersion: number;
-        };
-        CorrectOutcomeRequest: {
+        CorrectOutcomeToHitRequest: {
             reason: string;
             /** Format: int64 */
             expectedCurrentVersion: number;
@@ -3326,228 +1069,17 @@ export interface components {
             salesAndTradingMessage: string;
             assignedTraderId: string;
         };
+        DiscardAmendmentsRequest: {
+            items: components["schemas"]["AmendmentActionItemRequest"][];
+        };
         DiscardDraftItemRequest: {
             /** Format: int64 */
             caseId: number;
             /** Format: int64 */
-            expectedVersion: number;
+            expectedCurrentVersion: number;
         };
-        EodResponse: {
-            contactOwnerId: string;
-            /** Format: int32 */
-            open: number;
-            /** Format: int32 */
-            hit: number;
-            /** Format: int32 */
-            away: number;
-        };
-        EventResponse: components["schemas"]["EventResponseRfqClosedHitResponse"] | components["schemas"]["EventResponseRfqClosedAwayResponse"] | components["schemas"]["EventResponseRfqOutcomeCorrectedResponse"] | components["schemas"]["EventResponseRfqContactOwnerChangedResponse"] | components["schemas"]["EventResponseRfqRevisionConfirmedResponse"] | components["schemas"]["EventResponseRfqCancelledResponse"] | components["schemas"]["EventResponseRfqReopenedResponse"] | components["schemas"]["EventResponseRfqPickedUpResponse"] | components["schemas"]["EventResponseRfqReleasedResponse"] | components["schemas"]["EventResponseRfqAssignedTraderChangedResponse"] | components["schemas"]["EventResponseRfqTakenOverResponse"] | components["schemas"]["EventResponseQuoteConfirmedResponse"] | components["schemas"]["EventResponseQuotePresentedResponse"] | components["schemas"]["EventResponseQuoteUnpresentedResponse"] | components["schemas"]["EventResponseQuoteWithdrawnResponse"] | components["schemas"]["EventResponseQuoteExpiredResponse"];
-        EventResponseQuoteConfirmedResponse: {
-            /** @enum {string} */
-            type?: "quoteConfirmed";
-            /** Format: int64 */
-            caseId: number;
-            /** Format: uuid */
-            quoteId: string;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseQuoteExpiredResponse: {
-            /** @enum {string} */
-            type?: "quoteExpired";
-            /** Format: int64 */
-            caseId: number;
-            /** Format: uuid */
-            quoteId: string;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseQuotePresentedResponse: {
-            /** @enum {string} */
-            type?: "quotePresented";
-            /** Format: int64 */
-            caseId: number;
-            /** Format: uuid */
-            quoteId: string;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseQuoteUnpresentedResponse: {
-            /** @enum {string} */
-            type?: "quoteUnpresented";
-            /** Format: int64 */
-            caseId: number;
-            /** Format: uuid */
-            quoteId: string;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseQuoteWithdrawnResponse: {
-            /** @enum {string} */
-            type?: "quoteWithdrawn";
-            /** Format: int64 */
-            caseId: number;
-            /** Format: uuid */
-            quoteId: string;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqAssignedTraderChangedResponse: {
-            /** @enum {string} */
-            type?: "rfqAssignedTraderChanged";
-            from: string;
-            to: string;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqCancelledResponse: {
-            /** @enum {string} */
-            type?: "rfqCancelled";
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqClosedAwayResponse: {
-            /** @enum {string} */
-            type?: "rfqClosedAway";
-            /** Format: uuid */
-            quoteId: string;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqClosedHitResponse: {
-            /** @enum {string} */
-            type?: "rfqClosedHit";
-            /** Format: uuid */
-            quoteId: string;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqContactOwnerChangedResponse: {
-            /** @enum {string} */
-            type?: "rfqContactOwnerChanged";
-            from: string;
-            to: string;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqOutcomeCorrectedResponse: {
-            /** @enum {string} */
-            type?: "rfqOutcomeCorrected";
-            /** Format: uuid */
-            quoteId: string;
-            from: string;
-            to: string;
-            reason: string | null;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqPickedUpResponse: {
-            /** @enum {string} */
-            type?: "rfqPickedUp";
-            assignedTraderId: string;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqReleasedResponse: {
-            /** @enum {string} */
-            type?: "rfqReleased";
-            assignedTraderId: string;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqReopenedResponse: {
-            /** @enum {string} */
-            type?: "rfqReopened";
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqRevisionConfirmedResponse: {
-            /** @enum {string} */
-            type?: "rfqRevisionConfirmed";
-            /** Format: uuid */
-            from: string | null;
-            /** Format: uuid */
-            to: string;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
-        };
-        EventResponseRfqTakenOverResponse: {
-            /** @enum {string} */
-            type?: "rfqTakenOver";
-            from: string;
-            to: string;
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            eventId: number;
-            /** Format: date-time */
-            occurredAt: string;
-            actorUserId: string | null;
+        DiscardInitialDraftsRequest: {
+            items: components["schemas"]["DiscardDraftItemRequest"][];
         };
         GridConfigRequest: {
             /** Format: int32 */
@@ -3583,10 +1115,10 @@ export interface components {
             caseId: number;
             /** Format: uuid */
             revisionId: string;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
-            revisionStatus: components["schemas"]["RevisionStatusValue"];
-            quoteStatus: components["schemas"]["NullableOfQuoteStatusValue"];
-            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReasonValue"];
+            rfqStatus: components["schemas"]["RfqStatus"];
+            revisionStatus: components["schemas"]["RevisionStatus"];
+            quoteStatus: components["schemas"]["NullableOfQuoteStatus"];
+            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReason"];
             categoryId: string;
             contactOwnerId: string;
             assignedTraderId: string;
@@ -3603,25 +1135,6 @@ export interface components {
             createdAt: string;
         };
         JsonElement: unknown;
-        LifecycleItemRequest: {
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            expectedCurrentVersion: number;
-        };
-        LifecycleRequest: {
-            /** Format: int64 */
-            expectedCurrentVersion: number;
-        };
-        LifecycleResponse: {
-            /** Format: int64 */
-            caseId: number;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
-            quoteStatus: components["schemas"]["NullableOfQuoteStatusValue"];
-            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReasonValue"];
-            /** Format: int64 */
-            currentVersion: number;
-        };
         ManualQuoteResponse: {
             /** Format: double */
             price: number | null;
@@ -3633,31 +1146,25 @@ export interface components {
             roles: components["schemas"]["UserRoleValue"][];
             deskId: string;
         };
-        NullableOfBulkFailureCodeValue: number | null;
-        NullableOfQuoteExpiryType: number | null;
-        NullableOfQuoteRequestReasonValue: number | null;
-        NullableOfQuoteStatusValue: number | null;
-        NullableOfThemeMode: number | null;
+        /** @enum {string|null} */
+        NullableOfCaseOperationFailureCode: "VersionConflict" | "InvalidState" | "Validation" | "Forbidden" | "NotFound" | null;
+        /** @enum {string|null} */
+        NullableOfQuoteExpiryType: "None" | "After" | null;
+        /** @enum {string|null} */
+        NullableOfQuoteRequestReason: "Initial" | "Revised" | "Reopened" | "Expired" | "Withdrawn" | null;
+        /** @enum {string|null} */
+        NullableOfQuoteStatus: "Requested" | "Quoted" | null;
+        /** @enum {string|null} */
+        NullableOfThemeMode: "Light" | "Dark" | null;
         OwnershipItemRequest: {
             /** Format: int64 */
             caseId: number;
             /** Format: int64 */
-            expectedVersion: number;
+            expectedCurrentVersion: number;
         };
-        OwnershipResponse: {
-            /** Format: int64 */
-            caseId: number;
-            assignedTraderId: string;
-            owned: boolean;
-            /** Format: int64 */
-            currentVersion: number;
-        };
-        PickUpItemRequest: {
-            /** Format: int64 */
-            caseId: number;
-            /** Format: int64 */
-            expectedVersion: number;
+        PickUpRfqsRequest: {
             confirmed: boolean;
+            items: components["schemas"]["OwnershipItemRequest"][];
         };
         PostProcessCommitItemRequest: {
             /** Format: int64 */
@@ -3689,7 +1196,7 @@ export interface components {
             contactOwnerId: string;
             salesId: string | null;
             assignedTraderId: string;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
+            rfqStatus: components["schemas"]["RfqStatus"];
             /** Format: int64 */
             currentVersion: number;
             salesAndTradingMessage: string;
@@ -3717,21 +1224,15 @@ export interface components {
             type: components["schemas"]["PostProcessLifecycleChangeValue"];
             correctionReason: string | null;
         } | null;
-        PostProcessLifecycleChangeValue: number;
+        /** @enum {string} */
+        PostProcessLifecycleChangeValue: "Hit" | "Away" | "Cancel" | "CorrectToHit" | "CorrectToAway";
         PostProcessMemoChangeRequest: {
             /** Format: int64 */
-            expectedVersion: number;
+            expectedMemoVersion: number;
             value: string | null;
         } | null;
-        PresentationResponse: {
-            /** Format: int64 */
-            caseId: number;
-            /** Format: uuid */
-            quoteId: string;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
-            quoteStatus: components["schemas"]["QuoteStatusValue"];
-            /** Format: int64 */
-            currentVersion: number;
+        PresentRfqsRequest: {
+            items: components["schemas"]["CaseVersionItemRequest"][];
         };
         PricerRequest: {
             securityId: string;
@@ -3753,7 +1254,8 @@ export interface components {
             /** Format: int32 */
             minutes: number | null;
         };
-        QuoteExpiryType: number;
+        /** @enum {string} */
+        QuoteExpiryType: "None" | "After";
         QuoteHistoryResponse: {
             /** Format: uuid */
             quoteId: string;
@@ -3764,38 +1266,26 @@ export interface components {
             confirmedAt: string;
             /** Format: date-time */
             expiresAt: string | null;
-            requestReason: components["schemas"]["QuoteRequestReasonValue"];
+            requestReason: components["schemas"]["QuoteRequestReason"];
         };
-        QuoteMode: number;
+        /** @enum {string} */
+        QuoteMode: "Calculated" | "Manual";
         QuoteModeRequest: {
             mode: components["schemas"]["QuoteMode"];
         };
         QuoteModeResponse: {
             mode: components["schemas"]["QuoteMode"];
         };
-        QuoteRequestReasonValue: number;
-        QuoteStatusValue: number;
-        RevisionResponse: {
-            /** Format: uuid */
-            revisionId: string;
-            status: components["schemas"]["RevisionStatusValue"];
-            /** Format: double */
-            notional: number | null;
-            /** Format: date */
-            settlementDate: string | null;
-            message: string;
-            /** Format: int64 */
-            version: number;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            confirmedAt: string | null;
-            /** Format: uuid */
-            copiedFromRevisionId: string | null;
-            /** Format: uuid */
-            quoteSeedRevisionId: string | null;
+        /** @enum {string} */
+        QuoteRequestReason: "Initial" | "Revised" | "Reopened" | "Expired" | "Withdrawn";
+        ReleaseRfqsRequest: {
+            items: components["schemas"]["OwnershipItemRequest"][];
         };
-        RevisionStatusValue: number;
+        ReopenRfqsRequest: {
+            items: components["schemas"]["CaseVersionItemRequest"][];
+        };
+        /** @enum {string} */
+        RevisionStatus: "Draft" | "Confirmed" | "Superseded" | "Discarded";
         RfqCreationContextResponse: {
             categoryId: string;
             categoryName: string;
@@ -3814,8 +1304,8 @@ export interface components {
             securityId: string;
             securityName: string;
             categoryId: string;
-            status: components["schemas"]["RfqStatusValue"];
-            quoteStatus: components["schemas"]["NullableOfQuoteStatusValue"];
+            status: components["schemas"]["RfqStatus"];
+            quoteStatus: components["schemas"]["NullableOfQuoteStatus"];
             contactOwnerId: string;
             salesId: string | null;
             assignedTraderId: string;
@@ -3834,7 +1324,8 @@ export interface components {
             items: components["schemas"]["RfqSearchItemResponse"][];
             requiresNarrowing: boolean;
         };
-        RfqStatusValue: number;
+        /** @enum {string} */
+        RfqStatus: "Draft" | "Active" | "Presented" | "Cancelled" | "Hit" | "Away";
         SalesConfirmedQuoteSummaryResponse: {
             /** Format: uuid */
             quoteId: string;
@@ -3862,8 +1353,10 @@ export interface components {
             before: string | null;
             after: string | null;
         };
-        SalesRecentRevisionFieldValue: number;
-        SalesRecentRevisionKindValue: number;
+        /** @enum {string} */
+        SalesRecentRevisionFieldValue: "Notional" | "Settlement" | "Message" | "Price" | "Yield" | "Simple" | "GSpread";
+        /** @enum {string} */
+        SalesRecentRevisionKindValue: "Rfq" | "Quote";
         SalesRecentRevisionResponse: {
             kind: components["schemas"]["SalesRecentRevisionKindValue"];
             /** Format: date-time */
@@ -3885,9 +1378,9 @@ export interface components {
             securityJapaneseName: string;
             securityBbgDisplay: string;
             categoryId: string;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
-            quoteStatus: components["schemas"]["NullableOfQuoteStatusValue"];
-            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReasonValue"];
+            rfqStatus: components["schemas"]["RfqStatus"];
+            quoteStatus: components["schemas"]["NullableOfQuoteStatus"];
+            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReason"];
             /** Format: uuid */
             currentRevisionId: string;
             /** Format: uuid */
@@ -3896,7 +1389,7 @@ export interface components {
             closedQuoteId: string | null;
             /** Format: int64 */
             currentVersion: number;
-            revisionStatus: components["schemas"]["RevisionStatusValue"];
+            revisionStatus: components["schemas"]["RevisionStatus"];
             salesId: string | null;
             contactOwnerId: string;
             assignedTraderId: string;
@@ -3951,7 +1444,12 @@ export interface components {
             /** Format: int64 */
             expectedCurrentVersion: number;
         };
-        ThemeMode: number;
+        TakeOverRfqsRequest: {
+            confirmed: boolean;
+            items: components["schemas"]["OwnershipItemRequest"][];
+        };
+        /** @enum {string} */
+        ThemeMode: "Light" | "Dark";
         ThemeRequest: {
             mode: components["schemas"]["NullableOfThemeMode"];
         };
@@ -3974,9 +1472,9 @@ export interface components {
             securityJapaneseName: string;
             securityBbgDisplay: string;
             categoryId: string;
-            rfqStatus: components["schemas"]["RfqStatusValue"];
-            quoteStatus: components["schemas"]["NullableOfQuoteStatusValue"];
-            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReasonValue"];
+            rfqStatus: components["schemas"]["RfqStatus"];
+            quoteStatus: components["schemas"]["NullableOfQuoteStatus"];
+            quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReason"];
             /** Format: uuid */
             currentRevisionId: string;
             /** Format: uuid */
@@ -4012,8 +1510,8 @@ export interface components {
             /** Format: date-time */
             stateSince: string;
         };
-        UpdateCategoryRoutingRequest: {
-            defaultTraderId: string;
+        UnpresentRfqsRequest: {
+            items: components["schemas"]["CaseVersionItemRequest"][];
         };
         UpdateDraftRequest: {
             /** Format: double */
@@ -4025,7 +1523,7 @@ export interface components {
             salesAndTradingMessage: string;
             assignedTraderId: string;
             /** Format: int64 */
-            expectedVersion: number;
+            expectedCurrentVersion: number;
         };
         UpdateManualWorkingQuoteRequest: {
             /** Format: double */
@@ -4040,18 +1538,25 @@ export interface components {
         UpdateMemoRequest: {
             memo: string | null;
             /** Format: int64 */
-            expectedVersion: number;
+            expectedMemoVersion: number;
         };
         UserCandidateResponse: {
             userId: string;
             name: string;
         };
-        UserRoleValue: number;
-        VersionRequest: {
+        /** @enum {string} */
+        UserRoleValue: "Sales" | "Trader";
+        WithdrawQuoteItemRequest: {
             /** Format: int64 */
-            expectedVersion: number;
+            caseId: number;
+            /** Format: int64 */
+            expectedCurrentVersion: number;
         };
-        WorkingQuoteModeValue: number;
+        WithdrawQuotesRequest: {
+            items: components["schemas"]["WithdrawQuoteItemRequest"][];
+        };
+        /** @enum {string} */
+        WorkingQuoteModeValue: "Calculated" | "Manual";
         WorkingQuoteResponse: {
             /** Format: int64 */
             caseId: number;
@@ -4073,4 +1578,5027 @@ export interface components {
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    GetActiveTraderRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["TraderRfqResponse"][];
+                    "application/json": components["schemas"]["TraderRfqResponse"][];
+                    "text/json": components["schemas"]["TraderRfqResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetActiveSalesRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["SalesRfqResponse"][];
+                    "application/json": components["schemas"]["SalesRfqResponse"][];
+                    "text/json": components["schemas"]["SalesRfqResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSalesRecentRevisions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["SalesRecentRevisionResponse"][];
+                    "application/json": components["schemas"]["SalesRecentRevisionResponse"][];
+                    "text/json": components["schemas"]["SalesRecentRevisionResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    SearchRfqs: {
+        parameters: {
+            query?: {
+                CreatedFrom?: string;
+                CreatedTo?: string;
+                ClientId?: string;
+                SecurityId?: string;
+                CategoryId?: string;
+                ContactOwnerId?: string;
+                SalesId?: string;
+                AssignedTraderId?: string;
+                Status?: string;
+                CaseId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["RfqSearchResponse"];
+                    "application/json": components["schemas"]["RfqSearchResponse"];
+                    "text/json": components["schemas"]["RfqSearchResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CalculateWorkingQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalculateWorkingQuoteRequest"];
+                "text/json": components["schemas"]["CalculateWorkingQuoteRequest"];
+                "application/*+json": components["schemas"]["CalculateWorkingQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["WorkingQuoteResponse"];
+                    "application/json": components["schemas"]["WorkingQuoteResponse"];
+                    "text/json": components["schemas"]["WorkingQuoteResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ChangeWorkingQuoteMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeWorkingQuoteModeRequest"];
+                "text/json": components["schemas"]["ChangeWorkingQuoteModeRequest"];
+                "application/*+json": components["schemas"]["ChangeWorkingQuoteModeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["WorkingQuoteResponse"];
+                    "application/json": components["schemas"]["WorkingQuoteResponse"];
+                    "text/json": components["schemas"]["WorkingQuoteResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateManualWorkingQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateManualWorkingQuoteRequest"];
+                "text/json": components["schemas"]["UpdateManualWorkingQuoteRequest"];
+                "application/*+json": components["schemas"]["UpdateManualWorkingQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["WorkingQuoteResponse"];
+                    "application/json": components["schemas"]["WorkingQuoteResponse"];
+                    "text/json": components["schemas"]["WorkingQuoteResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ChangeContactOwners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeContactOwnersRequest"];
+                "text/json": components["schemas"]["ChangeContactOwnersRequest"];
+                "application/*+json": components["schemas"]["ChangeContactOwnersRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    PickUpRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PickUpRfqsRequest"];
+                "text/json": components["schemas"]["PickUpRfqsRequest"];
+                "application/*+json": components["schemas"]["PickUpRfqsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ReleaseRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseRfqsRequest"];
+                "text/json": components["schemas"]["ReleaseRfqsRequest"];
+                "application/*+json": components["schemas"]["ReleaseRfqsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    AssignTraders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignTradersRequest"];
+                "text/json": components["schemas"]["AssignTradersRequest"];
+                "application/*+json": components["schemas"]["AssignTradersRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    TakeOverRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TakeOverRfqsRequest"];
+                "text/json": components["schemas"]["TakeOverRfqsRequest"];
+                "application/*+json": components["schemas"]["TakeOverRfqsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSalesMemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMemoRequest"];
+                "text/json": components["schemas"]["UpdateMemoRequest"];
+                "application/*+json": components["schemas"]["UpdateMemoRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["SalesMemoResponse"];
+                    "application/json": components["schemas"]["SalesMemoResponse"];
+                    "text/json": components["schemas"]["SalesMemoResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateTraderMemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMemoRequest"];
+                "text/json": components["schemas"]["UpdateMemoRequest"];
+                "application/*+json": components["schemas"]["UpdateMemoRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["TraderMemoResponse"];
+                    "application/json": components["schemas"]["TraderMemoResponse"];
+                    "text/json": components["schemas"]["TraderMemoResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CloseHitRfq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseHitRfqRequest"];
+                "text/json": components["schemas"]["CloseHitRfqRequest"];
+                "application/*+json": components["schemas"]["CloseHitRfqRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CloseResponse"];
+                    "application/json": components["schemas"]["CloseResponse"];
+                    "text/json": components["schemas"]["CloseResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CorrectOutcomeToHit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectOutcomeToHitRequest"];
+                "text/json": components["schemas"]["CorrectOutcomeToHitRequest"];
+                "application/*+json": components["schemas"]["CorrectOutcomeToHitRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CloseResponse"];
+                    "application/json": components["schemas"]["CloseResponse"];
+                    "text/json": components["schemas"]["CloseResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CorrectOutcomeToAway: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectOutcomeToAwayRequest"];
+                "text/json": components["schemas"]["CorrectOutcomeToAwayRequest"];
+                "application/*+json": components["schemas"]["CorrectOutcomeToAwayRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CloseResponse"];
+                    "application/json": components["schemas"]["CloseResponse"];
+                    "text/json": components["schemas"]["CloseResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    PresentRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresentRfqsRequest"];
+                "text/json": components["schemas"]["PresentRfqsRequest"];
+                "application/*+json": components["schemas"]["PresentRfqsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    UnpresentRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnpresentRfqsRequest"];
+                "text/json": components["schemas"]["UnpresentRfqsRequest"];
+                "application/*+json": components["schemas"]["UnpresentRfqsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CloseAwayRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseAwayRfqsRequest"];
+                "text/json": components["schemas"]["CloseAwayRfqsRequest"];
+                "application/*+json": components["schemas"]["CloseAwayRfqsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CancelRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRfqsRequest"];
+                "text/json": components["schemas"]["CancelRfqsRequest"];
+                "application/*+json": components["schemas"]["CancelRfqsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ReopenRfqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenRfqsRequest"];
+                "text/json": components["schemas"]["ReopenRfqsRequest"];
+                "application/*+json": components["schemas"]["ReopenRfqsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDraftRequest"];
+                "text/json": components["schemas"]["CreateDraftRequest"];
+                "application/*+json": components["schemas"]["CreateDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["InitialRfqResponse"];
+                    "application/json": components["schemas"]["InitialRfqResponse"];
+                    "text/json": components["schemas"]["InitialRfqResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ConfirmNewRfq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDraftRequest"];
+                "text/json": components["schemas"]["CreateDraftRequest"];
+                "application/*+json": components["schemas"]["CreateDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["InitialRfqResponse"];
+                    "application/json": components["schemas"]["InitialRfqResponse"];
+                    "text/json": components["schemas"]["InitialRfqResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateInitialDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDraftRequest"];
+                "text/json": components["schemas"]["UpdateDraftRequest"];
+                "application/*+json": components["schemas"]["UpdateDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["InitialRfqResponse"];
+                    "application/json": components["schemas"]["InitialRfqResponse"];
+                    "text/json": components["schemas"]["InitialRfqResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateFromExisting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["InitialRfqResponse"];
+                    "application/json": components["schemas"]["InitialRfqResponse"];
+                    "text/json": components["schemas"]["InitialRfqResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ConfirmInitialDrafts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmInitialDraftsRequest"];
+                "text/json": components["schemas"]["ConfirmInitialDraftsRequest"];
+                "application/*+json": components["schemas"]["ConfirmInitialDraftsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscardInitialDrafts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscardInitialDraftsRequest"];
+                "text/json": components["schemas"]["DiscardInitialDraftsRequest"];
+                "application/*+json": components["schemas"]["DiscardInitialDraftsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ResolveRfqCreationContext: {
+        parameters: {
+            query: {
+                securityId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["RfqCreationContextResponse"];
+                    "application/json": components["schemas"]["RfqCreationContextResponse"];
+                    "text/json": components["schemas"]["RfqCreationContextResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    StartAmendment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartAmendmentRequest"];
+                "text/json": components["schemas"]["StartAmendmentRequest"];
+                "application/*+json": components["schemas"]["StartAmendmentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["AmendmentResponse"];
+                    "application/json": components["schemas"]["AmendmentResponse"];
+                    "text/json": components["schemas"]["AmendmentResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveAmendment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveAmendmentRequest"];
+                "text/json": components["schemas"]["SaveAmendmentRequest"];
+                "application/*+json": components["schemas"]["SaveAmendmentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["AmendmentResponse"];
+                    "application/json": components["schemas"]["AmendmentResponse"];
+                    "text/json": components["schemas"]["AmendmentResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ConfirmAmendments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmAmendmentsRequest"];
+                "text/json": components["schemas"]["ConfirmAmendmentsRequest"];
+                "application/*+json": components["schemas"]["ConfirmAmendmentsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscardAmendments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscardAmendmentsRequest"];
+                "text/json": components["schemas"]["DiscardAmendmentsRequest"];
+                "application/*+json": components["schemas"]["DiscardAmendmentsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRfqQuoteHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["QuoteHistoryResponse"][];
+                    "application/json": components["schemas"]["QuoteHistoryResponse"][];
+                    "text/json": components["schemas"]["QuoteHistoryResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    WithdrawQuotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawQuotesRequest"];
+                "text/json": components["schemas"]["WithdrawQuotesRequest"];
+                "application/*+json": components["schemas"]["WithdrawQuotesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ConfirmQuotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmQuotesRequest"];
+                "text/json": components["schemas"]["ConfirmQuotesRequest"];
+                "application/*+json": components["schemas"]["ConfirmQuotesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAssignableTraders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["UserCandidateResponse"][];
+                    "application/json": components["schemas"]["UserCandidateResponse"][];
+                    "text/json": components["schemas"]["UserCandidateResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetContactOwnerCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["UserCandidateResponse"][];
+                    "application/json": components["schemas"]["UserCandidateResponse"][];
+                    "text/json": components["schemas"]["UserCandidateResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    SearchClients: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["ClientCandidateResponse"][];
+                    "application/json": components["schemas"]["ClientCandidateResponse"][];
+                    "text/json": components["schemas"]["ClientCandidateResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    SearchSecurities: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["SecurityCandidateResponse"][];
+                    "application/json": components["schemas"]["SecurityCandidateResponse"][];
+                    "text/json": components["schemas"]["SecurityCandidateResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    ScratchPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricerRequest"];
+                "text/json": components["schemas"]["PricerRequest"];
+                "application/*+json": components["schemas"]["PricerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CalculatedQuoteResponse2"];
+                    "application/json": components["schemas"]["CalculatedQuoteResponse2"];
+                    "text/json": components["schemas"]["CalculatedQuoteResponse2"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPostProcess: {
+        parameters: {
+            query?: {
+                preset?: "Today" | "Unclosed";
+                scope?: "Mine" | "AllPermitted";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["PostProcessItemResponse"][];
+                    "application/json": components["schemas"]["PostProcessItemResponse"][];
+                    "text/json": components["schemas"]["PostProcessItemResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    CommitPostProcessChanges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostProcessCommitRequest"];
+                "text/json": components["schemas"]["PostProcessCommitRequest"];
+                "application/*+json": components["schemas"]["PostProcessCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["CaseOperationResponse"][];
+                    "application/json": components["schemas"]["CaseOperationResponse"][];
+                    "text/json": components["schemas"]["CaseOperationResponse"][];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    StreamWorklistInvalidations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["HealthResponse"];
+                    "application/json": components["schemas"]["HealthResponse"];
+                    "text/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["HealthResponse"];
+                    "application/json": components["schemas"]["HealthResponse"];
+                    "text/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetGridConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screenId: string;
+                configKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["GridConfigResponse"];
+                    "application/json": components["schemas"]["GridConfigResponse"];
+                    "text/json": components["schemas"]["GridConfigResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveGridConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screenId: string;
+                configKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GridConfigRequest"];
+                "text/json": components["schemas"]["GridConfigRequest"];
+                "application/*+json": components["schemas"]["GridConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["GridConfigResponse"];
+                    "application/json": components["schemas"]["GridConfigResponse"];
+                    "text/json": components["schemas"]["GridConfigResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["MeResponse"];
+                    "application/json": components["schemas"]["MeResponse"];
+                    "text/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetQuoteExpiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["QuoteExpiryResponse"];
+                    "application/json": components["schemas"]["QuoteExpiryResponse"];
+                    "text/json": components["schemas"]["QuoteExpiryResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveQuoteExpiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteExpiryRequest"];
+                "text/json": components["schemas"]["QuoteExpiryRequest"];
+                "application/*+json": components["schemas"]["QuoteExpiryRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["QuoteExpiryResponse"];
+                    "application/json": components["schemas"]["QuoteExpiryResponse"];
+                    "text/json": components["schemas"]["QuoteExpiryResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetDefaultQuoteMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["QuoteModeResponse"];
+                    "application/json": components["schemas"]["QuoteModeResponse"];
+                    "text/json": components["schemas"]["QuoteModeResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveDefaultQuoteMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteModeRequest"];
+                "text/json": components["schemas"]["QuoteModeRequest"];
+                "application/*+json": components["schemas"]["QuoteModeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["QuoteModeResponse"];
+                    "application/json": components["schemas"]["QuoteModeResponse"];
+                    "text/json": components["schemas"]["QuoteModeResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTheme: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["ThemeResponse"];
+                    "application/json": components["schemas"]["ThemeResponse"];
+                    "text/json": components["schemas"]["ThemeResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveTheme: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeRequest"];
+                "text/json": components["schemas"]["ThemeRequest"];
+                "application/*+json": components["schemas"]["ThemeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["ThemeResponse"];
+                    "application/json": components["schemas"]["ThemeResponse"];
+                    "text/json": components["schemas"]["ThemeResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBusinessDate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": components["schemas"]["BusinessDateResponse"];
+                    "application/json": components["schemas"]["BusinessDateResponse"];
+                    "text/json": components["schemas"]["BusinessDateResponse"];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblemDetails"];
+                };
+            };
+        };
+    };
+}

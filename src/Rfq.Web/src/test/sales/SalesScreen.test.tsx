@@ -377,7 +377,7 @@ describe('SalesScreen', () => {
         standardSettlementDate: '2026-09-23',
         salesAndTradingMessage: 'initial note',
         assignedTraderId: 'trader-a',
-        expectedVersion: 3,
+        expectedCurrentVersion: 3,
       }),
     )
   })
@@ -411,7 +411,7 @@ describe('SalesScreen', () => {
         101,
         expect.objectContaining({
           salesAndTradingMessage: 'changed note',
-          expectedVersion: 3,
+          expectedCurrentVersion: 3,
         }),
       ),
     )
@@ -440,6 +440,37 @@ describe('SalesScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Present' }))
 
     await waitFor(() => expect(onPresent).toHaveBeenCalledWith(101, 7))
+  })
+
+  it('keeps a successful mutation successful when reconciliation fails', async () => {
+    const onPresent = vi.fn().mockResolvedValue(undefined)
+    const onReconcileCases = vi.fn().mockRejectedValue(new Error('offline'))
+    const quoted = {
+      ...draftRow,
+      rfqStatus: 'Active',
+      revisionStatus: 'Confirmed',
+      quoteStatus: 'Quoted',
+      quoteRequestReason: null,
+      currentQuoteId: '00000000-0000-0000-0000-000000000301',
+      currentVersion: 7,
+    } as const
+    render(
+      <SalesScreen
+        {...baseProps}
+        rfqs={[quoted]}
+        {...withLifecycle({ present: onPresent })}
+        onReconcileCases={onReconcileCases}
+      />,
+    )
+
+    fireEvent.click(screen.getByText(/client-grid/))
+    fireEvent.click(screen.getByRole('button', { name: 'Present' }))
+
+    await waitFor(() => expect(onPresent).toHaveBeenCalledWith(101, 7))
+    await waitFor(() => expect(onReconcileCases).toHaveBeenCalledWith([101]))
+    expect(
+      screen.queryByText('The RFQ action could not be completed.'),
+    ).not.toBeInTheDocument()
   })
 
   it.each([
@@ -502,11 +533,11 @@ describe('SalesScreen', () => {
 
   it('preserves all eight bulk operations, excludes Bulk Hit, and moves results to the Result Bar', async () => {
     const onBulk = vi.fn().mockResolvedValue([
-      { caseId: 101, status: 'Succeeded', code: null, message: null },
+      { caseId: 101, status: 'Applied', failureCode: null, message: null },
       {
         caseId: 102,
         status: 'Failed',
-        code: 'VersionConflict',
+        failureCode: 'VersionConflict',
         message: 'Changed remotely',
       },
     ])
@@ -567,7 +598,7 @@ describe('SalesScreen', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     )
     expect(
-      await screen.findByText('Bulk Away: 1 ok / 1 skipped / 1 failed'),
+      await screen.findByText('Bulk Away: 1 applied / 0 no change / 2 failed'),
     ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Details' }))
     expect(screen.getByText('Changed remotely')).toBeInTheDocument()

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Button, Empty, List, Space, Tag, Tooltip, Typography } from 'antd'
-import type { BulkItemResult, SalesRfq } from '@/services/api'
+import type { CaseOperationResult, SalesRfq } from '@/services/api'
 import { BulkResultBar } from '@/shared/ui/BulkResultBar'
 import {
   bulkEligibility,
@@ -12,7 +12,7 @@ import {
 
 export type SalesBulkResult = {
   command: SalesBulkCommand
-  items: BulkItemResult[]
+  items: CaseOperationResult[]
 }
 
 interface BulkPaneProps {

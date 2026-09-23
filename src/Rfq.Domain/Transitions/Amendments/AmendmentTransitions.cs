@@ -16,7 +16,7 @@ public static class AmendmentTransitions
             throw new DomainRuleViolationException("The RFQ Case already has a Draft amendment.");
         }
 
-        RfqRevision draft = RfqRevision.CreateDraft(
+        var draft = RfqRevision.CreateDraft(
             newRevisionId,
             rfq.CaseId,
             rfq.CurrentRevision.Terms,

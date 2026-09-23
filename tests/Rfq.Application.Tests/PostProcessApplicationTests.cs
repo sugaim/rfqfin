@@ -133,7 +133,7 @@ public sealed class PostProcessApplicationTests
         var unitOfWork = new UnitOfWork();
         CommitPostProcessChanges commit = Committer(cases, memos, unitOfWork);
 
-        IReadOnlyList<BulkItemResult> successResults = await commit.ExecuteAsync(
+        IReadOnlyList<CaseOperationResult> successResults = await commit.ExecuteAsync(
         [
             new PostProcessCommitItem(
                 quoted.CaseId,
@@ -141,9 +141,9 @@ public sealed class PostProcessApplicationTests
                 new PostProcessLifecycleChange(PostProcessLifecycleChangeKind.Away),
                 new PostProcessMemoChange(new StateVersion(1), "follow tomorrow")),
         ]);
-        BulkItemResult succeeded = Assert.Single(successResults);
+        CaseOperationResult succeeded = Assert.Single(successResults);
 
-        Assert.Equal(BulkItemStatus.Succeeded, succeeded.Status);
+        Assert.Equal(CaseOperationStatus.Applied, succeeded.Status);
         Assert.Equal(1, unitOfWork.Saves);
         Assert.Equal(1, memos.SalesUpdates);
 
@@ -155,7 +155,7 @@ public sealed class PostProcessApplicationTests
             conflictCases,
             conflictMemos,
             conflictUnit);
-        IReadOnlyList<BulkItemResult> failureResults = await conflicting.ExecuteAsync(
+        IReadOnlyList<CaseOperationResult> failureResults = await conflicting.ExecuteAsync(
         [
             new PostProcessCommitItem(
                 second.CaseId,
@@ -163,10 +163,10 @@ public sealed class PostProcessApplicationTests
                 new PostProcessLifecycleChange(PostProcessLifecycleChangeKind.Hit),
                 new PostProcessMemoChange(new StateVersion(99), "conflict")),
         ]);
-        BulkItemResult failed = Assert.Single(failureResults);
+        CaseOperationResult failed = Assert.Single(failureResults);
 
-        Assert.Equal(BulkItemStatus.Failed, failed.Status);
-        Assert.Equal(BulkFailureCode.VersionConflict, failed.Code);
+        Assert.Equal(CaseOperationStatus.Failed, failed.Status);
+        Assert.Equal(CaseOperationFailureCode.VersionConflict, failed.FailureCode);
         Assert.Equal(0, conflictUnit.Saves);
         Assert.Equal(1, conflictUnit.Discards);
     }
@@ -181,7 +181,7 @@ public sealed class PostProcessApplicationTests
         var unitOfWork = new UnitOfWork();
         CommitPostProcessChanges commit = Committer(cases, memos, unitOfWork);
 
-        IReadOnlyList<BulkItemResult> results = await commit.ExecuteAsync(
+        IReadOnlyList<CaseOperationResult> results = await commit.ExecuteAsync(
         [
             new PostProcessCommitItem(
                 first.CaseId,
@@ -195,8 +195,8 @@ public sealed class PostProcessApplicationTests
                 null),
         ]);
 
-        Assert.Equal(BulkItemStatus.Failed, results[0].Status);
-        Assert.Equal(BulkItemStatus.Succeeded, results[1].Status);
+        Assert.Equal(CaseOperationStatus.Failed, results[0].Status);
+        Assert.Equal(CaseOperationStatus.Applied, results[1].Status);
         Assert.Equal(1, unitOfWork.Discards);
         Assert.Equal(1, unitOfWork.Saves);
         Assert.Equal(0, memos.SalesUpdates);

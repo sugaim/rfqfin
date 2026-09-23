@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { vi } from 'vitest'
 import { PostProcessScreen } from '@/pages/post-process/PostProcessScreen'
 import type {
-  BulkItemResult,
+  CaseOperationResult,
   PostProcessCommitItem,
   PostProcessItem,
   PostProcessPreset,
@@ -197,9 +197,9 @@ describe('Post Process staging', () => {
 
   it('stages lifecycle and own memo together and requires a correction reason', async () => {
     const onCommit = vi
-      .fn<(items: PostProcessCommitItem[]) => Promise<BulkItemResult[]>>()
+      .fn<(items: PostProcessCommitItem[]) => Promise<CaseOperationResult[]>>()
       .mockResolvedValue([
-        { caseId: 101, status: 'Succeeded', code: null, message: null },
+        { caseId: 101, status: 'Applied', failureCode: null, message: null },
       ])
     const hit = {
       ...baseItem,
@@ -245,7 +245,7 @@ describe('Post Process staging', () => {
           type: 'CorrectToAway',
           correctionReason: 'booking correction',
         },
-        memoChange: { expectedVersion: 2, value: 'follow tomorrow' },
+        memoChange: { expectedMemoVersion: 2, value: 'follow tomorrow' },
       },
     ])
   })
@@ -256,7 +256,7 @@ describe('Post Process staging', () => {
       {
         caseId: 101,
         status: 'Failed',
-        code: 'VersionConflict',
+        failureCode: 'VersionConflict',
         message: 'changed',
       },
     ])
@@ -343,8 +343,8 @@ describe('Post Process reconciliation', () => {
           return Promise.resolve([
             {
               caseId: 101,
-              status: 'Succeeded' as const,
-              code: null,
+              status: 'Applied' as const,
+              failureCode: null,
               message: null,
             },
           ])

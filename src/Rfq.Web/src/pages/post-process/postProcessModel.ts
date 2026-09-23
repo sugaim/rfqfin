@@ -50,7 +50,7 @@ export function toCommitItem(
       : undefined,
     memoChange: change.memo
       ? {
-          expectedVersion: change.memo.baseVersion,
+          expectedMemoVersion: change.memo.baseVersion,
           value: change.memo.value,
         }
       : undefined,

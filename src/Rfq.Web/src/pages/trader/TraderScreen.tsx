@@ -237,7 +237,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
     setResultExpanded(false)
     await onReconcileCases(
       items
-        .filter((item) => item.status === 'Succeeded')
+        .filter((item) => item.status === 'Applied')
         .map((item) => item.caseId),
     ).catch(() => undefined)
   }
@@ -284,8 +284,8 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
           items: [
             {
               caseId: row.caseId,
-              status: 'Succeeded',
-              code: null,
+              status: 'Applied',
+              failureCode: null,
               message: null,
             },
           ],

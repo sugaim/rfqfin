@@ -98,7 +98,7 @@ public sealed class RfqInvalidationRegistryTests
         long generation) => new(
             Today,
             generation,
-            ImmutableArray<SalesRfqListItem>.Empty,
-            ImmutableArray<TraderRfqListItem>.Empty,
+            [],
+            [],
             ImmutableDictionary<CaseId, RfqSnapshotRoute>.Empty.Add(CaseId, route));
 }

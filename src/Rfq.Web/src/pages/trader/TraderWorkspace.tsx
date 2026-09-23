@@ -2,21 +2,17 @@ import { useState } from 'react'
 import { useOutletContext } from 'react-router'
 import type { AppOutletContext } from '@/app/App'
 import {
-  useAssignTraderMutation,
-  useBulkAssignTraderMutation,
-  useBulkCancelRfqsMutation,
-  useBulkCloseAwayRfqsMutation,
-  useBulkConfirmQuotesMutation,
-  useBulkPickUpRfqsMutation,
-  useBulkReleaseRfqsMutation,
-  useBulkWithdrawQuotesMutation,
+  useAssignTradersMutation,
+  useCancelRfqsMutation,
+  useCloseAwayRfqsMutation,
+  useConfirmQuotesMutation,
+  usePickUpRfqsMutation,
+  useReleaseRfqsMutation,
+  useWithdrawQuotesMutation,
   useCalculateWorkingQuoteMutation,
-  useCancelRfqMutation,
-  useChangeContactOwnerMutation,
+  useChangeContactOwnersMutation,
   useChangeWorkingQuoteModeMutation,
-  useCloseAwayRfqMutation,
   useCloseHitRfqMutation,
-  useConfirmQuoteMutation,
   useCorrectOutcomeToAwayMutation,
   useCorrectOutcomeToHitMutation,
   useGetActiveTraderRfqsQuery,
@@ -25,18 +21,15 @@ import {
   useGetGridConfigQuery,
   useGetQuoteExpiryQuery,
   useLazySearchRfqsQuery,
-  usePickUpRfqMutation,
-  usePresentQuoteMutation,
-  useReleaseRfqMutation,
-  useReopenRfqMutation,
+  usePresentRfqsMutation,
+  useReopenRfqsMutation,
   useSaveGridConfigMutation,
   useScratchPriceMutation,
-  useTakeOverRfqMutation,
-  useUnpresentQuoteMutation,
+  useTakeOverRfqsMutation,
+  useUnpresentRfqsMutation,
   useUpdateManualWorkingQuoteMutation,
   useUpdateTraderMemoMutation,
-  useWithdrawQuoteMutation,
-  type BulkItemResult,
+  type CaseOperationResult,
   type QuoteExpiry,
   type RfqSearchParams,
   type TraderRfq,
@@ -78,33 +71,33 @@ export function TraderWorkspace() {
   })
   const [searchRfqs] = useLazySearchRfqsQuery()
   const [saveGridConfig] = useSaveGridConfigMutation()
-  const [pickUp, pickUpState] = usePickUpRfqMutation()
-  const [release, releaseState] = useReleaseRfqMutation()
-  const [assign, assignState] = useAssignTraderMutation()
-  const [takeOver, takeOverState] = useTakeOverRfqMutation()
+  const [pickUp, pickUpState] = usePickUpRfqsMutation()
+  const [release, releaseState] = useReleaseRfqsMutation()
+  const [assign, assignState] = useAssignTradersMutation()
+  const [takeOver, takeOverState] = useTakeOverRfqsMutation()
   const [calculate] = useCalculateWorkingQuoteMutation()
   const [changeMode, changeModeState] = useChangeWorkingQuoteModeMutation()
   const [updateManual] = useUpdateManualWorkingQuoteMutation()
-  const [confirmQuote, confirmState] = useConfirmQuoteMutation()
-  const [present, presentState] = usePresentQuoteMutation()
-  const [unpresent, unpresentState] = useUnpresentQuoteMutation()
-  const [withdraw, withdrawState] = useWithdrawQuoteMutation()
+  const [confirmQuote, confirmState] = useConfirmQuotesMutation()
+  const [present, presentState] = usePresentRfqsMutation()
+  const [unpresent, unpresentState] = useUnpresentRfqsMutation()
+  const [withdraw, withdrawState] = useWithdrawQuotesMutation()
   const [closeHit, closeHitState] = useCloseHitRfqMutation()
-  const [closeAway, closeAwayState] = useCloseAwayRfqMutation()
-  const [cancel, cancelState] = useCancelRfqMutation()
-  const [reopen, reopenState] = useReopenRfqMutation()
+  const [closeAway, closeAwayState] = useCloseAwayRfqsMutation()
+  const [cancel, cancelState] = useCancelRfqsMutation()
+  const [reopen, reopenState] = useReopenRfqsMutation()
   const [correctHit, correctHitState] = useCorrectOutcomeToHitMutation()
   const [correctAway, correctAwayState] = useCorrectOutcomeToAwayMutation()
-  const [changeOwner, changeOwnerState] = useChangeContactOwnerMutation()
+  const [changeOwner, changeOwnerState] = useChangeContactOwnersMutation()
   const [updateMemo, updateMemoState] = useUpdateTraderMemoMutation()
   const [scratch] = useScratchPriceMutation()
-  const [bulkPick, bulkPickState] = useBulkPickUpRfqsMutation()
-  const [bulkRelease, bulkReleaseState] = useBulkReleaseRfqsMutation()
-  const [bulkAssign, bulkAssignState] = useBulkAssignTraderMutation()
-  const [bulkConfirm, bulkConfirmState] = useBulkConfirmQuotesMutation()
-  const [bulkWithdraw, bulkWithdrawState] = useBulkWithdrawQuotesMutation()
-  const [bulkAway, bulkAwayState] = useBulkCloseAwayRfqsMutation()
-  const [bulkCancel, bulkCancelState] = useBulkCancelRfqsMutation()
+  const [bulkPick, bulkPickState] = usePickUpRfqsMutation()
+  const [bulkRelease, bulkReleaseState] = useReleaseRfqsMutation()
+  const [bulkAssign, bulkAssignState] = useAssignTradersMutation()
+  const [bulkConfirm, bulkConfirmState] = useConfirmQuotesMutation()
+  const [bulkWithdraw, bulkWithdrawState] = useWithdrawQuotesMutation()
+  const [bulkAway, bulkAwayState] = useCloseAwayRfqsMutation()
+  const [bulkCancel, bulkCancelState] = useCancelRfqsMutation()
 
   const [protectedState, setProtectedState] = useState(false)
   const [refreshGeneration, setRefreshGeneration] = useState(0)
@@ -125,7 +118,7 @@ export function TraderWorkspace() {
   const ownershipItems = (rows: TraderRfq[]) =>
     rows.map((row) => ({
       caseId: row.caseId,
-      expectedVersion: row.currentVersion,
+      expectedCurrentVersion: row.currentVersion,
     }))
   const expiryFor = (minutes: number | null): QuoteExpiry =>
     minutes === null
@@ -137,21 +130,23 @@ export function TraderWorkspace() {
     rows: TraderRfq[],
     expiryMinutes: number | null,
     targetTraderId?: string,
-  ): Promise<BulkItemResult[]> => {
+  ): Promise<CaseOperationResult[]> => {
     switch (command) {
       case 'pick':
         return bulkPick({
+          confirmed: rows.some((row) =>
+            requiresPickUpConfirmation(row, currentUserId),
+          ),
           items: rows.map((row) => ({
             caseId: row.caseId,
-            expectedVersion: row.currentVersion,
-            confirmed: requiresPickUpConfirmation(row, currentUserId),
+            expectedCurrentVersion: row.currentVersion,
           })),
         }).unwrap()
       case 'release':
         return bulkRelease({ items: ownershipItems(rows) }).unwrap()
       case 'assign':
         return bulkAssign({
-          targetAssignedTraderId: targetTraderId!,
+          targetTraderId: targetTraderId!,
           items: ownershipItems(rows),
         }).unwrap()
       case 'confirm':
@@ -221,27 +216,39 @@ export function TraderWorkspace() {
   const ownership: TraderOwnershipActions = {
     pickUp: (row, confirmed) =>
       pickUp({
-        caseId: row.caseId,
-        expectedVersion: row.currentVersion,
         confirmed,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     release: (row) =>
       release({
-        caseId: row.caseId,
-        expectedVersion: row.currentVersion,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     assign: (row, targetTraderId) =>
       assign({
-        caseId: row.caseId,
         targetTraderId,
-        expectedVersion: row.currentVersion,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     takeOver: (row) =>
       takeOver({
-        caseId: row.caseId,
-        expectedVersion: row.currentVersion,
         confirmed: true,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
   }
   const workingQuote: TraderWorkingQuoteActions = {
     calculate: (row, driver, value, slide) =>
@@ -270,43 +277,76 @@ export function TraderWorkspace() {
       }).unwrap(),
     confirm: (row, expiryMinutes) =>
       confirmQuote({
-        caseId: row.caseId,
-        expiry: expiryFor(expiryMinutes),
-        expectedCurrentVersion: row.currentVersion,
-        expectedWorkingQuoteVersion: row.workingQuoteVersion,
-      }).unwrap(),
+        items: [
+          {
+            caseId: row.caseId,
+            expiry: expiryFor(expiryMinutes),
+            expectedCurrentVersion: row.currentVersion,
+            expectedWorkingQuoteVersion: row.workingQuoteVersion,
+          },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
   }
   const lifecycle: TraderLifecycleActions = {
     present: (row) =>
       present({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     unpresent: (row) =>
       unpresent({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     withdraw: (row) =>
       withdraw({
-        caseId: row.caseId,
-        expectedVersion: row.currentVersion,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     close: (row, outcome) =>
-      (outcome === 'Hit' ? closeHit : closeAway)({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-      }).unwrap(),
+      (outcome === 'Hit'
+        ? closeHit({
+            caseId: row.caseId,
+            expectedCurrentVersion: row.currentVersion,
+          })
+        : closeAway({
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          })
+      )
+        .unwrap()
+        .then(() => undefined),
     cancel: (row) =>
       cancel({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     reopen: (row) =>
       reopen({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     correctOutcome: (row, outcome, reason) =>
       (outcome === 'Hit' ? correctHit : correctAway)({
         caseId: row.caseId,
@@ -317,18 +357,21 @@ export function TraderWorkspace() {
   const contactOwner: TraderContactOwnerActions = {
     change: (row, targetUserId) =>
       changeOwner({
-        caseId: row.caseId,
-        targetUserId,
-        expectedCurrentVersion: row.currentVersion,
+        targetContactOwnerId: targetUserId,
         confirmed: true,
-      }).unwrap(),
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
   }
   const memo: TraderMemoActions = {
     update: (row, value) =>
       updateMemo({
         caseId: row.caseId,
         memo: value,
-        expectedVersion: row.traderMemoVersion,
+        expectedMemoVersion: row.traderMemoVersion,
       }).unwrap(),
   }
   const bulk: TraderBulkActions = { execute: runBulk }

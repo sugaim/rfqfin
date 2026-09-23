@@ -7,7 +7,7 @@ import type {
 } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
 import type {
-  BulkItemResult,
+  CaseOperationResult,
   PostProcessCommitItem,
   PostProcessItem,
   PostProcessLifecycleChangeType,
@@ -40,7 +40,7 @@ export interface PostProcessScreenProps {
   onPresetChange: (value: PostProcessPreset) => void
   onScopeChange: (value: PostProcessScope) => void
   onRefresh: () => Promise<void>
-  onCommit: (items: PostProcessCommitItem[]) => Promise<BulkItemResult[]>
+  onCommit: (items: PostProcessCommitItem[]) => Promise<CaseOperationResult[]>
   onPendingChange?: (hasPending: boolean) => void
   gridConfigJson?: string
   onSaveGridConfig?: (configJson: string) => Promise<void>
@@ -68,7 +68,7 @@ export function PostProcessScreen({
     Record<number, PendingPostProcessChange>
   >({})
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [result, setResult] = useState<BulkItemResult[] | null>(null)
+  const [result, setResult] = useState<CaseOperationResult[] | null>(null)
   const [resultExpanded, setResultExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [knownRows, setKnownRows] = useState<Record<number, PostProcessItem>>(
@@ -210,7 +210,7 @@ export function PostProcessScreen({
       setResultExpanded(false)
       const succeeded = new Set(
         results
-          .filter((item) => item.status === 'Succeeded')
+          .filter((item) => item.status === 'Applied')
           .map((item) => item.caseId),
       )
       setPending((current) =>
@@ -290,16 +290,17 @@ export function PostProcessScreen({
             type="text"
             onClick={() => setResultExpanded(!resultExpanded)}
           >
-            {result.filter((item) => item.status === 'Succeeded').length}{' '}
+            {result.filter((item) => item.status === 'Applied').length}{' '}
             succeeded /{' '}
-            {result.filter((item) => item.status === 'Skipped').length} skipped
-            / {result.filter((item) => item.status === 'Failed').length} failed
+            {result.filter((item) => item.status === 'NoChange').length} no
+            change / {result.filter((item) => item.status === 'Failed').length}{' '}
+            failed
           </Button>
           {resultExpanded &&
             result.map((item) => (
               <div key={item.caseId}>
                 Case {item.caseId}: {item.status}
-                {item.code ? ` / ${item.code}` : ''}
+                {item.failureCode ? ` / ${item.failureCode}` : ''}
                 {item.message ? ` / ${item.message}` : ''}
               </div>
             ))}

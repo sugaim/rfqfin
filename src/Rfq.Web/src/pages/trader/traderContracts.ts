@@ -1,5 +1,5 @@
 import type {
-  BulkItemResult,
+  CaseOperationResult,
   CalculatedQuotePayload,
   CloseRfqResult,
   ConfirmQuoteResult,
@@ -89,7 +89,7 @@ export interface TraderBulkActions {
     rows: TraderRfq[],
     expiryMinutes: number | null,
     targetTraderId?: string,
-  ) => Promise<BulkItemResult[]>
+  ) => Promise<CaseOperationResult[]>
 }
 
 export interface TraderSearchActions {

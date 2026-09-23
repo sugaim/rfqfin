@@ -9,7 +9,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 bool generatingOpenApi =
     Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
 
-builder.Services.AddControllers(options => { })
+builder.Services.AddControllers()
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.Configure<ApiBehaviorOptions>(
@@ -25,18 +25,27 @@ builder.Services.Configure<ApiBehaviorOptions>(
                         string.IsNullOrWhiteSpace(error.ErrorMessage)
                             ? "The request value is invalid."
                             : error.ErrorMessage).ToArray());
-            var problem = new ValidationProblemDetails(errors)
+            var problem = new ApiProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Validation",
                 Detail = "One or more request values are invalid.",
+                Code = "Validation",
+                TraceId = context.HttpContext.TraceIdentifier,
+                Errors = errors,
             };
-            problem.Extensions["code"] = "Validation";
-            problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
-            return new BadRequestObjectResult(problem);
+            return new BadRequestObjectResult(problem)
+            {
+                ContentTypes = { "application/problem+json" },
+            };
         };
     });
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(
+    options =>
+    {
+        options.AddSchemaTransformer<StringEnumSchemaTransformer>();
+        options.AddDocumentTransformer<ApiContractDocumentTransformer>();
+    });
 if (!generatingOpenApi)
 {
     builder.Services.AddRfqApplication();

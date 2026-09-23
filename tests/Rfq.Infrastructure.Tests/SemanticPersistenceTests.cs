@@ -29,43 +29,6 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
     }
 
     [Fact]
-    public async Task Quote_event_feed_derives_case_through_quote_and_revision()
-    {
-        await RecreateAndSeed();
-        Guid quoteId;
-        long caseId;
-        string? salesId;
-        await using (RfqDbContext context = fixture.CreateContext())
-        {
-            var row = await (
-                from quote in context.ConfirmedQuotes
-                join revision in context.RfqRevisions on quote.RevisionId equals revision.RevisionId
-                join rfq in context.RfqCases on revision.CaseId equals rfq.CaseId
-                select new { quote.QuoteId, revision.CaseId, rfq.SalesId }).FirstAsync();
-            quoteId = row.QuoteId;
-            caseId = row.CaseId;
-            salesId = row.SalesId;
-            var sink = new PersistedEventSink();
-            sink.Record(new QuoteTransition(
-                QuoteTransitionKind.Confirmed, new QuoteId(quoteId), UserId.Create("trader-a"), DateTimeOffset.UtcNow));
-            await new PostgreSqlUnitOfWork(context, sink).SaveChangesAsync();
-        }
-
-        await using RfqDbContext read = fixture.CreateContext();
-        var feed = new EfCoreEventFeed(
-            read,
-            new CurrentUserService(
-                new CurrentUser(
-                    UserId.Create(salesId),
-                    new HashSet<UserRole> { UserRole.Sales },
-                    DeskId.Create("jpy-credit"))));
-        EventFeedItem item = Assert.Single(await feed.GetAfterAsync(0));
-        QuoteConfirmedEvent quoteEvent = Assert.IsType<QuoteConfirmedEvent>(item);
-        Assert.Equal(new CaseId(caseId), quoteEvent.CaseId);
-        Assert.Equal(new QuoteId(quoteId), quoteEvent.QuoteId);
-    }
-
-    [Fact]
     public async Task StateVersion_maps_to_bigint_and_detects_concurrent_updates()
     {
         await RecreateAndSeed();
@@ -319,92 +282,6 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         Assert.Equal<long>(
             caseIds[1..3],
             result.Items.Select(item => item.CaseId.Value).Order());
-    }
-
-    [Fact]
-    public async Task Eod_combines_current_open_rfqs_with_close_events_on_the_desk_local_date()
-    {
-        await RecreateAndSeed();
-        await using (RfqDbContext arrange = fixture.CreateContext())
-        {
-            arrange.Desks.Add(new DeskEntity
-            {
-                DeskId = "other-desk",
-                Name = "Other Desk",
-                TimeZoneId = "UTC",
-            });
-            arrange.MasterUsers.Add(new MasterUserEntity
-            {
-                UserId = "trader-other",
-                Name = "Other Trader",
-                DeskId = "other-desk",
-                Roles = ["Trader"],
-            });
-            await arrange.CaseCurrents.ExecuteUpdateAsync(setters => setters
-                .SetProperty(item => item.Lifecycle, RfqLifecycleKind.Cancelled)
-                .SetProperty(item => item.RfqStatus, RfqStatus.Cancelled));
-            CaseCurrentEntity[] rows = await arrange.CaseCurrents.OrderBy(item => item.CaseId)
-                .Take(6).ToArrayAsync();
-            rows[0].Lifecycle = RfqLifecycleKind.Open;
-            rows[0].RfqStatus = RfqStatus.Active;
-            rows[1].Lifecycle = RfqLifecycleKind.Closed;
-            rows[1].RfqStatus = RfqStatus.Hit;
-            rows[2].Lifecycle = RfqLifecycleKind.Closed;
-            rows[2].RfqStatus = RfqStatus.Away;
-            foreach (CaseCurrentEntity? row in rows)
-            {
-                row.ContactOwnerId = "sales-dev";
-                row.AssignedTraderId = "trader-a";
-            }
-            rows[3].AssignedTraderId = "trader-other";
-            long oldCaseId = rows[0].CaseId;
-            await arrange.RfqCases.Where(item => item.CaseId == oldCaseId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    item => item.CreatedAt,
-                    new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero)));
-
-            long nextEventId = (await arrange.Events.MaxAsync(item => (long?)item.EventId) ?? 0) + 1;
-            AddRfqEvent(
-                arrange,
-                nextEventId++,
-                rows[1].CaseId,
-                RfqTransitionKind.ClosedHit,
-                new DateTimeOffset(2026, 9, 20, 15, 0, 0, TimeSpan.Zero));
-            AddRfqEvent(
-                arrange,
-                nextEventId++,
-                rows[2].CaseId,
-                RfqTransitionKind.ClosedAway,
-                new DateTimeOffset(2026, 9, 21, 14, 59, 59, TimeSpan.Zero));
-            AddRfqEvent(
-                arrange,
-                nextEventId++,
-                rows[3].CaseId,
-                RfqTransitionKind.ClosedHit,
-                new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero));
-            AddRfqEvent(
-                arrange,
-                nextEventId++,
-                rows[4].CaseId,
-                RfqTransitionKind.ClosedHit,
-                new DateTimeOffset(2026, 9, 20, 14, 59, 59, TimeSpan.Zero));
-            AddRfqEvent(
-                arrange,
-                nextEventId,
-                rows[5].CaseId,
-                RfqTransitionKind.ClosedAway,
-                new DateTimeOffset(2026, 9, 21, 15, 0, 0, TimeSpan.Zero));
-            await arrange.SaveChangesAsync();
-        }
-
-        await using RfqDbContext read = fixture.CreateContext();
-        var queries = new EfCoreEodQueries(read, CurrentSales());
-        EodSummaryItem item = Assert.Single(await queries.GetEodAsync(new DateOnly(2026, 9, 21)));
-
-        Assert.Equal(UserId.Create("sales-dev"), item.ContactOwnerId);
-        Assert.Equal(1, item.Open);
-        Assert.Equal(1, item.Hit);
-        Assert.Equal(1, item.Away);
     }
 
     [Fact]

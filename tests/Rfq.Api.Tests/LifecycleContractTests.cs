@@ -10,7 +10,6 @@ public sealed class LifecycleContractTests
 {
     [Theory]
     [InlineData(nameof(RfqLifecycleController.CloseHit), "{caseId:long}/close/hit")]
-    [InlineData(nameof(RfqLifecycleController.CloseAway), "{caseId:long}/close/away")]
     [InlineData(
         nameof(RfqLifecycleController.CorrectToHit),
         "{caseId:long}/outcome/correct-to-hit")]

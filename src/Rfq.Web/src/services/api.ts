@@ -20,7 +20,7 @@ export interface UpdateDraftRequest {
   standardSettlementDate: string
   salesAndTradingMessage: string
   assignedTraderId: string
-  expectedVersion: number
+  expectedCurrentVersion: number
 }
 
 export interface InitialRfqResponse {
@@ -124,10 +124,10 @@ export interface AmendmentResult {
   quoteStatus: string | null
   quoteRequestReason: string | null
 }
-export interface BulkItemResult {
+export interface CaseOperationResult {
   caseId: number
-  status: 'Succeeded' | 'Skipped' | 'Failed'
-  code: string | null
+  status: 'Applied' | 'NoChange' | 'Failed'
+  failureCode: string | null
   message: string | null
 }
 export interface LifecycleResult {
@@ -136,12 +136,6 @@ export interface LifecycleResult {
   quoteStatus: string | null
   quoteRequestReason: string | null
   currentVersion: number
-}
-export interface EodSummary {
-  contactOwnerId: string
-  open: number
-  hit: number
-  away: number
 }
 export type PostProcessPreset = 'Today' | 'Unclosed'
 export type PostProcessScope = 'Mine' | 'AllPermitted'
@@ -184,7 +178,7 @@ export interface PostProcessCommitItem {
     correctionReason?: string | null
   }
   memoChange?: {
-    expectedVersion: number
+    expectedMemoVersion: number
     value: string
   }
 }
@@ -428,7 +422,7 @@ export const api = createApi({
   }),
   endpoints: (builder) => ({
     getHealth: builder.query<HealthResponse, void>({
-      query: () => '/health',
+      query: () => '/system/health',
     }),
     getBusinessDate: builder.query<BusinessDateResponse, void>({
       query: () => '/business-date',
@@ -437,19 +431,16 @@ export const api = createApi({
       query: () => '/me',
     }),
     getActiveSalesRfqs: builder.query<SalesRfq[], void>({
-      query: () => '/sales-rfqs',
+      query: () => '/worklists/sales',
     }),
     getSalesRecentRevisions: builder.query<
       SalesRecentRevision[],
       number | void
     >({
       query: (limit) => ({
-        url: '/sales-rfqs/recent-revisions',
+        url: '/worklists/sales/recent-revisions',
         params: limit === undefined ? undefined : { limit },
       }),
-    }),
-    getEod: builder.query<EodSummary[], string>({
-      query: (date) => ({ url: '/eod', params: { date } }),
     }),
     getPostProcess: builder.query<
       PostProcessItem[],
@@ -459,7 +450,7 @@ export const api = createApi({
       providesTags: ['PostProcess'],
     }),
     commitPostProcess: builder.mutation<
-      BulkItemResult[],
+      CaseOperationResult[],
       { items: PostProcessCommitItem[] }
     >({
       query: (body) => ({
@@ -470,7 +461,7 @@ export const api = createApi({
       invalidatesTags: (result) => (result ? ['PostProcess'] : []),
     }),
     searchRfqs: builder.query<RfqSearchResult, RfqSearchParams>({
-      query: (params) => ({ url: '/rfqs/search', params }),
+      query: (params) => ({ url: '/search/rfqs', params }),
     }),
     getGridConfig: builder.query<
       GridConfig,
@@ -555,103 +546,53 @@ export const api = createApi({
         body,
       }),
     }),
-    confirmDraft: builder.mutation<
-      InitialRfqResponse,
-      { caseId: number; body: UpdateDraftRequest }
-    >({
-      query: ({ caseId, body }) => ({
-        url: `/rfqs/${caseId}/draft/confirm`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    discardDraft: builder.mutation<
-      void,
-      { caseId: number; expectedVersion: number }
-    >({
-      query: ({ caseId, expectedVersion }) => ({
-        url: `/rfqs/${caseId}/draft/discard`,
-        method: 'POST',
-        body: { expectedVersion },
-      }),
-    }),
     getActiveTraderRfqs: builder.query<TraderRfq[], void>({
-      query: () => '/trader-rfqs',
+      query: () => '/worklists/trader',
     }),
-    pickUpRfq: builder.mutation<
-      OwnershipResult,
-      { caseId: number; expectedVersion: number; confirmed: boolean }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/ownership/pick-up`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    releaseRfq: builder.mutation<
-      OwnershipResult,
-      { caseId: number; expectedVersion: number }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/ownership/release`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    assignTrader: builder.mutation<
-      OwnershipResult,
-      { caseId: number; targetTraderId: string; expectedVersion: number }
-    >({
-      query: ({ caseId, targetTraderId, ...body }) => ({
-        url: `/rfqs/${caseId}/assigned-trader`,
-        method: 'PUT',
-        body: { assignedTraderId: targetTraderId, ...body },
-      }),
-    }),
-    takeOverRfq: builder.mutation<
-      OwnershipResult,
-      { caseId: number; expectedVersion: number; confirmed: boolean }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/ownership/take-over`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    bulkPickUpRfqs: builder.mutation<
-      BulkItemResult[],
+    pickUpRfqs: builder.mutation<
+      CaseOperationResult[],
       {
-        items: { caseId: number; expectedVersion: number; confirmed: boolean }[]
+        confirmed: boolean
+        items: { caseId: number; expectedCurrentVersion: number }[]
       }
     >({
       query: (body) => ({
-        url: '/rfqs/ownership/bulk-pick-up',
+        url: '/rfqs/pick-up',
         method: 'POST',
         body,
       }),
     }),
-    bulkReleaseRfqs: builder.mutation<
-      BulkItemResult[],
-      { items: { caseId: number; expectedVersion: number }[] }
+    releaseRfqs: builder.mutation<
+      CaseOperationResult[],
+      { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
       query: (body) => ({
-        url: '/rfqs/ownership/bulk-release',
+        url: '/rfqs/release',
         method: 'POST',
         body,
       }),
     }),
-    bulkAssignTrader: builder.mutation<
-      BulkItemResult[],
+    assignTraders: builder.mutation<
+      CaseOperationResult[],
       {
-        targetAssignedTraderId: string
-        items: { caseId: number; expectedVersion: number }[]
+        targetTraderId: string
+        items: { caseId: number; expectedCurrentVersion: number }[]
       }
     >({
       query: (body) => ({
-        url: '/rfqs/ownership/bulk-assign-trader',
+        url: '/rfqs/assign-trader',
         method: 'POST',
         body,
       }),
+    }),
+    takeOverRfqs: builder.mutation<
+      CaseOperationResult[],
+      {
+        confirmed: boolean
+        items: { caseId: number; expectedCurrentVersion: number }[]
+      }
+    >({
+      query: (body) => ({ url: '/rfqs/take-over', method: 'POST', body }),
     }),
     calculateWorkingQuote: builder.mutation<
       WorkingQuoteResult,
@@ -701,23 +642,8 @@ export const api = createApi({
         body,
       }),
     }),
-    confirmQuote: builder.mutation<
-      ConfirmQuoteResult,
-      {
-        caseId: number
-        expiry: QuoteExpiry
-        expectedCurrentVersion: number
-        expectedWorkingQuoteVersion: number
-      }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/quote/confirm`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    bulkConfirmQuotes: builder.mutation<
-      BulkItemResult[],
+    confirmQuotes: builder.mutation<
+      CaseOperationResult[],
       {
         items: {
           caseId: number
@@ -728,37 +654,17 @@ export const api = createApi({
       }
     >({
       query: (body) => ({
-        url: '/rfqs/quotes/bulk-confirm',
+        url: '/rfqs/confirm-quotes',
         method: 'POST',
         body,
       }),
     }),
-    bulkWithdrawQuotes: builder.mutation<
-      BulkItemResult[],
+    withdrawQuotes: builder.mutation<
+      CaseOperationResult[],
       { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
       query: (body) => ({
-        url: '/rfqs/quotes/bulk-withdraw',
-        method: 'POST',
-        body,
-      }),
-    }),
-    presentQuote: builder.mutation<
-      PresentationResult,
-      { caseId: number; expectedCurrentVersion: number }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/present`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    unpresentQuote: builder.mutation<
-      PresentationResult,
-      { caseId: number; expectedCurrentVersion: number }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/unpresent`,
+        url: '/rfqs/withdraw-quotes',
         method: 'POST',
         body,
       }),
@@ -773,42 +679,32 @@ export const api = createApi({
         body,
       }),
     }),
-    closeAwayRfq: builder.mutation<
-      CloseRfqResult,
-      { caseId: number; expectedCurrentVersion: number }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/close/away`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    bulkCloseAwayRfqs: builder.mutation<
-      BulkItemResult[],
+    closeAwayRfqs: builder.mutation<
+      CaseOperationResult[],
       { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
-      query: (body) => ({ url: '/rfqs/bulk-close-away', method: 'POST', body }),
+      query: (body) => ({ url: '/rfqs/close-away', method: 'POST', body }),
     }),
-    bulkPresentRfqs: builder.mutation<
-      BulkItemResult[],
+    presentRfqs: builder.mutation<
+      CaseOperationResult[],
       { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
-      query: (body) => ({ url: '/rfqs/bulk-present', method: 'POST', body }),
+      query: (body) => ({ url: '/rfqs/present', method: 'POST', body }),
     }),
-    bulkUnpresentRfqs: builder.mutation<
-      BulkItemResult[],
+    unpresentRfqs: builder.mutation<
+      CaseOperationResult[],
       { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
-      query: (body) => ({ url: '/rfqs/bulk-unpresent', method: 'POST', body }),
+      query: (body) => ({ url: '/rfqs/unpresent', method: 'POST', body }),
     }),
-    bulkCancelRfqs: builder.mutation<
-      BulkItemResult[],
+    cancelRfqs: builder.mutation<
+      CaseOperationResult[],
       { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
-      query: (body) => ({ url: '/rfqs/bulk-cancel', method: 'POST', body }),
+      query: (body) => ({ url: '/rfqs/cancel', method: 'POST', body }),
     }),
-    bulkConfirmInitialDrafts: builder.mutation<
-      BulkItemResult[],
+    confirmInitialDrafts: builder.mutation<
+      CaseOperationResult[],
       {
         items: {
           caseId: number
@@ -817,22 +713,22 @@ export const api = createApi({
           standardSettlementDate: string
           salesAndTradingMessage: string
           assignedTraderId: string
-          expectedVersion: number
+          expectedCurrentVersion: number
         }[]
       }
     >({
       query: (body) => ({
-        url: '/rfqs/drafts/bulk-confirm',
+        url: '/rfqs/confirm-initial-drafts',
         method: 'POST',
         body,
       }),
     }),
-    bulkDiscardInitialDrafts: builder.mutation<
-      BulkItemResult[],
-      { items: { caseId: number; expectedVersion: number }[] }
+    discardInitialDrafts: builder.mutation<
+      CaseOperationResult[],
+      { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
       query: (body) => ({
-        url: '/rfqs/drafts/bulk-discard',
+        url: '/rfqs/discard-initial-drafts',
         method: 'POST',
         body,
       }),
@@ -857,24 +753,23 @@ export const api = createApi({
         body,
       }),
     }),
-    changeContactOwner: builder.mutation<
-      ContactOwnerResult,
+    changeContactOwners: builder.mutation<
+      CaseOperationResult[],
       {
-        caseId: number
-        targetUserId: string
-        expectedCurrentVersion: number
+        targetContactOwnerId: string
         confirmed: boolean
+        items: { caseId: number; expectedCurrentVersion: number }[]
       }
     >({
-      query: ({ caseId, targetUserId, ...body }) => ({
-        url: `/rfqs/${caseId}/contact-owner`,
-        method: 'PUT',
-        body: { contactOwnerId: targetUserId, ...body },
+      query: (body) => ({
+        url: '/rfqs/change-contact-owner',
+        method: 'POST',
+        body,
       }),
     }),
     updateSalesMemo: builder.mutation<
       MemoResult,
-      { caseId: number; memo: string; expectedVersion: number }
+      { caseId: number; memo: string; expectedMemoVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
         url: `/rfqs/${caseId}/memos/sales`,
@@ -884,7 +779,7 @@ export const api = createApi({
     }),
     updateTraderMemo: builder.mutation<
       MemoResult,
-      { caseId: number; memo: string; expectedVersion: number }
+      { caseId: number; memo: string; expectedMemoVersion: number }
     >({
       query: ({ caseId, ...body }) => ({
         url: `/rfqs/${caseId}/memos/trader`,
@@ -919,36 +814,8 @@ export const api = createApi({
         body,
       }),
     }),
-    confirmAmendment: builder.mutation<
-      AmendmentResult,
-      {
-        caseId: number
-        expectedCurrentVersion: number
-        expectedDraftVersion: number
-      }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/amendment/confirm`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    discardAmendment: builder.mutation<
-      AmendmentResult,
-      {
-        caseId: number
-        expectedCurrentVersion: number
-        expectedDraftVersion: number
-      }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/amendment/discard`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    bulkConfirmAmendments: builder.mutation<
-      BulkItemResult[],
+    confirmAmendments: builder.mutation<
+      CaseOperationResult[],
       {
         items: {
           caseId: number
@@ -958,13 +825,13 @@ export const api = createApi({
       }
     >({
       query: (body) => ({
-        url: '/rfqs/amendment/bulk-confirm',
+        url: '/rfqs/confirm-amendments',
         method: 'POST',
         body,
       }),
     }),
-    bulkDiscardAmendments: builder.mutation<
-      BulkItemResult[],
+    discardAmendments: builder.mutation<
+      CaseOperationResult[],
       {
         items: {
           caseId: number
@@ -974,7 +841,7 @@ export const api = createApi({
       }
     >({
       query: (body) => ({
-        url: '/rfqs/amendment/bulk-discard',
+        url: '/rfqs/discard-amendments',
         method: 'POST',
         body,
       }),
@@ -985,35 +852,11 @@ export const api = createApi({
         method: 'POST',
       }),
     }),
-    cancelRfq: builder.mutation<
-      LifecycleResult,
-      { caseId: number; expectedCurrentVersion: number }
+    reopenRfqs: builder.mutation<
+      CaseOperationResult[],
+      { items: { caseId: number; expectedCurrentVersion: number }[] }
     >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/cancel`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    reopenRfq: builder.mutation<
-      LifecycleResult,
-      { caseId: number; expectedCurrentVersion: number }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/reopen`,
-        method: 'POST',
-        body,
-      }),
-    }),
-    withdrawQuote: builder.mutation<
-      LifecycleResult,
-      { caseId: number; expectedVersion: number }
-    >({
-      query: ({ caseId, ...body }) => ({
-        url: `/rfqs/${caseId}/quote/withdraw`,
-        method: 'POST',
-        body,
-      }),
+      query: (body) => ({ url: '/rfqs/reopen', method: 'POST', body }),
     }),
     scratchPrice: builder.mutation<
       CalculatedQuotePayload,
@@ -1024,20 +867,20 @@ export const api = createApi({
         value: number
         simpleYieldSlide: number
       }
-    >({ query: (body) => ({ url: '/pricer', method: 'POST', body }) }),
+    >({ query: (body) => ({ url: '/pricing/scratch', method: 'POST', body }) }),
     searchClients: builder.query<ClientSearchResult[], string>({
-      query: (q) => ({ url: '/rfqs/candidates/clients', params: { q } }),
+      query: (q) => ({ url: '/reference-data/clients', params: { q } }),
       keepUnusedDataFor: 0,
     }),
     searchSecurities: builder.query<SecuritySearchResult[], string>({
-      query: (q) => ({ url: '/rfqs/candidates/securities', params: { q } }),
+      query: (q) => ({ url: '/reference-data/securities', params: { q } }),
       keepUnusedDataFor: 0,
     }),
     getAssignableTraders: builder.query<UserSummary[], void>({
-      query: () => '/assignable-traders',
+      query: () => '/reference-data/assignable-traders',
     }),
     getContactOwnerCandidates: builder.query<UserSummary[], void>({
-      query: () => '/contact-owner-candidates',
+      query: () => '/reference-data/contact-owner-candidates',
     }),
     resolveRfqCreationContext: builder.query<
       RfqCreationContext,
@@ -1050,42 +893,32 @@ export const api = createApi({
 })
 
 export const {
-  useAssignTraderMutation,
-  useBulkAssignTraderMutation,
-  useBulkConfirmQuotesMutation,
-  useBulkCloseAwayRfqsMutation,
-  useBulkPickUpRfqsMutation,
-  useBulkReleaseRfqsMutation,
-  useBulkWithdrawQuotesMutation,
-  useBulkPresentRfqsMutation,
-  useBulkUnpresentRfqsMutation,
-  useBulkCancelRfqsMutation,
-  useBulkConfirmInitialDraftsMutation,
-  useBulkDiscardInitialDraftsMutation,
-  useBulkConfirmAmendmentsMutation,
-  useBulkDiscardAmendmentsMutation,
-  useCancelRfqMutation,
+  useAssignTradersMutation,
+  useConfirmQuotesMutation,
+  useCloseAwayRfqsMutation,
+  usePickUpRfqsMutation,
+  useReleaseRfqsMutation,
+  useWithdrawQuotesMutation,
+  usePresentRfqsMutation,
+  useUnpresentRfqsMutation,
+  useCancelRfqsMutation,
+  useConfirmInitialDraftsMutation,
+  useDiscardInitialDraftsMutation,
+  useConfirmAmendmentsMutation,
+  useDiscardAmendmentsMutation,
   useCalculateWorkingQuoteMutation,
-  useChangeContactOwnerMutation,
+  useChangeContactOwnersMutation,
   useChangeWorkingQuoteModeMutation,
   useCloseHitRfqMutation,
-  useCloseAwayRfqMutation,
-  useConfirmQuoteMutation,
-  useConfirmDraftMutation,
   useConfirmNewRfqMutation,
   useCreateDraftMutation,
   useCreateFromExistingMutation,
   useCorrectOutcomeToHitMutation,
   useCorrectOutcomeToAwayMutation,
-  useDiscardDraftMutation,
-  useDiscardAmendmentMutation,
-  useConfirmAmendmentMutation,
   useSaveAmendmentMutation,
   useStartAmendmentMutation,
-  useReopenRfqMutation,
-  useWithdrawQuoteMutation,
+  useReopenRfqsMutation,
   useScratchPriceMutation,
-  useGetEodQuery,
   useGetPostProcessQuery,
   useCommitPostProcessMutation,
   useSearchRfqsQuery,
@@ -1110,13 +943,9 @@ export const {
   useLazySearchClientsQuery,
   useLazySearchSecuritiesQuery,
   useLazySearchRfqsQuery,
-  usePickUpRfqMutation,
-  usePresentQuoteMutation,
-  useReleaseRfqMutation,
-  useTakeOverRfqMutation,
+  useTakeOverRfqsMutation,
   useUpdateSalesMemoMutation,
   useUpdateTraderMemoMutation,
   useUpdateManualWorkingQuoteMutation,
-  useUnpresentQuoteMutation,
   useUpdateDraftMutation,
 } = api

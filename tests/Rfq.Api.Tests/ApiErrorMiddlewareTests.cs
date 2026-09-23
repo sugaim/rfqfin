@@ -19,6 +19,7 @@ public sealed class ApiErrorMiddlewareTests
             new CalculationFailureException(Guid.NewGuid(), "CALC", "calculation"),
             422,
             "CalculationFailure" },
+        { new RfqReadModelUnavailableException("unavailable"), 503, "ServiceUnavailable" },
     };
 
     public static TheoryData<Exception> UnexpectedErrors =>

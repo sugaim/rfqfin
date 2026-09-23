@@ -56,7 +56,7 @@ public sealed class RfqInvalidationSubscription : IAsyncDisposable
     public async Task<RfqInvalidationCategory> WaitAsync(CancellationToken cancellationToken)
     {
         await signal.WaitAsync(cancellationToken);
-        RfqInvalidationCategory categories =
+        var categories =
             (RfqInvalidationCategory)Interlocked.Exchange(ref pending, 0);
         Interlocked.Exchange(ref wakeScheduled, 0);
         if (Volatile.Read(ref pending) != 0

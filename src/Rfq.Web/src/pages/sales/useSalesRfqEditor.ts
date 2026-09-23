@@ -109,7 +109,7 @@ export function useSalesRfqEditor({
               const result = await draft.update(row.caseId, {
                 ...values,
                 ...delta,
-                expectedVersion: version,
+                expectedCurrentVersion: version,
               })
 
               return stateFromResponse(result)
@@ -202,7 +202,7 @@ export function useSalesRfqEditor({
             const { version, ...values } = state
             await draft.confirm(selected.caseId, {
               ...values,
-              expectedVersion: version,
+              expectedCurrentVersion: version,
             })
           }
         } else {

@@ -2,27 +2,21 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router'
 import type { AppOutletContext } from '@/app/App'
 import {
-  useBulkCancelRfqsMutation,
-  useBulkCloseAwayRfqsMutation,
-  useBulkConfirmAmendmentsMutation,
-  useBulkConfirmInitialDraftsMutation,
-  useBulkDiscardAmendmentsMutation,
-  useBulkDiscardInitialDraftsMutation,
-  useBulkPresentRfqsMutation,
-  useBulkUnpresentRfqsMutation,
-  useCancelRfqMutation,
-  useChangeContactOwnerMutation,
-  useCloseAwayRfqMutation,
+  useCancelRfqsMutation,
+  useCloseAwayRfqsMutation,
+  useConfirmAmendmentsMutation,
+  useConfirmInitialDraftsMutation,
+  useDiscardAmendmentsMutation,
+  useDiscardInitialDraftsMutation,
+  usePresentRfqsMutation,
+  useUnpresentRfqsMutation,
+  useChangeContactOwnersMutation,
   useCloseHitRfqMutation,
-  useConfirmAmendmentMutation,
-  useConfirmDraftMutation,
   useConfirmNewRfqMutation,
   useCorrectOutcomeToAwayMutation,
   useCorrectOutcomeToHitMutation,
   useCreateDraftMutation,
   useCreateFromExistingMutation,
-  useDiscardAmendmentMutation,
-  useDiscardDraftMutation,
   useGetActiveSalesRfqsQuery,
   useGetAssignableTradersQuery,
   useGetContactOwnerCandidatesQuery,
@@ -31,15 +25,13 @@ import {
   useLazyResolveRfqCreationContextQuery,
   useLazySearchClientsQuery,
   useLazySearchSecuritiesQuery,
-  usePresentQuoteMutation,
-  useReopenRfqMutation,
+  useReopenRfqsMutation,
   useSaveAmendmentMutation,
   useSaveGridConfigMutation,
-  useUnpresentQuoteMutation,
   useUpdateDraftMutation,
   useUpdateSalesMemoMutation,
   useStartAmendmentMutation,
-  type BulkItemResult,
+  type CaseOperationResult,
   type ClientSearchResult,
   type SalesRfq,
   type SecuritySearchResult,
@@ -73,39 +65,39 @@ export function SalesWorkspace() {
   const [createDraft, createState] = useCreateDraftMutation()
   const [updateDraft, updateState] = useUpdateDraftMutation()
   const [confirmNewRfq, confirmNewState] = useConfirmNewRfqMutation()
-  const [confirmDraft, confirmState] = useConfirmDraftMutation()
-  const [discardDraft, discardState] = useDiscardDraftMutation()
-  const [presentQuote, presentState] = usePresentQuoteMutation()
-  const [unpresentQuote, unpresentState] = useUnpresentQuoteMutation()
+  const [confirmDraft, confirmState] = useConfirmInitialDraftsMutation()
+  const [discardDraft, discardState] = useDiscardInitialDraftsMutation()
+  const [presentQuote, presentState] = usePresentRfqsMutation()
+  const [unpresentQuote, unpresentState] = useUnpresentRfqsMutation()
   const [closeHitRfq, closeHitState] = useCloseHitRfqMutation()
-  const [closeAwayRfq, closeAwayState] = useCloseAwayRfqMutation()
+  const [closeAwayRfq, closeAwayState] = useCloseAwayRfqsMutation()
   const [correctToHit, correctToHitState] = useCorrectOutcomeToHitMutation()
   const [correctToAway, correctToAwayState] = useCorrectOutcomeToAwayMutation()
-  const [cancelRfq, cancelState] = useCancelRfqMutation()
+  const [cancelRfq, cancelState] = useCancelRfqsMutation()
   const [changeContactOwner, changeContactOwnerState] =
-    useChangeContactOwnerMutation()
-  const [reopenRfq, reopenState] = useReopenRfqMutation()
+    useChangeContactOwnersMutation()
+  const [reopenRfq, reopenState] = useReopenRfqsMutation()
   const [createFromExisting, createFromExistingState] =
     useCreateFromExistingMutation()
   const [updateSalesMemo, updateSalesMemoState] = useUpdateSalesMemoMutation()
   const [saveAmendment, saveAmendmentState] = useSaveAmendmentMutation()
   const [startAmendment, startAmendmentState] = useStartAmendmentMutation()
   const [confirmAmendment, confirmAmendmentState] =
-    useConfirmAmendmentMutation()
+    useConfirmAmendmentsMutation()
   const [discardAmendment, discardAmendmentState] =
-    useDiscardAmendmentMutation()
-  const [bulkAway, bulkAwayState] = useBulkCloseAwayRfqsMutation()
-  const [bulkCancel, bulkCancelState] = useBulkCancelRfqsMutation()
-  const [bulkPresent, bulkPresentState] = useBulkPresentRfqsMutation()
-  const [bulkUnpresent, bulkUnpresentState] = useBulkUnpresentRfqsMutation()
+    useDiscardAmendmentsMutation()
+  const [bulkAway, bulkAwayState] = useCloseAwayRfqsMutation()
+  const [bulkCancel, bulkCancelState] = useCancelRfqsMutation()
+  const [bulkPresent, bulkPresentState] = usePresentRfqsMutation()
+  const [bulkUnpresent, bulkUnpresentState] = useUnpresentRfqsMutation()
   const [bulkConfirmDrafts, bulkConfirmDraftsState] =
-    useBulkConfirmInitialDraftsMutation()
+    useConfirmInitialDraftsMutation()
   const [bulkDiscardDrafts, bulkDiscardDraftsState] =
-    useBulkDiscardInitialDraftsMutation()
+    useDiscardInitialDraftsMutation()
   const [bulkConfirmAmendments, bulkConfirmAmendmentsState] =
-    useBulkConfirmAmendmentsMutation()
+    useConfirmAmendmentsMutation()
   const [bulkDiscardAmendments, bulkDiscardAmendmentsState] =
-    useBulkDiscardAmendmentsMutation()
+    useDiscardAmendmentsMutation()
   const [saveGridConfig] = useSaveGridConfigMutation()
   const [searchClients] = useLazySearchClientsQuery()
   const [searchSecurities] = useLazySearchSecuritiesQuery()
@@ -160,7 +152,7 @@ export function SalesWorkspace() {
   const runBulk = async (
     command: SalesBulkCommand,
     rows: SalesRfq[],
-  ): Promise<BulkItemResult[]> => {
+  ): Promise<CaseOperationResult[]> => {
     switch (command) {
       case 'away':
         return bulkAway(lifecycleItems(rows)).unwrap()
@@ -179,14 +171,14 @@ export function SalesWorkspace() {
             standardSettlementDate: row.standardSettlementDate,
             salesAndTradingMessage: row.salesAndTradingMessage,
             assignedTraderId: row.assignedTraderId,
-            expectedVersion: row.version,
+            expectedCurrentVersion: row.version,
           })),
         }).unwrap()
       case 'discard-drafts':
         return bulkDiscardDrafts({
           items: rows.map((row) => ({
             caseId: row.caseId,
-            expectedVersion: row.version,
+            expectedCurrentVersion: row.version,
           })),
         }).unwrap()
       case 'confirm-amendments':
@@ -249,24 +241,33 @@ export function SalesWorkspace() {
     create: (request) => createDraft(request).unwrap(),
     update: (caseId, body) => updateDraft({ caseId, body }).unwrap(),
     confirmNew: (request) => confirmNewRfq(request).unwrap(),
-    confirm: (caseId, body) => confirmDraft({ caseId, body }).unwrap(),
+    confirm: (caseId, body) =>
+      confirmDraft({
+        items: [{ caseId, ...body, notional: body.notional ?? null }],
+      })
+        .unwrap()
+        .then(() => undefined),
     discard: (caseId, expectedVersion) =>
-      discardDraft({ caseId, expectedVersion }).unwrap(),
+      discardDraft({
+        items: [{ caseId, expectedCurrentVersion: expectedVersion }],
+      })
+        .unwrap()
+        .then(() => undefined),
   }
   const lifecycle: SalesLifecycleActions = {
     present: (caseId, expectedCurrentVersion) =>
-      presentQuote({ caseId, expectedCurrentVersion })
+      presentQuote({ items: [{ caseId, expectedCurrentVersion }] })
         .unwrap()
         .then(() => undefined),
     unpresent: (caseId, expectedCurrentVersion) =>
-      unpresentQuote({ caseId, expectedCurrentVersion })
+      unpresentQuote({ items: [{ caseId, expectedCurrentVersion }] })
         .unwrap()
         .then(() => undefined),
     close: (caseId, outcome, expectedCurrentVersion) =>
-      (outcome === 'Hit' ? closeHitRfq : closeAwayRfq)({
-        caseId,
-        expectedCurrentVersion,
-      })
+      (outcome === 'Hit'
+        ? closeHitRfq({ caseId, expectedCurrentVersion })
+        : closeAwayRfq({ items: [{ caseId, expectedCurrentVersion }] })
+      )
         .unwrap()
         .then(() => undefined),
     correctOutcome: (caseId, outcome, expectedCurrentVersion, reason) =>
@@ -279,15 +280,17 @@ export function SalesWorkspace() {
         .then(() => undefined),
     cancel: (row) =>
       cancelRfq({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
       })
         .unwrap()
         .then(() => undefined),
     reopen: (row) =>
       reopenRfq({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
+        items: [
+          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
+        ],
       })
         .unwrap()
         .then(() => undefined),
@@ -296,17 +299,20 @@ export function SalesWorkspace() {
   const contactOwner: SalesContactOwnerActions = {
     change: (caseId, targetUserId, expectedCurrentVersion) =>
       changeContactOwner({
-        caseId,
-        targetUserId,
-        expectedCurrentVersion,
+        targetContactOwnerId: targetUserId,
         confirmed: true,
+        items: [{ caseId, expectedCurrentVersion }],
       })
         .unwrap()
         .then(() => undefined),
   }
   const memo: SalesMemoActions = {
     update: (caseId, value, expectedVersion) =>
-      updateSalesMemo({ caseId, memo: value, expectedVersion })
+      updateSalesMemo({
+        caseId,
+        memo: value,
+        expectedMemoVersion: expectedVersion,
+      })
         .unwrap()
         .then(() => undefined),
   }
@@ -334,16 +340,28 @@ export function SalesWorkspace() {
       }).unwrap(),
     confirm: (row) =>
       confirmAmendment({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-        expectedDraftVersion: row.draftVersion!,
-      }).unwrap(),
+        items: [
+          {
+            caseId: row.caseId,
+            expectedCurrentVersion: row.currentVersion,
+            expectedDraftVersion: row.draftVersion!,
+          },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
     discard: (row) =>
       discardAmendment({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-        expectedDraftVersion: row.draftVersion!,
-      }).unwrap(),
+        items: [
+          {
+            caseId: row.caseId,
+            expectedCurrentVersion: row.currentVersion,
+            expectedDraftVersion: row.draftVersion!,
+          },
+        ],
+      })
+        .unwrap()
+        .then(() => undefined),
   }
   const bulk: SalesBulkActions = { execute: runBulk }
   const gridLayout: SalesGridLayoutActions = {

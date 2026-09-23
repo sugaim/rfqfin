@@ -12,7 +12,7 @@ public sealed class HealthEndpointTests(WebApplicationFactory<Program> factory) 
     [Fact]
     public async Task GetHealthReturnsOk()
     {
-        HttpResponseMessage response = await _client.GetAsync("/api/health");
+        HttpResponseMessage response = await _client.GetAsync("/api/system/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 

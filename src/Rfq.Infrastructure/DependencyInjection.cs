@@ -40,11 +40,8 @@ public static class DependencyInjection
         services.AddScoped<ICategoryRouting, EfCoreCategoryRouting>();
         services.AddScoped<IBusinessDateProvider, EfCoreBusinessDateProvider>();
         services.AddScoped<IDeskLocalDateResolver, EfCoreDeskLocalDateResolver>();
-        services.AddScoped<IEventFeed, EfCoreEventFeed>();
         services.AddScoped<IRfqSearchQueries, EfCoreRfqSearchQueries>();
-        services.AddScoped<IRfqRevisionQueries, EfCoreRfqRevisionQueries>();
         services.AddScoped<IRfqQuoteQueries, EfCoreRfqQuoteQueries>();
-        services.AddScoped<IEodQueries, EfCoreEodQueries>();
         services.AddScoped<IPostProcessQueries, EfCorePostProcessQueries>();
         services.AddScoped<IPostProcessVisibility, EfCorePostProcessVisibility>();
         services.AddScoped<IGridConfigStore, EfCoreGridConfigStore>();

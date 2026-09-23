@@ -343,7 +343,7 @@ public sealed class SemanticDomainTests
     [Fact]
     public void Initial_draft_records_business_date_independently_from_timestamp()
     {
-        RfqCase draft = RfqCase.CreateDraft(
+        var draft = RfqCase.CreateDraft(
             new CaseId(2),
             RevisionId.New(),
             ClientId.Create("c"),

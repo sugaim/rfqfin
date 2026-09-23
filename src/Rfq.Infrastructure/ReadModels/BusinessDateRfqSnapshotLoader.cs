@@ -24,7 +24,7 @@ internal sealed class BusinessDateRfqSnapshotLoader(RfqDbContext dbContext)
 
         var salesByCase = sales.ToDictionary(item => item.CaseId);
         var traderByCase = trader.ToDictionary(item => item.CaseId);
-        ImmutableDictionary<CaseId, RfqSnapshotRoute> routes = salesByCase.Keys
+        var routes = salesByCase.Keys
             .Union(traderByCase.Keys)
             .ToImmutableDictionary(
                 caseId => caseId,
@@ -53,8 +53,8 @@ internal sealed class BusinessDateRfqSnapshotLoader(RfqDbContext dbContext)
         return new BusinessDateRfqSnapshot(
             businessDate,
             generation,
-            sales.ToImmutableArray(),
-            trader.ToImmutableArray(),
+            [.. sales],
+            [.. trader],
             routes);
     }
 }

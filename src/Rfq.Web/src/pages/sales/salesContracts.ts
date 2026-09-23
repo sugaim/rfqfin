@@ -1,5 +1,5 @@
 import type {
-  BulkItemResult,
+  CaseOperationResult,
   CreateDraftRequest,
   InitialRfqResponse,
   AmendmentResult,
@@ -27,10 +27,7 @@ export interface SalesDraftActions {
     request: UpdateDraftRequest,
   ) => Promise<InitialRfqResponse>
   confirmNew: (request: CreateDraftRequest) => Promise<InitialRfqResponse>
-  confirm: (
-    caseId: number,
-    request: UpdateDraftRequest,
-  ) => Promise<InitialRfqResponse>
+  confirm: (caseId: number, request: UpdateDraftRequest) => Promise<void>
   discard: (caseId: number, expectedVersion: number) => Promise<void>
 }
 
@@ -63,8 +60,8 @@ export interface SalesAmendmentActions {
     expectedCurrentVersion: number,
     expectedDraftVersion: number | null,
   ) => Promise<AmendmentResult>
-  confirm: (row: SalesRfq) => Promise<AmendmentResult>
-  discard: (row: SalesRfq) => Promise<AmendmentResult>
+  confirm: (row: SalesRfq) => Promise<void>
+  discard: (row: SalesRfq) => Promise<void>
 }
 
 export interface SalesContactOwnerActions {
@@ -87,7 +84,7 @@ export interface SalesBulkActions {
   execute: (
     command: SalesBulkCommand,
     rows: SalesRfq[],
-  ) => Promise<BulkItemResult[]>
+  ) => Promise<CaseOperationResult[]>
 }
 
 export interface SalesGridLayoutActions {

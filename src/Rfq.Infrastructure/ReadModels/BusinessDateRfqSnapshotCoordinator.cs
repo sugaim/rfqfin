@@ -15,8 +15,9 @@ public sealed class BusinessDateRfqSnapshotCoordinator : ICommittedRfqChangeSign
     private readonly RfqRuntimeOptions options;
     private readonly RfqInvalidationRegistry invalidations;
     private readonly TimeProvider timeProvider;
-    private readonly object gate = new();
+    private readonly Lock gate = new();
     private readonly SemaphoreSlim refreshRequested = new(0, 1);
+    private readonly CancellationTokenSource lifetimeCancellation = new();
     private BusinessDateRfqSnapshot? snapshot;
     private Task<BusinessDateRfqSnapshot>? refreshTask;
     private DateOnly? requiredBusinessDate;
@@ -184,7 +185,8 @@ public sealed class BusinessDateRfqSnapshotCoordinator : ICommittedRfqChangeSign
             BusinessDateRfqSnapshot loaded;
             try
             {
-                loaded = await LoadWithRetryAsync(businessDate, targetGeneration);
+                loaded = await LoadWithRetryAsync(
+                    businessDate, targetGeneration, lifetimeCancellation.Token);
             }
             catch (Exception exception)
             {
@@ -216,7 +218,8 @@ public sealed class BusinessDateRfqSnapshotCoordinator : ICommittedRfqChangeSign
 
     private async Task<BusinessDateRfqSnapshot> LoadWithRetryAsync(
         DateOnly businessDate,
-        long generation)
+        long generation,
+        CancellationToken cancellationToken)
     {
         Exception? last = null;
         int attempts = Math.Max(1, options.SnapshotRefreshRetryCount);
@@ -224,7 +227,7 @@ public sealed class BusinessDateRfqSnapshotCoordinator : ICommittedRfqChangeSign
         {
             try
             {
-                return await load(businessDate, generation, CancellationToken.None);
+                return await load(businessDate, generation, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -235,7 +238,7 @@ public sealed class BusinessDateRfqSnapshotCoordinator : ICommittedRfqChangeSign
                 last = exception;
                 if (attempt < attempts)
                 {
-                    await Task.Delay(options.SnapshotRefreshRetryDelay);
+                    await Task.Delay(options.SnapshotRefreshRetryDelay, cancellationToken);
                 }
             }
         }
@@ -265,5 +268,10 @@ public sealed class BusinessDateRfqSnapshotCoordinator : ICommittedRfqChangeSign
         return await loader.LoadAsync(businessDate, generation, cancellationToken);
     }
 
-    public void Dispose() => refreshRequested.Dispose();
+    public void Dispose()
+    {
+        lifetimeCancellation.Cancel();
+        lifetimeCancellation.Dispose();
+        refreshRequested.Dispose();
+    }
 }

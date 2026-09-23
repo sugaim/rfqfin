@@ -196,6 +196,94 @@ public sealed class SemanticApplicationTests
     }
 
     [Fact]
+    public async Task Reopen_rfqs_reuses_single_case_behavior_and_keeps_item_failures_independent()
+    {
+        RfqCase firstOpen = Open(101);
+        RfqCase secondOpen = Open(102);
+        RfqCase first = RfqLifecycleTransitions.Cancel(firstOpen, firstOpen.Version);
+        RfqCase second = RfqLifecycleTransitions.Cancel(secondOpen, secondOpen.Version);
+        var cases = new MultiCaseRepository(first, second);
+        var unitOfWork = new UnitOfWork();
+        ICurrentUser current = Current(Sales, UserRole.Sales);
+        var single = new ReopenRfq(
+            cases,
+            new RfqAuthorization(),
+            current,
+            new RfqEvents(),
+            unitOfWork,
+            TimeProvider.System);
+        var plural = new ReopenRfqs(single, unitOfWork);
+
+        IReadOnlyList<CaseOperationResult> results = await plural.ExecuteAsync(
+        [
+            new(first.CaseId, first.Version),
+            new(second.CaseId, new StateVersion(second.Version.Value + 1)),
+        ]);
+
+        Assert.Equal(CaseOperationStatus.Applied, results[0].Status);
+        Assert.Equal(CaseOperationStatus.Failed, results[1].Status);
+        Assert.Equal(CaseOperationFailureCode.VersionConflict, results[1].FailureCode);
+        Assert.Equal(1, unitOfWork.Saves);
+        Assert.Equal(1, unitOfWork.Discards);
+        Assert.Equal(QuoteRequestReason.Reopened, cases[first.CaseId].QuoteRequestReason);
+    }
+
+    [Fact]
+    public async Task Take_over_rfqs_reuses_single_case_behavior()
+    {
+        var previousTrader = UserId.Create("previous-trader");
+        RfqCase open = Open(201);
+        open = RfqOwnershipTransitions.Assign(open, previousTrader, open.Version);
+        open = RfqOwnershipTransitions.PickUp(open, previousTrader, open.Version);
+        var cases = new MultiCaseRepository(open);
+        var unitOfWork = new UnitOfWork();
+        ICurrentUser current = Current(Trader, UserRole.Trader);
+        var single = new TakeOverRfq(
+            cases,
+            new RfqAuthorization(),
+            current,
+            unitOfWork,
+            new RfqEvents(),
+            TimeProvider.System);
+
+        CaseOperationResult result = Assert.Single(await new TakeOverRfqs(
+            single, unitOfWork).ExecuteAsync(
+                true,
+                [new(open.CaseId, open.Version)]));
+
+        Assert.Equal(CaseOperationStatus.Applied, result.Status);
+        Assert.Equal(Trader, cases[open.CaseId].AssignedTraderId);
+        Assert.IsType<Owned>(cases[open.CaseId].Ownership);
+    }
+
+    [Fact]
+    public async Task Change_contact_owners_reuses_single_case_behavior()
+    {
+        var target = UserId.Create("next-sales");
+        RfqCase open = Open(301);
+        var cases = new MultiCaseRepository(open);
+        var unitOfWork = new UnitOfWork();
+        ICurrentUser current = Current(Sales, UserRole.Sales);
+        var single = new ChangeContactOwner(
+            cases,
+            new Users(),
+            new RfqAuthorization(),
+            current,
+            new RfqEvents(),
+            unitOfWork,
+            TimeProvider.System);
+
+        CaseOperationResult result = Assert.Single(await new ChangeContactOwners(
+            single, unitOfWork).ExecuteAsync(
+                target,
+                true,
+                [new(open.CaseId, open.Version)]));
+
+        Assert.Equal(CaseOperationStatus.Applied, result.Status);
+        Assert.Equal(target, cases[open.CaseId].ContactOwnerId);
+    }
+
+    [Fact]
     public async Task Quote_confirmation_allocates_identity_before_persistence_and_commits_atomically()
     {
         RfqCase rfq = RfqOwnershipTransitions.PickUp(Open(), Trader, Open().Version);
@@ -397,12 +485,12 @@ public sealed class SemanticApplicationTests
             new QuoteEvents(),
             unitOfWork,
             TimeProvider.System);
-        var bulk = new BulkWithdrawQuotes(single, unitOfWork);
+        var bulk = new WithdrawQuotes(single, unitOfWork);
 
-        BulkItemResult result = Assert.Single(await bulk.ExecuteAsync(
+        CaseOperationResult result = Assert.Single(await bulk.ExecuteAsync(
             [new LifecycleItem(rfq.CaseId, rfq.Version)]));
 
-        Assert.Equal(BulkItemStatus.Skipped, result.Status);
+        Assert.Equal(CaseOperationStatus.NoChange, result.Status);
         Assert.Equal(0, unitOfWork.Saves);
     }
 
@@ -419,7 +507,7 @@ public sealed class SemanticApplicationTests
         var awayAuthorization = new RfqAuthorization();
         ICurrentUser awayCurrent = Current(Sales, UserRole.Sales);
         var awayEvents = new RfqEvents();
-        var awayBulk = new BulkCloseAwayRfqs(
+        var awayBulk = new CloseAwayRfqs(
             new CloseAwayRfq(
                 awayCases,
                 awayAuthorization,
@@ -433,9 +521,9 @@ public sealed class SemanticApplicationTests
                     TimeProvider.System),
                 awayUnit),
             awayUnit);
-        BulkItemResult skipped = Assert.Single(await awayBulk.ExecuteAsync(
+        CaseOperationResult skipped = Assert.Single(await awayBulk.ExecuteAsync(
             [new LifecycleItem(away.CaseId, away.Version)]));
-        Assert.Equal(BulkItemStatus.Skipped, skipped.Status);
+        Assert.Equal(CaseOperationStatus.NoChange, skipped.Status);
 
         RfqCase hit = RfqLifecycleTransitions.CloseHit(
             quoted,
@@ -446,7 +534,7 @@ public sealed class SemanticApplicationTests
         var hitAuthorization = new RfqAuthorization();
         ICurrentUser hitCurrent = Current(Sales, UserRole.Sales);
         var hitEvents = new RfqEvents();
-        var hitBulk = new BulkCloseAwayRfqs(
+        var hitBulk = new CloseAwayRfqs(
             new CloseAwayRfq(
                 hitCases,
                 hitAuthorization,
@@ -460,10 +548,10 @@ public sealed class SemanticApplicationTests
                     TimeProvider.System),
                 hitUnit),
             hitUnit);
-        BulkItemResult failed = Assert.Single(await hitBulk.ExecuteAsync(
+        CaseOperationResult failed = Assert.Single(await hitBulk.ExecuteAsync(
             [new LifecycleItem(hit.CaseId, hit.Version)]));
-        Assert.Equal(BulkItemStatus.Failed, failed.Status);
-        Assert.Equal(BulkFailureCode.InvalidState, failed.Code);
+        Assert.Equal(CaseOperationStatus.Failed, failed.Status);
+        Assert.Equal(CaseOperationFailureCode.InvalidState, failed.FailureCode);
         Assert.Equal(1, hitUnit.Discards);
     }
 
@@ -491,8 +579,8 @@ public sealed class SemanticApplicationTests
         "message",
         Trader);
 
-    private static RfqCase Draft(DateTimeOffset? createdAt = null) => RfqCase.CreateDraft(
-        new CaseId(10),
+    private static RfqCase Draft(DateTimeOffset? createdAt = null, long caseId = 10) => RfqCase.CreateDraft(
+        new CaseId(caseId),
         RevisionId.New(),
         ClientId.Create("client"),
         SecurityId.Create("security"),
@@ -503,9 +591,9 @@ public sealed class SemanticApplicationTests
         Sales,
         createdAt ?? Now);
 
-    private static RfqCase Open(DateTimeOffset? createdAt = null)
+    private static RfqCase Open(DateTimeOffset? createdAt = null, long caseId = 10)
     {
-        RfqCase draft = Draft(createdAt);
+        RfqCase draft = Draft(createdAt, caseId);
         return RfqLifecycleTransitions.ConfirmInitial(
             draft,
             draft.CurrentRevision.Terms,
@@ -515,6 +603,8 @@ public sealed class SemanticApplicationTests
             Now,
             draft.CurrentRevision.Version);
     }
+
+    private static RfqCase Open(long caseId) => Open(null, caseId);
 
     private static CalculatedQuotePayload Payload() => new(
         CalculationDriver.Price, 100m, 100m, 1m, 1m, 0m, 1m, 1m, 10m, 10m);
@@ -552,6 +642,23 @@ public sealed class SemanticApplicationTests
 
         public void Update(RfqCase rfq) { Updates++; Case = rfq; }
         public void UpdateRevision(RfqRevision revision) => ChangedRevisions.Add(revision);
+    }
+
+    private sealed class MultiCaseRepository(params RfqCase[] values) : IRfqCaseRepository
+    {
+        private readonly Dictionary<CaseId, RfqCase> cases =
+            values.ToDictionary(value => value.CaseId);
+
+        public RfqCase this[CaseId caseId] => cases[caseId];
+
+        public void Add(RfqCase rfq) => cases.Add(rfq.CaseId, rfq);
+
+        public Task<RfqCase?> GetAsync(CaseId id, CancellationToken token = default) =>
+            Task.FromResult(cases.GetValueOrDefault(id));
+
+        public void Update(RfqCase rfq) => cases[rfq.CaseId] = rfq;
+
+        public void UpdateRevision(RfqRevision revision) { }
     }
 
     private sealed class TraderRfqQueries(

@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react'
 import { Button } from 'antd'
-import type { BulkItemResult } from '@/services/api'
+import type { CaseOperationResult } from '@/services/api'
 
 export interface BulkResultBarProps {
   label: string
-  items: BulkItemResult[]
+  items: CaseOperationResult[]
   expanded: boolean
   onToggle: () => void
   toggleType: 'link' | 'text'
@@ -21,11 +21,11 @@ export function BulkResultBar({
   ariaLabel,
   summaryRole,
 }: BulkResultBarProps): ReactElement {
-  const succeeded = items.filter((item) => item.status === 'Succeeded').length
-  const skipped = items.filter((item) => item.status === 'Skipped').length
+  const applied = items.filter((item) => item.status === 'Applied').length
+  const noChange = items.filter((item) => item.status === 'NoChange').length
   const failed = items.filter((item) => item.status === 'Failed').length
-  const tone = failed ? 'error' : skipped ? 'warning' : 'success'
-  const detailRows = items.filter((item) => item.status !== 'Succeeded')
+  const tone = failed ? 'error' : noChange ? 'warning' : 'success'
+  const detailRows = items.filter((item) => item.status !== 'Applied')
 
   return (
     <section
@@ -48,7 +48,7 @@ export function BulkResultBar({
                 <tr key={item.caseId}>
                   <td>{item.caseId}</td>
                   <td>{item.status}</td>
-                  <td>{item.code}</td>
+                  <td>{item.failureCode}</td>
                   <td>{item.message}</td>
                 </tr>
               ))}
@@ -58,7 +58,7 @@ export function BulkResultBar({
       )}
       <div className="bulk-result-summary" role={summaryRole}>
         <span>
-          {label}: {succeeded} ok / {skipped} skipped / {failed} failed
+          {label}: {applied} applied / {noChange} no change / {failed} failed
         </span>
         <Button size="small" type={toggleType} onClick={onToggle}>
           {expanded ? 'Collapse' : 'Details'}

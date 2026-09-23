@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { BulkItemResult, SalesRfq } from '@/services/api'
+import type { CaseOperationResult, SalesRfq } from '@/services/api'
 import {
   bulkEligibility,
   type SalesBulkCommand,
@@ -67,7 +67,7 @@ export function useSalesBulkOperations({
     const eligible = snapshot.items
       .filter((item) => item.eligible)
       .map((item) => item.row)
-    let results: BulkItemResult[]
+    let results: CaseOperationResult[]
     try {
       results = await actions.execute(snapshot.command, eligible)
     } catch {
@@ -75,19 +75,19 @@ export function useSalesBulkOperations({
 
       return
     }
-    const skipped: BulkItemResult[] = snapshot.items
+    const ineligible: CaseOperationResult[] = snapshot.items
       .filter((item) => !item.eligible)
       .map((item) => ({
         caseId: item.row.caseId,
-        status: 'Skipped',
-        code: 'InvalidState',
+        status: 'Failed',
+        failureCode: 'InvalidState',
         message: item.reason ?? null,
       }))
-    setResult({ command: snapshot.command, items: [...results, ...skipped] })
+    setResult({ command: snapshot.command, items: [...results, ...ineligible] })
     setResultExpanded(false)
     await onReconcileCases(
       results
-        .filter((item) => item.status === 'Succeeded')
+        .filter((item) => item.status === 'Applied')
         .map((item) => item.caseId),
     ).catch(() => undefined)
   }

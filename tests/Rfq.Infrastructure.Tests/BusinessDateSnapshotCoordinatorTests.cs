@@ -17,7 +17,7 @@ public sealed class BusinessDateSnapshotCoordinatorTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var generations = new ConcurrentQueue<long>();
         int loads = 0;
-        using var coordinator = Create(async (_, generation, _) =>
+        using BusinessDateRfqSnapshotCoordinator coordinator = Create(async (_, generation, _) =>
         {
             generations.Enqueue(generation);
             if (Interlocked.Increment(ref loads) == 1)
@@ -48,7 +48,7 @@ public sealed class BusinessDateSnapshotCoordinatorTests
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int loads = 0;
-        using var coordinator = Create(async (_, generation, _) =>
+        using BusinessDateRfqSnapshotCoordinator coordinator = Create(async (_, generation, _) =>
         {
             Interlocked.Increment(ref loads);
             started.SetResult();
@@ -68,10 +68,64 @@ public sealed class BusinessDateSnapshotCoordinatorTests
     }
 
     [Fact]
+    public async Task Cancelling_one_waiter_does_not_cancel_the_shared_refresh()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using BusinessDateRfqSnapshotCoordinator coordinator = Create(async (_, generation, cancellationToken) =>
+        {
+            started.SetResult();
+            await release.Task.WaitAsync(cancellationToken);
+            return EmptySnapshot(generation);
+        });
+        using var cancelledWaiter = new CancellationTokenSource();
+
+        Task<BusinessDateRfqSnapshot> first = coordinator.GetSnapshotAsync(
+            Today, cancelledWaiter.Token);
+        await started.Task;
+        Task<BusinessDateRfqSnapshot> second = coordinator.GetSnapshotAsync(Today);
+        cancelledWaiter.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+        release.SetResult();
+        BusinessDateRfqSnapshot snapshot = await second;
+
+        Assert.Equal(Today, snapshot.BusinessDate);
+    }
+
+    [Fact]
+    public async Task Disposing_coordinator_cancels_the_underlying_refresh()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        BusinessDateRfqSnapshotCoordinator coordinator = Create(async (_, generation, cancellationToken) =>
+        {
+            started.SetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return EmptySnapshot(generation);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                cancelled.SetResult();
+                throw;
+            }
+        });
+
+        Task<BusinessDateRfqSnapshot> refresh = coordinator.GetSnapshotAsync(Today);
+        await started.Task;
+        coordinator.Dispose();
+
+        await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAsync<RfqReadModelUnavailableException>(() => refresh);
+    }
+
+    [Fact]
     public async Task Retry_exhaustion_does_not_serve_a_known_stale_snapshot()
     {
         bool fail = false;
-        using var coordinator = Create(
+        using BusinessDateRfqSnapshotCoordinator coordinator = Create(
             (_, generation, _) =>
             {
                 if (fail)
@@ -109,7 +163,7 @@ public sealed class BusinessDateSnapshotCoordinatorTests
     private static BusinessDateRfqSnapshot EmptySnapshot(long generation) => new(
         Today,
         generation,
-        ImmutableArray<SalesRfqListItem>.Empty,
-        ImmutableArray<TraderRfqListItem>.Empty,
+        [],
+        [],
         ImmutableDictionary<Rfq.Domain.CaseId, RfqSnapshotRoute>.Empty);
 }
