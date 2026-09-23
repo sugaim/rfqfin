@@ -3214,7 +3214,7 @@ Persisted `RfqEvent` / `QuoteEvent` records remain semantic audit/business-histo
 
 If a `GetEventsAfter` endpoint remains, its cursor/order contract is independent from Sales/Trader Live correctness. The frontend current-worklist refresh path must not require a semantic Event for every Draft, memo, WorkingQuote, or other UI-visible mutation.
 
-## 6. Expiry BackgroundService
+## 8. Expiry BackgroundService
 
 Run an ASP.NET Core `BackgroundService` in the same App Server process.
 
@@ -3236,7 +3236,7 @@ Do not implement expiry as ad-hoc SQL state mutation disconnected from Domain/Ap
 
 ---
 
-## 7. Expiry idempotency and concurrency
+## 9. Expiry idempotency and concurrency
 
 Initial deployment assumes one App Server, but ExpireQuote should be safe if attempted more than once.
 
@@ -3248,7 +3248,7 @@ Future multi-instance coordination is deferred.
 
 ---
 
-## 8. Logging, audit, observability
+## 10. Logging, audit, observability
 
 Keep these concerns separate.
 
@@ -3305,7 +3305,7 @@ Use standard .NET primitives such as `ActivitySource` and `Meter`.
 
 ---
 
-## 9. Event retention
+## 11. Event retention
 
 Initial implementation does not delete Events by count or age.
 
@@ -3313,7 +3313,7 @@ Retain events; archive/partition later only if actual growth/compliance requires
 
 ---
 
-## 10. Realtime subscriber filtering
+## 12. Realtime subscriber filtering
 
 Do not wake every connected client for every mutation.
 
@@ -3321,7 +3321,7 @@ Server-side old/new snapshot diff and subscriber metadata decide which Sales use
 
 ---
 
-## 11. Authentication scope
+## 13. Authentication scope
 
 The environment identifies current user and roles somehow.
 
