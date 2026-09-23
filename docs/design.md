@@ -63,8 +63,8 @@ These rules are the fastest way to understand what must not be casually refactor
 7. **Business Date is a first-class business fact.** Persist it where semantics depend on the desk day; do not reconstruct operational day from UTC timestamps.
 8. **Use optimistic concurrency.** Do not hold long-lived DB locks around user work or external calculation; re-read/revalidate after external work before applying results.
 9. **Bulk APIs remain operation-specific and reuse single-item business logic.** Bulk is normally per-Case atomic with explicit partial success; unexpected/invariant failures are not silently converted into ordinary item failures.
-10. **Persistence shape may differ from Domain shape.** Current operational state is stored directly; persisted Events are audit/notification/history, not event sourcing.
-11. **SSE is a wake-up mechanism, not authoritative state.** Authoritative state comes from normal queries/persisted data.
+10. **Persistence shape may differ from Domain shape.** Current operational state is stored directly; persisted semantic Events are audit/business-history records, not event sourcing and not the complete realtime invalidation mechanism.
+11. **SSE is a wake-up mechanism, not authoritative state.** Authoritative state comes from normal queries/persisted data; realtime invalidation is derived from committed current-state changes rather than requiring every UI-visible mutation to create a semantic Event.
 12. **Calculation does pricing; RFQ Application owns RFQ workflow.** Calculation must not become the owner of lifecycle, ownership, WorkingQuote persistence, or RFQ concurrency.
 13. **Server query state is authoritative; local interaction state is separate.** The frontend must not reconstruct business transitions after mutations. Live/Paused reconciliation uses authoritative page projections, while short-lived protected input is not silently overwritten.
 14. **This is a dense operational desktop tool.** Information density, inline/grid editing, keyboard efficiency, and low-friction repeated actions are product requirements; confirmations should be proportional to risk rather than applied everywhere.
@@ -315,6 +315,7 @@ RfqRevision
 - Version : StateVersion
 - CreatedAt
 - CreatedBy
+- DraftCreatedBusinessDate
 - ConfirmedAt?
 - ConfirmedBy?
 
@@ -691,24 +692,43 @@ Infrastructure/API may map to raw `long` at boundaries.
 
 Business Date is a first-class operational fact and is not reconstructed from UTC timestamps.
 
-Authoritative business date comes from the configured business-date provider and is represented as `DateOnly` at the Application/Domain boundary where applicable.
+The database Business Date value is authoritative. Application use cases resolve it through the configured business-date provider and pass an explicit `DateOnly` where business/query semantics depend on the desk day.
 
 Persisted facts include:
 
 - `CreatedBusinessDate` on the Case, established when an initial Draft is first confirmed/opened
+- `DraftCreatedBusinessDate` on every Revision, established when that Draft Revision is first created and retained after Confirm/Supersede/Discard
 - `ClosedBusinessDate` on Hit/Away closed lifecycle state
-- `BusinessDate` on persisted RFQ events that are used for day-scoped operational queries
+- `BusinessDate` on persisted RFQ events where the event itself has day-scoped business meaning
 
 Rules:
 
-- Draft Cases do not yet require `CreatedBusinessDate`
-- non-Draft Cases do
+- Draft Cases do not yet require Case `CreatedBusinessDate`
+- every initial/amendment Draft Revision records `DraftCreatedBusinessDate`
+- non-Draft Cases require Case `CreatedBusinessDate`
 - Hit/Away require `ClosedBusinessDate`
 - outcome correction does not rewrite the original close date
 - same-day outcome correction is allowed only when current Business Date equals the original `ClosedBusinessDate`
 - timestamps remain audit facts; Business Date remains the operational desk-day fact
 
-Do not infer these facts from `CreatedAt.UtcDateTime.Date` or timestamp ranges.
+For the Sales/Trader current-Business-Date worklists, membership is historical-within-the-day:
+
+```text
+Case.CreatedBusinessDate == current Business Date
+OR
+any Revision.DraftCreatedBusinessDate == current Business Date
+```
+
+This deliberately means:
+
+- an initial Draft created today is visible before initial Confirm
+- a Draft created on a prior Business Date does not become today's work merely because it remains open
+- a Case whose initial Draft was older but is first confirmed/opened today is visible through Case `CreatedBusinessDate`
+- an older Case with an Amendment Draft created today remains in today's worklist after that Draft is Confirmed or Discarded, because the Revision's creation Business Date is historical fact
+
+Post Process `Today` remains its separately defined operational preset; do not silently substitute these Sales/Trader worklist-membership rules for the Post Process rules.
+
+Do not infer any of these facts from `CreatedAt.UtcDateTime.Date` or timestamp ranges.
 
 ---
 
@@ -800,6 +820,7 @@ Effects:
 
 - create Case
 - create initial Revision with `Draft`
+- persist the Revision's `DraftCreatedBusinessDate = current Business Date`
 - lifecycle = `DraftRfq`
 - Case ID assigned
 - the persisted Draft becomes the server-side working copy
@@ -907,6 +928,8 @@ The Draft may start in either of two intentional ways:
 
 - an inline edit completes with a value different from the effective current value, which creates or updates the pending Draft
 - an explicit `Start Amendment` action creates the pending Draft before pane-based editing begins
+
+When the pending Draft is first created, persist `DraftCreatedBusinessDate = current Business Date`. Subsequent edits do not rewrite it.
 
 Once a pending Draft exists, its editable fields are a server-side working copy and subsequent edits autosave when editing completes and the effective value actually changed.
 
@@ -2051,7 +2074,9 @@ Do not expose/edit the opposite side's memo.
 
 ## 5. Refresh and remote-change semantics
 
-Persisted Events + SSE provide remote-change awareness.
+Committed RFQ/read-model invalidation + SSE provide remote-change awareness.
+
+Persisted semantic Events remain separate audit/business-history records and are not required to cover every UI-visible mutation.
 
 SSE is a wake-up mechanism, not authoritative UI data. Normal page queries/persisted projections remain the source of truth.
 
@@ -2073,6 +2098,7 @@ On a remote wake-up:
 
 - when no protected interaction is active, perform authoritative catch-up
 - when a protected interaction is active, do not replace that interaction; mark that an update is pending and perform one authoritative catch-up when protection ends
+- if another wake-up or successful local mutation arrives while a catch-up is already in flight, do not start N parallel reads and do not lose the later change; coalesce work but run/await another catch-up when the observed generation advanced during the in-flight read
 
 Protection is deliberately short-lived. It covers the field/cell editing and save/in-flight interval that would be unsafe to replace. It is not a long-lived page mode, pane-open flag, Draft-lifetime flag, or unsaved-New flag.
 
@@ -2095,8 +2121,10 @@ Successful explicit Refresh does not require a success toast; the refreshed data
 Mutation responses are not used to predict the resulting business state in the frontend.
 
 - in Live, successful mutations are followed by authoritative page catch-up
-- in Paused, successful single-Case mutations re-read that Case through the page-specific authoritative query/projection and replace only that Case in the Paused snapshot
+- in Paused, successful single-Case mutations re-read through the page-specific authoritative query/projection and reconcile only the successful target Case(s)
 - in Paused bulk operations, only Succeeded Cases are authoritatively re-read and replaced; Failed/Skipped Cases and unrelated rows remain on the Paused snapshot
+- creation operations reconcile using the newly created CaseId returned by the server rather than treating the source Case as the changed target
+- a committed mutation and a failed subsequent read reconciliation are reported as different outcomes; never tell the operator that the mutation itself failed merely because authoritative catch-up failed afterward
 
 Page-specific catch-up side effects may differ, for example Trader calculation invalidation, without changing these core semantics. Sales Recent Revisions is intentionally handled separately from normal page catch-up as described in the Sales workspace rules.
 
@@ -2405,12 +2433,15 @@ Business Date is stored as a date fact where operational semantics depend on des
 Required persisted facts include:
 
 - Case `CreatedBusinessDate`
+- Revision `DraftCreatedBusinessDate`
 - closed-state `ClosedBusinessDate`
-- event `BusinessDate` for RFQ events used by Today/Post Process semantics
+- event `BusinessDate` where an RFQ event itself has day-scoped business meaning
 
-These values are written by Application use cases using the authoritative business-date provider.
+These values are written by Application use cases using the authoritative database-backed business-date provider.
 
-Do not implement Today/Post Process semantics by converting timestamps in SQL or by assuming UTC date equals desk date.
+`DraftCreatedBusinessDate` is immutable provenance of when that Draft Revision entered the workflow. Confirming, superseding, or discarding the Revision does not erase or rewrite it.
+
+Do not implement current-Business-Date worklist or Post Process semantics by converting timestamps in SQL or by assuming UTC date equals desk date.
 
 Outcome correction preserves the original `ClosedBusinessDate`; the correction event carries the current Business Date.
 
@@ -2519,9 +2550,9 @@ Queries that need CaseId join through the relation.
 
 Quote events refer to immutable ConfirmedQuote by `QuoteId`.
 
-Quote Confirm emits `Confirmed` so other sessions can discover Requested -> Quoted through the persisted feed.
+Quote Confirm emits `Confirmed` because confirmation is a semantic business event useful for audit/history and revision-aware surfaces.
 
-State mutation and event append occur in the same use-case transaction.
+Realtime cross-session invalidation does not depend on semantic-event coverage. State mutation and any semantic event append that belongs to that use case still occur in the same transaction.
 
 ---
 
@@ -2540,7 +2571,9 @@ Authoritative business data includes:
 
 `CaseCurrent` is the transactionally maintained current operational projection/flattened persistence slice.
 
-Do not rebuild it from events on every request.
+Sales/Trader current-Business-Date reads are additionally served from a process-local immutable `BusinessDateRfqSnapshot`, derived from persisted state. This snapshot is a read optimization and notification-diff source, not a second business source of truth.
+
+Do not rebuild current state from events on every request.
 
 ---
 
@@ -2583,7 +2616,11 @@ Examples include:
 - Amendment Confirm: revisions + CaseCurrent + new WorkingQuote + event(s)
 - Expire: CaseCurrent + QuoteEvent
 
-Do not hold DB locks while performing external/heavy calculation.
+After a successful RFQ/business Unit-of-Work commit, Infrastructure performs only a cheap process-local invalidation/generation signal on the mutation path. The mutation does **not** synchronously rebuild the Sales/Trader snapshot while holding the request/use-case path.
+
+The snapshot coordinator converges separately to the latest committed generation. Multiple commits before a rebuild are collapsed; the system does not enqueue one rebuild job per mutation.
+
+Do not hold DB locks while performing external/heavy calculation or snapshot rebuilding.
 
 ---
 
@@ -2615,6 +2652,15 @@ Command-side retrieval loads only state needed for the transition:
 Do not routinely load all historical Revisions, all quotes, or all Events.
 
 History/search uses query-side DTOs.
+
+For the current-Business-Date Sales/Trader read path:
+
+- use a dedicated Infrastructure snapshot loader; do not build the snapshot by repeatedly invoking user/desk-specific query ports
+- load all required current-Business-Date projection data once per refresh cycle
+- build distinct Sales and Trader projections in one immutable snapshot; duplicate read-model representation is acceptable
+- cached implementations of the existing Application query ports filter the snapshot in memory by Sales/current-user visibility and Trader desk
+- query ports receive Business Date explicitly from Application rather than hiding the day boundary inside Infrastructure
+- push aggregations such as `StateSince = MAX(relevant event OccurredAt)` into SQL instead of materializing complete relevant event histories only to aggregate them in application memory
 
 ---
 
@@ -3025,7 +3071,9 @@ ASP.NET Core App
   - RFQ APIs
   - Search APIs
   - OpenAPI
-  - SSE wake-up endpoint
+  - process-local BusinessDateRfqSnapshot + refresh coordinator
+  - relevant-subscriber SSE wake-up endpoint
+  - Business Date / snapshot BackgroundService
   - Expiry BackgroundService
   - Mock CalculationClient
       |
@@ -3053,74 +3101,118 @@ The generated contract may later drive FE client generation.
 
 ---
 
-## 3. Server change notification model
+## 3. Current-Business-Date read snapshot
 
-Do not stream full authoritative UI state over SSE.
-
-Use SSE as a **wake-up signal**.
-
-Flow:
+Sales/Trader current worklists use a bounded, process-local immutable snapshot:
 
 ```text
-business transaction
--> Event rows committed
--> SSE sends "changed"
--> FE receives wake-up
--> FE calls GET events after last EventId
--> FE updates Pending Updates / shows important toasts
+BusinessDateRfqSnapshot
+- BusinessDate
+- Generation
+- Sales projections
+- Trader projections
+- routing metadata needed for audience diff/filtering
 ```
 
-The persisted Event feed is the recovery/source-of-truth mechanism for change retrieval.
+The snapshot is built by a dedicated Infrastructure loader from PostgreSQL and atomically swapped only after a complete successful build.
 
-SSE is only transport signaling.
+Reads:
 
----
+- Application resolves the current Business Date and passes it explicitly to the Sales/Trader query port
+- when snapshot Business Date/generation is current, query implementations filter in memory and return immediately
+- when the snapshot is dirty, a GET participates in/awaits the same single-flight refresh; it must not return the older generation as current data
+- if the requested Business Date and runtime snapshot disagree, re-check the authoritative DB Business Date and converge the runtime snapshot; a request that crossed Business-Date rollover may resolve/retry once rather than serving the wrong day
 
-## 4. SSE behavior
-
-SSE is preferred for RFQ responsiveness, but the domain/application design must not depend on SSE.
-
-Requirements:
-
-- reconnect safely
-- no silent data loss
-- FE retains last fetched EventId
-- after reconnect, fetch persisted Events after that ID
-
-Because the initial design uses one server instance, no cross-instance fan-out mechanism is required.
-
-If SSE becomes operationally problematic behind proxy/LB infrastructure, a short polling fallback can reuse the same `GetEventsAfter` API without changing the event model.
-
----
-
-## 5. Event retrieval
-
-Because persistence has a shared parent `Event` table, FE needs one cursor:
+Refresh/invalidation:
 
 ```text
-lastSeenEventId
+successful RFQ/business commit
+-> generation++
+-> signal refresh coordinator
+-> optional short coalescing window
+-> one DB rebuild for the latest generation
+-> atomic immutable swap
+-> diff old/new snapshot
+-> notify relevant local SSE subscribers
 ```
 
-The cursor semantics are based on **committed event visibility**, not merely sequence allocation order. Infrastructure must guarantee that advancing the cursor cannot hide a lower EventId that commits later.
+If generation advances from 10 to 20 before refresh starts, build once for the latest state rather than processing ten queued refresh jobs.
 
-Query concept:
+If generation advances while a rebuild is running, the in-progress build must not be treated as final. Re-run/converge until the published snapshot corresponds to the latest observed generation. Intermediate stale builds may be retained internally but must not be served as current.
+
+The initial refresh-coalescing value is approximately **500 ms** and is configuration, not business semantics.
+
+## 4. Snapshot failure and retry behavior
+
+Snapshot refresh failure is operationally critical because authoritative Sales/Trader reads depend on a fresh snapshot.
+
+Rules:
+
+- retain the last successfully built immutable snapshot for diagnostics/recovery, but do not serve it as current when the coordinator knows a newer generation/Business Date is required
+- current-worklist GET returns a service-unavailable failure rather than silently returning the stale snapshot
+- snapshot refresh performs a bounded configurable retry count for transient failures/contention; retry settings live in host/infrastructure configuration rather than Domain/Application
+- after bounded retries are exhausted, the snapshot remains dirty/unavailable and later background retry continues
+- startup does not fail the whole process solely because the initial snapshot cannot be built; the process starts with the read model unavailable, reports the incident, exposes unhealthy/degraded readiness, and retries until recovered
+- normal shutdown cancellation is not an incident
+
+Background refresh/startup failures are reported through the existing Host-level `IIncidentReporter`; Infrastructure does not depend directly on the API incident abstraction. GET-triggered failures propagate through the normal API error boundary so the same incident mechanism can report them without duplicate/storm reporting.
+
+## 5. Business Date authority and rollover
+
+The database Business Date value is the source of truth.
+
+The runtime keeps only a derived current-Business-Date mirror for the snapshot.
+
+- startup reads the authoritative DB Business Date and attempts the initial snapshot build
+- a low-frequency background poll checks the authoritative Business Date; initial interval is **10 minutes**
+- ordinary Application/business use cases continue to resolve Business Date through the authoritative provider
+- a query-side Business-Date mismatch triggers an immediate authoritative re-check, so correctness does not depend on waiting for the next 10-minute poll
+- on detected rollover, build the new-Business-Date snapshot first and atomically swap only after success
+- if rollover build fails, retain the old snapshot object but do not present it as the new current Business Date; current-day reads remain unavailable until the new snapshot succeeds
+- successful rollover wakes relevant clients with a Business-Date-changed signal so they re-read Business Date and page state
+
+Do not infer rollover from system clock/calendar rules.
+
+## 6. Realtime change notification and SSE routing
+
+Persisted semantic Events and realtime invalidation are deliberately separate.
+
+Realtime flow:
 
 ```text
-GetEventsAfter(lastSeenEventId)
+business mutation commit
+-> process-local generation invalidation
+-> latest snapshot rebuild
+-> diff old/new snapshot
+-> determine affected Sales users / Trader desks / invalidation categories
+-> wake only relevant process-local SSE subscribers
+-> FE performs authoritative page GET
 ```
 
-Server resolves child RfqEvent/QuoteEvent information and filters as appropriate for the current screen/user.
+The old design where every SSE connection polls the global persisted Event cursor is not the target architecture.
 
-For QuoteEvent, Case context is derived by joining `QuoteId -> ConfirmedQuote -> Revision -> Case`; QuoteEvent itself does not redundantly store CaseId.
+Subscriber routing is process-local and may retain:
 
-This endpoint powers:
+- current user identity
+- desk
+- relevant role/page context
+- coarse invalidation interests
 
-- Updates Available
-- Pending Updates list
-- important toasts
-- reconnect catch-up
+Audience is derived from both old and new snapshot routing metadata so responsibility changes do not lose the previous audience. For example, Contact Owner or Assigned Trader changes may require waking both old and new audiences.
 
----
+Useful coarse invalidation categories include Sales list, Trader list, Recent Revisions stale, and Business Date changed. These are wake-up categories only; SSE must not become row-patch authority.
+
+Slow subscribers must be coalesced/bounded (for example capacity 1 / “change pending”) rather than receiving unbounded queues.
+
+SSE reconnect must cause authoritative catch-up so a transient connection loss cannot permanently hide a committed change. Persisted Event replay is not required for current-worklist correctness.
+
+Same-user multiple tabs are independent subscribers; do not suppress a wake-up merely because the mutation actor has the same user ID.
+
+## 7. Persisted Event retrieval remains separate
+
+Persisted `RfqEvent` / `QuoteEvent` records remain semantic audit/business-history data and may still support history/revision-aware query surfaces.
+
+If a `GetEventsAfter` endpoint remains, its cursor/order contract is independent from Sales/Trader Live correctness. The frontend current-worklist refresh path must not require a semantic Event for every Draft, memo, WorkingQuote, or other UI-visible mutation.
 
 ## 6. Expiry BackgroundService
 
@@ -3203,6 +3295,8 @@ Normal shutdown cancellation is not an incident.
 
 Unexpected worker exceptions are reported through `IIncidentReporter`.
 
+Snapshot/Business-Date worker failures use the same incident boundary. Repeated retry failures for the same unavailable period should not create an unbounded incident storm; report the operational failure coherently and report/log recovery separately as appropriate.
+
 Business-state races that the use case already classifies as expected must not be reintroduced as broad swallowed `InvalidOperationException` catches.
 
 ### Tracing / metrics
@@ -3219,11 +3313,11 @@ Retain events; archive/partition later only if actual growth/compliance requires
 
 ---
 
-## 10. Important event filtering
+## 10. Realtime subscriber filtering
 
-Do not toast every Desk event.
+Do not wake every connected client for every mutation.
 
-Server uses current-user/screen scope to decide which events are important; normal events can still set Updates Available.
+Server-side old/new snapshot diff and subscriber metadata decide which Sales users / Trader desks / coarse surfaces are affected. Filtering occurs before delivery; do not broadcast identity-rich changes to all clients and rely on frontend filtering.
 
 ---
 
@@ -3479,7 +3573,13 @@ Current user/roles are supplied by hosting environment; transport is not specifi
 
 ### Multi-instance App Server
 
-Single instance initially; no Redis/distributed fan-out/leader election.
+Single API process initially.
+
+Snapshot invalidation and SSE subscriber routing are deliberately process-local. If user growth or increased application responsibility/performance load later requires horizontal scaling, add cross-process invalidation/notification while keeping PostgreSQL authoritative and keeping per-node local snapshots/subscribers. PostgreSQL `LISTEN/NOTIFY` is a natural candidate before introducing heavier infrastructure, but the exact mechanism depends on the scaling reason.
+
+Sticky sessions alone are not a consistency mechanism: a mutation handled by one node must eventually invalidate other nodes whose users/subscribers can observe that Case.
+
+Do not implement Redis/distributed fan-out/leader election in the current scope.
 
 ### Full event sourcing
 
@@ -3519,6 +3619,9 @@ Category is master data and routing is configurable in DB, but a new admin UI/wo
 - one WorkingQuote maximum per Revision
 - quote expiry supports None or a positive fixed duration
 - expiry check interval ≈ 10 seconds
+- authoritative Business Date background poll ≈ 10 minutes
+- snapshot invalidation coalescing ≈ 500 ms
+- snapshot refresh retry count / retry timing are configurable host/infrastructure values
 - no auto-Away at Post Process / end-of-day
 - no silent replacement of protected/actively edited Sales/Trader grid state
 - security/client search hits DB directly without broad result caching
@@ -3999,7 +4102,7 @@ Rationale:
 
 ## 29. Current operational state is stored directly, not rebuilt from events
 
-CaseCurrent remains a flattened persistence projection/state table; events remain audit/notification/history.
+CaseCurrent remains a flattened persistence projection/state table; semantic Events remain audit/business-history records. Realtime current-worklist invalidation is derived from committed current-state changes and the process-local snapshot generation.
 
 Rationale:
 
@@ -4040,9 +4143,11 @@ Rationale:
 
 ## 32. SSE is wake-up transport, not authoritative data
 
-SSE signals change; persisted event query performs catch-up.
+SSE signals relevant snapshot/category changes; authoritative page queries perform catch-up.
 
-Rationale remains safe reconnect and transport replaceability.
+Persisted semantic-event replay is not required for Sales/Trader current-worklist correctness. Reconnect instead forces/causes authoritative catch-up against the current snapshot.
+
+Rationale remains safe reconnect, relevant routing, and transport replaceability.
 
 ---
 
@@ -4101,17 +4206,18 @@ Rationale:
 
 ---
 
-## 38. Persist all cross-session observable transitions
+## 38. Semantic Events and realtime invalidation are separate concerns
 
-Any business transition another active session must discover through Pending Updates must append a persisted event in the same transaction as state mutation.
+Persist an Event when the transition itself is meaningful audit/business history. Do not manufacture semantic Events merely so another session can discover that current UI state changed.
 
-At minimum this includes quote confirmation as well as Revision Confirm, lifecycle transitions, ownership/responsibility transitions where notification is required, and Presentation/Withdraw/Expire.
+Every successful RFQ/business commit that can affect the current read model invalidates the process-local snapshot generation even when no semantic Event is written.
 
 Rationale:
 
-- SSE is only a wake-up channel
-- reconnect recovery depends on the persisted feed
-- event coverage is determined by cross-session observability, not whether an event feels like audit history
+- Draft autosave, memo updates, WorkingQuote edits, and similar current-state changes still need cross-session visibility
+- forcing every UI-visible mutation into the semantic Event taxonomy distorts audit meaning
+- snapshot diff + relevant SSE wake-up handles realtime discovery
+- persisted Events remain useful for audit/history and revision-aware surfaces
 
 
 ---
@@ -4133,7 +4239,7 @@ Rationale:
 
 ## 40. Business Date is persisted when it is a business fact
 
-`CreatedBusinessDate`, `ClosedBusinessDate`, and relevant Event BusinessDate are explicit persisted values.
+`CreatedBusinessDate`, Revision `DraftCreatedBusinessDate`, `ClosedBusinessDate`, and relevant Event BusinessDate are explicit persisted values.
 
 Rationale:
 
@@ -4312,3 +4418,43 @@ Rationale:
 - unnecessary modal confirmations and extra vertical chrome directly reduce throughput
 - remote-update safety matters because silently replacing active work is operationally dangerous
 - usability rules therefore belong in system design, not only in component styling
+
+---
+
+## 52. Current-Business-Date Sales/Trader reads use one immutable process-local snapshot
+
+A dedicated loader builds both Sales and Trader read projections for the current Business Date. Query implementations filter those projections in memory by user/desk.
+
+Mutation commits invalidate a generation cheaply; rebuild is single-flight/coalesced and converges to latest state rather than queuing one refresh per mutation.
+
+Rationale:
+
+- one DB rebuild per change burst is materially cheaper than one multi-query page load per connected client
+- immutable atomic swap keeps read paths simple
+- Sales and Trader projections may duplicate data without creating two business truths because PostgreSQL remains authoritative
+- GET after a committed mutation must not present a known-stale generation as current
+
+---
+
+## 53. Database Business Date is authoritative; polling is only proactive detection
+
+The runtime snapshot mirrors the DB Business Date and polls it infrequently (initially about 10 minutes), while explicit Business-Date inputs/mismatch checks preserve correctness across rollover.
+
+Rationale:
+
+- desk Business Date is operational state, not a system-clock calculation
+- low-frequency polling is sufficient for proactive rollover because Business Date changes rarely
+- query mismatch and business use cases can detect authoritative change immediately rather than waiting for the poll
+
+---
+
+## 54. Horizontal scaling requires cross-process invalidation
+
+The current snapshot generation and SSE registry are process-local and therefore assume one API process.
+
+If horizontal scaling is introduced, add DB-backed or otherwise reliable cross-process invalidation/notification so each node refreshes its local snapshot and wakes its local subscribers. Sticky routing alone is insufficient.
+
+Rationale:
+
+- a POST handled by node A followed by a GET/SSE client on node B must not observe an indefinitely stale local snapshot
+- preserving the local-snapshot boundary allows the cross-process transport to change without moving business authority out of PostgreSQL
