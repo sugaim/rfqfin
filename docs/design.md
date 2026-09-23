@@ -648,7 +648,7 @@ This separation preserves own-side semantics without a generic mutable memo bag.
 
 ---
 
-## 14. IDs
+## 14. IDs and typed scalar values
 
 Use typed IDs in Domain/Application:
 
@@ -660,13 +660,17 @@ Use typed IDs in Domain/Application:
 - `CategoryId`
 - `UserId`
 
-Allocation responsibility:
+Use `NaiveBusinessDate` as the Domain/Application value type for a business-day identity. It is a thin wrapper over `DateOnly`; it represents only the date value and deliberately does not contain desk, location, timezone, or calendar metadata.
 
-- `CaseId`: DB/Application-Infrastructure sequence path
-- `RevisionId`: Application allocates and passes into Domain
-- `QuoteId`: Application allocates and passes into Domain
+ID allocation responsibility remains a separate design topic:
 
-Domain transitions/factories should not call random/clock infrastructure internally.
+- `CaseId`: existing DB/Application-Infrastructure sequence path
+- `RevisionId`: Application currently allocates and passes into Domain
+- `QuoteId`: Application currently allocates and passes into Domain
+
+The broader ID lifecycle/allocation model is deferred to the later ID-model review.
+
+Domain transitions/factories should not call random/clock/repository infrastructure internally.
 
 ---
 
@@ -694,14 +698,49 @@ Infrastructure/API may map to raw `long` at boundaries.
 
 Business Date is a first-class operational fact and is not reconstructed from UTC timestamps.
 
-The database Business Date value is authoritative. Application use cases resolve it through the configured business-date provider and pass an explicit `DateOnly` where business/query semantics depend on the desk day.
+### NaiveBusinessDate
 
-Persisted facts include:
+Domain/Application code represents a business-day identity as:
+
+```text
+NaiveBusinessDate(DateOnly)
+```
+
+`NaiveBusinessDate` means only **which business date a business fact belongs to**. It is intentionally "naive": no desk, location, timezone, or business-calendar identity is embedded in the value. If a future workflow needs scope such as desk/location plus date, model that as a separate context/value composed with `NaiveBusinessDate`; do not change equality of the date value itself.
+
+The database Business Date value is authoritative. Application use cases resolve it through the configured business-date provider. Timestamps remain separate audit facts.
+
+The classification rule is semantic, not name-based:
+
+> Use `NaiveBusinessDate` when the value answers "which business day does this business fact/process belong to?"
+
+Representative `NaiveBusinessDate` values include:
+
+- current authoritative Business Date returned by `IBusinessDateProvider`
+- Case `CreatedBusinessDate`
+- Revision `DraftCreatedBusinessDate`
+- lifecycle `ClosedBusinessDate`
+- persisted `Event.BusinessDate`
+- current-Business-Date snapshot/query parameters and Post Process day membership
+- other values explicitly used as business-day identity
+
+Do **not** replace every `DateOnly`. Representative values that remain ordinary calendar dates include:
+
+- `SettlementDate`
+- `StandardSettlementDate`
+- pricing/calculation settlement dates
+- security maturity/coupon/payment dates if/when present
+- search date-range values that mean calendar boundaries over timestamps
+- a desk-local calendar date derived from a timestamp when it is not itself an authoritative business-day fact
+
+At HTTP and persistence boundaries the representation may still be a JSON date string / PostgreSQL `date`; the semantic Domain/Application value remains `NaiveBusinessDate`, with explicit boundary mapping or an Infrastructure value converter.
+
+Persisted business-date facts include:
 
 - `CreatedBusinessDate` on the Case, established when an initial Draft is first confirmed/opened
 - `DraftCreatedBusinessDate` on every Revision, established when that Draft Revision is first created and retained after Confirm/Supersede/Discard
 - `ClosedBusinessDate` on Hit/Away closed lifecycle state
-- `BusinessDate` on persisted RFQ events where the event itself has day-scoped business meaning
+- required `BusinessDate` on every persisted semantic Event, meaning the Business Date on which that Event occurred
 
 Rules:
 
@@ -709,6 +748,8 @@ Rules:
 - every initial/amendment Draft Revision records `DraftCreatedBusinessDate`
 - non-Draft Cases require Case `CreatedBusinessDate`
 - Hit/Away require `ClosedBusinessDate`
+- every persisted semantic Event requires `BusinessDate`, including Quote Events
+- Event Business Date is supplied by Application from the authoritative business-date provider; do not derive it from `OccurredAt` or DB commit time
 - outcome correction does not rewrite the original close date
 - same-day outcome correction is allowed only when current Business Date equals the original `ClosedBusinessDate`
 - timestamps remain audit facts; Business Date remains the operational desk-day fact
@@ -730,7 +771,7 @@ This deliberately means:
 
 Post Process `Today` remains its separately defined operational preset; do not silently substitute these Sales/Trader worklist-membership rules for the Post Process rules.
 
-Do not infer any of these facts from `CreatedAt.UtcDateTime.Date` or timestamp ranges.
+Do not infer authoritative Business Date facts from `CreatedAt.UtcDateTime.Date` or timestamp ranges.
 
 ---
 
@@ -2238,11 +2279,15 @@ Independent grids use independent config keys. Sales main, Trader main/search/co
 ## 1. Persistence principles
 
 - Persistence shape may differ from Domain type shape.
-- Domain types do not expose DB implementation details.
+- Domain/Application do not know JSON serialization details or DB implementation details.
+- Relational identity/lifecycle/filter-relevant facts remain relational; JSONB is used only where the persisted shape is intentionally snapshot-like or volatile.
+- Durable JSON persistence uses explicit Infrastructure-owned persistence DTO/contracts. Do not serialize Domain objects directly as the durable storage contract.
+- Do not create persistence DTOs mechanically for ordinary relational entities; introduce them where a versioned/opaque JSON boundary needs a stable contract.
 - Current operational state is stored directly; this is not event sourcing.
-- Events provide audit/history and notification feed, not the sole state-rebuild source.
+- Events provide semantic audit/history, not the sole state-rebuild source or realtime replay requirement.
 - Confirmed business snapshots are immutable.
 - Flattened persistence status columns are projections of the typed Domain state, not a second Domain source of truth.
+- Reads do not silently repair, rewrite, or normalize corrupt persisted data. Invalid persisted combinations fail explicitly.
 
 ---
 
@@ -2419,8 +2464,11 @@ Use a thin shared parent **at DB level**.
 ```text
 EventId
 OccurredAt
+BusinessDate
 ActorUserId?
 ```
+
+`BusinessDate` is required and means the authoritative Business Date on which the semantic Event occurred. It is the same concept for RFQ and Quote Events. Application resolves it at the use-case boundary and records it with the Event; Infrastructure does not infer it from `OccurredAt` or commit time.
 
 `EventId` is the stable identity of the persisted Event. Current realtime invalidation, reconnect catch-up, Recent Revisions, and current-worklist behavior do not rely on `EventId` ordering. Whether Event identity should also carry global ordering/cursor semantics is deferred to the later ID-model review.
 
@@ -2430,11 +2478,10 @@ ActorUserId?
 EventId -> Event
 CaseId
 Type
-BusinessDate?
 Payload jsonb
 ```
 
-`BusinessDate` belongs on the RFQ-event child row because it is an RFQ business-day fact used by Post Process/operational queries. Quote events do not acquire a Business Date merely because they share the parent Event row.
+Do not duplicate `Event.BusinessDate` on `RfqEvent` when it means the same thing. If a future RFQ-event subtype genuinely needs a second date with different semantics, name and persist that separate fact explicitly.
 
 ### `QuoteEvent`
 
@@ -2487,7 +2534,17 @@ Quote events refer to immutable ConfirmedQuote by `QuoteId`.
 
 Quote Confirm emits `Confirmed` because confirmation is a semantic business event useful for audit/history and revision-aware surfaces.
 
-Realtime cross-session invalidation does not depend on semantic-event coverage. State mutation and any semantic event append that belongs to that use case still occur in the same transaction.
+Event payload JSON is an Infrastructure persistence contract. Every written payload carries an explicit payload version inside JSON, initially:
+
+```json
+{ "version": 1, ... }
+```
+
+The event `Type` column remains the business event type; do not encode payload version into the type name and do not add a separate DB payload-version column. Deserialization branches explicitly on payload version and rejects unsupported versions.
+
+Infrastructure owns event-payload DTOs and interpretation. Query code must not deserialize event DTO classes directly; expose a narrow persistence helper when a query needs a persisted payload fact such as correction reason.
+
+Realtime cross-session invalidation does not depend on semantic-event coverage. State mutation and any semantic event append that belongs to that use case still occur in the same transaction. Generic persisted-event feed/deserialization machinery with no runtime consumer should be deleted rather than retained for hypothetical replay.
 
 ---
 
@@ -2526,7 +2583,11 @@ InsertQuoteEventRow(...)
 
 Application invokes Domain transitions/factories and asks repositories to persist the resulting typed values.
 
-Query-side repositories/readers may project directly into query DTOs.
+Query-side readers may project directly into query DTOs and should be owned by the capability/use case that needs them. Do not introduce a generic repository abstraction.
+
+Infrastructure may be explicitly PostgreSQL/EF-specific. The replacement boundary is the Application port; do not add another abstraction layer beneath EF solely to simulate database portability.
+
+Versioned JSON serialization remains explicit in Infrastructure rather than hidden inside a generic/magic EF converter. Value-object conversion such as `NaiveBusinessDate <-> PostgreSQL date` is ordinary persistence mapping and is not subject to that JSON rule.
 
 ---
 
@@ -2555,7 +2616,7 @@ After a successful RFQ/business Unit-of-Work commit, Infrastructure performs onl
 
 The snapshot coordinator converges separately to the latest committed generation. Multiple commits before a rebuild are collapsed; the system does not enqueue one rebuild job per mutation.
 
-Do not hold DB locks while performing external/heavy calculation or snapshot rebuilding.
+Do not hold DB locks while performing external/heavy calculation or snapshot rebuilding. External calculation happens outside the DB transaction; after it returns, re-read/revalidate optimistic state before committing when the use case requires it.
 
 ---
 
@@ -2787,7 +2848,9 @@ Database uniqueness remains the final one-per-Revision guard.
 
 ## 6. Calculation failure log
 
-Keep append-only failure logging with enough context to reproduce the attempted request:
+Keep append-only calculation-failure logging as **human diagnostic evidence**, not a replay/source-of-truth persistence contract.
+
+Retain enough context to understand the attempted operation:
 
 - FailureLogId
 - CaseId
@@ -2796,10 +2859,12 @@ Keep append-only failure logging with enough context to reproduce the attempted 
 - RequestId
 - driver/type/value
 - slide
-- prior WorkingQuote snapshot
+- prior WorkingQuote diagnostic snapshot
 - request/calculation context
 - error code/message
 - timestamp
+
+Use a dedicated Infrastructure diagnostic DTO/shape rather than serializing Domain objects or anonymous request objects directly. Because this JSON is diagnostic-only, do not add historical readers/migrations/version-compatibility machinery unless a real machine-consumer requirement appears.
 
 Use typed Domain/Application IDs before persistence mapping.
 

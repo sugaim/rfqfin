@@ -21,6 +21,8 @@ Both files are updated in place. **Git history is the version history.** Files u
 8. **Current-Business-Date snapshot/runtime mechanics remain Infrastructure/Hosting concerns.**
 9. **Generated artifacts are committed and reproducible.**
 10. **Testing follows the real boundary: Domain pure tests, Application orchestration tests, PostgreSQL Infrastructure tests, API contract tests, and focused FE tests.**
+11. **Business-day identity is typed as `NaiveBusinessDate`; ordinary calendar dates remain `DateOnly`.**
+12. **Durable JSON contracts are explicit, Infrastructure-owned, and versioned where machine-read persistence requires it.**
 
 ---
 
@@ -757,8 +759,13 @@ Focus on:
 - one WorkingQuote per Revision
 - optimistic concurrency / `StateVersion` mapping
 - Category/Security/Routing FKs
-- JSONB event payloads
+- `NaiveBusinessDate` mapping to PostgreSQL `date` without changing ordinary calendar-date semantics
+- required parent `Event.BusinessDate` for RFQ and Quote Events
+- JSONB event payload version dispatch, including current round-trip, historical V1 fixtures, malformed payload, and unsupported-version rejection
+- versioned quote-payload round-trip/historical fixture/malformed-or-unsupported-type behavior
+- query helpers for payload-derived facts without query-side knowledge of persistence DTO classes
 - quote-event joins after removal of `QuoteEvent.CaseId`
+- CalculationFailureLog diagnostic DTO serialization without direct Domain-object serialization
 - expiry worker selection/transition behavior
 
 Do not use EF InMemory/SQLite as a PostgreSQL substitute.
@@ -970,3 +977,11 @@ Generated DTOs may reach Screen unchanged when UI and API semantics match. RTK Q
 ## 7. SSE remains handwritten transport
 
 EventSource lifecycle is intentionally separate from the generated HTTP client. SSE carries wake-up categories only; authoritative state still comes from normal queries.
+
+## 8. Business-day identity is typed; calendar dates are not
+
+`NaiveBusinessDate` represents a business-day identity only. Do not mechanically replace `DateOnly`; settlement/pricing/search calendar dates remain ordinary dates unless their semantic meaning is explicitly business-day identity.
+
+## 9. JSON persistence contracts are explicit Infrastructure concerns
+
+Machine-read durable JSON uses dedicated persistence DTOs and explicit version dispatch. Domain/Application do not own JSON serialization. Diagnostic-only JSON is not burdened with replay compatibility, but still uses a dedicated diagnostic shape rather than direct Domain serialization.
