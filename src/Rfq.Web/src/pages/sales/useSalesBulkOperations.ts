@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import type { CaseOperationResult, SalesRfq } from '@/services/api'
+import type {
+  CaseOperationResponse,
+  SalesRfqResponse,
+} from '@/generated/rfqApi'
 import {
   bulkEligibility,
   type SalesBulkCommand,
@@ -8,7 +11,7 @@ import type { SalesBulkActions } from '@/pages/sales/salesContracts'
 import type { SalesBulkResult } from '@/pages/sales/SalesBulkUi'
 
 export interface SalesBulkSnapshotItem {
-  row: SalesRfq
+  row: SalesRfqResponse
   eligible: boolean
   reason?: string
 }
@@ -19,7 +22,7 @@ export interface SalesBulkDialog {
 }
 
 interface UseSalesBulkOperationsInput {
-  selectedRows: SalesRfq[]
+  selectedRows: SalesRfqResponse[]
   currentUserId: string
   actions: SalesBulkActions
   onReconcileCases: (caseIds: number[]) => Promise<void>
@@ -67,7 +70,7 @@ export function useSalesBulkOperations({
     const eligible = snapshot.items
       .filter((item) => item.eligible)
       .map((item) => item.row)
-    let results: CaseOperationResult[]
+    let results: CaseOperationResponse[]
     try {
       results = await actions.execute(snapshot.command, eligible)
     } catch {
@@ -75,7 +78,7 @@ export function useSalesBulkOperations({
 
       return
     }
-    const ineligible: CaseOperationResult[] = snapshot.items
+    const ineligible: CaseOperationResponse[] = snapshot.items
       .filter((item) => !item.eligible)
       .map((item) => ({
         caseId: item.row.caseId,

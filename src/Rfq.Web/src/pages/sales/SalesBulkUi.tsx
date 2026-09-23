@@ -1,6 +1,9 @@
 import type { ReactElement } from 'react'
 import { Button, Empty, List, Space, Tag, Tooltip, Typography } from 'antd'
-import type { CaseOperationResult, SalesRfq } from '@/services/api'
+import type {
+  CaseOperationResponse,
+  SalesRfqResponse,
+} from '@/generated/rfqApi'
 import { BulkResultBar } from '@/shared/ui/BulkResultBar'
 import {
   bulkEligibility,
@@ -12,11 +15,11 @@ import {
 
 export type SalesBulkResult = {
   command: SalesBulkCommand
-  items: CaseOperationResult[]
+  items: CaseOperationResponse[]
 }
 
 interface BulkPaneProps {
-  rows: SalesRfq[]
+  rows: SalesRfqResponse[]
   userId: string
   onOpen: (command: SalesBulkCommand) => void
 }
@@ -101,7 +104,7 @@ const rowActionLabels: Record<
 }
 
 interface RowActionsProps {
-  row: SalesRfq
+  row: SalesRfqResponse
   userId: string
   disabled: boolean
   onCommand: (command: SalesRowCommand) => void

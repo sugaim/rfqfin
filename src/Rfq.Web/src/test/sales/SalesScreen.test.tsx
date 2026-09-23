@@ -9,15 +9,15 @@ import {
 import { vi } from 'vitest'
 import { SalesScreen, type SalesScreenProps } from '@/pages/sales/SalesScreen'
 import type {
-  ClientSearchResult,
-  SalesRfq,
-  SecuritySearchResult,
-} from '@/services/api'
+  ClientCandidateResponse,
+  SalesRfqResponse,
+  SecurityCandidateResponse,
+} from '@/generated/rfqApi'
 
-const clients: ClientSearchResult[] = [
+const clients: ClientCandidateResponse[] = [
   { clientId: 'client-001', code: 'C001', name: '青空銀行' },
 ]
-const securities: SecuritySearchResult[] = [
+const securities: SecurityCandidateResponse[] = [
   {
     securityId: 'sec-jgb-375',
     japaneseName: '利付国債 第375回',
@@ -118,7 +118,7 @@ const withAmendment = (
   amendment: { ...baseProps.amendment, ...actions },
 })
 
-const draftRow: SalesRfq = {
+const draftRow: SalesRfqResponse = {
   caseId: 101,
   clientId: 'client-grid',
   clientName: '顧客表示名',
@@ -147,6 +147,11 @@ const draftRow: SalesRfq = {
   createdAt: '2026-09-21T00:00:00Z',
   stateSince: '2026-09-21T00:00:00Z',
   confirmedQuote: null,
+  draftRevisionId: null,
+  draftVersion: null,
+  draftSettlementDate: null,
+  draftNotional: null,
+  draftSalesAndTradingMessage: null,
 }
 
 async function selectRequiredMasters() {
@@ -164,7 +169,7 @@ async function selectRequiredMasters() {
 }
 
 describe('SalesScreen', () => {
-  const quotedRow = (caseId: number): SalesRfq => ({
+  const quotedRow = (caseId: number): SalesRfqResponse => ({
     ...draftRow,
     caseId,
     clientId: `client-${caseId}`,
@@ -241,7 +246,7 @@ describe('SalesScreen', () => {
   })
 
   it('renders lifecycle and quote status returned by the API', () => {
-    const confirmed = {
+    const confirmed: SalesRfqResponse = {
       ...draftRow,
       rfqStatus: 'Active',
       revisionStatus: 'Confirmed',
@@ -272,7 +277,7 @@ describe('SalesScreen', () => {
       expect(onCreate).toHaveBeenCalledWith({
         clientId: 'client-001',
         securityId: 'sec-jgb-375',
-        notional: undefined,
+        notional: null,
         settlementDate: '2026-09-23',
         standardSettlementDate: '2026-09-23',
         salesAndTradingMessage: '',
@@ -420,7 +425,7 @@ describe('SalesScreen', () => {
 
   it('lets the Contact Owner Present an Active quoted RFQ', async () => {
     const onPresent = vi.fn().mockResolvedValue(undefined)
-    const quoted = {
+    const quoted: SalesRfqResponse = {
       ...draftRow,
       rfqStatus: 'Active',
       revisionStatus: 'Confirmed',
@@ -445,7 +450,7 @@ describe('SalesScreen', () => {
   it('keeps a successful mutation successful when reconciliation fails', async () => {
     const onPresent = vi.fn().mockResolvedValue(undefined)
     const onReconcileCases = vi.fn().mockRejectedValue(new Error('offline'))
-    const quoted = {
+    const quoted: SalesRfqResponse = {
       ...draftRow,
       rfqStatus: 'Active',
       revisionStatus: 'Confirmed',
@@ -657,7 +662,7 @@ describe('SalesScreen', () => {
   it('preserves Contact Owner handoff in the redesigned Work Pane', async () => {
     const onChangeContactOwner = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
-    const quoted = {
+    const quoted: SalesRfqResponse = {
       ...draftRow,
       rfqStatus: 'Active',
       revisionStatus: 'Confirmed',

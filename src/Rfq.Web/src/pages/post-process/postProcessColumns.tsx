@@ -2,9 +2,9 @@ import type { ReactElement } from 'react'
 import { Button, Space, Tag, Typography } from 'antd'
 import type { ColDef, ICellRendererParams } from 'ag-grid-community'
 import type {
-  PostProcessItem,
-  PostProcessLifecycleChangeType,
-} from '@/services/api'
+  PostProcessItemResponse,
+  PostProcessLifecycleChangeValue,
+} from '@/generated/rfqApi'
 import {
   isCorrection,
   stagedState,
@@ -17,8 +17,8 @@ export interface BuildPostProcessColumnsOptions {
   currentUserId: string
   pending: Record<number, PendingPostProcessChange>
   onStageLifecycle: (
-    row: PostProcessItem,
-    type: PostProcessLifecycleChangeType,
+    row: PostProcessItemResponse,
+    type: PostProcessLifecycleChangeValue,
   ) => void
   onClear: (caseId: number) => void
 }
@@ -28,14 +28,14 @@ export function buildPostProcessColumns({
   pending,
   onStageLifecycle,
   onClear,
-}: BuildPostProcessColumnsOptions): ColDef<PostProcessItem>[] {
+}: BuildPostProcessColumnsOptions): ColDef<PostProcessItemResponse>[] {
   const actionRenderer = ({
     data,
-  }: ICellRendererParams<PostProcessItem>): ReactElement | null => {
+  }: ICellRendererParams<PostProcessItemResponse>): ReactElement | null => {
     if (!data) return null
 
     const canChangeLifecycle = data.contactOwnerId === currentUserId
-    const buttons: { label: string; type: PostProcessLifecycleChangeType }[] =
+    const buttons: { label: string; type: PostProcessLifecycleChangeValue }[] =
       data.rfqStatus === 'Active' || data.rfqStatus === 'Presented'
         ? [
             { label: 'Hit', type: 'Hit' },
@@ -105,7 +105,9 @@ export function buildPostProcessColumns({
 
         return next ? `${data.rfqStatus} -> ${next}` : data.rfqStatus
       },
-      cellRenderer: ({ data }: ICellRendererParams<PostProcessItem>) => {
+      cellRenderer: ({
+        data,
+      }: ICellRendererParams<PostProcessItemResponse>) => {
         if (!data) return null
 
         const next = stagedState(pending[data.caseId])

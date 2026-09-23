@@ -11,10 +11,10 @@ import {
 } from 'antd'
 import type { FormInstance } from 'antd'
 import type {
-  ClientSearchResult,
-  SalesRfq,
-  SecuritySearchResult,
-} from '@/services/api'
+  ClientCandidateResponse,
+  SalesRfqResponse,
+  SecurityCandidateResponse,
+} from '@/generated/rfqApi'
 
 export interface RfqFormValues {
   clientId: string
@@ -30,9 +30,9 @@ export interface RfqFormValues {
 interface SalesRfqEditorProps {
   form: FormInstance<RfqFormValues>
   mode: 'new' | 'draft'
-  selected?: SalesRfq
-  clients: ClientSearchResult[]
-  securities: SecuritySearchResult[]
+  selected?: SalesRfqResponse
+  clients: ClientCandidateResponse[]
+  securities: SecurityCandidateResponse[]
   traders: { userId: string; name: string }[]
   defaultsLoading: boolean
   isMutating: boolean
@@ -48,7 +48,7 @@ interface SalesRfqEditorProps {
       | 'salesAndTradingMessage',
   ) => void | Promise<void>
   onSave: (confirm: boolean) => void | Promise<void>
-  onDiscard: (row: SalesRfq) => void | Promise<void>
+  onDiscard: (row: SalesRfqResponse) => void | Promise<void>
 }
 
 export function SalesRfqEditor({

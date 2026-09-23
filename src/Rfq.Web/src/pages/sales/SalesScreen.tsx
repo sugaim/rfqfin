@@ -28,12 +28,13 @@ import type {
 } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
 import type {
-  AmendmentResult,
-  ClientSearchResult,
-  SalesRecentRevision,
-  SalesRfq,
-  SecuritySearchResult,
-} from '@/services/api'
+  ApiProblemDetails,
+  AmendmentResponse,
+  ClientCandidateResponse,
+  SalesRecentRevisionResponse,
+  SalesRfqResponse,
+  SecurityCandidateResponse,
+} from '@/generated/rfqApi'
 import {
   createCaseAutosaveCoordinator,
   type CaseAutosaveCoordinator,
@@ -98,16 +99,16 @@ type AmendmentDelta = Pick<
 >
 
 export interface SalesScreenProps {
-  rfqs: SalesRfq[]
-  clients: ClientSearchResult[]
-  securities: SecuritySearchResult[]
+  rfqs: SalesRfqResponse[]
+  clients: ClientCandidateResponse[]
+  securities: SecurityCandidateResponse[]
   traders: UserOption[]
   users?: UserOption[]
   currentUserId: string
   isLoading: boolean
   isError: boolean
   isMutating: boolean
-  recentRevisions?: SalesRecentRevision[]
+  recentRevisions?: SalesRecentRevisionResponse[]
   recentRevisionsLoading?: boolean
   onRecentRevisionsOpenChange?: (open: boolean) => void
   remoteUpdatePending?: boolean
@@ -161,7 +162,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
     bulk,
     gridLayout = {},
   } = props
-  const [gridApi, setGridApi] = useState<GridApi<SalesRfq> | null>(null)
+  const [gridApi, setGridApi] = useState<GridApi<SalesRfqResponse> | null>(null)
   const defaultColumnGroupState = useRef<GridColumnGroupState>([])
   const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([])
   const [activeCaseId, setActiveCaseId] = useState<number>()
@@ -185,7 +186,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
     () =>
       selectedCaseIds
         .map((caseId) => rfqs.find((row) => row.caseId === caseId))
-        .filter((row): row is SalesRfq => Boolean(row)),
+        .filter((row): row is SalesRfqResponse => Boolean(row)),
     [rfqs, selectedCaseIds],
   )
   const selected = rfqs.find((row) => row.caseId === activeCaseId)
@@ -276,7 +277,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
     )
   }, [gridApi, gridLayout.configJson])
 
-  const ensureAmendmentCoordinator = (row: SalesRfq) => {
+  const ensureAmendmentCoordinator = (row: SalesRfqResponse) => {
     if (amendmentAutosave.current?.caseId === row.caseId)
       return amendmentAutosave.current.value
     const initial = amendmentStateFromRow(row)
@@ -307,7 +308,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
   }
 
   const saveAmendmentDelta = async (
-    row: SalesRfq,
+    row: SalesRfqResponse,
     delta: Partial<AmendmentDelta>,
   ) => {
     const coordinator = ensureAmendmentCoordinator(row)
@@ -322,7 +323,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
     try {
       await coordinator.enqueue(delta)
     } catch (error) {
-      const status = (error as { status?: number }).status
+      const status = (error as ApiProblemDetails).status
       operations.setActionError(
         status === 409
           ? 'This Amendment was updated elsewhere. Your local input is preserved; review the latest state explicitly.'
@@ -335,7 +336,9 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
     await onReconcileCases([row.caseId]).catch(() => undefined)
   }
 
-  const editAmendment = async (event: CellEditRequestEvent<SalesRfq>) => {
+  const editAmendment = async (
+    event: CellEditRequestEvent<SalesRfqResponse>,
+  ) => {
     const row = event.data
     if (!row || row.revisionStatus === 'Draft') return
     setActiveCaseId(row.caseId)
@@ -357,7 +360,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
       })
   }
 
-  const contextMenu = (params: GetContextMenuItemsParams<SalesRfq>) =>
+  const contextMenu = (params: GetContextMenuItemsParams<SalesRfqResponse>) =>
     buildSalesContextMenu({
       params,
       currentUserId,
@@ -423,13 +426,13 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
   )
 
   const rowClassRules = {
-    'sales-row-selected': ({ node }: RowClassParams<SalesRfq>) =>
+    'sales-row-selected': ({ node }: RowClassParams<SalesRfqResponse>) =>
       Boolean(node.isSelected()),
-    'sales-row-quoted': ({ data }: RowClassParams<SalesRfq>) =>
+    'sales-row-quoted': ({ data }: RowClassParams<SalesRfqResponse>) =>
       data?.rfqStatus === 'Active' && data.quoteStatus === 'Quoted',
-    'sales-row-draft': ({ data }: RowClassParams<SalesRfq>) =>
+    'sales-row-draft': ({ data }: RowClassParams<SalesRfqResponse>) =>
       data?.revisionStatus === 'Draft',
-    'sales-row-terminal': ({ data }: RowClassParams<SalesRfq>) =>
+    'sales-row-terminal': ({ data }: RowClassParams<SalesRfqResponse>) =>
       Boolean(data && ['Cancelled', 'Hit', 'Away'].includes(data.rfqStatus)),
   }
   const shortcutText = (() => {
@@ -537,7 +540,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
           )}
           <Spin spinning={isLoading}>
             <div className="sales-grid" data-testid="rfq-grid">
-              <AgGridReact<SalesRfq>
+              <AgGridReact<SalesRfqResponse>
                 rowData={rfqs}
                 columnDefs={columns}
                 defaultColDef={{
@@ -566,18 +569,18 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
                     gridLayout.configJson,
                   )
                 }}
-                onRowClicked={({ data }: RowClickedEvent<SalesRfq>) =>
+                onRowClicked={({ data }: RowClickedEvent<SalesRfqResponse>) =>
                   data && editor.selectRow(data)
                 }
                 onSelectionChanged={({
                   api,
-                }: SelectionChangedEvent<SalesRfq>) =>
+                }: SelectionChangedEvent<SalesRfqResponse>) =>
                   setSelectedCaseIds(
                     api.getSelectedRows().map((row) => row.caseId),
                   )
                 }
                 isExternalFilterPresent={() => filterPreset !== 'all'}
-                doesExternalFilterPass={(node: IRowNode<SalesRfq>) =>
+                doesExternalFilterPass={(node: IRowNode<SalesRfqResponse>) =>
                   Boolean(
                     node.data &&
                     matchesSalesPreset(node.data, filterPreset, currentUserId),
@@ -849,7 +852,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
   )
 }
 
-function amendmentStateFromRow(row: SalesRfq): AmendmentAutosaveState {
+function amendmentStateFromRow(row: SalesRfqResponse): AmendmentAutosaveState {
   return {
     currentVersion: row.currentVersion,
     draftVersion: row.draftVersion ?? null,
@@ -864,7 +867,7 @@ function amendmentStateFromRow(row: SalesRfq): AmendmentAutosaveState {
 }
 
 function amendmentStateFromResult(
-  result: AmendmentResult,
+  result: AmendmentResponse,
 ): AmendmentAutosaveState {
   return {
     currentVersion: result.currentVersion,

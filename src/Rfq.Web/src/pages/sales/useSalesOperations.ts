@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { SalesRfq } from '@/services/api'
+import type { ApiProblemDetails, SalesRfqResponse } from '@/generated/rfqApi'
 import {
   commandEligible,
   type SalesCommand,
@@ -14,7 +14,7 @@ import type {
 
 export interface SalesSingleDialog {
   command: SalesCommand
-  row: SalesRfq
+  row: SalesRfqResponse
 }
 
 interface UseSalesOperationsInput {
@@ -34,9 +34,13 @@ export interface SalesOperationsController {
   setActionError: (message: string | null) => void
   clearDialog: () => void
   run: (action: () => Promise<unknown>, caseIds?: number[]) => Promise<boolean>
-  execute: (command: SalesCommand, row: SalesRfq) => Promise<void>
-  executeRow: (command: SalesRowCommand, row: SalesRfq) => Promise<void>
-  request: (command: SalesCommand, row: SalesRfq, confirm: boolean) => void
+  execute: (command: SalesCommand, row: SalesRfqResponse) => Promise<void>
+  executeRow: (command: SalesRowCommand, row: SalesRfqResponse) => Promise<void>
+  request: (
+    command: SalesCommand,
+    row: SalesRfqResponse,
+    confirm: boolean,
+  ) => void
 }
 
 export function useSalesOperations({
@@ -67,7 +71,7 @@ export function useSalesOperations({
     try {
       await action()
     } catch (error) {
-      const status = (error as { status?: number })?.status
+      const status = (error as ApiProblemDetails).status
       setConflict(status === 409)
       setActionError(
         status === 409
@@ -83,7 +87,7 @@ export function useSalesOperations({
     return true
   }
 
-  const execute = async (command: SalesCommand, row: SalesRfq) => {
+  const execute = async (command: SalesCommand, row: SalesRfqResponse) => {
     if (command === 'create-from-existing') {
       let createdCaseId: number | undefined
       const succeeded = await run(async () => {
@@ -117,7 +121,10 @@ export function useSalesOperations({
     }, [row.caseId])
   }
 
-  const executeRow = async (command: SalesRowCommand, row: SalesRfq) => {
+  const executeRow = async (
+    command: SalesRowCommand,
+    row: SalesRfqResponse,
+  ) => {
     if (refreshMode === 'live') return
     if (command === 'confirm-draft') {
       const { assignedTraderId, settlementDate, notional } = row
@@ -141,7 +148,11 @@ export function useSalesOperations({
     }
   }
 
-  const request = (command: SalesCommand, row: SalesRfq, confirm: boolean) => {
+  const request = (
+    command: SalesCommand,
+    row: SalesRfqResponse,
+    confirm: boolean,
+  ) => {
     if (!commandEligible(command, row, currentUserId)) return
     if (confirm) setSingleDialog({ command, row })
     else void execute(command, row)

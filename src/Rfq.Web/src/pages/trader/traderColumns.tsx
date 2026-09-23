@@ -2,10 +2,10 @@ import { useMemo } from 'react'
 import { Spin, Tooltip } from 'antd'
 import type { ColDef, ColGroupDef } from 'ag-grid-community'
 import type {
-  CalculatedQuotePayload,
-  RfqSearchItem,
-  TraderRfq,
-} from '@/services/api'
+  CalculatedQuoteResponse2,
+  RfqSearchItemResponse,
+  TraderRfqResponse,
+} from '@/generated/rfqApi'
 import {
   canEditQuote,
   elapsedLabel,
@@ -25,7 +25,8 @@ const formatPercent = (value: unknown): string =>
 const formatBp = (value: unknown): string =>
   value == null ? '' : `${formatNumber(value)} bp`
 
-export type TraderColumnDefinition = ColDef<TraderRfq> | ColGroupDef<TraderRfq>
+export type TraderColumnDefinition =
+  ColDef<TraderRfqResponse> | ColGroupDef<TraderRfqResponse>
 
 export interface UseTraderActiveColumnsOptions {
   calcStates: Record<number, CalcState>
@@ -38,12 +39,14 @@ export function useTraderActiveColumns({
   currentUserId,
   now,
 }: UseTraderActiveColumnsOptions): TraderColumnDefinition[] {
-  return useMemo<(ColDef<TraderRfq> | ColGroupDef<TraderRfq>)[]>(() => {
+  return useMemo<
+    (ColDef<TraderRfqResponse> | ColGroupDef<TraderRfqResponse>)[]
+  >(() => {
     const calculated = (
-      id: keyof CalculatedQuotePayload,
+      id: keyof CalculatedQuoteResponse2,
       headerName: string,
       formatter = formatNumber,
-    ): ColDef<TraderRfq> => ({
+    ): ColDef<TraderRfqResponse> => ({
       colId: id,
       headerName,
       minWidth: 78,
@@ -204,7 +207,7 @@ export function useTraderActiveColumns({
             colId: 'calcStatus',
             headerName: 'Calc',
             width: 70,
-            cellRenderer: ({ data }: { data?: TraderRfq }) => {
+            cellRenderer: ({ data }: { data?: TraderRfqResponse }) => {
               const state = data ? calcStates[data.caseId] : undefined
               if (!state) return null
               if (state.status === 'calculating') return <Spin size="small" />
@@ -230,8 +233,8 @@ export function useTraderActiveColumns({
   }, [calcStates, currentUserId, now])
 }
 
-export function useTraderSearchColumns(): ColDef<RfqSearchItem>[] {
-  return useMemo<ColDef<RfqSearchItem>[]>(
+export function useTraderSearchColumns(): ColDef<RfqSearchItemResponse>[] {
+  return useMemo<ColDef<RfqSearchItemResponse>[]>(
     () => [
       { field: 'caseId', headerName: 'Case', width: 78 },
       {
@@ -272,8 +275,8 @@ export function useTraderSearchColumns(): ColDef<RfqSearchItem>[] {
 
 export function useTraderConfirmColumns(
   expiryMinutes: number | null,
-): ColDef<TraderRfq>[] {
-  return useMemo<ColDef<TraderRfq>[]>(
+): ColDef<TraderRfqResponse>[] {
+  return useMemo<ColDef<TraderRfqResponse>[]>(
     () => [
       { field: 'caseId', headerName: 'Case', width: 75 },
       { field: 'clientName', headerName: 'Client', minWidth: 125 },

@@ -1,4 +1,4 @@
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 
 export type SalesRefreshMode = 'live' | 'paused'
 
@@ -37,7 +37,7 @@ export type SalesBulkCommand =
 export type SalesInvocationSurface = 'work-pane' | 'row-action' | 'context-menu'
 
 export function derivePaneMode(
-  rows: SalesRfq[],
+  rows: SalesRfqResponse[],
   activeCaseId: number | undefined,
   newIntent: boolean,
 ): SalesPaneMode {
@@ -54,7 +54,7 @@ export function derivePaneMode(
 }
 
 export function rowActionCommands(
-  row: SalesRfq,
+  row: SalesRfqResponse,
   userId: string,
 ): SalesRowCommand[] {
   if (row.contactOwnerId !== userId) return []
@@ -76,14 +76,17 @@ export function rowActionCommands(
   return commands
 }
 
-export function reconcileSelection(caseIds: number[], rows: SalesRfq[]) {
+export function reconcileSelection(
+  caseIds: number[],
+  rows: SalesRfqResponse[],
+) {
   const existing = new Set(rows.map((row) => row.caseId))
 
   return caseIds.filter((caseId) => existing.has(caseId))
 }
 
 export function matchesSalesPreset(
-  row: SalesRfq,
+  row: SalesRfqResponse,
   preset: SalesFilterPreset,
   currentUserId: string,
 ) {
@@ -103,7 +106,7 @@ export function matchesSalesPreset(
   }
 }
 
-export function displayState(row: SalesRfq) {
+export function displayState(row: SalesRfqResponse) {
   if (row.rfqStatus === 'Draft') return 'DRAFT'
   if (row.rfqStatus === 'Presented') return 'PRESENTED'
   if (row.rfqStatus === 'Cancelled') return 'CANCELLED'
@@ -125,7 +128,7 @@ export function elapsedLabel(stateSince: string, now = Date.now()) {
 
 export function commandEligible(
   command: SalesCommand,
-  row: SalesRfq,
+  row: SalesRfqResponse,
   userId: string,
 ) {
   const owner = row.contactOwnerId === userId
@@ -156,7 +159,7 @@ export function commandEligible(
 
 export function bulkEligibility(
   command: SalesBulkCommand,
-  row: SalesRfq,
+  row: SalesRfqResponse,
   userId: string,
 ) {
   switch (command) {
@@ -183,7 +186,7 @@ export function bulkEligibility(
   }
 }
 
-export function hasAmendmentChanges(row: SalesRfq): boolean {
+export function hasAmendmentChanges(row: SalesRfqResponse): boolean {
   return Boolean(
     row.draftRevisionId &&
     (row.draftNotional !== row.notional ||

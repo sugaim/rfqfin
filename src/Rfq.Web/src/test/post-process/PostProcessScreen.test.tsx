@@ -10,20 +10,22 @@ import { useState } from 'react'
 import { vi } from 'vitest'
 import { PostProcessScreen } from '@/pages/post-process/PostProcessScreen'
 import type {
-  CaseOperationResult,
-  PostProcessCommitItem,
-  PostProcessItem,
+  CaseOperationResponse,
+  PostProcessCommitItemRequest,
+  PostProcessItemResponse,
+} from '@/generated/rfqApi'
+import type {
   PostProcessPreset,
   PostProcessScope,
-} from '@/services/api'
+} from '@/pages/post-process/postProcessModel'
 
 type GridColumn = {
   field?: string
   colId?: string
   headerName?: string
-  editable?: boolean | ((params: { data: PostProcessItem }) => boolean)
-  cellRenderer?: (params: { data: PostProcessItem }) => ReactNode
-  valueGetter?: (params: { data: PostProcessItem }) => unknown
+  editable?: boolean | ((params: { data: PostProcessItemResponse }) => boolean)
+  cellRenderer?: (params: { data: PostProcessItemResponse }) => ReactNode
+  valueGetter?: (params: { data: PostProcessItemResponse }) => unknown
 }
 
 vi.mock('ag-grid-react', () => ({
@@ -33,16 +35,16 @@ vi.mock('ag-grid-react', () => ({
     onCellEditRequest,
     rowClassRules,
   }: {
-    rowData: PostProcessItem[]
+    rowData: PostProcessItemResponse[]
     columnDefs: GridColumn[]
     onCellEditRequest: (event: {
-      data: PostProcessItem
+      data: PostProcessItemResponse
       newValue: string
       column: { getColId: () => string }
     }) => void
     rowClassRules: Record<
       string,
-      (params: { data: PostProcessItem }) => boolean
+      (params: { data: PostProcessItemResponse }) => boolean
     >
   }) => (
     <div>
@@ -109,7 +111,7 @@ vi.mock('ag-grid-react', () => ({
   ),
 }))
 
-const baseItem: PostProcessItem = {
+const baseItem: PostProcessItemResponse = {
   caseId: 101,
   createdAt: '2026-09-22T01:00:00Z',
   createdBusinessDate: '2026-09-22',
@@ -197,7 +199,11 @@ describe('Post Process staging', () => {
 
   it('stages lifecycle and own memo together and requires a correction reason', async () => {
     const onCommit = vi
-      .fn<(items: PostProcessCommitItem[]) => Promise<CaseOperationResult[]>>()
+      .fn<
+        (
+          items: PostProcessCommitItemRequest[],
+        ) => Promise<CaseOperationResponse[]>
+      >()
       .mockResolvedValue([
         { caseId: 101, status: 'Applied', failureCode: null, message: null },
       ])

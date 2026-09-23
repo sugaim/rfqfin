@@ -1,46 +1,17 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { rfqApi, type ApiProblemDetails } from '@/generated/rfqApi'
+import { baseApi } from '@/services/baseApi'
+import { normalizeApiProblem, unwrapApiResult } from '@/services/apiProblem'
 import {
-  api,
-  type PostProcessItem,
-  type PostProcessPreset,
-  type PostProcessScope,
-} from '@/services/api'
-import { worklistStreamUrl } from '@/app/App'
+  connectWorklistStream,
+  worklistStreamUrl,
+  type WorklistInvalidationCategory,
+} from '@/services/worklistStream'
 
-const item: PostProcessItem = {
-  caseId: 101,
-  createdAt: '2026-09-22T01:00:00Z',
-  createdBusinessDate: '2026-09-22',
-  clientId: 'client-a',
-  clientName: 'Client A',
-  securityId: 'security-a',
-  securityName: 'Security A',
-  securityBbgDisplay: 'SEC A',
-  notional: 1_000_000,
-  settlementDate: '2026-09-24',
-  contactOwnerId: 'sales-dev',
-  salesId: 'sales-dev',
-  assignedTraderId: 'trader-dev',
-  rfqStatus: 'Active',
-  currentVersion: 3,
-  salesAndTradingMessage: '',
-  myMemo: '',
-  myMemoVersion: 1,
-  price: 99.25,
-  finalSimpleYield: 1.5,
-  yield: 1.4,
-  ysc: 1.3,
-  gSpread: 20,
-  closedBusinessDate: null,
-  lastCorrectionReason: null,
-  lastChangedBy: 'sales-dev',
-  lastChangedAt: '2026-09-22T01:00:00Z',
-}
-
-function json(value: unknown) {
+function json(value: unknown, status = 200) {
   return new Response(JSON.stringify(value), {
-    status: 200,
+    status,
     headers: { 'Content-Type': 'application/json' },
   })
 }
@@ -60,182 +31,84 @@ function useAbsoluteRequests() {
   vi.stubGlobal('Request', AbsoluteRequest)
 }
 
-describe('Post Process API cache reconciliation', () => {
-  afterEach(() => vi.unstubAllGlobals())
+function createStore() {
+  return configureStore({
+    reducer: { [baseApi.reducerPath]: baseApi.reducer },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware().concat(baseApi.middleware),
+  })
+}
 
-  it('invalidates inactive preset and scope variants after a successful commit', async () => {
-    let closed = false
-    const gets: { preset: PostProcessPreset; scope: PostProcessScope }[] = []
+describe('generated API transport boundary', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+    vi.unstubAllGlobals()
+  })
+
+  it('sends the configured development identity from baseApi', async () => {
     useAbsoluteRequests()
+    window.localStorage.setItem('rfq-development-user', 'sales-a')
+    let identity: string | null = null
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const request =
           input instanceof Request ? input : new Request(input, init)
-        const url = new URL(request.url)
-        if (request.method === 'POST') {
-          closed = true
+        identity = request.headers.get('X-Development-User')
 
-          return json([
-            {
-              caseId: 101,
-              status: 'Applied',
-              failureCode: null,
-              message: null,
-            },
-          ])
-        }
-
-        const preset = url.searchParams.get('preset') as PostProcessPreset
-        const scope = url.searchParams.get('scope') as PostProcessScope
-        gets.push({ preset, scope })
-
-        return json(preset === 'Unclosed' && closed ? [] : [item])
+        return json({ status: 'ok' })
       }),
     )
-    const store = configureStore({
-      reducer: { [api.reducerPath]: api.reducer },
-      middleware: (getDefaultMiddleware) =>
-        getDefaultMiddleware().concat(api.middleware),
-    })
+    const store = createStore()
 
-    const unclosed = store.dispatch(
-      api.endpoints.getPostProcess.initiate({
-        preset: 'Unclosed',
-        scope: 'Mine',
-      }),
-    )
-    expect(await unclosed.unwrap()).toEqual([item])
-    unclosed.unsubscribe()
+    await store.dispatch(rfqApi.endpoints.getHealth.initiate()).unwrap()
 
-    const today = store.dispatch(
-      api.endpoints.getPostProcess.initiate({
-        preset: 'Today',
-        scope: 'AllPermitted',
-      }),
-    )
-    expect(await today.unwrap()).toEqual([item])
-
-    await store
-      .dispatch(
-        api.endpoints.commitPostProcess.initiate({
-          items: [
-            {
-              caseId: 101,
-              expectedCurrentVersion: 3,
-              lifecycleChange: { type: 'Away' },
-            },
-          ],
-        }),
-      )
-      .unwrap()
-
-    const revisited = store.dispatch(
-      api.endpoints.getPostProcess.initiate({
-        preset: 'Unclosed',
-        scope: 'Mine',
-      }),
-    )
-    expect(await revisited.unwrap()).toEqual([])
-    expect(
-      gets.filter(
-        (request) => request.preset === 'Unclosed' && request.scope === 'Mine',
-      ),
-    ).toHaveLength(2)
-
-    revisited.unsubscribe()
-    today.unsubscribe()
-    store.dispatch(api.util.resetApiState())
+    expect(identity).toBe('sales-a')
+    store.dispatch(baseApi.util.resetApiState())
   })
 
-  it('re-fetches authoritative state when every commit item fails or has no change', async () => {
-    const queryArgs = { preset: 'Today', scope: 'Mine' } as const
-    const authoritativeItem: PostProcessItem = {
-      ...item,
-      rfqStatus: 'Presented',
-      currentVersion: 4,
-      lastChangedBy: 'other-sales',
-      lastChangedAt: '2026-09-22T02:00:00Z',
-    }
-    let currentItem = item
-    let getCount = 0
+  it('uses the generated query contract without duplicating the /api prefix', async () => {
     useAbsoluteRequests()
+    let capturedUrl = ''
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const request =
           input instanceof Request ? input : new Request(input, init)
-        if (request.method === 'POST') {
-          currentItem = authoritativeItem
+        capturedUrl = request.url
 
-          return json([
-            {
-              caseId: 101,
-              status: 'Failed',
-              failureCode: 'VersionConflict',
-              message: 'The RFQ changed before the commit was applied.',
-            },
-            {
-              caseId: 102,
-              status: 'NoChange',
-              failureCode: null,
-              message: null,
-            },
-          ])
-        }
-
-        getCount += 1
-
-        return json([currentItem])
+        return json([])
       }),
     )
-    const store = configureStore({
-      reducer: { [api.reducerPath]: api.reducer },
-      middleware: (getDefaultMiddleware) =>
-        getDefaultMiddleware().concat(api.middleware),
-    })
-    const query = store.dispatch(
-      api.endpoints.getPostProcess.initiate(queryArgs),
-    )
-    expect(await query.unwrap()).toEqual([item])
+    const store = createStore()
 
     await store
       .dispatch(
-        api.endpoints.commitPostProcess.initiate({
-          items: [
-            {
-              caseId: 101,
-              expectedCurrentVersion: 3,
-              lifecycleChange: { type: 'Away' },
-            },
-            {
-              caseId: 102,
-              expectedCurrentVersion: 1,
-              lifecycleChange: { type: 'Hit' },
-            },
-          ],
+        rfqApi.endpoints.getPostProcess.initiate({
+          preset: 'Today',
+          scope: 'Mine',
         }),
       )
       .unwrap()
 
-    await vi.waitFor(() => {
-      expect(
-        api.endpoints.getPostProcess.select(queryArgs)(store.getState()).data,
-      ).toEqual([authoritativeItem])
+    const url = new URL(capturedUrl)
+    expect(url.pathname).toBe('/api/post-process')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      preset: 'Today',
+      scope: 'Mine',
     })
-    expect(getCount).toBe(2)
-
-    query.unsubscribe()
-    store.dispatch(api.util.resetApiState())
+    store.dispatch(baseApi.util.resetApiState())
   })
-})
 
-describe('03a transport contract', () => {
-  afterEach(() => vi.unstubAllGlobals())
-
-  it('sends a single UI action through the final one-item plural route', async () => {
+  it('uses the generated plural mutation contract and preserves Failed business results', async () => {
+    useAbsoluteRequests()
     let captured: { url: string; body: unknown } | undefined
-    useAbsoluteRequests()
+    const failedResult = {
+      caseId: 101,
+      status: 'Failed' as const,
+      failureCode: 'VersionConflict' as const,
+      message: 'The RFQ changed.',
+    }
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -246,26 +119,17 @@ describe('03a transport contract', () => {
           body: await request.clone().json(),
         }
 
-        return json([
-          {
-            caseId: 101,
-            status: 'Applied',
-            failureCode: null,
-            message: null,
-          },
-        ])
+        return json([failedResult])
       }),
     )
-    const store = configureStore({
-      reducer: { [api.reducerPath]: api.reducer },
-      middleware: (getDefaultMiddleware) =>
-        getDefaultMiddleware().concat(api.middleware),
-    })
+    const store = createStore()
 
-    await store
+    const result = await store
       .dispatch(
-        api.endpoints.presentRfqs.initiate({
-          items: [{ caseId: 101, expectedCurrentVersion: 7 }],
+        rfqApi.endpoints.presentRfqs.initiate({
+          presentRfqsRequest: {
+            items: [{ caseId: 101, expectedCurrentVersion: 7 }],
+          },
         }),
       )
       .unwrap()
@@ -274,15 +138,109 @@ describe('03a transport contract', () => {
       url: '/api/rfqs/present',
       body: { items: [{ caseId: 101, expectedCurrentVersion: 7 }] },
     })
-    store.dispatch(api.util.resetApiState())
+    expect(result).toEqual([failedResult])
+    store.dispatch(baseApi.util.resetApiState())
   })
 
-  it('builds the final worklist stream URL with the selected identity', () => {
-    expect(worklistStreamUrl('trader-a')).toBe(
-      '/api/worklists/stream?developmentUser=trader-a',
+  it('normalizes server problems and hides unknown RTK transport envelopes', () => {
+    const problem: ApiProblemDetails = {
+      status: 409,
+      title: 'Conflict',
+      detail: 'The RFQ changed.',
+      code: 'VersionConflict',
+      traceId: 'trace-1',
+      calculationErrorCode: null,
+      failureLogId: null,
+    }
+
+    expect(normalizeApiProblem({ status: 409, data: problem })).toBe(problem)
+    expect(
+      normalizeApiProblem({ status: 'FETCH_ERROR', error: 'offline' }),
+    ).toEqual({
+      status: 0,
+      title: 'Transport failure',
+      detail: 'The request could not be completed.',
+      code: 'TransportFailure',
+      traceId: '',
+    })
+  })
+
+  it('rejects capabilities with normalized problems rather than RTK envelopes', async () => {
+    const problem: ApiProblemDetails = {
+      status: 409,
+      title: 'Conflict',
+      detail: 'The RFQ changed.',
+      code: 'VersionConflict',
+      traceId: 'trace-2',
+      calculationErrorCode: null,
+      failureLogId: null,
+    }
+
+    await expect(
+      unwrapApiResult({
+        unwrap: () => Promise.reject({ status: 409, data: problem }),
+      }),
+    ).rejects.toBe(problem)
+    await expect(
+      unwrapApiResult({
+        unwrap: () =>
+          Promise.reject({ status: 'FETCH_ERROR', error: 'offline' }),
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining({ status: 0, code: 'TransportFailure' }),
     )
+  })
+})
+
+describe('worklist stream transport', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('encodes the selected development identity in the stream URL', () => {
     expect(worklistStreamUrl('trader a')).toBe(
       '/api/worklists/stream?developmentUser=trader%20a',
     )
+  })
+
+  it('parses known invalidation categories, delivers them, and closes', () => {
+    class FakeEventSource {
+      static current: FakeEventSource
+      readonly url: string
+      closed = false
+      private listener?: (event: Event) => void
+
+      constructor(url: string | URL) {
+        this.url = String(url)
+        FakeEventSource.current = this
+      }
+
+      addEventListener(
+        _type: string,
+        listener: EventListenerOrEventListenerObject,
+      ) {
+        this.listener = listener as (event: Event) => void
+      }
+
+      emit(data: string) {
+        this.listener?.(new MessageEvent('invalidation', { data }))
+      }
+
+      close() {
+        this.closed = true
+      }
+    }
+    vi.stubGlobal('EventSource', FakeEventSource)
+    const received: WorklistInvalidationCategory[][] = []
+
+    const dispose = connectWorklistStream('trader-a', (value) =>
+      received.push(value),
+    )
+    FakeEventSource.current.emit('sales-list,unknown,business-date,sales-list')
+
+    expect(FakeEventSource.current.url).toBe(
+      '/api/worklists/stream?developmentUser=trader-a',
+    )
+    expect(received).toEqual([['sales-list', 'business-date']])
+    dispose()
+    expect(FakeEventSource.current.closed).toBe(true)
   })
 })

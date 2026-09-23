@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Button, Popconfirm, Select, Space, Typography } from 'antd'
-import type { TraderRfq } from '@/services/api'
+import type { TraderRfqResponse } from '@/generated/rfqApi'
 import type { UserOption } from '@/pages/trader/traderContracts'
 import type {
   ContactOwnerOperationIntents,
@@ -8,7 +8,7 @@ import type {
 } from '@/pages/trader/operations/operationTypes'
 
 interface ContactOwnerActionsProps {
-  row: TraderRfq
+  row: TraderRfqResponse
   users: UserOption[]
   targetContactOwnerId?: string
   onTargetContactOwnerChange: (value?: string) => void

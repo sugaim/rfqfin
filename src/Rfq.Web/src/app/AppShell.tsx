@@ -7,7 +7,7 @@ import {
   SettingsDrawer,
   type PersonalSettingsDraft,
 } from '@/app/SettingsDrawer'
-import type { QuoteExpiry, QuoteModeSetting } from '@/services/api'
+import type { QuoteExpiryResponse, QuoteModeResponse } from '@/generated/rfqApi'
 
 const navigationItems = [
   { key: '/sales', label: 'Sales' },
@@ -25,8 +25,8 @@ export interface AppShellProps {
   onRefreshUpdates?: () => void
   isTrader?: boolean
   themeMode?: AppThemeMode
-  quoteMode?: QuoteModeSetting['mode']
-  quoteExpiry?: QuoteExpiry
+  quoteMode?: QuoteModeResponse['mode']
+  quoteExpiry?: QuoteExpiryResponse
   settingsLoading?: boolean
   onSaveSettings?: (settings: PersonalSettingsDraft) => Promise<void>
 }

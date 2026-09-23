@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Button, Input, Space, Tooltip, Typography } from 'antd'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 import { compactText } from '@/pages/sales/work-pane/workPaneFormatters'
 
 export interface MemoEditorControl {
@@ -13,7 +13,7 @@ export interface MemoEditorControl {
 }
 
 interface SalesMemoSectionProps {
-  row: SalesRfq
+  row: SalesRfqResponse
   isMutating: boolean
   control: MemoEditorControl
 }

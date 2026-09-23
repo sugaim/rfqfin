@@ -1,14 +1,18 @@
 import { useState } from 'react'
 import { Modal } from 'antd'
 import {
-  useCommitPostProcessMutation,
+  useCommitPostProcessChangesMutation,
   useGetPostProcessQuery,
   useGetGridConfigQuery,
   useSaveGridConfigMutation,
-  type PostProcessPreset,
-  type PostProcessScope,
-} from '@/services/api'
+  type PostProcessCommitItemRequest,
+} from '@/generated/rfqApi'
 import { PostProcessScreen } from '@/pages/post-process/PostProcessScreen'
+import type {
+  PostProcessPreset,
+  PostProcessScope,
+} from '@/pages/post-process/postProcessModel'
+import { unwrapApiResult } from '@/services/apiProblem'
 import { useBlocker, useOutletContext } from 'react-router'
 import type { AppOutletContext } from '@/app/App'
 
@@ -22,9 +26,21 @@ export function PostProcessWorkspace() {
     screenId: 'post-process',
     configKey: 'main',
   })
-  const [commit, commitState] = useCommitPostProcessMutation()
+  const [commit, commitState] = useCommitPostProcessChangesMutation()
   const [saveGridConfig] = useSaveGridConfigMutation()
   const blocker = useBlocker(hasPending)
+
+  const commitChanges = async (items: PostProcessCommitItemRequest[]) => {
+    const results = await unwrapApiResult(
+      commit({ postProcessCommitRequest: { items } }),
+    )
+    await query
+      .refetch()
+      .unwrap()
+      .catch(() => undefined)
+
+    return results
+  }
 
   return (
     <>
@@ -39,7 +55,7 @@ export function PostProcessWorkspace() {
         onPresetChange={setPreset}
         onScopeChange={setScope}
         onRefresh={() => query.refetch().then(() => undefined)}
-        onCommit={(items) => commit({ items }).unwrap()}
+        onCommit={commitChanges}
         onPendingChange={setHasPending}
         gridConfigJson={
           gridConfigQuery.data
@@ -47,14 +63,21 @@ export function PostProcessWorkspace() {
             : undefined
         }
         onSaveGridConfig={(configJson) =>
-          saveGridConfig({
-            screenId: 'post-process',
-            configKey: 'main',
-            version: (gridConfigQuery.data?.version ?? 0) + 1,
-            config: JSON.parse(configJson),
+          unwrapApiResult(
+            saveGridConfig({
+              screenId: 'post-process',
+              configKey: 'main',
+              gridConfigRequest: {
+                version: (gridConfigQuery.data?.version ?? 0) + 1,
+                config: JSON.parse(configJson),
+              },
+            }),
+          ).then(async () => {
+            await gridConfigQuery
+              .refetch()
+              .unwrap()
+              .catch(() => undefined)
           })
-            .unwrap()
-            .then(() => undefined)
         }
       />
       <Modal

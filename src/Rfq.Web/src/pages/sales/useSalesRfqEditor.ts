@@ -2,10 +2,11 @@ import { useRef, useState } from 'react'
 import { Form } from 'antd'
 import type { GridApi } from 'ag-grid-community'
 import type {
+  ApiProblemDetails,
   CreateDraftRequest,
   InitialRfqResponse,
-  SalesRfq,
-} from '@/services/api'
+  SalesRfqResponse,
+} from '@/generated/rfqApi'
 import { derivePaneMode, type SalesPaneMode } from '@/pages/sales/salesModel'
 import type { RfqFormValues } from '@/pages/sales/SalesRfqEditor'
 import type {
@@ -20,24 +21,24 @@ import {
 const million = 1_000_000
 
 interface UseSalesRfqEditorInput {
-  rfqs: SalesRfq[]
+  rfqs: SalesRfqResponse[]
   activeCaseId?: number
-  gridApi: GridApi<SalesRfq> | null
+  gridApi: GridApi<SalesRfqResponse> | null
   draft: SalesDraftActions
   lookup: SalesLookupActions
   run: (action: () => Promise<unknown>, caseIds?: number[]) => Promise<boolean>
   onError: (message: string | null) => void
   onStartNew: () => void
-  onSelectRow: (row: SalesRfq) => void
+  onSelectRow: (row: SalesRfqResponse) => void
   onPersisted: (caseId: number) => void
   onReconcileCases: (caseIds: number[]) => Promise<void>
 }
 
 interface DraftAutosaveState {
   version: number
-  notional?: number
-  settlementDate: string
-  standardSettlementDate: string
+  notional: number | null
+  settlementDate: string | null
+  standardSettlementDate: string | null
   salesAndTradingMessage: string
   assignedTraderId: string
 }
@@ -52,12 +53,12 @@ export interface SalesRfqEditorController {
   protectedState: boolean
   startNew: () => void
   cancelNew: () => void
-  selectRow: (row: SalesRfq) => void
+  selectRow: (row: SalesRfqResponse) => void
   applyDefaults: (securityId: string) => Promise<void>
   beginEdit: () => void
   completeEdit: (field: keyof DraftDelta) => Promise<void>
   save: (confirm: boolean) => Promise<void>
-  discard: (row: SalesRfq) => Promise<void>
+  discard: (row: SalesRfqResponse) => Promise<void>
 }
 
 export function useSalesRfqEditor({
@@ -93,7 +94,7 @@ export function useSalesRfqEditor({
     onError(null)
   }
 
-  const selectRow = (row: SalesRfq) => {
+  const selectRow = (row: SalesRfqResponse) => {
     setNewIntent(false)
     onSelectRow(row)
     onError(null)
@@ -177,7 +178,7 @@ export function useSalesRfqEditor({
       settlementDate: values.settlementDate,
       standardSettlementDate: values.standardSettlementDate,
       notional:
-        values.notional === undefined ? undefined : values.notional * million,
+        values.notional === undefined ? null : values.notional * million,
       salesAndTradingMessage: values.salesAndTradingMessage ?? '',
     }
     if (
@@ -222,7 +223,7 @@ export function useSalesRfqEditor({
     }
   }
 
-  const ensureCoordinator = (row: SalesRfq) => {
+  const ensureCoordinator = (row: SalesRfqResponse) => {
     if (autosave.current?.caseId !== row.caseId) selectRow(row)
 
     return autosave.current!.value
@@ -243,7 +244,7 @@ export function useSalesRfqEditor({
     try {
       await coordinator.enqueue(delta)
     } catch (error) {
-      const status = (error as { status?: number }).status
+      const status = (error as ApiProblemDetails).status
       onError(
         status === 409
           ? 'This Draft was updated elsewhere. Your local input is preserved; review the latest state explicitly.'
@@ -278,11 +279,11 @@ export function useSalesRfqEditor({
   }
 }
 
-function stateFromRow(row: SalesRfq): DraftAutosaveState {
+function stateFromRow(row: SalesRfqResponse): DraftAutosaveState {
   return {
     version: row.version,
-    notional: row.notional ?? undefined,
-    settlementDate: row.settlementDate ?? '',
+    notional: row.notional,
+    settlementDate: row.settlementDate,
     standardSettlementDate: row.standardSettlementDate,
     salesAndTradingMessage: row.salesAndTradingMessage,
     assignedTraderId: row.assignedTraderId,
@@ -292,8 +293,8 @@ function stateFromRow(row: SalesRfq): DraftAutosaveState {
 function stateFromResponse(result: InitialRfqResponse): DraftAutosaveState {
   return {
     version: result.version,
-    notional: result.notional ?? undefined,
-    settlementDate: result.settlementDate ?? '',
+    notional: result.notional,
+    settlementDate: result.settlementDate,
     standardSettlementDate: result.standardSettlementDate,
     salesAndTradingMessage: result.salesAndTradingMessage,
     assignedTraderId: result.assignedTraderId,

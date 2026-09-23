@@ -10,29 +10,29 @@ import {
   Typography,
 } from 'antd'
 import type { AppThemeMode } from '@/app/theme'
-import type { QuoteExpiry, QuoteModeSetting } from '@/services/api'
+import type { QuoteExpiryResponse, QuoteModeResponse } from '@/generated/rfqApi'
 
 export interface PersonalSettingsDraft {
   theme: AppThemeMode
-  quoteMode: QuoteModeSetting['mode']
-  quoteExpiry: QuoteExpiry
+  quoteMode: QuoteModeResponse['mode']
+  quoteExpiry: QuoteExpiryResponse
 }
 
 interface SettingsDrawerProps {
   open: boolean
   theme: AppThemeMode
-  quoteMode: QuoteModeSetting['mode']
-  quoteExpiry: QuoteExpiry
+  quoteMode: QuoteModeResponse['mode']
+  quoteExpiry: QuoteExpiryResponse
   isLoading?: boolean
   onClose: () => void
   onSave: (settings: PersonalSettingsDraft) => Promise<void>
 }
 
-function expiryValue(expiry: QuoteExpiry) {
+function expiryValue(expiry: QuoteExpiryResponse) {
   return expiry.type === 'None' ? 'none' : String(expiry.minutes)
 }
 
-function expiryFromValue(value: string): QuoteExpiry {
+function expiryFromValue(value: string): QuoteExpiryResponse {
   return value === 'none'
     ? { type: 'None', minutes: null }
     : { type: 'After', minutes: Number(value) }
@@ -118,7 +118,7 @@ export function SettingsDrawer({
           onChange={(value) =>
             setDraft((current) => ({
               ...current,
-              quoteMode: value as QuoteModeSetting['mode'],
+              quoteMode: value as QuoteModeResponse['mode'],
             }))
           }
         />

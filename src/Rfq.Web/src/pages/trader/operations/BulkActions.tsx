@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Button, Popconfirm, Space, Typography } from 'antd'
-import type { TraderRfq } from '@/services/api'
+import type { TraderRfqResponse } from '@/generated/rfqApi'
 import {
   isPickUpEligible,
   requiresPickUpConfirmation,
@@ -8,7 +8,7 @@ import {
 import type { BulkOperationIntents } from '@/pages/trader/operations/operationTypes'
 
 interface BulkActionsProps {
-  rows: TraderRfq[]
+  rows: TraderRfqResponse[]
   currentUserId: string
   isMutating: boolean
   targetTraderId?: string

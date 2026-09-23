@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 import type { SalesCommand } from '@/pages/sales/salesModel'
 import type { ContactOwnerControl } from '@/pages/sales/work-pane/SalesContactOwnerSection'
 import type { MemoEditorControl } from '@/pages/sales/work-pane/SalesMemoSection'
@@ -11,7 +11,7 @@ import { SalesContactOwnerSection } from '@/pages/sales/work-pane/SalesContactOw
 import { SalesMemoSection } from '@/pages/sales/work-pane/SalesMemoSection'
 
 interface LifecyclePaneProps {
-  row: SalesRfq
+  row: SalesRfqResponse
   mode: string
   now: number
   isMutating: boolean

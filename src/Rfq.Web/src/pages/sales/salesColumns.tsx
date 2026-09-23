@@ -3,7 +3,7 @@ import type {
   ColGroupDef,
   ICellRendererParams,
 } from 'ag-grid-community'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 import { RowActions } from '@/pages/sales/SalesBulkUi'
 import {
   displayState,
@@ -12,7 +12,9 @@ import {
   type SalesRowCommand,
 } from '@/pages/sales/salesModel'
 
-export function hasChangedDraftMessage(row: SalesRfq | undefined): boolean {
+export function hasChangedDraftMessage(
+  row: SalesRfqResponse | undefined,
+): boolean {
   return Boolean(
     row?.draftRevisionId &&
     row.draftSalesAndTradingMessage !== row.salesAndTradingMessage,
@@ -21,14 +23,15 @@ export function hasChangedDraftMessage(row: SalesRfq | undefined): boolean {
 
 const million = 1_000_000
 
-export type SalesColumnDefinition = ColDef<SalesRfq> | ColGroupDef<SalesRfq>
+export type SalesColumnDefinition =
+  ColDef<SalesRfqResponse> | ColGroupDef<SalesRfqResponse>
 
 export interface BuildSalesColumnsOptions {
   currentUserId: string
   isMutating: boolean
   now: number
   refreshMode: SalesRefreshMode
-  onRowCommand: (command: SalesRowCommand, row: SalesRfq) => void
+  onRowCommand: (command: SalesRowCommand, row: SalesRfqResponse) => void
 }
 
 export function buildSalesColumns({
@@ -48,7 +51,7 @@ export function buildSalesColumns({
       sortable: false,
       filter: false,
       suppressMovable: true,
-      cellRenderer: ({ data }: ICellRendererParams<SalesRfq>) =>
+      cellRenderer: ({ data }: ICellRendererParams<SalesRfqResponse>) =>
         data ? (
           <RowActions
             row={data}

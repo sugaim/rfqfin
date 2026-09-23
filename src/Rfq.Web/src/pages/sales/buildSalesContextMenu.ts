@@ -3,7 +3,7 @@ import type {
   GetContextMenuItemsParams,
   MenuItemDef,
 } from 'ag-grid-community'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 import {
   commandEligible,
   requiresConfirmation,
@@ -16,16 +16,16 @@ import {
 import type { SalesGridLayoutActions } from '@/pages/sales/salesContracts'
 
 interface BuildSalesContextMenuInput {
-  params: GetContextMenuItemsParams<SalesRfq>
+  params: GetContextMenuItemsParams<SalesRfqResponse>
   currentUserId: string
   gridLayout: SalesGridLayoutActions
   defaultColumnGroupState: GridColumnGroupState
   onRequestCommand: (
     command: SalesCommand,
-    row: SalesRfq,
+    row: SalesRfqResponse,
     confirm: boolean,
   ) => void
-  onExecuteCommand: (command: SalesCommand, row: SalesRfq) => void
+  onExecuteCommand: (command: SalesCommand, row: SalesRfqResponse) => void
 }
 
 export function buildSalesContextMenu({
@@ -35,9 +35,11 @@ export function buildSalesContextMenu({
   defaultColumnGroupState,
   onRequestCommand,
   onExecuteCommand,
-}: BuildSalesContextMenuInput): (DefaultMenuItem | MenuItemDef<SalesRfq>)[] {
+}: BuildSalesContextMenuInput): (
+  DefaultMenuItem | MenuItemDef<SalesRfqResponse>
+)[] {
   const row = params.node?.data
-  const items: (DefaultMenuItem | MenuItemDef<SalesRfq>)[] = []
+  const items: (DefaultMenuItem | MenuItemDef<SalesRfqResponse>)[] = []
   if (row) {
     const add = (command: SalesCommand, label: string) => {
       if (commandEligible(command, row, currentUserId))

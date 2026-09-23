@@ -5,9 +5,9 @@ import {
   TraderScreen,
   type TraderScreenProps,
 } from '@/pages/trader/TraderScreen'
-import type { TraderRfq } from '@/services/api'
+import type { TraderRfqResponse } from '@/generated/rfqApi'
 
-const traderRow: TraderRfq = {
+const traderRow: TraderRfqResponse = {
   caseId: 201,
   clientId: 'client-001',
   clientName: 'Client One',

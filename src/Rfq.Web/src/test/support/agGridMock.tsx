@@ -1,8 +1,12 @@
 import type { ReactNode } from 'react'
 import { vi } from 'vitest'
-import type { RfqSearchItem, SalesRfq, TraderRfq } from '@/services/api'
+import type {
+  RfqSearchItemResponse,
+  SalesRfqResponse,
+  TraderRfqResponse,
+} from '@/generated/rfqApi'
 
-type GridRow = SalesRfq | TraderRfq | RfqSearchItem
+type GridRow = SalesRfqResponse | TraderRfqResponse | RfqSearchItemResponse
 type GridColumn = {
   field?: string
   colId?: string

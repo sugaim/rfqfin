@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import type { CellEditRequestEvent } from 'ag-grid-community'
 import type {
   ApiProblemDetails,
-  CalculatedQuotePayload,
-  TraderRfq,
-  WorkingQuoteResult,
-} from '@/services/api'
+  CalculatedQuoteResponse2,
+  TraderRfqResponse,
+  WorkingQuoteResponse,
+} from '@/generated/rfqApi'
 import {
   calculatedValue,
   canEditQuote,
@@ -14,7 +14,7 @@ import {
 
 const calculationTimeoutMs = 10_000
 
-const calculationDrivers: Record<string, CalculatedQuotePayload['driver']> = {
+const calculationDrivers: Record<string, CalculatedQuoteResponse2['driver']> = {
   price: 'Price',
   bbgYield: 'BbgYield',
   baseSimpleYield: 'SimpleYield',
@@ -26,17 +26,17 @@ const calculationDrivers: Record<string, CalculatedQuotePayload['driver']> = {
 }
 
 type CalculateWorkingQuote = (
-  row: TraderRfq,
-  driver: CalculatedQuotePayload['driver'],
+  row: TraderRfqResponse,
+  driver: CalculatedQuoteResponse2['driver'],
   value: number,
   simpleYieldSlide: number,
-) => Promise<WorkingQuoteResult | void>
+) => Promise<WorkingQuoteResponse | void>
 
 type UpdateManualQuote = (
-  row: TraderRfq,
+  row: TraderRfqResponse,
   price: number | null,
   finalSimpleYield: number | null,
-) => Promise<WorkingQuoteResult | void>
+) => Promise<WorkingQuoteResponse | void>
 
 export interface UseWorkingQuoteCalculationOptions {
   currentUserId: string
@@ -49,7 +49,7 @@ export interface UseWorkingQuoteCalculationOptions {
 export interface WorkingQuoteCalculationController {
   calcStates: Record<number, CalcState>
   calculating: boolean
-  editQuote: (event: CellEditRequestEvent<TraderRfq>) => Promise<void>
+  editQuote: (event: CellEditRequestEvent<TraderRfqResponse>) => Promise<void>
   invalidate: () => void
 }
 
@@ -74,16 +74,16 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 }
 
 function failureFrom(error: unknown, requestId: number): CalcState {
-  const apiError = error as { data?: ApiProblemDetails; message?: string }
-  const detail = apiError.data
+  const problem = error as Partial<ApiProblemDetails>
+  const message = error instanceof Error ? error.message : undefined
 
   return {
     status: 'failed',
     requestId,
-    code: detail?.calculationErrorCode ?? detail?.code,
-    message: detail?.detail ?? apiError.message ?? 'Calculation failed.',
-    traceId: detail?.traceId,
-    failureLogId: detail?.failureLogId,
+    code: problem.calculationErrorCode ?? problem.code ?? undefined,
+    message: problem.detail ?? message ?? 'Calculation failed.',
+    traceId: problem.traceId ?? undefined,
+    failureLogId: problem.failureLogId ?? undefined,
   }
 }
 
@@ -117,7 +117,7 @@ export function useWorkingQuoteCalculation({
   }, [refreshGeneration])
 
   const editQuote = async (
-    event: CellEditRequestEvent<TraderRfq>,
+    event: CellEditRequestEvent<TraderRfqResponse>,
   ): Promise<void> => {
     const row = event.data
     const column = event.column.getColId()
@@ -197,11 +197,11 @@ export function useWorkingQuoteCalculation({
 }
 
 async function updateManualQuote(
-  row: TraderRfq,
+  row: TraderRfqResponse,
   column: string,
   value: number,
   onUpdateManual: UpdateManualQuote,
-): Promise<WorkingQuoteResult | void> {
+): Promise<WorkingQuoteResponse | void> {
   return withTimeout(
     onUpdateManual(
       row,
@@ -215,11 +215,11 @@ async function updateManualQuote(
 }
 
 async function updateCalculatedQuote(
-  row: TraderRfq,
+  row: TraderRfqResponse,
   column: string,
   value: number,
   onCalculate: CalculateWorkingQuote,
-): Promise<WorkingQuoteResult | void> {
+): Promise<WorkingQuoteResponse | void> {
   const driver =
     column === 'simpleYieldSlide'
       ? row.calculated?.driver

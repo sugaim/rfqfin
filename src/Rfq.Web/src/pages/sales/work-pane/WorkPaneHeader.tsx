@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react'
 import { Tag, Typography } from 'antd'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 
 interface WorkPaneHeaderProps {
   mode: string
-  row?: SalesRfq
+  row?: SalesRfqResponse
 }
 
 export function WorkPaneHeader({

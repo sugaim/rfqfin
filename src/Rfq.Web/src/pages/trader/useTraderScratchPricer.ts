@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import type { CalculatedQuotePayload, TraderRfq } from '@/services/api'
+import type {
+  CalculatedQuoteResponse2,
+  TraderRfqResponse,
+} from '@/generated/rfqApi'
 import {
   calculatedValue,
   sameSourceTerms,
@@ -9,11 +12,11 @@ import type { ScratchState } from '@/pages/trader/TraderPricerPane'
 import type { TraderPricerActions } from '@/pages/trader/traderContracts'
 
 interface UseTraderScratchPricerInput {
-  rfqs: TraderRfq[]
-  selected?: TraderRfq
+  rfqs: TraderRfqResponse[]
+  selected?: TraderRfqResponse
   actions?: TraderPricerActions
   onApply: (
-    row: TraderRfq,
+    row: TraderRfqResponse,
     price: number | null,
     finalSimpleYield: number | null,
   ) => Promise<void>
@@ -22,9 +25,9 @@ interface UseTraderScratchPricerInput {
 
 export interface TraderScratchPricerController {
   scratch: ScratchState
-  result: CalculatedQuotePayload | null
+  result: CalculatedQuoteResponse2 | null
   provenance: PricerProvenance | null
-  sourceRow?: TraderRfq
+  sourceRow?: TraderRfqResponse
   canApply: boolean
   busy: boolean
   setScratch: React.Dispatch<React.SetStateAction<ScratchState>>
@@ -55,7 +58,7 @@ export function useTraderScratchPricer({
   onError,
 }: UseTraderScratchPricerInput): TraderScratchPricerController {
   const [scratch, setScratch] = useState<ScratchState>(emptyScratch)
-  const [result, setResult] = useState<CalculatedQuotePayload | null>(null)
+  const [result, setResult] = useState<CalculatedQuoteResponse2 | null>(null)
   const [provenance, setProvenance] = useState<PricerProvenance | null>(null)
   const [busy, setBusy] = useState(false)
   const sourceRow = provenance

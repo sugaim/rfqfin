@@ -28,14 +28,14 @@ import {
   useReopenRfqsMutation,
   useSaveAmendmentMutation,
   useSaveGridConfigMutation,
-  useUpdateDraftMutation,
+  useUpdateInitialDraftMutation,
   useUpdateSalesMemoMutation,
   useStartAmendmentMutation,
-  type CaseOperationResult,
-  type ClientSearchResult,
-  type SalesRfq,
-  type SecuritySearchResult,
-} from '@/services/api'
+  type CaseOperationResponse,
+  type ClientCandidateResponse,
+  type SalesRfqResponse,
+  type SecurityCandidateResponse,
+} from '@/generated/rfqApi'
 import { SalesScreen } from '@/pages/sales/SalesScreen'
 import type { SalesBulkCommand } from '@/pages/sales/salesModel'
 import type {
@@ -50,6 +50,7 @@ import type {
 } from '@/pages/sales/salesContracts'
 import { useLivePausedRows } from '@/shared/state/useLivePausedRows'
 import { shouldLoadRecentRevisions } from '@/pages/sales/recentRevisions'
+import { unwrapApiResult } from '@/services/apiProblem'
 
 export function SalesWorkspace() {
   const { currentUserId, salesChangeVersion, recentRevisionsChangeVersion } =
@@ -63,7 +64,7 @@ export function SalesWorkspace() {
   })
   const [loadRecent, recentQuery] = useLazyGetSalesRecentRevisionsQuery()
   const [createDraft, createState] = useCreateDraftMutation()
-  const [updateDraft, updateState] = useUpdateDraftMutation()
+  const [updateDraft, updateState] = useUpdateInitialDraftMutation()
   const [confirmNewRfq, confirmNewState] = useConfirmNewRfqMutation()
   const [confirmDraft, confirmState] = useConfirmInitialDraftsMutation()
   const [discardDraft, discardState] = useDiscardInitialDraftsMutation()
@@ -102,8 +103,8 @@ export function SalesWorkspace() {
   const [searchClients] = useLazySearchClientsQuery()
   const [searchSecurities] = useLazySearchSecuritiesQuery()
   const [resolveDefaults] = useLazyResolveRfqCreationContextQuery()
-  const [clients, setClients] = useState<ClientSearchResult[]>([])
-  const [securities, setSecurities] = useState<SecuritySearchResult[]>([])
+  const [clients, setClients] = useState<ClientCandidateResponse[]>([])
+  const [securities, setSecurities] = useState<SecurityCandidateResponse[]>([])
   const [protectedState, setProtectedState] = useState(false)
   const [recentOpen, setRecentOpen] = useState(false)
   const [recentGeneration, setRecentGeneration] = useState(1)
@@ -113,7 +114,7 @@ export function SalesWorkspace() {
     remoteChangeVersion: salesChangeVersion,
     protectedState,
     refetch: rfqsQuery.refetch,
-    keyOf: (row: SalesRfq) => row.caseId,
+    keyOf: (row: SalesRfqResponse) => row.caseId,
   })
 
   useEffect(() => {
@@ -131,7 +132,7 @@ export function SalesWorkspace() {
     )
       return
     const requestedGeneration = recentGeneration
-    void loadRecent(undefined)
+    void loadRecent({})
       .unwrap()
       .then(() => setLoadedRecentGeneration(requestedGeneration))
   }, [
@@ -142,7 +143,7 @@ export function SalesWorkspace() {
     recentQuery.isFetching,
   ])
 
-  const lifecycleItems = (rows: SalesRfq[]) => ({
+  const lifecycleItems = (rows: SalesRfqResponse[]) => ({
     items: rows.map((row) => ({
       caseId: row.caseId,
       expectedCurrentVersion: row.currentVersion,
@@ -151,52 +152,76 @@ export function SalesWorkspace() {
 
   const runBulk = async (
     command: SalesBulkCommand,
-    rows: SalesRfq[],
-  ): Promise<CaseOperationResult[]> => {
+    rows: SalesRfqResponse[],
+  ): Promise<CaseOperationResponse[]> => {
     switch (command) {
       case 'away':
-        return bulkAway(lifecycleItems(rows)).unwrap()
+        return unwrapApiResult(
+          bulkAway({ closeAwayRfqsRequest: lifecycleItems(rows) }),
+        )
       case 'cancel':
-        return bulkCancel(lifecycleItems(rows)).unwrap()
+        return unwrapApiResult(
+          bulkCancel({ cancelRfqsRequest: lifecycleItems(rows) }),
+        )
       case 'present':
-        return bulkPresent(lifecycleItems(rows)).unwrap()
+        return unwrapApiResult(
+          bulkPresent({ presentRfqsRequest: lifecycleItems(rows) }),
+        )
       case 'unpresent':
-        return bulkUnpresent(lifecycleItems(rows)).unwrap()
+        return unwrapApiResult(
+          bulkUnpresent({ unpresentRfqsRequest: lifecycleItems(rows) }),
+        )
       case 'confirm-drafts':
-        return bulkConfirmDrafts({
-          items: rows.map((row) => ({
-            caseId: row.caseId,
-            notional: row.notional,
-            settlementDate: row.settlementDate!,
-            standardSettlementDate: row.standardSettlementDate,
-            salesAndTradingMessage: row.salesAndTradingMessage,
-            assignedTraderId: row.assignedTraderId,
-            expectedCurrentVersion: row.version,
-          })),
-        }).unwrap()
+        return unwrapApiResult(
+          bulkConfirmDrafts({
+            confirmInitialDraftsRequest: {
+              items: rows.map((row) => ({
+                caseId: row.caseId,
+                notional: row.notional,
+                settlementDate: row.settlementDate,
+                standardSettlementDate: row.standardSettlementDate,
+                salesAndTradingMessage: row.salesAndTradingMessage,
+                assignedTraderId: row.assignedTraderId,
+                expectedCurrentVersion: row.version,
+              })),
+            },
+          }),
+        )
       case 'discard-drafts':
-        return bulkDiscardDrafts({
-          items: rows.map((row) => ({
-            caseId: row.caseId,
-            expectedCurrentVersion: row.version,
-          })),
-        }).unwrap()
+        return unwrapApiResult(
+          bulkDiscardDrafts({
+            discardInitialDraftsRequest: {
+              items: rows.map((row) => ({
+                caseId: row.caseId,
+                expectedCurrentVersion: row.version,
+              })),
+            },
+          }),
+        )
       case 'confirm-amendments':
-        return bulkConfirmAmendments({
-          items: rows.map((row) => ({
-            caseId: row.caseId,
-            expectedCurrentVersion: row.currentVersion,
-            expectedDraftVersion: row.draftVersion!,
-          })),
-        }).unwrap()
+        return unwrapApiResult(
+          bulkConfirmAmendments({
+            confirmAmendmentsRequest: {
+              items: rows.map((row) => ({
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+                expectedDraftVersion: row.draftVersion!,
+              })),
+            },
+          }),
+        )
       case 'discard-amendments':
-        return bulkDiscardAmendments({
-          items: rows.map((row) => ({
-            caseId: row.caseId,
-            expectedCurrentVersion: row.currentVersion,
-            expectedDraftVersion: row.draftVersion!,
-          })),
-        }).unwrap()
+        return unwrapApiResult(
+          bulkDiscardAmendments({
+            discardAmendmentsRequest: {
+              items: rows.map((row) => ({
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+                expectedDraftVersion: row.draftVersion!,
+              })),
+            },
+          }),
+        )
     }
   }
 
@@ -232,96 +257,144 @@ export function SalesWorkspace() {
   ]
   const lookup: SalesLookupActions = {
     searchClients: async (query) =>
-      setClients(query.trim() ? await searchClients(query).unwrap() : []),
+      setClients(
+        query.trim() ? await unwrapApiResult(searchClients({ q: query })) : [],
+      ),
     searchSecurities: async (query) =>
-      setSecurities(query.trim() ? await searchSecurities(query).unwrap() : []),
-    resolveDefaults: (securityId) => resolveDefaults({ securityId }).unwrap(),
+      setSecurities(
+        query.trim()
+          ? await unwrapApiResult(searchSecurities({ q: query }))
+          : [],
+      ),
+    resolveDefaults: (securityId) =>
+      unwrapApiResult(resolveDefaults({ securityId })),
   }
   const draft: SalesDraftActions = {
-    create: (request) => createDraft(request).unwrap(),
-    update: (caseId, body) => updateDraft({ caseId, body }).unwrap(),
-    confirmNew: (request) => confirmNewRfq(request).unwrap(),
+    create: (request) =>
+      unwrapApiResult(createDraft({ createDraftRequest: request })),
+    update: (caseId, body) =>
+      unwrapApiResult(updateDraft({ caseId, updateDraftRequest: body })),
+    confirmNew: (request) =>
+      unwrapApiResult(confirmNewRfq({ createDraftRequest: request })),
     confirm: (caseId, body) =>
-      confirmDraft({
-        items: [{ caseId, ...body, notional: body.notional ?? null }],
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        confirmDraft({
+          confirmInitialDraftsRequest: { items: [{ caseId, ...body }] },
+        }),
+      ).then(() => undefined),
     discard: (caseId, expectedVersion) =>
-      discardDraft({
-        items: [{ caseId, expectedCurrentVersion: expectedVersion }],
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        discardDraft({
+          discardInitialDraftsRequest: {
+            items: [{ caseId, expectedCurrentVersion: expectedVersion }],
+          },
+        }),
+      ).then(() => undefined),
   }
   const lifecycle: SalesLifecycleActions = {
     present: (caseId, expectedCurrentVersion) =>
-      presentQuote({ items: [{ caseId, expectedCurrentVersion }] })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        presentQuote({
+          presentRfqsRequest: { items: [{ caseId, expectedCurrentVersion }] },
+        }),
+      ).then(() => undefined),
     unpresent: (caseId, expectedCurrentVersion) =>
-      unpresentQuote({ items: [{ caseId, expectedCurrentVersion }] })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        unpresentQuote({
+          unpresentRfqsRequest: { items: [{ caseId, expectedCurrentVersion }] },
+        }),
+      ).then(() => undefined),
     close: (caseId, outcome, expectedCurrentVersion) =>
       (outcome === 'Hit'
-        ? closeHitRfq({ caseId, expectedCurrentVersion })
-        : closeAwayRfq({ items: [{ caseId, expectedCurrentVersion }] })
-      )
-        .unwrap()
-        .then(() => undefined),
+        ? unwrapApiResult(
+            closeHitRfq({
+              caseId,
+              closeHitRfqRequest: { expectedCurrentVersion },
+            }),
+          )
+        : unwrapApiResult(
+            closeAwayRfq({
+              closeAwayRfqsRequest: {
+                items: [{ caseId, expectedCurrentVersion }],
+              },
+            }),
+          )
+      ).then(() => undefined),
     correctOutcome: (caseId, outcome, expectedCurrentVersion, reason) =>
-      (outcome === 'Hit' ? correctToHit : correctToAway)({
-        caseId,
-        expectedCurrentVersion,
-        reason,
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        outcome === 'Hit'
+          ? correctToHit({
+              caseId,
+              correctOutcomeToHitRequest: { expectedCurrentVersion, reason },
+            })
+          : correctToAway({
+              caseId,
+              correctOutcomeToAwayRequest: { expectedCurrentVersion, reason },
+            }),
+      ).then(() => undefined),
     cancel: (row) =>
-      cancelRfq({
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        cancelRfq({
+          cancelRfqsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
     reopen: (row) =>
-      reopenRfq({
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-    createFromExisting: (caseId) => createFromExisting(caseId).unwrap(),
+      unwrapApiResult(
+        reopenRfq({
+          reopenRfqsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
+    createFromExisting: (caseId) =>
+      unwrapApiResult(createFromExisting({ caseId })),
   }
   const contactOwner: SalesContactOwnerActions = {
     change: (caseId, targetUserId, expectedCurrentVersion) =>
-      changeContactOwner({
-        targetContactOwnerId: targetUserId,
-        confirmed: true,
-        items: [{ caseId, expectedCurrentVersion }],
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        changeContactOwner({
+          changeContactOwnersRequest: {
+            targetContactOwnerId: targetUserId,
+            confirmed: true,
+            items: [{ caseId, expectedCurrentVersion }],
+          },
+        }),
+      ).then(() => undefined),
   }
   const memo: SalesMemoActions = {
     update: (caseId, value, expectedVersion) =>
-      updateSalesMemo({
-        caseId,
-        memo: value,
-        expectedMemoVersion: expectedVersion,
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        updateSalesMemo({
+          caseId,
+          updateMemoRequest: {
+            memo: value,
+            expectedMemoVersion: expectedVersion,
+          },
+        }),
+      ).then(() => undefined),
   }
   const amendment: SalesAmendmentActions = {
     start: (row) =>
-      startAmendment({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-      }).unwrap(),
+      unwrapApiResult(
+        startAmendment({
+          caseId: row.caseId,
+          startAmendmentRequest: {
+            expectedCurrentVersion: row.currentVersion,
+          },
+        }),
+      ),
     save: (
       caseId,
       notional,
@@ -330,38 +403,46 @@ export function SalesWorkspace() {
       expectedCurrentVersion,
       expectedDraftVersion,
     ) =>
-      saveAmendment({
-        caseId,
-        notional,
-        settlementDate,
-        salesAndTradingMessage: text,
-        expectedCurrentVersion,
-        expectedDraftVersion,
-      }).unwrap(),
+      unwrapApiResult(
+        saveAmendment({
+          caseId,
+          saveAmendmentRequest: {
+            notional,
+            settlementDate,
+            salesAndTradingMessage: text,
+            expectedCurrentVersion,
+            expectedDraftVersion,
+          },
+        }),
+      ),
     confirm: (row) =>
-      confirmAmendment({
-        items: [
-          {
-            caseId: row.caseId,
-            expectedCurrentVersion: row.currentVersion,
-            expectedDraftVersion: row.draftVersion!,
+      unwrapApiResult(
+        confirmAmendment({
+          confirmAmendmentsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+                expectedDraftVersion: row.draftVersion!,
+              },
+            ],
           },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
+        }),
+      ).then(() => undefined),
     discard: (row) =>
-      discardAmendment({
-        items: [
-          {
-            caseId: row.caseId,
-            expectedCurrentVersion: row.currentVersion,
-            expectedDraftVersion: row.draftVersion!,
+      unwrapApiResult(
+        discardAmendment({
+          discardAmendmentsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+                expectedDraftVersion: row.draftVersion!,
+              },
+            ],
           },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
+        }),
+      ).then(() => undefined),
   }
   const bulk: SalesBulkActions = { execute: runBulk }
   const gridLayout: SalesGridLayoutActions = {
@@ -369,14 +450,21 @@ export function SalesWorkspace() {
       ? JSON.stringify(gridConfigQuery.data.config)
       : undefined,
     save: (configJson) =>
-      saveGridConfig({
-        screenId: 'sales',
-        configKey: 'main',
-        version: (gridConfigQuery.data?.version ?? 0) + 1,
-        config: JSON.parse(configJson),
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        saveGridConfig({
+          screenId: 'sales',
+          configKey: 'main',
+          gridConfigRequest: {
+            version: (gridConfigQuery.data?.version ?? 0) + 1,
+            config: JSON.parse(configJson),
+          },
+        }),
+      ).then(async () => {
+        await gridConfigQuery
+          .refetch()
+          .unwrap()
+          .catch(() => undefined)
+      }),
   }
 
   return (

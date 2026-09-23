@@ -1,15 +1,15 @@
-import type { TraderRfq } from '@/services/api'
+import type { TraderRfqResponse } from '@/generated/rfqApi'
 import type { TraderBulkCommand } from '@/pages/trader/traderModel'
 
 export type TraderOperationRunner = <T>(
   action: () => Promise<T | void>,
-  row?: TraderRfq,
+  row?: TraderRfqResponse,
 ) => Promise<T | void>
 
 export type TraderBulkRunner = (
   label: string,
   command: TraderBulkCommand,
-  rows: TraderRfq[],
+  rows: TraderRfqResponse[],
   trader?: string,
 ) => Promise<void>
 

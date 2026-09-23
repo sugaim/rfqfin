@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Descriptions, Space, Tag } from 'antd'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 import { displayState, elapsedLabel } from '@/pages/sales/salesModel'
 import type { UserOption } from '@/pages/sales/salesContracts'
 import {
@@ -10,7 +10,7 @@ import {
 } from '@/pages/sales/work-pane/workPaneFormatters'
 
 interface SalesRfqSummaryProps {
-  row: SalesRfq
+  row: SalesRfqResponse
   mode: string
   now: number
   users: UserOption[]

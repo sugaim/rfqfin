@@ -1,12 +1,12 @@
 import type {
-  CaseOperationResult,
+  CaseOperationResponse,
   CreateDraftRequest,
   InitialRfqResponse,
-  AmendmentResult,
-  RfqCreationContext,
-  SalesRfq,
+  AmendmentResponse,
+  RfqCreationContextResponse,
+  SalesRfqResponse,
   UpdateDraftRequest,
-} from '@/services/api'
+} from '@/generated/rfqApi'
 import type { SalesBulkCommand } from '@/pages/sales/salesModel'
 
 export interface UserOption {
@@ -17,7 +17,7 @@ export interface UserOption {
 export interface SalesLookupActions {
   searchClients: (query: string) => void | Promise<void>
   searchSecurities: (query: string) => void | Promise<void>
-  resolveDefaults: (securityId: string) => Promise<RfqCreationContext>
+  resolveDefaults: (securityId: string) => Promise<RfqCreationContextResponse>
 }
 
 export interface SalesDraftActions {
@@ -39,8 +39,8 @@ export interface SalesLifecycleActions {
     outcome: 'Hit' | 'Away',
     expectedCurrentVersion: number,
   ) => Promise<void>
-  cancel: (row: SalesRfq) => Promise<void>
-  reopen: (row: SalesRfq) => Promise<void>
+  cancel: (row: SalesRfqResponse) => Promise<void>
+  reopen: (row: SalesRfqResponse) => Promise<void>
   createFromExisting: (caseId: number) => Promise<InitialRfqResponse>
   correctOutcome: (
     caseId: number,
@@ -51,7 +51,7 @@ export interface SalesLifecycleActions {
 }
 
 export interface SalesAmendmentActions {
-  start: (row: SalesRfq) => Promise<AmendmentResult>
+  start: (row: SalesRfqResponse) => Promise<AmendmentResponse>
   save: (
     caseId: number,
     notional: number | null,
@@ -59,9 +59,9 @@ export interface SalesAmendmentActions {
     text: string,
     expectedCurrentVersion: number,
     expectedDraftVersion: number | null,
-  ) => Promise<AmendmentResult>
-  confirm: (row: SalesRfq) => Promise<void>
-  discard: (row: SalesRfq) => Promise<void>
+  ) => Promise<AmendmentResponse>
+  confirm: (row: SalesRfqResponse) => Promise<void>
+  discard: (row: SalesRfqResponse) => Promise<void>
 }
 
 export interface SalesContactOwnerActions {
@@ -83,8 +83,8 @@ export interface SalesMemoActions {
 export interface SalesBulkActions {
   execute: (
     command: SalesBulkCommand,
-    rows: SalesRfq[],
-  ) => Promise<CaseOperationResult[]>
+    rows: SalesRfqResponse[],
+  ) => Promise<CaseOperationResponse[]>
 }
 
 export interface SalesGridLayoutActions {

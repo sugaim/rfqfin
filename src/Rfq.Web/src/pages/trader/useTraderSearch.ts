@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { InputRef } from 'antd'
-import type { RfqSearchParams, RfqSearchResult } from '@/services/api'
+import type { SearchRfqsApiArg, RfqSearchResponse } from '@/generated/rfqApi'
 import {
   searchDateRange,
   type SearchDatePreset,
@@ -18,7 +18,7 @@ export interface TraderSearchController {
   filtersOpen: boolean
   preset: SearchDatePreset
   filters: Record<string, string>
-  result: RfqSearchResult
+  result: RfqSearchResponse
   searching: boolean
   caseInputRef: React.RefObject<InputRef | null>
   toggle: () => void
@@ -38,7 +38,7 @@ export function useTraderSearch({
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [preset, setPreset] = useState<SearchDatePreset>('1Y')
   const [filters, setFilters] = useState<Record<string, string>>({})
-  const [result, setResult] = useState<RfqSearchResult>({
+  const [result, setResult] = useState<RfqSearchResponse>({
     items: [],
     requiresNarrowing: false,
   })
@@ -49,7 +49,7 @@ export function useTraderSearch({
     setSearching(true)
     onError(null)
     try {
-      const params: RfqSearchParams = searchDateRange(businessDate, preset)
+      const params: SearchRfqsApiArg = searchDateRange(businessDate, preset)
       for (const [key, value] of Object.entries(filters)) {
         if (!value.trim()) continue
         if (key === 'caseId') params.caseId = Number(value)

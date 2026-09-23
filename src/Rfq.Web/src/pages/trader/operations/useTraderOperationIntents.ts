@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TraderRfq } from '@/services/api'
+import type { TraderRfqResponse } from '@/generated/rfqApi'
 import {
   isPickUpEligible,
   requiresPickUpConfirmation,
@@ -21,8 +21,8 @@ import type {
 } from '@/pages/trader/operations/operationTypes'
 
 interface UseTraderOperationIntentsInput {
-  selected?: TraderRfq
-  selectedRows: TraderRfq[]
+  selected?: TraderRfqResponse
+  selectedRows: TraderRfqResponse[]
   currentUserId: string
   run: TraderOperationRunner
   runBulk: TraderBulkRunner
@@ -58,7 +58,7 @@ export function useTraderOperationIntents({
 }: UseTraderOperationIntentsInput): TraderOperationController {
   const [targetTraderId, setTargetTraderId] = useState<string>()
   const [targetContactOwnerId, setTargetContactOwnerId] = useState<string>()
-  const withSelected = (intent: (row: TraderRfq) => void) => {
+  const withSelected = (intent: (row: TraderRfqResponse) => void) => {
     if (selected) intent(selected)
   }
   const pickRows = selectedRows.filter(isPickUpEligible)

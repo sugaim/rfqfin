@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRoutes } from '@/app/router'
 
-vi.mock('@/services/api', () => ({
+vi.mock('@/generated/rfqApi', () => ({
   useGetHealthQuery: () => ({
     data: { status: 'ok' },
     isLoading: false,

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Button, Popconfirm, Select, Space, Typography } from 'antd'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 import type { UserOption } from '@/pages/sales/salesContracts'
 
 export interface ContactOwnerControl {
@@ -12,7 +12,7 @@ export interface ContactOwnerControl {
 }
 
 interface SalesContactOwnerSectionProps {
-  row: SalesRfq
+  row: SalesRfqResponse
   isMutating: boolean
   control: ContactOwnerControl
 }

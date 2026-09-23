@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TraderRfq } from '@/services/api'
+import type { TraderRfqResponse } from '@/generated/rfqApi'
 import {
   attentionClass,
   isPickUpEligible,
@@ -10,7 +10,9 @@ import {
   traderState,
 } from '@/pages/trader/traderModel'
 
-const row = (overrides: Partial<TraderRfq> = {}): TraderRfq => ({
+const row = (
+  overrides: Partial<TraderRfqResponse> = {},
+): TraderRfqResponse => ({
   caseId: 1,
   clientId: 'c',
   clientName: 'Client',

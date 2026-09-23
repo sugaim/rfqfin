@@ -29,11 +29,11 @@ import {
   useUnpresentRfqsMutation,
   useUpdateManualWorkingQuoteMutation,
   useUpdateTraderMemoMutation,
-  type CaseOperationResult,
-  type QuoteExpiry,
-  type RfqSearchParams,
-  type TraderRfq,
-} from '@/services/api'
+  type CaseOperationResponse,
+  type QuoteExpiryResponse,
+  type SearchRfqsApiArg,
+  type TraderRfqResponse,
+} from '@/generated/rfqApi'
 import { TraderScreen } from '@/pages/trader/TraderScreen'
 import type { TraderBulkCommand } from '@/pages/trader/traderModel'
 import { requiresPickUpConfirmation } from '@/pages/trader/traderModel'
@@ -49,6 +49,7 @@ import type {
   TraderWorkingQuoteActions,
 } from '@/pages/trader/traderContracts'
 import { useLivePausedRows } from '@/shared/state/useLivePausedRows'
+import { unwrapApiResult } from '@/services/apiProblem'
 
 export function TraderWorkspace() {
   const { currentUserId, businessDate, traderChangeVersion } =
@@ -106,64 +107,87 @@ export function TraderWorkspace() {
     remoteChangeVersion: traderChangeVersion,
     protectedState,
     refetch: rfqsQuery.refetch,
-    keyOf: (row: TraderRfq) => row.caseId,
+    keyOf: (row: TraderRfqResponse) => row.caseId,
     onAuthoritativeRefresh: () => setRefreshGeneration((value) => value + 1),
   })
 
-  const lifecycleItems = (rows: TraderRfq[]) =>
+  const lifecycleItems = (rows: TraderRfqResponse[]) =>
     rows.map((row) => ({
       caseId: row.caseId,
       expectedCurrentVersion: row.currentVersion,
     }))
-  const ownershipItems = (rows: TraderRfq[]) =>
+  const ownershipItems = (rows: TraderRfqResponse[]) =>
     rows.map((row) => ({
       caseId: row.caseId,
       expectedCurrentVersion: row.currentVersion,
     }))
-  const expiryFor = (minutes: number | null): QuoteExpiry =>
+  const expiryFor = (minutes: number | null): QuoteExpiryResponse =>
     minutes === null
       ? { type: 'None', minutes: null }
       : { type: 'After', minutes }
 
   const runBulk = async (
     command: TraderBulkCommand,
-    rows: TraderRfq[],
+    rows: TraderRfqResponse[],
     expiryMinutes: number | null,
     targetTraderId?: string,
-  ): Promise<CaseOperationResult[]> => {
+  ): Promise<CaseOperationResponse[]> => {
     switch (command) {
       case 'pick':
-        return bulkPick({
-          confirmed: rows.some((row) =>
-            requiresPickUpConfirmation(row, currentUserId),
-          ),
-          items: rows.map((row) => ({
-            caseId: row.caseId,
-            expectedCurrentVersion: row.currentVersion,
-          })),
-        }).unwrap()
+        return unwrapApiResult(
+          bulkPick({
+            pickUpRfqsRequest: {
+              confirmed: rows.some((row) =>
+                requiresPickUpConfirmation(row, currentUserId),
+              ),
+              items: ownershipItems(rows),
+            },
+          }),
+        )
       case 'release':
-        return bulkRelease({ items: ownershipItems(rows) }).unwrap()
+        return unwrapApiResult(
+          bulkRelease({
+            releaseRfqsRequest: { items: ownershipItems(rows) },
+          }),
+        )
       case 'assign':
-        return bulkAssign({
-          targetTraderId: targetTraderId!,
-          items: ownershipItems(rows),
-        }).unwrap()
+        return unwrapApiResult(
+          bulkAssign({
+            assignTradersRequest: {
+              targetTraderId: targetTraderId!,
+              items: ownershipItems(rows),
+            },
+          }),
+        )
       case 'confirm':
-        return bulkConfirm({
-          items: rows.map((row) => ({
-            caseId: row.caseId,
-            expiry: expiryFor(expiryMinutes),
-            expectedCurrentVersion: row.currentVersion,
-            expectedWorkingQuoteVersion: row.workingQuoteVersion,
-          })),
-        }).unwrap()
+        return unwrapApiResult(
+          bulkConfirm({
+            confirmQuotesRequest: {
+              items: rows.map((row) => ({
+                caseId: row.caseId,
+                expiry: expiryFor(expiryMinutes),
+                expectedCurrentVersion: row.currentVersion,
+                expectedWorkingQuoteVersion: row.workingQuoteVersion,
+              })),
+            },
+          }),
+        )
       case 'withdraw':
-        return bulkWithdraw({ items: lifecycleItems(rows) }).unwrap()
+        return unwrapApiResult(
+          bulkWithdraw({
+            withdrawQuotesRequest: { items: lifecycleItems(rows) },
+          }),
+        )
       case 'away':
-        return bulkAway({ items: lifecycleItems(rows) }).unwrap()
+        return unwrapApiResult(
+          bulkAway({
+            closeAwayRfqsRequest: { items: lifecycleItems(rows) },
+          }),
+        )
       case 'cancel':
-        return bulkCancel({ items: lifecycleItems(rows) }).unwrap()
+        return unwrapApiResult(
+          bulkCancel({ cancelRfqsRequest: { items: lifecycleItems(rows) } }),
+        )
     }
   }
 
@@ -177,14 +201,21 @@ export function TraderWorkspace() {
           ? searchConfigQuery
           : confirmConfigQuery
 
-    return saveGridConfig({
-      screenId: 'trader',
-      configKey: key,
-      version: (query.data?.version ?? 0) + 1,
-      config: JSON.parse(json),
+    return unwrapApiResult(
+      saveGridConfig({
+        screenId: 'trader',
+        configKey: key,
+        gridConfigRequest: {
+          version: (query.data?.version ?? 0) + 1,
+          config: JSON.parse(json),
+        },
+      }),
+    ).then(async () => {
+      await query
+        .refetch()
+        .unwrap()
+        .catch(() => undefined)
     })
-      .unwrap()
-      .then(() => undefined)
   }
 
   const mutationStates = [
@@ -215,171 +246,257 @@ export function TraderWorkspace() {
   ]
   const ownership: TraderOwnershipActions = {
     pickUp: (row, confirmed) =>
-      pickUp({
-        confirmed,
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-    release: (row) =>
-      release({
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-    assign: (row, targetTraderId) =>
-      assign({
-        targetTraderId,
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-    takeOver: (row) =>
-      takeOver({
-        confirmed: true,
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-  }
-  const workingQuote: TraderWorkingQuoteActions = {
-    calculate: (row, driver, value, slide) =>
-      calculate({
-        caseId: row.caseId,
-        driver,
-        value,
-        simpleYieldSlide: slide,
-        expectedCurrentVersion: row.currentVersion,
-        expectedWorkingQuoteVersion: row.workingQuoteVersion,
-      }).unwrap(),
-    changeMode: (row, mode) =>
-      changeMode({
-        caseId: row.caseId,
-        mode,
-        expectedCurrentVersion: row.currentVersion,
-        expectedWorkingQuoteVersion: row.workingQuoteVersion,
-      }).unwrap(),
-    updateManual: (row, price, finalSimpleYield) =>
-      updateManual({
-        caseId: row.caseId,
-        price,
-        finalSimpleYield,
-        expectedCurrentVersion: row.currentVersion,
-        expectedWorkingQuoteVersion: row.workingQuoteVersion,
-      }).unwrap(),
-    confirm: (row, expiryMinutes) =>
-      confirmQuote({
-        items: [
-          {
-            caseId: row.caseId,
-            expiry: expiryFor(expiryMinutes),
-            expectedCurrentVersion: row.currentVersion,
-            expectedWorkingQuoteVersion: row.workingQuoteVersion,
-          },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-  }
-  const lifecycle: TraderLifecycleActions = {
-    present: (row) =>
-      present({
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-    unpresent: (row) =>
-      unpresent({
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-    withdraw: (row) =>
-      withdraw({
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
-    close: (row, outcome) =>
-      (outcome === 'Hit'
-        ? closeHit({
-            caseId: row.caseId,
-            expectedCurrentVersion: row.currentVersion,
-          })
-        : closeAway({
+      unwrapApiResult(
+        pickUp({
+          pickUpRfqsRequest: {
+            confirmed,
             items: [
               {
                 caseId: row.caseId,
                 expectedCurrentVersion: row.currentVersion,
               },
             ],
-          })
-      )
-        .unwrap()
-        .then(() => undefined),
+          },
+        }),
+      ).then(() => undefined),
+    release: (row) =>
+      unwrapApiResult(
+        release({
+          releaseRfqsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
+    assign: (row, targetTraderId) =>
+      unwrapApiResult(
+        assign({
+          assignTradersRequest: {
+            targetTraderId,
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
+    takeOver: (row) =>
+      unwrapApiResult(
+        takeOver({
+          takeOverRfqsRequest: {
+            confirmed: true,
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
+  }
+  const workingQuote: TraderWorkingQuoteActions = {
+    calculate: (row, driver, value, slide) =>
+      unwrapApiResult(
+        calculate({
+          caseId: row.caseId,
+          calculateWorkingQuoteRequest: {
+            driver,
+            value,
+            simpleYieldSlide: slide,
+            expectedCurrentVersion: row.currentVersion,
+            expectedWorkingQuoteVersion: row.workingQuoteVersion,
+          },
+        }),
+      ),
+    changeMode: (row, mode) =>
+      unwrapApiResult(
+        changeMode({
+          caseId: row.caseId,
+          changeWorkingQuoteModeRequest: {
+            mode,
+            expectedCurrentVersion: row.currentVersion,
+            expectedWorkingQuoteVersion: row.workingQuoteVersion,
+          },
+        }),
+      ),
+    updateManual: (row, price, finalSimpleYield) =>
+      unwrapApiResult(
+        updateManual({
+          caseId: row.caseId,
+          updateManualWorkingQuoteRequest: {
+            price,
+            finalSimpleYield,
+            expectedCurrentVersion: row.currentVersion,
+            expectedWorkingQuoteVersion: row.workingQuoteVersion,
+          },
+        }),
+      ),
+    confirm: (row, expiryMinutes) =>
+      unwrapApiResult(
+        confirmQuote({
+          confirmQuotesRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expiry: expiryFor(expiryMinutes),
+                expectedCurrentVersion: row.currentVersion,
+                expectedWorkingQuoteVersion: row.workingQuoteVersion,
+              },
+            ],
+          },
+        }),
+      ),
+  }
+  const lifecycle: TraderLifecycleActions = {
+    present: (row) =>
+      unwrapApiResult(
+        present({
+          presentRfqsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
+    unpresent: (row) =>
+      unwrapApiResult(
+        unpresent({
+          unpresentRfqsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
+    withdraw: (row) =>
+      unwrapApiResult(
+        withdraw({
+          withdrawQuotesRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
+    close: (row, outcome) =>
+      (outcome === 'Hit'
+        ? unwrapApiResult(
+            closeHit({
+              caseId: row.caseId,
+              closeHitRfqRequest: {
+                expectedCurrentVersion: row.currentVersion,
+              },
+            }),
+          )
+        : unwrapApiResult(
+            closeAway({
+              closeAwayRfqsRequest: {
+                items: [
+                  {
+                    caseId: row.caseId,
+                    expectedCurrentVersion: row.currentVersion,
+                  },
+                ],
+              },
+            }),
+          )
+      ).then(() => undefined),
     cancel: (row) =>
-      cancel({
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        cancel({
+          cancelRfqsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
     reopen: (row) =>
-      reopen({
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        reopen({
+          reopenRfqsRequest: {
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
     correctOutcome: (row, outcome, reason) =>
-      (outcome === 'Hit' ? correctHit : correctAway)({
-        caseId: row.caseId,
-        expectedCurrentVersion: row.currentVersion,
-        reason,
-      }).unwrap(),
+      unwrapApiResult(
+        outcome === 'Hit'
+          ? correctHit({
+              caseId: row.caseId,
+              correctOutcomeToHitRequest: {
+                expectedCurrentVersion: row.currentVersion,
+                reason,
+              },
+            })
+          : correctAway({
+              caseId: row.caseId,
+              correctOutcomeToAwayRequest: {
+                expectedCurrentVersion: row.currentVersion,
+                reason,
+              },
+            }),
+      ),
   }
   const contactOwner: TraderContactOwnerActions = {
     change: (row, targetUserId) =>
-      changeOwner({
-        targetContactOwnerId: targetUserId,
-        confirmed: true,
-        items: [
-          { caseId: row.caseId, expectedCurrentVersion: row.currentVersion },
-        ],
-      })
-        .unwrap()
-        .then(() => undefined),
+      unwrapApiResult(
+        changeOwner({
+          changeContactOwnersRequest: {
+            targetContactOwnerId: targetUserId,
+            confirmed: true,
+            items: [
+              {
+                caseId: row.caseId,
+                expectedCurrentVersion: row.currentVersion,
+              },
+            ],
+          },
+        }),
+      ).then(() => undefined),
   }
   const memo: TraderMemoActions = {
     update: (row, value) =>
-      updateMemo({
-        caseId: row.caseId,
-        memo: value,
-        expectedMemoVersion: row.traderMemoVersion,
-      }).unwrap(),
+      unwrapApiResult(
+        updateMemo({
+          caseId: row.caseId,
+          updateMemoRequest: {
+            memo: value,
+            expectedMemoVersion: row.traderMemoVersion,
+          },
+        }),
+      ),
   }
   const bulk: TraderBulkActions = { execute: runBulk }
   const search: TraderSearchActions = {
-    execute: (params: RfqSearchParams) => searchRfqs(params).unwrap(),
+    execute: (params: SearchRfqsApiArg) => unwrapApiResult(searchRfqs(params)),
   }
   const pricer: TraderPricerActions = {
-    calculate: (input) => scratch(input).unwrap(),
+    calculate: (input) => unwrapApiResult(scratch({ pricerRequest: input })),
   }
   const gridLayout: TraderGridLayoutActions = {
     configs: {

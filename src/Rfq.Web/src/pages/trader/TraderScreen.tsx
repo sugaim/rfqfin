@@ -19,7 +19,7 @@ import type {
   SelectionChangedEvent,
 } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
-import type { ApiProblemDetails, TraderRfq } from '@/services/api'
+import type { ApiProblemDetails, TraderRfqResponse } from '@/generated/rfqApi'
 import {
   attentionClass,
   isPickUpEligible,
@@ -71,7 +71,7 @@ function isTextInput(target: EventTarget | null): boolean {
 }
 
 export interface TraderScreenProps {
-  rfqs: TraderRfq[]
+  rfqs: TraderRfqResponse[]
   traders: UserOption[]
   users: UserOption[]
   currentUserId: string
@@ -138,7 +138,9 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
   const [activeCaseId, setActiveCaseId] = useState<number>()
   const [rightPaneOpen, setRightPaneOpen] = useState(true)
   const [rightTab, setRightTab] = useState<TraderPaneTab>('operations')
-  const [confirmRows, setConfirmRows] = useState<TraderRfq[] | null>(null)
+  const [confirmRows, setConfirmRows] = useState<TraderRfqResponse[] | null>(
+    null,
+  )
   const [result, setResult] = useState<TraderResultState | null>(null)
   const [resultExpanded, setResultExpanded] = useState(false)
   const [expiryMinutes, setExpiryMinutes] = useState<number | null>(
@@ -151,7 +153,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
 
   const selectedRows = selectedCaseIds
     .map((id) => rfqs.find((row) => row.caseId === id))
-    .filter((row): row is TraderRfq => Boolean(row))
+    .filter((row): row is TraderRfqResponse => Boolean(row))
   const selected = rfqs.find((row) => row.caseId === activeCaseId)
   const confirmableRows = selectedRows.filter((row) =>
     isConfirmable(row, currentUserId),
@@ -204,7 +206,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
     try {
       value = await action()
     } catch (error) {
-      const detail = (error as { data?: ApiProblemDetails }).data?.detail
+      const detail = (error as ApiProblemDetails).detail
       setActionError(detail ?? 'The Trader operation could not be completed.')
 
       return undefined
@@ -221,7 +223,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
   const runBulk = async (
     label: string,
     command: TraderBulkCommand,
-    rows: TraderRfq[],
+    rows: TraderRfqResponse[],
     assignedTraderId?: string,
   ) => {
     setActionError(null)
@@ -243,7 +245,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
   }
 
   const editQuote = async (
-    event: CellEditRequestEvent<TraderRfq>,
+    event: CellEditRequestEvent<TraderRfqResponse>,
   ): Promise<void> => {
     const row = event.data
     if (event.column.getColId() !== 'traderMemo') {
@@ -368,19 +370,23 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
   })
 
   const rowClassRules = {
-    'trader-row-selected': ({ node }: RowClassParams<TraderRfq>) =>
+    'trader-row-selected': ({ node }: RowClassParams<TraderRfqResponse>) =>
       Boolean(node.isSelected()),
-    'trader-row-attention-high': ({ data }: RowClassParams<TraderRfq>) =>
+    'trader-row-attention-high': ({
+      data,
+    }: RowClassParams<TraderRfqResponse>) =>
       Boolean(
         data &&
         attentionClass(data, currentUserId) === 'trader-row-attention-high',
       ),
-    'trader-row-attention-work': ({ data }: RowClassParams<TraderRfq>) =>
+    'trader-row-attention-work': ({
+      data,
+    }: RowClassParams<TraderRfqResponse>) =>
       Boolean(
         data &&
         attentionClass(data, currentUserId) === 'trader-row-attention-work',
       ),
-    'trader-row-terminal': ({ data }: RowClassParams<TraderRfq>) =>
+    'trader-row-terminal': ({ data }: RowClassParams<TraderRfqResponse>) =>
       Boolean(
         data && attentionClass(data, currentUserId) === 'trader-row-terminal',
       ),
@@ -480,7 +486,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
                 tabIndex={-1}
                 data-testid="trader-rfq-grid"
               >
-                <AgGridReact<TraderRfq>
+                <AgGridReact<TraderRfqResponse>
                   rowData={rfqs}
                   columnDefs={activeColumns}
                   getRowId={({ data }) => String(data.caseId)}
@@ -517,7 +523,9 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
                   getContextMenuItems={({ api }) => [
                     gridLayouts.menu('main', api),
                   ]}
-                  onRowClicked={({ data }: RowClickedEvent<TraderRfq>) => {
+                  onRowClicked={({
+                    data,
+                  }: RowClickedEvent<TraderRfqResponse>) => {
                     if (data) {
                       setActiveCaseId(data.caseId)
                       operationController.clearTargets()
@@ -525,7 +533,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
                   }}
                   onSelectionChanged={({
                     api,
-                  }: SelectionChangedEvent<TraderRfq>) =>
+                  }: SelectionChangedEvent<TraderRfqResponse>) =>
                     setSelectedCaseIds(
                       api.getSelectedRows().map((row) => row.caseId),
                     )
@@ -655,7 +663,7 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
           />
         </div>
         <div className="trader-confirm-grid">
-          <AgGridReact<TraderRfq>
+          <AgGridReact<TraderRfqResponse>
             rowData={confirmRows ?? []}
             columnDefs={confirmColumns}
             getRowId={({ data }) => String(data.caseId)}

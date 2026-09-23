@@ -8,7 +8,10 @@ import {
   Space,
   Typography,
 } from 'antd'
-import type { CalculatedQuotePayload, TraderRfq } from '@/services/api'
+import type {
+  CalculatedQuoteResponse2,
+  TraderRfqResponse,
+} from '@/generated/rfqApi'
 import {
   sameSourceTerms,
   type PricerProvenance,
@@ -18,14 +21,14 @@ export type ScratchState = {
   securityId: string
   notional: number | null
   settlementDate: string
-  driver: CalculatedQuotePayload['driver']
+  driver: CalculatedQuoteResponse2['driver']
   value: number
   slide: number
 }
 
 const million = 1_000_000
 const driverOptions: {
-  value: CalculatedQuotePayload['driver']
+  value: CalculatedQuoteResponse2['driver']
   label: string
 }[] = [
   { value: 'Price', label: 'Price' },
@@ -39,16 +42,16 @@ const driverOptions: {
 ]
 
 interface TraderPricerPaneProps {
-  selected?: TraderRfq
+  selected?: TraderRfqResponse
   scratch: ScratchState
   setScratch: Dispatch<SetStateAction<ScratchState>>
   setScratchIdentity: (
     key: 'securityId' | 'notional' | 'settlementDate',
     value: string | number | null,
   ) => void
-  result: CalculatedQuotePayload | null
+  result: CalculatedQuoteResponse2 | null
   provenance: PricerProvenance | null
-  sourceRow?: TraderRfq
+  sourceRow?: TraderRfqResponse
   canApply: boolean
   busy: boolean
   onLoad: () => void

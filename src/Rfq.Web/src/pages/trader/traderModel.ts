@@ -1,4 +1,7 @@
-import type { CalculatedQuotePayload, TraderRfq } from '@/services/api'
+import type {
+  CalculatedQuoteResponse2,
+  TraderRfqResponse,
+} from '@/generated/rfqApi'
 
 export type TraderRefreshMode = 'live' | 'paused'
 export type TraderPaneTab = 'operations' | 'pricer'
@@ -23,7 +26,7 @@ export interface PricerProvenance {
   settlementDate: string | null
 }
 
-export function traderState(row: TraderRfq) {
+export function traderState(row: TraderRfqResponse) {
   if (row.rfqStatus === 'Presented') return 'Presented'
   if (row.rfqStatus === 'Cancelled') return 'Cancelled'
   if (row.rfqStatus === 'Hit') return 'Hit'
@@ -42,14 +45,14 @@ export function traderState(row: TraderRfq) {
     : row.rfqStatus
 }
 
-export function traderRouting(row: TraderRfq, currentUserId: string) {
+export function traderRouting(row: TraderRfqResponse, currentUserId: string) {
   const trader =
     row.assignedTraderId === currentUserId ? 'Me' : row.assignedTraderId
 
   return `${trader} · ${row.owned ? 'Owned' : 'New'}`
 }
 
-export function attentionClass(row: TraderRfq, currentUserId: string) {
+export function attentionClass(row: TraderRfqResponse, currentUserId: string) {
   if (row.assignedTraderId === currentUserId && !row.owned)
     return 'trader-row-attention-high'
   if (
@@ -65,7 +68,7 @@ export function attentionClass(row: TraderRfq, currentUserId: string) {
 }
 
 export function canEditQuote(
-  row: TraderRfq | undefined,
+  row: TraderRfqResponse | undefined,
   currentUserId: string,
 ) {
   return Boolean(
@@ -76,18 +79,18 @@ export function canEditQuote(
   )
 }
 
-export function isPickUpEligible(row: TraderRfq) {
+export function isPickUpEligible(row: TraderRfqResponse) {
   return !row.owned && ['Active', 'Presented'].includes(row.rfqStatus)
 }
 
 export function requiresPickUpConfirmation(
-  row: TraderRfq,
+  row: TraderRfqResponse,
   currentUserId: string,
 ) {
   return row.assignedTraderId !== currentUserId
 }
 
-export function isConfirmable(row: TraderRfq, currentUserId: string) {
+export function isConfirmable(row: TraderRfqResponse, currentUserId: string) {
   if (!canEditQuote(row, currentUserId)) return false
 
   return row.workingQuoteMode === 'Calculated'
@@ -117,7 +120,7 @@ export function searchDateRange(date: string, preset: SearchDatePreset) {
 }
 
 export function sameSourceTerms(
-  row: TraderRfq,
+  row: TraderRfqResponse,
   provenance: PricerProvenance | null,
 ) {
   return Boolean(
@@ -130,11 +133,11 @@ export function sameSourceTerms(
 }
 
 export function calculatedValue(
-  payload: CalculatedQuotePayload | null,
-  driver: CalculatedQuotePayload['driver'],
+  payload: CalculatedQuoteResponse2 | null,
+  driver: CalculatedQuoteResponse2['driver'],
 ) {
   if (!payload) return undefined
-  const values: Record<CalculatedQuotePayload['driver'], number> = {
+  const values: Record<CalculatedQuoteResponse2['driver'], number> = {
     Price: payload.price,
     BbgYield: payload.bbgYield,
     SimpleYield: payload.baseSimpleYield,

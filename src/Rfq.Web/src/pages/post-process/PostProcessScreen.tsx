@@ -7,13 +7,11 @@ import type {
 } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
 import type {
-  CaseOperationResult,
-  PostProcessCommitItem,
-  PostProcessItem,
-  PostProcessLifecycleChangeType,
-  PostProcessPreset,
-  PostProcessScope,
-} from '@/services/api'
+  CaseOperationResponse,
+  PostProcessCommitItemRequest,
+  PostProcessItemResponse,
+  PostProcessLifecycleChangeValue,
+} from '@/generated/rfqApi'
 import { buildPostProcessColumns } from '@/pages/post-process/postProcessColumns'
 import {
   isCorrection,
@@ -21,6 +19,8 @@ import {
   stagedState,
   toCommitItem,
   type PendingPostProcessChange,
+  type PostProcessPreset,
+  type PostProcessScope,
 } from '@/pages/post-process/postProcessModel'
 import {
   applyGridLayout,
@@ -30,7 +30,7 @@ import {
 } from '@/shared/grid/gridLayout'
 
 export interface PostProcessScreenProps {
-  items: PostProcessItem[]
+  items: PostProcessItemResponse[]
   currentUserId: string
   preset: PostProcessPreset
   scope: PostProcessScope
@@ -40,7 +40,9 @@ export interface PostProcessScreenProps {
   onPresetChange: (value: PostProcessPreset) => void
   onScopeChange: (value: PostProcessScope) => void
   onRefresh: () => Promise<void>
-  onCommit: (items: PostProcessCommitItem[]) => Promise<CaseOperationResult[]>
+  onCommit: (
+    items: PostProcessCommitItemRequest[],
+  ) => Promise<CaseOperationResponse[]>
   onPendingChange?: (hasPending: boolean) => void
   gridConfigJson?: string
   onSaveGridConfig?: (configJson: string) => Promise<void>
@@ -62,18 +64,18 @@ export function PostProcessScreen({
   gridConfigJson,
   onSaveGridConfig,
 }: PostProcessScreenProps): ReactElement {
-  const gridApi = useRef<GridApi<PostProcessItem> | null>(null)
+  const gridApi = useRef<GridApi<PostProcessItemResponse> | null>(null)
   const defaultColumnGroupState = useRef<GridColumnGroupState>([])
   const [pending, setPending] = useState<
     Record<number, PendingPostProcessChange>
   >({})
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [result, setResult] = useState<CaseOperationResult[] | null>(null)
+  const [result, setResult] = useState<CaseOperationResponse[] | null>(null)
   const [resultExpanded, setResultExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [knownRows, setKnownRows] = useState<Record<number, PostProcessItem>>(
-    {},
-  )
+  const [knownRows, setKnownRows] = useState<
+    Record<number, PostProcessItemResponse>
+  >({})
   const pendingChanges = Object.values(pending)
   const pendingRows = pendingChanges
     .map((change) => ({
@@ -85,7 +87,7 @@ export function PostProcessScreen({
         value,
       ): value is {
         change: PendingPostProcessChange
-        row: PostProcessItem
+        row: PostProcessItemResponse
       } => Boolean(value.row),
     )
   const invalidCorrection = pendingChanges.some(
@@ -126,7 +128,7 @@ export function PostProcessScreen({
   }, [gridConfigJson])
 
   const updatePending = (
-    row: PostProcessItem,
+    row: PostProcessItemResponse,
     update: (current: PendingPostProcessChange) => PendingPostProcessChange,
   ) =>
     setPending((current) => {
@@ -147,8 +149,8 @@ export function PostProcessScreen({
     })
 
   const stageLifecycle = (
-    row: PostProcessItem,
-    type: PostProcessLifecycleChangeType,
+    row: PostProcessItemResponse,
+    type: PostProcessLifecycleChangeValue,
   ) =>
     updatePending(row, (current) => ({
       ...current,
@@ -160,7 +162,7 @@ export function PostProcessScreen({
       },
     }))
 
-  const edit = (event: CellEditRequestEvent<PostProcessItem>) => {
+  const edit = (event: CellEditRequestEvent<PostProcessItemResponse>) => {
     const row = event.data
     const column = event.column.getColId()
     if (column === 'myMemo') {
@@ -324,21 +326,21 @@ export function PostProcessScreen({
             rowClassRules={{
               'post-process-row-unclosed': ({
                 data,
-              }: RowClassParams<PostProcessItem>) =>
+              }: RowClassParams<PostProcessItemResponse>) =>
                 Boolean(
                   data &&
                   rowClass(data, false).includes('post-process-row-unclosed'),
                 ),
               'post-process-row-cancelled': ({
                 data,
-              }: RowClassParams<PostProcessItem>) =>
+              }: RowClassParams<PostProcessItemResponse>) =>
                 Boolean(
                   data &&
                   rowClass(data, false).includes('post-process-row-cancelled'),
                 ),
               'post-process-row-pending': ({
                 data,
-              }: RowClassParams<PostProcessItem>) =>
+              }: RowClassParams<PostProcessItemResponse>) =>
                 Boolean(data && pending[data.caseId]),
             }}
             onGridReady={({ api }) => {

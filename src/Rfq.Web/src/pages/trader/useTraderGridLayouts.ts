@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
 import type { GridApi, MenuItemDef } from 'ag-grid-community'
-import type { RfqSearchItem, TraderRfq } from '@/services/api'
+import type {
+  RfqSearchItemResponse,
+  TraderRfqResponse,
+} from '@/generated/rfqApi'
 import {
   applyGridLayout,
   gridLayoutMenu,
@@ -20,9 +23,9 @@ export interface TraderGridLayoutsController {
 export function useTraderGridLayouts(
   actions: TraderGridLayoutActions,
 ): TraderGridLayoutsController {
-  const mainGrid = useRef<GridApi<TraderRfq> | null>(null)
-  const searchGrid = useRef<GridApi<RfqSearchItem> | null>(null)
-  const confirmGrid = useRef<GridApi<TraderRfq> | null>(null)
+  const mainGrid = useRef<GridApi<TraderRfqResponse> | null>(null)
+  const searchGrid = useRef<GridApi<RfqSearchItemResponse> | null>(null)
+  const confirmGrid = useRef<GridApi<TraderRfqResponse> | null>(null)
   const defaults = useRef<Record<TraderGridConfigKey, GridColumnGroupState>>({
     main: [],
     search: [],
@@ -54,10 +57,10 @@ export function useTraderGridLayouts(
   }, [actions.configs.confirm])
 
   const initialize = <T>(key: TraderGridConfigKey, api: GridApi<T>) => {
-    if (key === 'main') mainGrid.current = api as GridApi<TraderRfq>
+    if (key === 'main') mainGrid.current = api as GridApi<TraderRfqResponse>
     else if (key === 'search')
-      searchGrid.current = api as GridApi<RfqSearchItem>
-    else confirmGrid.current = api as GridApi<TraderRfq>
+      searchGrid.current = api as GridApi<RfqSearchItemResponse>
+    else confirmGrid.current = api as GridApi<TraderRfqResponse>
     defaults.current[key] = initializeGridLayout(api, actions.configs[key])
   }
 

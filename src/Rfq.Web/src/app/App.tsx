@@ -11,7 +11,9 @@ import {
   useSaveDefaultQuoteModeMutation,
   useSaveQuoteExpiryMutation,
   useSaveThemeMutation,
-} from '@/services/api'
+} from '@/generated/rfqApi'
+import { connectWorklistStream } from '@/services/worklistStream'
+import { unwrapApiResult } from '@/services/apiProblem'
 import { AppShell } from '@/app/AppShell'
 import {
   applicationTheme,
@@ -26,10 +28,6 @@ export interface AppOutletContext {
   salesChangeVersion: number
   traderChangeVersion: number
   recentRevisionsChangeVersion: number
-}
-
-export function worklistStreamUrl(developmentUser: string): string {
-  return `/api/worklists/stream?developmentUser=${encodeURIComponent(developmentUser)}`
 }
 
 export function App() {
@@ -80,21 +78,28 @@ export function App() {
 
   const saveSettings = async (settings: PersonalSettingsDraft) => {
     await Promise.all([
-      saveQuoteMode({ mode: settings.quoteMode }).unwrap(),
-      saveQuoteExpiry(settings.quoteExpiry).unwrap(),
+      unwrapApiResult(
+        saveQuoteMode({
+          quoteModeRequest: { mode: settings.quoteMode },
+        }),
+      ),
+      unwrapApiResult(
+        saveQuoteExpiry({ quoteExpiryRequest: settings.quoteExpiry }),
+      ),
     ])
-    await saveTheme({ mode: settings.theme }).unwrap()
+    await unwrapApiResult(saveTheme({ themeRequest: { mode: settings.theme } }))
     setThemeMode(settings.theme)
     applyGlobalTheme(settings.theme)
+    await Promise.all([
+      quoteModeQuery.refetch().unwrap(),
+      quoteExpiryQuery.refetch().unwrap(),
+      themeQuery.refetch().unwrap(),
+    ]).catch(() => undefined)
   }
 
   useEffect(() => {
-    if (typeof EventSource === 'undefined') return undefined
-    const source = new EventSource(worklistStreamUrl(configuredIdentity))
-    source.addEventListener('invalidation', (event) => {
-      const categories = new Set(
-        (event as MessageEvent<string>).data.split(','),
-      )
+    return connectWorklistStream(configuredIdentity, (receivedCategories) => {
+      const categories = new Set(receivedCategories)
       if (categories.has('sales-list'))
         setSalesChangeVersion((current) => current + 1)
       if (categories.has('trader-list'))
@@ -107,8 +112,6 @@ export function App() {
         setTraderChangeVersion((current) => current + 1)
       }
     })
-
-    return () => source.close()
   }, [businessDateQuery.refetch, configuredIdentity])
 
   const outletContext: AppOutletContext = {

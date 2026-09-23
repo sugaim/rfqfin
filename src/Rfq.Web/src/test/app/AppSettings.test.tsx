@@ -5,7 +5,7 @@ import { App } from '@/app/App'
 
 const settings = vi.hoisted(() => ({ theme: 'Light' as 'Light' | 'Dark' }))
 
-vi.mock('@/services/api', () => ({
+vi.mock('@/generated/rfqApi', () => ({
   useGetHealthQuery: () => ({
     data: { status: 'ok' },
     isLoading: false,

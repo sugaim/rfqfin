@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Button, Input, InputNumber, Space, Typography } from 'antd'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 import {
   hasAmendmentChanges,
   type SalesCommand,
@@ -8,7 +8,7 @@ import {
 import { million, quoteValue } from '@/pages/sales/work-pane/workPaneFormatters'
 
 interface SalesAmendmentSectionProps {
-  row: SalesRfq
+  row: SalesRfqResponse
   control: AmendmentEditorControl
   onCommand: (command: SalesCommand) => void
 }

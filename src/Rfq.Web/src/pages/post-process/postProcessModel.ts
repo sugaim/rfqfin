@@ -1,14 +1,18 @@
 import type {
-  PostProcessCommitItem,
-  PostProcessItem,
-  PostProcessLifecycleChangeType,
-} from '@/services/api'
+  GetPostProcessApiArg,
+  PostProcessCommitItemRequest,
+  PostProcessItemResponse,
+  PostProcessLifecycleChangeValue,
+} from '@/generated/rfqApi'
+
+export type PostProcessPreset = NonNullable<GetPostProcessApiArg['preset']>
+export type PostProcessScope = NonNullable<GetPostProcessApiArg['scope']>
 
 export type PendingPostProcessChange = {
   caseId: number
   baseCurrentVersion: number
   lifecycle?: {
-    type: PostProcessLifecycleChangeType
+    type: PostProcessLifecycleChangeValue
     correctionReason?: string
   }
   memo?: {
@@ -17,7 +21,7 @@ export type PendingPostProcessChange = {
   }
 }
 
-export function isCorrection(type: PostProcessLifecycleChangeType) {
+export function isCorrection(type: PostProcessLifecycleChangeValue) {
   return type === 'CorrectToHit' || type === 'CorrectToAway'
 }
 
@@ -38,7 +42,7 @@ export function stagedState(change: PendingPostProcessChange | undefined) {
 
 export function toCommitItem(
   change: PendingPostProcessChange,
-): PostProcessCommitItem {
+): PostProcessCommitItemRequest {
   return {
     caseId: change.caseId,
     expectedCurrentVersion: change.baseCurrentVersion,
@@ -47,17 +51,20 @@ export function toCommitItem(
           type: change.lifecycle.type,
           correctionReason: change.lifecycle.correctionReason?.trim() || null,
         }
-      : undefined,
+      : null,
     memoChange: change.memo
       ? {
           expectedMemoVersion: change.memo.baseVersion,
           value: change.memo.value,
         }
-      : undefined,
+      : null,
   }
 }
 
-export function rowClass(row: PostProcessItem, pending: boolean): string[] {
+export function rowClass(
+  row: PostProcessItemResponse,
+  pending: boolean,
+): string[] {
   const classes: string[] = []
   if (row.rfqStatus === 'Active' || row.rfqStatus === 'Presented')
     classes.push('post-process-row-unclosed')

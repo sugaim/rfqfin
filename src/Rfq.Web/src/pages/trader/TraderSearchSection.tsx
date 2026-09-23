@@ -8,7 +8,10 @@ import type {
   MenuItemDef,
 } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
-import type { RfqSearchItem, RfqSearchResult } from '@/services/api'
+import type {
+  RfqSearchItemResponse,
+  RfqSearchResponse,
+} from '@/generated/rfqApi'
 import type { SearchDatePreset } from '@/pages/trader/traderModel'
 
 const datePresets: SearchDatePreset[] = ['1M', '3M', '6M', '1Y', '2Y', '5Y']
@@ -29,17 +32,17 @@ interface TraderSearchSectionProps {
   preset: SearchDatePreset
   filters: Record<string, string>
   searching: boolean
-  result: RfqSearchResult
-  columns: ColDef<RfqSearchItem>[]
+  result: RfqSearchResponse
+  columns: ColDef<RfqSearchItemResponse>[]
   onToggle: () => void
   onToggleFilters: () => void
   onPresetChange: (preset: SearchDatePreset) => void
   onFiltersChange: (filters: Record<string, string>) => void
   onSearch: () => void | Promise<void>
-  onGridReady: (api: GridApi<RfqSearchItem>) => void
+  onGridReady: (api: GridApi<RfqSearchItemResponse>) => void
   getLayoutMenu: (
-    api: GridApi<RfqSearchItem>,
-  ) => DefaultMenuItem | MenuItemDef<RfqSearchItem>
+    api: GridApi<RfqSearchItemResponse>,
+  ) => DefaultMenuItem | MenuItemDef<RfqSearchItemResponse>
 }
 
 export function TraderSearchSection({
@@ -142,7 +145,7 @@ export function TraderSearchSection({
                 message="Result cap reached. Narrow the search."
               />
             )}
-            <AgGridReact<RfqSearchItem>
+            <AgGridReact<RfqSearchItemResponse>
               rowData={result.items}
               columnDefs={columns}
               getRowId={({ data }) => String(data.caseId)}

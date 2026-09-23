@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react'
 import { Button } from 'antd'
-import type { CaseOperationResult } from '@/services/api'
+import type { CaseOperationResponse } from '@/generated/rfqApi'
 
 export interface BulkResultBarProps {
   label: string
-  items: CaseOperationResult[]
+  items: CaseOperationResponse[]
   expanded: boolean
   onToggle: () => void
   toggleType: 'link' | 'text'

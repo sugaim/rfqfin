@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react'
-import type { CaseOperationResult } from '@/services/api'
+import type { CaseOperationResponse } from '@/generated/rfqApi'
 import { BulkResultBar } from '@/shared/ui/BulkResultBar'
 
 export type TraderResultState = {
   label: string
-  items: CaseOperationResult[]
+  items: CaseOperationResponse[]
 }
 
 interface TraderResultBarProps {

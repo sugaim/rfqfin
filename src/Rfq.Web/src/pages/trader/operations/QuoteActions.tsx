@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react'
 import { Button, Select, Space, Typography } from 'antd'
-import type { TraderRfq } from '@/services/api'
+import type { TraderRfqResponse } from '@/generated/rfqApi'
 import { canEditQuote } from '@/pages/trader/traderModel'
 import type { QuoteOperationIntents } from '@/pages/trader/operations/operationTypes'
 
 interface QuoteActionsProps {
-  row: TraderRfq
+  row: TraderRfqResponse
   currentUserId: string
   isMutating: boolean
   intents: QuoteOperationIntents

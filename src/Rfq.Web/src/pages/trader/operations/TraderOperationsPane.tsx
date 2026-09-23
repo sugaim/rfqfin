@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Descriptions, Empty, Tag } from 'antd'
-import type { TraderRfq } from '@/services/api'
+import type { TraderRfqResponse } from '@/generated/rfqApi'
 import { traderRouting, traderState } from '@/pages/trader/traderModel'
 import type { UserOption } from '@/pages/trader/traderContracts'
 import { OwnershipActions } from '@/pages/trader/operations/OwnershipActions'
@@ -10,8 +10,8 @@ import { BulkActions } from '@/pages/trader/operations/BulkActions'
 import type { TraderOperationController } from '@/pages/trader/operations/useTraderOperationIntents'
 
 interface TraderOperationsPaneProps {
-  selected?: TraderRfq
-  selectedRows: TraderRfq[]
+  selected?: TraderRfqResponse
+  selectedRows: TraderRfqResponse[]
   currentUserId: string
   traders: UserOption[]
   users: UserOption[]

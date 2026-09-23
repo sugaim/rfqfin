@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { Outlet, RouterProvider, createMemoryRouter } from 'react-router'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 import { AppShell } from '@/app/AppShell'
 import { PostProcessWorkspace } from '@/pages/post-process/PostProcessWorkspace'
-import type { PostProcessItem } from '@/services/api'
+import type { PostProcessItemResponse } from '@/generated/rfqApi'
 
-const { item } = vi.hoisted(() => ({
+const { item, refetchPostProcess, commitPostProcess } = vi.hoisted(() => ({
   item: {
     caseId: 101,
     createdAt: '2026-09-22T01:00:00Z',
@@ -36,19 +36,33 @@ const { item } = vi.hoisted(() => ({
     lastChangedBy: 'sales-dev',
     lastChangedAt: '2026-09-22T01:00:00Z',
   },
+  refetchPostProcess: vi.fn(() => ({
+    unwrap: () => Promise.resolve([]),
+  })),
+  commitPostProcess: vi.fn(() => ({
+    unwrap: () =>
+      Promise.resolve([
+        {
+          caseId: 101,
+          status: 'Applied' as const,
+          failureCode: null,
+          message: null,
+        },
+      ]),
+  })),
 }))
 
-vi.mock('@/services/api', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/services/api')>()),
+vi.mock('@/generated/rfqApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/generated/rfqApi')>()),
   useGetPostProcessQuery: () => ({
     data: [item],
     isLoading: false,
     isFetching: false,
     isError: false,
-    refetch: vi.fn().mockResolvedValue(undefined),
+    refetch: refetchPostProcess,
   }),
-  useCommitPostProcessMutation: () => [
-    vi.fn(() => ({ unwrap: () => Promise.resolve([]) })),
+  useCommitPostProcessChangesMutation: () => [
+    commitPostProcess,
     { isLoading: false },
   ],
   useGetGridConfigQuery: () => ({ data: undefined }),
@@ -63,10 +77,10 @@ vi.mock('ag-grid-react', () => ({
     rowData,
     columnDefs,
   }: {
-    rowData: PostProcessItem[]
+    rowData: PostProcessItemResponse[]
     columnDefs: {
       colId?: string
-      cellRenderer?: (params: { data: PostProcessItem }) => ReactNode
+      cellRenderer?: (params: { data: PostProcessItemResponse }) => ReactNode
     }[]
   }) => (
     <div>
@@ -90,6 +104,11 @@ function Root() {
 }
 
 describe('Post Process navigation guard', () => {
+  beforeEach(() => {
+    refetchPostProcess.mockClear()
+    commitPostProcess.mockClear()
+  })
+
   it('keeps pending changes on cancelled SPA navigation and discards them on confirm', async () => {
     const router = createMemoryRouter(
       [
@@ -126,4 +145,44 @@ describe('Post Process navigation guard', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/sales'))
     expect(screen.getByText('Sales Workspace')).toBeInTheDocument()
   }, 10_000)
+
+  it('explicitly refetches the authoritative query after commit', async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/',
+          element: <Root />,
+          children: [
+            { path: 'post-process', element: <PostProcessWorkspace /> },
+          ],
+        },
+      ],
+      { initialEntries: ['/post-process'] },
+    )
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Away' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Confirm Changes (1)' }),
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }))
+
+    await waitFor(() => expect(commitPostProcess).toHaveBeenCalledOnce())
+    expect(commitPostProcess).toHaveBeenCalledWith({
+      postProcessCommitRequest: {
+        items: [
+          {
+            caseId: 101,
+            expectedCurrentVersion: 3,
+            lifecycleChange: {
+              type: 'Away',
+              correctionReason: null,
+            },
+            memoChange: null,
+          },
+        ],
+      },
+    })
+    await waitFor(() => expect(refetchPostProcess).toHaveBeenCalledOnce())
+  })
 })

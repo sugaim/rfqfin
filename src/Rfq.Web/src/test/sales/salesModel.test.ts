@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SalesRfq } from '@/services/api'
+import type { SalesRfqResponse } from '@/generated/rfqApi'
 import {
   bulkEligibility,
   commandEligible,
@@ -13,7 +13,7 @@ import {
 } from '@/pages/sales/salesModel'
 import { hasChangedDraftMessage } from '@/pages/sales/salesColumns'
 
-const row = (overrides: Partial<SalesRfq> = {}): SalesRfq => ({
+const row = (overrides: Partial<SalesRfqResponse> = {}): SalesRfqResponse => ({
   caseId: 101,
   clientId: 'client-1',
   clientName: 'Client One',
@@ -42,6 +42,11 @@ const row = (overrides: Partial<SalesRfq> = {}): SalesRfq => ({
   createdAt: '2026-09-21T00:00:00Z',
   stateSince: '2026-09-21T00:05:00Z',
   confirmedQuote: null,
+  draftRevisionId: null,
+  draftVersion: null,
+  draftSettlementDate: null,
+  draftNotional: null,
+  draftSalesAndTradingMessage: null,
   ...overrides,
 })
 
