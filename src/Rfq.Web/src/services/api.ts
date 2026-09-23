@@ -117,6 +117,9 @@ export interface AmendmentResult {
   draftRevisionId: string | null
   currentVersion: number
   draftVersion: number | null
+  draftNotional: number | null
+  draftSettlementDate: string | null
+  draftSalesAndTradingMessage: string | null
   rfqStatus: string
   quoteStatus: string | null
   quoteRequestReason: string | null
@@ -918,6 +921,16 @@ export const api = createApi({
         body,
       }),
     }),
+    startAmendment: builder.mutation<
+      AmendmentResult,
+      { caseId: number; expectedCurrentVersion: number }
+    >({
+      query: ({ caseId, ...body }) => ({
+        url: `/rfqs/${caseId}/amendment/start`,
+        method: 'POST',
+        body,
+      }),
+    }),
     confirmAmendment: builder.mutation<
       AmendmentResult,
       {
@@ -1080,6 +1093,7 @@ export const {
   useDiscardAmendmentMutation,
   useConfirmAmendmentMutation,
   useSaveAmendmentMutation,
+  useStartAmendmentMutation,
   useReopenRfqMutation,
   useWithdrawQuoteMutation,
   useScratchPriceMutation,
@@ -1093,6 +1107,7 @@ export const {
   useGetActiveTraderRfqsQuery,
   useGetActiveSalesRfqsQuery,
   useGetSalesRecentRevisionsQuery,
+  useLazyGetSalesRecentRevisionsQuery,
   useGetMeQuery,
   useGetHealthQuery,
   useGetBusinessDateQuery,

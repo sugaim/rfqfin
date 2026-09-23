@@ -319,6 +319,25 @@ public sealed class SemanticDomainTests
     }
 
     [Fact]
+    public void Amendment_start_creates_zero_difference_draft_that_cannot_be_confirmed()
+    {
+        RfqCase rfq = Open();
+        AmendmentSaveResult started = AmendmentTransitions.StartDraft(
+            rfq, RevisionId.New(), Sales, Now, rfq.Version);
+
+        Assert.Equal(rfq.CurrentRevision.Terms, started.DraftRevision.Terms);
+        Assert.NotNull(started.Rfq.PendingDraftRevision);
+        Assert.Throws<DomainRuleViolationException>(() => AmendmentTransitions.Confirm(
+            started.Rfq,
+            Today,
+            Sales,
+            Now,
+            started.Rfq.Version,
+            started.DraftRevision.Version));
+        Assert.NotNull(started.Rfq.PendingDraftRevision);
+    }
+
+    [Fact]
     public void Close_discards_pending_amendment_and_requires_quote()
     {
         RfqCase open = Open();
@@ -394,7 +413,11 @@ public sealed class SemanticDomainTests
             AmendmentSaveResult saved = AmendmentTransitions.SaveDraft(
                 open,
                 RevisionId.New(),
-                open.CurrentRevision.Terms,
+                new RevisionTerms(
+                    open.CurrentRevision.Terms.Notional,
+                    open.CurrentRevision.Terms.SettlementDate,
+                    open.CurrentRevision.Terms.StandardSettlementDate,
+                    "changed"),
                 Sales,
                 Now,
                 open.Version);

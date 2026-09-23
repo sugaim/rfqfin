@@ -8,7 +8,7 @@ import {
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { vi } from 'vitest'
-import { PostProcessScreen } from '@/features/post-process/PostProcessScreen'
+import { PostProcessScreen } from '@/pages/post-process/PostProcessScreen'
 import type {
   BulkItemResult,
   PostProcessCommitItem,

@@ -35,13 +35,13 @@ vi.mock('@/services/api', () => ({
   useSaveQuoteExpiryMutation: () => [vi.fn(), { isLoading: false }],
 }))
 
-vi.mock('@/features/sales/SalesWorkspace', () => ({
+vi.mock('@/pages/sales/SalesWorkspace', () => ({
   SalesWorkspace: () => <div>Sales Workspace</div>,
 }))
-vi.mock('@/features/trader/TraderWorkspace', () => ({
+vi.mock('@/pages/trader/TraderWorkspace', () => ({
   TraderWorkspace: () => <div>Trader Workspace</div>,
 }))
-vi.mock('@/features/post-process/PostProcessWorkspace', () => ({
+vi.mock('@/pages/post-process/PostProcessWorkspace', () => ({
   PostProcessWorkspace: () => <div>Post Process Workspace</div>,
 }))
 

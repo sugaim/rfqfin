@@ -8,7 +8,7 @@ import {
   sameSourceTerms,
   searchDateRange,
   traderState,
-} from '@/features/trader/traderModel'
+} from '@/pages/trader/traderModel'
 
 const row = (overrides: Partial<TraderRfq> = {}): TraderRfq => ({
   caseId: 1,

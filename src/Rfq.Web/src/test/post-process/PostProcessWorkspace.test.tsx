@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Outlet, RouterProvider, createMemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import { AppShell } from '@/app/AppShell'
-import { PostProcessWorkspace } from '@/features/post-process/PostProcessWorkspace'
+import { PostProcessWorkspace } from '@/pages/post-process/PostProcessWorkspace'
 import type { PostProcessItem } from '@/services/api'
 
 const { item } = vi.hoisted(() => ({

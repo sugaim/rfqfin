@@ -39,6 +39,9 @@ public sealed class SaveAmendment(
         rfq.PendingDraftRevision?.RevisionId,
         rfq.Version,
         rfq.PendingDraftRevision?.Version,
+        rfq.PendingDraftRevision?.Notional,
+        rfq.PendingDraftRevision?.SettlementDate,
+        rfq.PendingDraftRevision?.SalesAndTradingMessage,
         rfq.Status,
         rfq.QuoteStatus,
         rfq.QuoteRequestReason);

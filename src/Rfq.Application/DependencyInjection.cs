@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<UpdateTraderMemo>();
         services.AddScoped<UpdateMemoOperation>();
         services.AddScoped<SaveAmendment>();
+        services.AddScoped<StartAmendment>();
         services.AddScoped<ConfirmAmendment>();
         services.AddScoped<DiscardAmendment>();
         services.AddScoped<BulkConfirmAmendments>();

@@ -264,6 +264,32 @@ public sealed class SemanticApplicationTests
     }
 
     [Fact]
+    public async Task Start_amendment_persists_authoritative_zero_difference_draft()
+    {
+        RfqCase rfq = Open();
+        var cases = new CaseRepository(rfq);
+        var uow = new UnitOfWork();
+        var useCase = new StartAmendment(
+            cases,
+            new RfqAuthorization(),
+            Current(Sales, UserRole.Sales),
+            uow,
+            TimeProvider.System);
+
+        AmendmentResult result = await useCase.ExecuteAsync(
+            new StartAmendmentCommand(rfq.CaseId, rfq.Version));
+
+        Assert.NotNull(result.DraftRevisionId);
+        Assert.Equal(rfq.CurrentRevision.Notional, result.DraftNotional);
+        Assert.Equal(rfq.CurrentRevision.SettlementDate, result.DraftSettlementDate);
+        Assert.Equal(
+            rfq.CurrentRevision.SalesAndTradingMessage,
+            result.DraftSalesAndTradingMessage);
+        Assert.NotNull(cases.Case!.PendingDraftRevision);
+        Assert.Equal(1, uow.Saves);
+    }
+
+    [Fact]
     public async Task Calculation_revalidates_case_after_external_call()
     {
         RfqCase rfq = RfqOwnershipTransitions.PickUp(Open(), Trader, Open().Version);

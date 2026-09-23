@@ -8,12 +8,23 @@ namespace Rfq.Api.RfqAmendments;
 [ApiController]
 [Route("api/rfqs")]
 public sealed class RfqAmendmentsController(
+    StartAmendment start,
     SaveAmendment save,
     ConfirmAmendment confirm,
     DiscardAmendment discard,
     BulkConfirmAmendments bulkConfirm,
     BulkDiscardAmendments bulkDiscard) : ControllerBase
 {
+    [HttpPost("{caseId:long}/amendment/start")]
+    public async Task<AmendmentResponse> Start(
+        long caseId,
+        StartAmendmentRequest request,
+        CancellationToken token) => AmendmentApiMapper.ToApi(await start.ExecuteAsync(
+            new StartAmendmentCommand(
+                new CaseId(caseId),
+                new StateVersion(request.ExpectedCurrentVersion)),
+            token));
+
     [HttpPut("{caseId:long}/amendment")]
     public async Task<AmendmentResponse> Save(
         long caseId,
@@ -23,7 +34,7 @@ public sealed class RfqAmendmentsController(
                 new CaseId(caseId),
                 request.Notional,
                 request.SettlementDate,
-                request.Message,
+                request.SalesAndTradingMessage,
                 new StateVersion(request.ExpectedCurrentVersion),
                 request.ExpectedDraftVersion is null ? null
                     : new StateVersion(request.ExpectedDraftVersion.Value)),
@@ -61,9 +72,12 @@ public sealed class RfqAmendmentsController(
 public sealed record SaveAmendmentRequest(
     decimal? Notional,
     DateOnly? SettlementDate,
-    string? Message,
+    string? SalesAndTradingMessage,
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
     long? ExpectedDraftVersion);
+
+public sealed record StartAmendmentRequest(
+    [Range(1, long.MaxValue)] long ExpectedCurrentVersion);
 
 public sealed record AmendmentActionRequest(
     [Range(1, long.MaxValue)] long ExpectedCurrentVersion,
@@ -108,6 +122,9 @@ public sealed record AmendmentResponse(
     Guid? DraftRevisionId,
     long CurrentVersion,
     long? DraftVersion,
+    decimal? DraftNotional,
+    DateOnly? DraftSettlementDate,
+    string? DraftSalesAndTradingMessage,
     RfqStatusValue RfqStatus,
     QuoteStatusValue? QuoteStatus,
     QuoteRequestReasonValue? QuoteRequestReason);
@@ -130,6 +147,9 @@ public static class AmendmentApiMapper
         value.DraftRevisionId?.Value,
         value.CurrentVersion.Value,
         value.DraftVersion?.Value,
+        value.DraftNotional,
+        value.DraftSettlementDate,
+        value.DraftSalesAndTradingMessage,
         Map<RfqStatusValue>(value.RfqStatus),
         MapNullable<QuoteStatusValue>(value.QuoteStatus),
         MapNullable<QuoteRequestReasonValue>(value.QuoteRequestReason));

@@ -2513,6 +2513,66 @@
         }
       }
     },
+    "/api/rfqs/{caseId}/amendment/start": {
+      "post": {
+        "tags": [
+          "RfqAmendments"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAmendmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAmendmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAmendmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/rfqs/{caseId}/amendment": {
       "put": {
         "tags": [
@@ -3837,6 +3897,9 @@
           "draftRevisionId",
           "currentVersion",
           "draftVersion",
+          "draftNotional",
+          "draftSettlementDate",
+          "draftSalesAndTradingMessage",
           "rfqStatus",
           "quoteStatus",
           "quoteRequestReason"
@@ -3863,6 +3926,20 @@
           "draftVersion": {
             "type": "integer",
             "format": "int64",
+            "nullable": true
+          },
+          "draftNotional": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "draftSettlementDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "draftSalesAndTradingMessage": {
+            "type": "string",
             "nullable": true
           },
           "rfqStatus": {
@@ -6547,7 +6624,7 @@
         "required": [
           "notional",
           "settlementDate",
-          "message",
+          "salesAndTradingMessage",
           "expectedCurrentVersion",
           "expectedDraftVersion"
         ],
@@ -6563,7 +6640,7 @@
             "format": "date",
             "nullable": true
           },
-          "message": {
+          "salesAndTradingMessage": {
             "type": "string",
             "nullable": true
           },
@@ -6610,6 +6687,18 @@
           },
           "categoryName": {
             "type": "string"
+          }
+        }
+      },
+      "StartAmendmentRequest": {
+        "required": [
+          "expectedCurrentVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedCurrentVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

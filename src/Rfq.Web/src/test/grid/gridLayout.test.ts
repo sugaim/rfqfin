@@ -5,7 +5,7 @@ import {
   captureGridLayout,
   gridLayoutMenu,
   resetGridLayout,
-} from '@/features/grid/gridLayout'
+} from '@/shared/grid/gridLayout'
 
 function gridApi() {
   return {

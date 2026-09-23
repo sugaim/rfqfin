@@ -10,12 +10,19 @@ public sealed record SaveAmendmentCommand(
     StateVersion ExpectedCurrentVersion,
     StateVersion? ExpectedDraftVersion);
 
+public sealed record StartAmendmentCommand(
+    CaseId CaseId,
+    StateVersion ExpectedCurrentVersion);
+
 public sealed record AmendmentResult(
     CaseId CaseId,
     RevisionId CurrentRevisionId,
     RevisionId? DraftRevisionId,
     StateVersion CurrentVersion,
     StateVersion? DraftVersion,
+    decimal? DraftNotional,
+    DateOnly? DraftSettlementDate,
+    string? DraftSalesAndTradingMessage,
     RfqStatus RfqStatus,
     QuoteStatus? QuoteStatus,
     QuoteRequestReason? QuoteRequestReason);

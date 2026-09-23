@@ -4,13 +4,13 @@ import {
   bulkEligibility,
   commandEligible,
   derivePaneMode,
+  hasAmendmentChanges,
   isTextEditingTarget,
   matchesSalesPreset,
   reconcileSelection,
-  reflectConfirmedAmendment,
   requiresConfirmation,
   rowActionCommands,
-} from '@/features/sales/salesModel'
+} from '@/pages/sales/salesModel'
 
 const row = (overrides: Partial<SalesRfq> = {}): SalesRfq => ({
   caseId: 101,
@@ -69,31 +69,6 @@ describe('Sales pane mode', () => {
   })
 })
 
-describe('Paused Sales snapshot transitions', () => {
-  it('returns a Presented RFQ to Active when confirming an Amendment', () => {
-    const updated = reflectConfirmedAmendment(
-      row({
-        rfqStatus: 'Presented',
-        quoteStatus: 'Quoted',
-        quoteRequestReason: null,
-        draftRevisionId: '00000000-0000-0000-0000-000000000201',
-        draftVersion: 1,
-        draftNotional: 250_000_000,
-      }),
-    )
-
-    expect(updated).toMatchObject({
-      rfqStatus: 'Active',
-      quoteStatus: 'Requested',
-      quoteRequestReason: 'Revised',
-      notional: 250_000_000,
-      draftRevisionId: null,
-      draftVersion: null,
-      currentVersion: 3,
-    })
-  })
-})
-
 describe('Sales preset filters', () => {
   it('keeps owner and originating Sales predicates independent', () => {
     const owned = row({ salesId: 'sales-a', contactOwnerId: 'sales-dev' })
@@ -107,6 +82,26 @@ describe('Sales preset filters', () => {
 })
 
 describe('Sales command eligibility', () => {
+  it('keeps a zero-difference Amendment discardable but not confirmable', () => {
+    const unchanged = row({
+      draftRevisionId: '00000000-0000-0000-0000-000000000201',
+      draftVersion: 1,
+      draftNotional: 100_000_000,
+      draftSettlementDate: '2026-09-23',
+      draftSalesAndTradingMessage: '',
+    })
+    expect(hasAmendmentChanges(unchanged)).toBe(false)
+    expect(commandEligible('confirm-amendment', unchanged, 'sales-dev')).toBe(
+      false,
+    )
+    expect(commandEligible('discard-amendment', unchanged, 'sales-dev')).toBe(
+      true,
+    )
+    expect(hasAmendmentChanges({ ...unchanged, draftNotional: null })).toBe(
+      true,
+    )
+  })
+
   it('supports quoted single actions and deliberately exposes no bulk Hit command', () => {
     const quoted = row({ quoteStatus: 'Quoted' })
     expect(commandEligible('present', quoted, 'sales-dev')).toBe(true)

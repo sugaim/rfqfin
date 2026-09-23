@@ -1911,6 +1911,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rfqs/{caseId}/amendment/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StartAmendmentRequest"];
+                    "text/json": components["schemas"]["StartAmendmentRequest"];
+                    "application/*+json": components["schemas"]["StartAmendmentRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AmendmentResponse"];
+                        "application/json": components["schemas"]["AmendmentResponse"];
+                        "text/json": components["schemas"]["AmendmentResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rfqs/{caseId}/amendment": {
         parameters: {
             query?: never;
@@ -3007,6 +3052,11 @@ export interface components {
             currentVersion: number;
             /** Format: int64 */
             draftVersion: number | null;
+            /** Format: double */
+            draftNotional: number | null;
+            /** Format: date */
+            draftSettlementDate: string | null;
+            draftSalesAndTradingMessage: string | null;
             rfqStatus: components["schemas"]["RfqStatusValue"];
             quoteStatus: components["schemas"]["NullableOfQuoteStatusValue"];
             quoteRequestReason: components["schemas"]["NullableOfQuoteRequestReasonValue"];
@@ -3835,7 +3885,7 @@ export interface components {
             notional: number | null;
             /** Format: date */
             settlementDate: string | null;
-            message: string | null;
+            salesAndTradingMessage: string | null;
             /** Format: int64 */
             expectedCurrentVersion: number;
             /** Format: int64 */
@@ -3849,6 +3899,10 @@ export interface components {
             isin: string;
             categoryId: string;
             categoryName: string;
+        };
+        StartAmendmentRequest: {
+            /** Format: int64 */
+            expectedCurrentVersion: number;
         };
         ThemeMode: number;
         ThemeRequest: {

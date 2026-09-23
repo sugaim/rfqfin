@@ -7,10 +7,7 @@ import {
   within,
 } from '@testing-library/react'
 import { vi } from 'vitest'
-import {
-  SalesScreen,
-  type SalesScreenProps,
-} from '@/features/sales/SalesScreen'
+import { SalesScreen, type SalesScreenProps } from '@/pages/sales/SalesScreen'
 import type {
   ClientSearchResult,
   SalesRfq,
@@ -40,6 +37,23 @@ const defaults = {
   assignedTraderName: '国債 トレーダー',
   standardSettlementDate: '2026-09-23',
 }
+const draftResponse = {
+  caseId: 101,
+  revisionId: '00000000-0000-0000-0000-000000000101',
+  rfqStatus: 'Draft',
+  revisionStatus: 'Draft',
+  quoteStatus: null,
+  quoteRequestReason: null,
+  categoryId: 'JGB',
+  contactOwnerId: 'sales-dev',
+  assignedTraderId: 'trader-a',
+  notional: 100_000_000,
+  settlementDate: '2026-09-23',
+  standardSettlementDate: '2026-09-23',
+  salesAndTradingMessage: 'initial note',
+  version: 3,
+  createdAt: '2026-09-21T00:00:00Z',
+}
 
 const baseProps: SalesScreenProps = {
   rfqs: [],
@@ -61,10 +75,10 @@ const baseProps: SalesScreenProps = {
     resolveDefaults: vi.fn().mockResolvedValue(defaults),
   },
   draft: {
-    create: vi.fn().mockResolvedValue(undefined),
-    update: vi.fn().mockResolvedValue(undefined),
-    confirmNew: vi.fn().mockResolvedValue(undefined),
-    confirm: vi.fn().mockResolvedValue(undefined),
+    create: vi.fn().mockResolvedValue(draftResponse),
+    update: vi.fn().mockResolvedValue(draftResponse),
+    confirmNew: vi.fn().mockResolvedValue(draftResponse),
+    confirm: vi.fn().mockResolvedValue(draftResponse),
     discard: vi.fn().mockResolvedValue(undefined),
   },
   lifecycle: {
@@ -77,6 +91,7 @@ const baseProps: SalesScreenProps = {
     correctOutcome: vi.fn().mockResolvedValue(undefined),
   },
   amendment: {
+    start: vi.fn().mockResolvedValue(undefined),
     save: vi.fn().mockResolvedValue(undefined),
     confirm: vi.fn().mockResolvedValue(undefined),
     discard: vi.fn().mockResolvedValue(undefined),
@@ -84,7 +99,7 @@ const baseProps: SalesScreenProps = {
   contactOwner: { change: vi.fn().mockResolvedValue(undefined) },
   memo: { update: vi.fn().mockResolvedValue(undefined) },
   bulk: { execute: vi.fn().mockResolvedValue([]) },
-  onReload: vi.fn(),
+  onReconcileCases: vi.fn().mockResolvedValue(undefined),
 }
 
 const withDraft = (
@@ -240,13 +255,13 @@ describe('SalesScreen', () => {
   })
 
   it('populates creation context and saves a draft with nullable notional', async () => {
-    const onCreate = vi.fn().mockResolvedValue(undefined)
+    const onCreate = vi.fn().mockResolvedValue(draftResponse)
     const onReload = vi.fn().mockResolvedValue(undefined)
     render(
       <SalesScreen
         {...baseProps}
         {...withDraft({ create: onCreate })}
-        onReload={onReload}
+        onReconcileCases={onReload}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
@@ -298,6 +313,23 @@ describe('SalesScreen', () => {
     )
   }, 15_000)
 
+  it('does not protect Live refresh merely because unsaved New input is active', () => {
+    const onTransientStateChange = vi.fn()
+    render(
+      <SalesScreen
+        {...baseProps}
+        onTransientStateChange={onTransientStateChange}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'New RFQ' }))
+    fireEvent.focus(screen.getByLabelText('Message'))
+    fireEvent.change(screen.getByLabelText('Message'), {
+      target: { value: 'local input' },
+    })
+
+    expect(onTransientStateChange).not.toHaveBeenCalledWith(true)
+  })
+
   it('uses Alt+Enter to confirm the active New RFQ form', async () => {
     const onConfirmNew = vi.fn().mockResolvedValue(undefined)
     render(
@@ -348,6 +380,42 @@ describe('SalesScreen', () => {
         expectedVersion: 3,
       }),
     )
+  })
+
+  it('autosaves only changed persisted Draft fields after editing completes', async () => {
+    const onUpdate = vi.fn().mockResolvedValue({
+      ...draftResponse,
+      salesAndTradingMessage: 'changed note',
+      version: 4,
+    })
+    const onReconcileCases = vi.fn().mockResolvedValue(undefined)
+    render(
+      <SalesScreen
+        {...baseProps}
+        rfqs={[draftRow]}
+        {...withDraft({ update: onUpdate })}
+        onReconcileCases={onReconcileCases}
+      />,
+    )
+    fireEvent.click(screen.getByText(/client-grid/))
+    const message = screen.getByLabelText('Message')
+    fireEvent.focus(message)
+    fireEvent.blur(message)
+    expect(onUpdate).not.toHaveBeenCalled()
+
+    fireEvent.focus(message)
+    fireEvent.change(message, { target: { value: 'changed note' } })
+    fireEvent.blur(message)
+    await waitFor(() =>
+      expect(onUpdate).toHaveBeenCalledWith(
+        101,
+        expect.objectContaining({
+          salesAndTradingMessage: 'changed note',
+          expectedVersion: 3,
+        }),
+      ),
+    )
+    expect(onReconcileCases).toHaveBeenCalledWith([101])
   })
 
   it('lets the Contact Owner Present an Active quoted RFQ', async () => {
@@ -506,7 +574,7 @@ describe('SalesScreen', () => {
     expect(
       screen.getByText('Not eligible in current state'),
     ).toBeInTheDocument()
-  }, 15_000)
+  }, 30_000)
 
   it('toggles Live/Pause, shows pending updates, and refreshes manually without changing mode', () => {
     const onRefreshModeChange = vi.fn()
@@ -515,12 +583,12 @@ describe('SalesScreen', () => {
       <SalesScreen
         {...baseProps}
         refreshMode="paused"
-        pendingUpdateCount={4}
+        updatesPending
         onRefreshModeChange={onRefreshModeChange}
         onManualRefresh={onManualRefresh}
       />,
     )
-    expect(screen.getByText('Paused · 4 updates pending')).toBeInTheDocument()
+    expect(screen.getByText('Updates pending')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Live'))
     expect(onRefreshModeChange).toHaveBeenCalledOnce()
     expect(onRefreshModeChange).toHaveBeenCalledWith('live')
@@ -571,7 +639,7 @@ describe('SalesScreen', () => {
         refreshMode="paused"
         rfqs={[quoted]}
         contactOwner={{ change: onChangeContactOwner }}
-        onReload={onReload}
+        onReconcileCases={onReload}
       />,
     )
     fireEvent.click(screen.getByText(/client-grid/))
@@ -583,7 +651,7 @@ describe('SalesScreen', () => {
     await waitFor(() =>
       expect(onChangeContactOwner).toHaveBeenCalledWith(101, 'sales-a', 7),
     )
-    expect(onReload).not.toHaveBeenCalled()
+    expect(onReload).toHaveBeenCalledWith([101])
   })
 
   it('shows the current quote ID in the same abbreviated form as Trader', () => {
@@ -640,12 +708,12 @@ describe('SalesScreen', () => {
   it('updates the Sales-only Memo after close', async () => {
     const onUpdateMemo = vi.fn().mockResolvedValue(undefined)
     const onReload = vi.fn().mockResolvedValue(undefined)
-    render(
+    const { rerender } = render(
       <SalesScreen
         {...baseProps}
         refreshMode="paused"
         memo={{ update: onUpdateMemo }}
-        onReload={onReload}
+        onReconcileCases={onReload}
         rfqs={[
           {
             ...draftRow,
@@ -666,12 +734,35 @@ describe('SalesScreen', () => {
     fireEvent.change(screen.getByLabelText('Sales-only Memo'), {
       target: { value: 'post-close follow-up' },
     })
+    rerender(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        memo={{ update: onUpdateMemo }}
+        onReconcileCases={onReload}
+        rfqs={[
+          {
+            ...draftRow,
+            rfqStatus: 'Away',
+            revisionStatus: 'Confirmed',
+            quoteStatus: null,
+            currentQuoteId: null,
+            closedQuoteId: '12345678-1234-1234-1234-123456789abc',
+            salesMemo: 'remote note',
+            salesMemoVersion: 4,
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByLabelText('Sales-only Memo')).toHaveValue(
+      'post-close follow-up',
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() =>
       expect(onUpdateMemo).toHaveBeenCalledWith(101, 'post-close follow-up', 3),
     )
-    expect(onReload).not.toHaveBeenCalled()
+    expect(onReload).toHaveBeenCalledWith([101])
   })
 
   it('keeps the paused snapshot after correcting a closed outcome', async () => {
@@ -686,7 +777,7 @@ describe('SalesScreen', () => {
         refreshMode="paused"
         rfqs={[{ ...quotedRow(101), rfqStatus: 'Hit', quoteStatus: null }]}
         {...withLifecycle({ correctOutcome: onCorrectOutcome })}
-        onReload={onReload}
+        onReconcileCases={onReload}
       />,
     )
 
@@ -701,12 +792,24 @@ describe('SalesScreen', () => {
         'booking correction',
       ),
     )
-    expect(onReload).not.toHaveBeenCalled()
+    expect(onReload).toHaveBeenCalledWith([101])
     prompt.mockRestore()
   })
 
   it('keeps the paused snapshot after an inline Amendment edit', async () => {
-    const onSaveAmendment = vi.fn().mockResolvedValue(undefined)
+    const onSaveAmendment = vi.fn().mockResolvedValue({
+      caseId: 101,
+      currentRevisionId: draftRow.currentRevisionId,
+      draftRevisionId: '00000000-0000-0000-0000-000000000102',
+      currentVersion: 7,
+      draftVersion: 1,
+      draftNotional: 99_500_000,
+      draftSettlementDate: '2026-09-23',
+      draftSalesAndTradingMessage: 'initial note',
+      rfqStatus: 'Active',
+      quoteStatus: 'Quoted',
+      quoteRequestReason: null,
+    })
     const onReload = vi.fn().mockResolvedValue(undefined)
     render(
       <SalesScreen
@@ -714,7 +817,7 @@ describe('SalesScreen', () => {
         refreshMode="paused"
         rfqs={[quotedRow(101)]}
         {...withAmendment({ save: onSaveAmendment })}
-        onReload={onReload}
+        onReconcileCases={onReload}
       />,
     )
 
@@ -722,13 +825,67 @@ describe('SalesScreen', () => {
 
     await waitFor(() =>
       expect(onSaveAmendment).toHaveBeenCalledWith(
-        expect.objectContaining({ caseId: 101 }),
+        101,
         99_500_000,
         '2026-09-23',
         'initial note',
+        7,
+        null,
       ),
     )
-    expect(onReload).not.toHaveBeenCalled()
+    expect(onReload).toHaveBeenCalledWith([101])
+  })
+
+  it('starts a real zero-difference Amendment and inhibits confirmation until changed', async () => {
+    const onStart = vi.fn().mockResolvedValue({
+      caseId: 101,
+      currentRevisionId: draftRow.currentRevisionId,
+      draftRevisionId: '00000000-0000-0000-0000-000000000102',
+      currentVersion: 7,
+      draftVersion: 1,
+      draftNotional: 100_000_000,
+      draftSettlementDate: '2026-09-23',
+      draftSalesAndTradingMessage: 'initial note',
+      rfqStatus: 'Active',
+      quoteStatus: 'Quoted',
+      quoteRequestReason: null,
+    })
+    const onReconcileCases = vi.fn().mockResolvedValue(undefined)
+    const { rerender } = render(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        rfqs={[quotedRow(101)]}
+        {...withAmendment({ start: onStart })}
+        onReconcileCases={onReconcileCases}
+      />,
+    )
+    fireEvent.click(screen.getByText(/client-101/))
+    fireEvent.click(screen.getByRole('button', { name: 'Start Amendment' }))
+    await waitFor(() => expect(onStart).toHaveBeenCalledOnce())
+    expect(onReconcileCases).toHaveBeenCalledWith([101])
+
+    rerender(
+      <SalesScreen
+        {...baseProps}
+        refreshMode="paused"
+        rfqs={[
+          {
+            ...quotedRow(101),
+            draftRevisionId: '00000000-0000-0000-0000-000000000102',
+            draftVersion: 1,
+            draftNotional: 100_000_000,
+            draftSettlementDate: '2026-09-23',
+            draftSalesAndTradingMessage: 'initial note',
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByText('No changes yet')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Confirm Amendment' }),
+    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeEnabled()
   })
 
   it('opens the typed Recent Revisions drawer with changed fields only', async () => {

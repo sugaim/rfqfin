@@ -5,9 +5,9 @@ import {
   type RouteObject,
   useRoutes,
 } from 'react-router'
-import { PostProcessWorkspace } from '@/features/post-process/PostProcessWorkspace'
-import { SalesWorkspace } from '@/features/sales/SalesWorkspace'
-import { TraderWorkspace } from '@/features/trader/TraderWorkspace'
+import { PostProcessWorkspace } from '@/pages/post-process/PostProcessWorkspace'
+import { SalesWorkspace } from '@/pages/sales/SalesWorkspace'
+import { TraderWorkspace } from '@/pages/trader/TraderWorkspace'
 import { App } from '@/app/App'
 
 export function defaultWorkspacePath() {

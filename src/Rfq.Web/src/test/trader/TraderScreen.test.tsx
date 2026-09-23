@@ -4,7 +4,7 @@ import { vi } from 'vitest'
 import {
   TraderScreen,
   type TraderScreenProps,
-} from '@/features/trader/TraderScreen'
+} from '@/pages/trader/TraderScreen'
 import type { TraderRfq } from '@/services/api'
 
 const traderRow: TraderRfq = {
@@ -76,7 +76,7 @@ const traderProps: TraderScreenProps = {
   contactOwner: { change: vi.fn().mockResolvedValue(undefined) },
   memo: { update: vi.fn().mockResolvedValue(undefined) },
   bulk: { execute: vi.fn().mockResolvedValue([]) },
-  onReload: vi.fn(),
+  onReconcileCases: vi.fn().mockResolvedValue(undefined),
 }
 
 const withOwnership = (
@@ -406,7 +406,6 @@ describe('TraderScreen', () => {
     }>((resolve) => {
       resolveCalculation = resolve
     })
-    const onPatchRow = vi.fn()
     const onReload = vi.fn()
     const { rerender } = render(
       <TraderScreen
@@ -414,8 +413,7 @@ describe('TraderScreen', () => {
         rfqs={[{ ...traderRow, owned: true }]}
         refreshGeneration={0}
         {...withWorkingQuote({ calculate: () => calculation })}
-        onPatchRow={onPatchRow}
-        onReload={onReload}
+        onReconcileCases={onReload}
       />,
     )
 
@@ -426,8 +424,7 @@ describe('TraderScreen', () => {
         rfqs={[{ ...traderRow, owned: true }]}
         refreshGeneration={1}
         {...withWorkingQuote({ calculate: () => calculation })}
-        onPatchRow={onPatchRow}
-        onReload={onReload}
+        onReconcileCases={onReload}
       />,
     )
     resolveCalculation({
@@ -443,7 +440,6 @@ describe('TraderScreen', () => {
     await act(async () => {
       await calculation
     })
-    expect(onPatchRow).not.toHaveBeenCalled()
     expect(onReload).not.toHaveBeenCalled()
   })
 
@@ -475,8 +471,7 @@ describe('TraderScreen', () => {
     }
   })
 
-  it('patches an authoritative calculation response without refreshing while Paused', async () => {
-    const onPatchRow = vi.fn()
+  it('reconciles an authoritative calculation response while Paused', async () => {
     const onReload = vi.fn()
     const payload = {
       driver: 'Price' as const,
@@ -508,17 +503,13 @@ describe('TraderScreen', () => {
         refreshMode="paused"
         rfqs={[{ ...traderRow, owned: true }]}
         {...withWorkingQuote({ calculate: onCalculate })}
-        onPatchRow={onPatchRow}
-        onReload={onReload}
+        onReconcileCases={onReload}
       />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Price 201' }))
 
-    await waitFor(() =>
-      expect(onPatchRow).toHaveBeenCalledWith(201, expect.any(Function)),
-    )
-    expect(onReload).not.toHaveBeenCalled()
+    await waitFor(() => expect(onReload).toHaveBeenCalledWith([201]))
   })
 
   it('unlocks the row and exposes a compact calculation failure state', async () => {
