@@ -93,6 +93,7 @@ public sealed class RfqCase
         CategoryId categorySnapshot,
         UserId assignedTraderId,
         RevisionTerms terms,
+        DateOnly draftCreatedBusinessDate,
         UserId createdBy,
         DateTimeOffset createdAt,
         UserId? salesId = null,
@@ -100,7 +101,13 @@ public sealed class RfqCase
         RevisionId? copiedFromRevisionId = null)
     {
         var revision = RfqRevision.CreateDraft(
-            revisionId, caseId, terms, createdAt, createdBy, copiedFromRevisionId);
+            revisionId,
+            caseId,
+            terms,
+            createdAt,
+            draftCreatedBusinessDate,
+            createdBy,
+            copiedFromRevisionId);
         return new RfqCase(
             caseId,
             clientId,

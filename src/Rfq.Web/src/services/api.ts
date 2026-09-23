@@ -137,15 +137,6 @@ export interface LifecycleResult {
   quoteRequestReason: string | null
   currentVersion: number
 }
-export interface PersistedEvent {
-  type: string
-  eventId: number
-  occurredAt: string
-  actorUserId: string | null
-  caseId: number
-  quoteId?: string
-  [key: string]: unknown
-}
 export interface EodSummary {
   contactOwnerId: string
   open: number
@@ -452,13 +443,10 @@ export const api = createApi({
       SalesRecentRevision[],
       number | void
     >({
-      query: (limit = 50) => ({
+      query: (limit) => ({
         url: '/sales-rfqs/recent-revisions',
-        params: { limit },
+        params: limit === undefined ? undefined : { limit },
       }),
-    }),
-    getEvents: builder.query<PersistedEvent[], number>({
-      query: (after) => ({ url: '/events', params: { after } }),
     }),
     getEod: builder.query<EodSummary[], string>({
       query: (date) => ({ url: '/eod', params: { date } }),
@@ -1100,7 +1088,6 @@ export const {
   useGetEodQuery,
   useGetPostProcessQuery,
   useCommitPostProcessMutation,
-  useGetEventsQuery,
   useSearchRfqsQuery,
   useGetGridConfigQuery,
   useSaveGridConfigMutation,

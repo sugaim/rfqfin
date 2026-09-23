@@ -248,6 +248,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
                     new DateOnly(2026, 9, 23),
                     new DateOnly(2026, 9, 23),
                     ""),
+                new DateOnly(2026, 9, 21),
                 trader,
                 DateTimeOffset.UtcNow,
                 salesId: null);
@@ -272,7 +273,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
 
         var activeQueries = new EfCoreTraderRfqQueries(read);
         await Assert.ThrowsAsync<DomainInvariantException>(
-            () => activeQueries.GetAsync(DeskId.Create("jpy-credit")));
+            () => activeQueries.LoadAllAsync(new DateOnly(2026, 9, 21)));
 
         Assert.Equal(before, await read.WorkingQuotes.CountAsync());
         Assert.False(read.ChangeTracker.HasChanges());
@@ -309,7 +310,8 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         }
 
         await using RfqDbContext read = fixture.CreateContext();
-        var queries = new EfCoreRfqSearchQueries(read, CurrentSales());
+        var queries = new EfCoreRfqSearchQueries(
+            read, CurrentSales(), new RfqRuntimeOptions());
         RfqSearchResult result = await queries.SearchAsync(new RfqSearch(
             CreatedFrom: new DateOnly(2026, 9, 21),
             CreatedTo: new DateOnly(2026, 9, 21)));
@@ -436,7 +438,8 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
 
         await using RfqDbContext read = fixture.CreateContext();
         SalesRfqListItem item = (await new EfCoreSalesRfqQueries(read)
-            .GetAsync(UserId.Create("sales-dev"))).Single(value => value.CaseId.Value == caseId);
+            .LoadAllAsync(new DateOnly(2026, 9, 21)))
+            .Single(value => value.CaseId.Value == caseId);
 
         Assert.Equal(UserId.Create("sales-dev"), item.SalesId);
         Assert.Equal(stateSince, item.StateSince);
@@ -466,7 +469,8 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
 
         await using RfqDbContext read = fixture.CreateContext();
         SalesRfqListItem item = (await new EfCoreSalesRfqQueries(read)
-            .GetAsync(UserId.Create("sales-dev"))).Single(value => value.CaseId.Value == caseId);
+            .LoadAllAsync(new DateOnly(2026, 9, 21)))
+            .Single(value => value.CaseId.Value == caseId);
 
         Assert.Equal(99.25m, item.ConfirmedQuote!.Price);
         Assert.Equal(item.ConfirmedQuote.ConfirmedAt, item.StateSince);
@@ -734,6 +738,153 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
         new HashSet<UserRole> { UserRole.Sales },
         DeskId.Create("jpy-credit")));
 
+    [Fact]
+    public async Task Snapshot_membership_uses_persisted_case_or_revision_business_date()
+    {
+        await RecreateAndSeed();
+        var today = new DateOnly(2026, 9, 21);
+        DateOnly oldDate = today.AddDays(-1);
+        long draftTodayId;
+        long confirmedTodayId;
+        long confirmedAmendmentId;
+        long discardedAmendmentId;
+        long timestampOnlyId;
+        await using (RfqDbContext arrange = fixture.CreateContext())
+        {
+            await arrange.RfqCases.ExecuteUpdateAsync(setters => setters
+                .SetProperty(
+                    item => item.CreatedBusinessDate,
+                    item => item.CreatedBusinessDate == null ? null : oldDate));
+            await arrange.RfqRevisions.ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.DraftCreatedBusinessDate, oldDate));
+
+            RfqCaseEntity draftToday = await arrange.RfqCases
+                .Include(item => item.Current).ThenInclude(item => item.CurrentRevision)
+                .FirstAsync(item => item.Current.Lifecycle == RfqLifecycleKind.Draft);
+            List<RfqCaseEntity> openCases = await arrange.RfqCases
+                .Include(item => item.Current).ThenInclude(item => item.CurrentRevision)
+                .Where(item => item.Current.Lifecycle == RfqLifecycleKind.Open)
+                .OrderBy(item => item.CaseId)
+                .Take(4)
+                .ToListAsync();
+            draftTodayId = draftToday.CaseId;
+            confirmedTodayId = openCases[0].CaseId;
+            confirmedAmendmentId = openCases[1].CaseId;
+            discardedAmendmentId = openCases[2].CaseId;
+            timestampOnlyId = openCases[3].CaseId;
+            draftToday.Current.CurrentRevision.DraftCreatedBusinessDate = today;
+            openCases[0].CreatedBusinessDate = today;
+            arrange.RfqRevisions.Add(HistoricalRevision(openCases[1], today, RevisionStatus.Superseded));
+            arrange.RfqRevisions.Add(HistoricalRevision(openCases[2], today, RevisionStatus.Discarded));
+            openCases[3].CreatedAt = new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.Zero);
+            await arrange.SaveChangesAsync();
+        }
+
+        await using RfqDbContext read = fixture.CreateContext();
+        BusinessDateRfqSnapshot snapshot = await new BusinessDateRfqSnapshotLoader(read)
+            .LoadAsync(today, 7);
+        long[] salesIds = [.. snapshot.Sales.Select(item => item.CaseId.Value)];
+        long[] traderIds = [.. snapshot.Trader.Select(item => item.CaseId.Value)];
+        Assert.Contains(draftTodayId, salesIds);
+        Assert.Contains(confirmedTodayId, salesIds);
+        Assert.Contains(confirmedAmendmentId, salesIds);
+        Assert.Contains(discardedAmendmentId, salesIds);
+        Assert.DoesNotContain(timestampOnlyId, salesIds);
+        Assert.DoesNotContain(draftTodayId, traderIds);
+        Assert.Contains(confirmedTodayId, traderIds);
+        Assert.Contains(confirmedAmendmentId, traderIds);
+        Assert.Contains(discardedAmendmentId, traderIds);
+        Assert.Equal(7, snapshot.Generation);
+    }
+
+    [Fact]
+    public async Task Unit_of_work_invalidates_only_after_successful_no_event_commit()
+    {
+        await RecreateAndSeed();
+        await using RfqDbContext context = fixture.CreateContext();
+        var signal = new RecordingCommittedChangeSignal();
+        var draft = RfqCase.CreateDraft(
+            new CaseId(199_001),
+            RevisionId.New(),
+            ClientId.Create("client-001"),
+            SecurityId.Create("sec-jgb-375"),
+            CategoryId.Create("JGB"),
+            UserId.Create("trader-a"),
+            new RevisionTerms(
+                1_000_000,
+                new DateOnly(2026, 9, 23),
+                new DateOnly(2026, 9, 23),
+                ""),
+            new DateOnly(2026, 9, 21),
+            UserId.Create("sales-dev"),
+            DateTimeOffset.UtcNow);
+        new RfqCaseRepository(context).Add(draft);
+
+        await new PostgreSqlUnitOfWork(
+            context, new PersistedEventSink(), signal).SaveChangesAsync();
+
+        Assert.Equal(1, signal.Count);
+    }
+
+    [Fact]
+    public async Task Failed_commit_does_not_invalidate_snapshot()
+    {
+        await RecreateAndSeed();
+        await using RfqDbContext context = fixture.CreateContext();
+        var signal = new RecordingCommittedChangeSignal();
+        context.SeedMarkers.Add(new SeedMarker(
+            DevelopmentDataSeeder.BusinessDateSeedKey,
+            DateTimeOffset.UtcNow));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => new PostgreSqlUnitOfWork(
+            context, new PersistedEventSink(), signal).SaveChangesAsync());
+
+        Assert.Equal(0, signal.Count);
+    }
+
+    [Fact]
+    public async Task Semantic_event_transaction_invalidates_after_commit()
+    {
+        await RecreateAndSeed();
+        await using RfqDbContext context = fixture.CreateContext();
+        long caseId = await context.RfqCases.Select(item => item.CaseId).FirstAsync();
+        var signal = new RecordingCommittedChangeSignal();
+        var sink = new PersistedEventSink();
+        sink.Record(new RfqTransition(
+            RfqTransitionKind.Reopened,
+            new CaseId(caseId),
+            UserId.Create("sales-dev"),
+            DateTimeOffset.UtcNow));
+
+        await new PostgreSqlUnitOfWork(context, sink, signal).SaveChangesAsync();
+
+        Assert.Equal(1, signal.Count);
+    }
+
+    private static RfqRevisionEntity HistoricalRevision(
+        RfqCaseEntity rfqCase,
+        DateOnly businessDate,
+        RevisionStatus status) => new()
+        {
+            RevisionId = Guid.NewGuid(),
+            CaseId = rfqCase.CaseId,
+            Status = status,
+            Version = 2,
+            CreatedAt = DateTimeOffset.UtcNow.AddDays(-30),
+            DraftCreatedBusinessDate = businessDate,
+            CreatedBy = rfqCase.CreatedBy,
+            SettlementDate = rfqCase.Current.CurrentRevision.SettlementDate,
+            StandardSettlementDate = rfqCase.Current.CurrentRevision.StandardSettlementDate,
+            Notional = rfqCase.Current.CurrentRevision.Notional,
+            SalesAndTradingMessage = "historical amendment",
+        };
+
+    private sealed class RecordingCommittedChangeSignal : ICommittedRfqChangeSignal
+    {
+        public int Count { get; private set; }
+        public void SignalCommittedChange() => Count++;
+    }
+
     private async Task<CaseId> AddCase()
     {
         await using RfqDbContext context = fixture.CreateContext();
@@ -750,6 +901,7 @@ public sealed class SemanticPersistenceTests(PostgreSqlFixture fixture)
                 new DateOnly(2026, 9, 23),
                 new DateOnly(2026, 9, 23),
                 ""),
+            new DateOnly(2026, 9, 21),
             UserId.Create("sales-dev"),
             DateTimeOffset.UtcNow);
         new RfqCaseRepository(context).Add(draft);

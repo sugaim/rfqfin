@@ -11,6 +11,7 @@ public sealed class RfqRevision
         RevisionId? quoteSeedRevisionId,
         StateVersion version,
         DateTimeOffset createdAt,
+        DateOnly draftCreatedBusinessDate,
         UserId createdBy,
         DateTimeOffset? confirmedAt,
         UserId? confirmedBy)
@@ -23,6 +24,7 @@ public sealed class RfqRevision
         QuoteSeedRevisionId = quoteSeedRevisionId;
         Version = version;
         CreatedAt = createdAt.ToUniversalTime();
+        DraftCreatedBusinessDate = draftCreatedBusinessDate;
         CreatedBy = createdBy;
         ConfirmedAt = confirmedAt?.ToUniversalTime();
         ConfirmedBy = confirmedBy;
@@ -41,6 +43,7 @@ public sealed class RfqRevision
     public RevisionId? QuoteSeedRevisionId { get; }
     public StateVersion Version { get; }
     public DateTimeOffset CreatedAt { get; }
+    public DateOnly DraftCreatedBusinessDate { get; }
     public UserId CreatedBy { get; }
     public DateTimeOffset? ConfirmedAt { get; }
     public UserId? ConfirmedBy { get; }
@@ -50,6 +53,7 @@ public sealed class RfqRevision
         CaseId caseId,
         RevisionTerms terms,
         DateTimeOffset createdAt,
+        DateOnly draftCreatedBusinessDate,
         UserId createdBy,
         RevisionId? copiedFromRevisionId = null,
         RevisionId? quoteSeedRevisionId = null) => new(
@@ -61,6 +65,7 @@ public sealed class RfqRevision
             quoteSeedRevisionId,
             new StateVersion(1),
             createdAt,
+            draftCreatedBusinessDate,
             createdBy,
             null,
             null);
@@ -113,6 +118,7 @@ public sealed class RfqRevision
         RevisionId? quoteSeedRevisionId,
         StateVersion version,
         DateTimeOffset createdAt,
+        DateOnly draftCreatedBusinessDate,
         UserId createdBy,
         DateTimeOffset? confirmedAt,
         UserId? confirmedBy) => new(
@@ -124,6 +130,7 @@ public sealed class RfqRevision
             quoteSeedRevisionId,
             version,
             createdAt,
+            draftCreatedBusinessDate,
             createdBy,
             confirmedAt,
             confirmedBy);
@@ -142,6 +149,7 @@ public sealed class RfqRevision
             QuoteSeedRevisionId,
             version ?? Version,
             CreatedAt,
+            DraftCreatedBusinessDate,
             CreatedBy,
             confirmedAt ?? ConfirmedAt,
             confirmedBy ?? ConfirmedBy);

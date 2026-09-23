@@ -8,4 +8,5 @@ public enum RfqErrorKind
     NotFound,
     Forbidden,
     CalculationFailure,
+    ServiceUnavailable,
 }

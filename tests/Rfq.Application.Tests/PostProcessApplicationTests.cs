@@ -283,6 +283,7 @@ public sealed class PostProcessApplicationTests
                 Today.AddDays(2),
                 Today.AddDays(2),
                 "message"),
+            Today,
             Sales,
             Now,
             Sales);

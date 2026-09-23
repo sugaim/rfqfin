@@ -11,11 +11,17 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.AddRfqDatabaseOperations(configuration);
+        services.AddSingleton(CreateRuntimeOptions(configuration));
+        services.AddSingleton<RfqInvalidationRegistry>();
+        services.AddSingleton<BusinessDateRfqSnapshotCoordinator>();
+        services.AddSingleton<ICommittedRfqChangeSignal>(provider =>
+            provider.GetRequiredService<BusinessDateRfqSnapshotCoordinator>());
+        services.AddScoped<BusinessDateRfqSnapshotLoader>();
         services.AddScoped<ICaseIdGenerator, PostgreSqlCaseIdGenerator>();
         services.AddScoped<IRfqCaseRepository, RfqCaseRepository>();
-        services.AddScoped<ISalesRfqQueries, EfCoreSalesRfqQueries>();
+        services.AddScoped<ISalesRfqQueries, CachedSalesRfqQueries>();
         services.AddScoped<ISalesRecentRevisionQueries, EfCoreSalesRecentRevisionQueries>();
-        services.AddScoped<ITraderRfqQueries, EfCoreTraderRfqQueries>();
+        services.AddScoped<ITraderRfqQueries, CachedTraderRfqQueries>();
         services.AddScoped<IQuoteExpiryQueries, EfCoreQuoteExpiryQueries>();
         services.AddScoped<IWorkingQuoteRepository, WorkingQuoteRepository>();
         services.AddScoped<IConfirmedQuoteRepository, ConfirmedQuoteRepository>();
@@ -47,6 +53,37 @@ public static class DependencyInjection
 
         return services;
     }
+
+    private static RfqRuntimeOptions CreateRuntimeOptions(IConfiguration configuration)
+    {
+        IConfigurationSection section = configuration.GetSection("RfqRuntime");
+        return new RfqRuntimeOptions
+        {
+            BusinessDatePollInterval = ParseDuration(
+                section["BusinessDatePollInterval"], TimeSpan.FromMinutes(10)),
+            SnapshotRefreshCoalesce = ParseDuration(
+                section["SnapshotRefreshCoalesce"], TimeSpan.FromMilliseconds(500)),
+            SnapshotRefreshRetryCount = ParsePositiveInt(
+                section["SnapshotRefreshRetryCount"], 3),
+            SnapshotRefreshRetryDelay = ParseDuration(
+                section["SnapshotRefreshRetryDelay"], TimeSpan.FromMilliseconds(250)),
+            SnapshotRecoveryInterval = ParseDuration(
+                section["SnapshotRecoveryInterval"], TimeSpan.FromSeconds(5)),
+            SearchResultCap = ParsePositiveInt(section["SearchResultCap"], 20_000),
+            RecentRevisionsDefaultLimit = ParsePositiveInt(
+                section["RecentRevisionsDefaultLimit"], 50),
+            RecentRevisionsMaxLimit = ParsePositiveInt(
+                section["RecentRevisionsMaxLimit"], 100),
+        };
+    }
+
+    private static TimeSpan ParseDuration(string? value, TimeSpan fallback) =>
+        TimeSpan.TryParse(value, out TimeSpan parsed) && parsed > TimeSpan.Zero
+            ? parsed
+            : fallback;
+
+    private static int ParsePositiveInt(string? value, int fallback) =>
+        int.TryParse(value, out int parsed) && parsed > 0 ? parsed : fallback;
 
     public static IServiceCollection AddRfqDatabaseOperations(
         this IServiceCollection services,

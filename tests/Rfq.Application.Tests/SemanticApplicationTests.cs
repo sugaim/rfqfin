@@ -182,12 +182,16 @@ public sealed class SemanticApplicationTests
         var cases = new CaseRepository(null);
         var queries = new TraderRfqQueries([]);
         var useCase = new GetActiveTraderRfqs(
-            queries, new RfqAuthorization(), Current(Trader, UserRole.Trader));
+            queries,
+            new RfqAuthorization(),
+            new BusinessDate(),
+            Current(Trader, UserRole.Trader));
 
         IReadOnlyList<TraderRfqListItem> result = await useCase.ExecuteAsync();
 
         Assert.Empty(result);
         Assert.Equal(1, queries.TraderQueries);
+        Assert.Equal(Today, queries.BusinessDate);
         Assert.Equal(0, cases.Updates);
     }
 
@@ -237,6 +241,7 @@ public sealed class SemanticApplicationTests
                 "amended"),
             Sales,
             Now,
+            Today,
             rfq.Version);
         var cases = new CaseRepository(saved.Rfq);
         var working = new WorkingRepository(seed);
@@ -274,6 +279,7 @@ public sealed class SemanticApplicationTests
             new RfqAuthorization(),
             Current(Sales, UserRole.Sales),
             uow,
+            new BusinessDate(),
             TimeProvider.System);
 
         AmendmentResult result = await useCase.ExecuteAsync(
@@ -473,6 +479,7 @@ public sealed class SemanticApplicationTests
             current),
         new AssignedTraderValidator(new Users(), current),
         current,
+        new BusinessDate(),
         TimeProvider.System);
 
     private static CreateDraftCommand Command() => new(
@@ -492,6 +499,7 @@ public sealed class SemanticApplicationTests
         CategoryId.Create("category"),
         Trader,
         new RevisionTerms(1_000_000, Today.AddDays(2), Today.AddDays(2), ""),
+        Today,
         Sales,
         createdAt ?? Now);
 
@@ -550,12 +558,15 @@ public sealed class SemanticApplicationTests
         IReadOnlyList<TraderRfqListItem> traderRows) : ITraderRfqQueries
     {
         public int TraderQueries { get; private set; }
+        public DateOnly? BusinessDate { get; private set; }
 
         public Task<IReadOnlyList<TraderRfqListItem>> GetAsync(
             DeskId desk,
+            DateOnly businessDate,
             CancellationToken token = default)
         {
             TraderQueries++;
+            BusinessDate = businessDate;
             return Task.FromResult(traderRows);
         }
     }

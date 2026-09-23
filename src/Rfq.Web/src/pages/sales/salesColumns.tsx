@@ -12,6 +12,13 @@ import {
   type SalesRowCommand,
 } from '@/pages/sales/salesModel'
 
+export function hasChangedDraftMessage(row: SalesRfq | undefined): boolean {
+  return Boolean(
+    row?.draftRevisionId &&
+    row.draftSalesAndTradingMessage !== row.salesAndTradingMessage,
+  )
+}
+
 const million = 1_000_000
 
 export type SalesColumnDefinition = ColDef<SalesRfq> | ColGroupDef<SalesRfq>
@@ -285,9 +292,7 @@ export function buildSalesColumns({
       valueGetter: ({ data }) =>
         data?.draftSalesAndTradingMessage ?? data?.salesAndTradingMessage,
       cellClass: ({ data }) =>
-        data?.draftSalesAndTradingMessage != null
-          ? 'amendment-changed-cell'
-          : undefined,
+        hasChangedDraftMessage(data) ? 'amendment-changed-cell' : undefined,
     },
     {
       field: 'currentQuoteId',

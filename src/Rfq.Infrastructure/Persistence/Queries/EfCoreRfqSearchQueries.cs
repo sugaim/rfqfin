@@ -6,10 +6,9 @@ namespace Rfq.Infrastructure;
 
 public sealed class EfCoreRfqSearchQueries(
     RfqDbContext dbContext,
-    ICurrentUser currentUser) : IRfqSearchQueries
+    ICurrentUser currentUser,
+    RfqRuntimeOptions runtimeOptions) : IRfqSearchQueries
 {
-    private const int ResultCap = 20_000;
-
     public async Task<RfqSearchResult> SearchAsync(
         RfqSearch search,
         CancellationToken cancellationToken = default)
@@ -73,7 +72,8 @@ public sealed class EfCoreRfqSearchQueries(
             query = query.Where(item => item.CaseId == search.CaseId.Value.Value);
         }
 
-        List<RfqSearchItem> rows = await query.OrderByDescending(item => item.CreatedAt).Take(ResultCap + 1)
+        int resultCap = runtimeOptions.SearchResultCap;
+        List<RfqSearchItem> rows = await query.OrderByDescending(item => item.CreatedAt).Take(resultCap + 1)
             .Select(item => new RfqSearchItem(
                 new CaseId(item.CaseId),
                 item.CreatedAt,
@@ -95,7 +95,7 @@ public sealed class EfCoreRfqSearchQueries(
                 null,
                 null))
             .ToListAsync(cancellationToken);
-        RfqSearchItem[] cappedRows = [.. rows.Take(ResultCap)];
+        RfqSearchItem[] cappedRows = [.. rows.Take(resultCap)];
         long[] caseIds = [.. cappedRows.Select(item => item.CaseId.Value)];
         List<SearchQuoteRef> quoteRefs = await dbContext.RfqCases.AsNoTracking()
             .Where(item => caseIds.Contains(item.CaseId))
@@ -146,7 +146,7 @@ public sealed class EfCoreRfqSearchQueries(
                 Ysc = summary.Ysc,
             };
         })];
-        return new(projected, rows.Count > ResultCap);
+        return new(projected, rows.Count > resultCap);
     }
 
     private async Task<TimeZoneInfo> ResolveDeskTimeZoneAsync(

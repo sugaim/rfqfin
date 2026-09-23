@@ -3,7 +3,6 @@ import { ConfigProvider } from 'antd'
 import { Outlet } from 'react-router'
 import {
   useGetBusinessDateQuery,
-  useGetEventsQuery,
   useGetHealthQuery,
   useGetMeQuery,
   useGetDefaultQuoteModeQuery,
@@ -12,7 +11,6 @@ import {
   useSaveDefaultQuoteModeMutation,
   useSaveQuoteExpiryMutation,
   useSaveThemeMutation,
-  type PersistedEvent,
 } from '@/services/api'
 import { AppShell } from '@/app/AppShell'
 import {
@@ -25,18 +23,18 @@ import type { PersonalSettingsDraft } from '@/app/SettingsDrawer'
 export interface AppOutletContext {
   currentUserId: string
   businessDate?: string
-  events: PersistedEvent[]
-  refreshToken: number
-  remoteChangeVersion: number
-  acknowledgeRemoteChanges: () => Promise<void>
+  salesChangeVersion: number
+  traderChangeVersion: number
+  recentRevisionsChangeVersion: number
 }
 
 export function App() {
   const configuredIdentity =
     window.localStorage.getItem('rfq-development-user') ?? 'sales-dev'
-  const [refreshEventId, setRefreshEventId] = useState(0)
-  const [refreshToken, setRefreshToken] = useState(0)
-  const [remoteChangeVersion, setRemoteChangeVersion] = useState(0)
+  const [salesChangeVersion, setSalesChangeVersion] = useState(0)
+  const [traderChangeVersion, setTraderChangeVersion] = useState(0)
+  const [recentRevisionsChangeVersion, setRecentRevisionsChangeVersion] =
+    useState(0)
   const [themeMode, setThemeMode] = useState<AppThemeMode>('Dark')
   const healthQuery = useGetHealthQuery()
   const businessDateQuery = useGetBusinessDateQuery()
@@ -47,7 +45,6 @@ export function App() {
   const [saveTheme, saveThemeState] = useSaveThemeMutation()
   const [saveQuoteMode, saveQuoteModeState] = useSaveDefaultQuoteModeMutation()
   const [saveQuoteExpiry, saveQuoteExpiryState] = useSaveQuoteExpiryMutation()
-  const eventsQuery = useGetEventsQuery(refreshEventId)
   const health = healthQuery.isLoading
     ? 'checking'
     : healthQuery.isError || healthQuery.data?.status !== 'ok'
@@ -71,18 +68,10 @@ export function App() {
     window.location.assign(userId.startsWith('trader-') ? '/trader' : '/sales')
   }
 
-  const acknowledgeRemoteChanges = async () => {
-    const result = await eventsQuery.refetch()
-    const latest = Math.max(
-      0,
-      ...(result.data ?? []).map((event) => event.eventId),
-    )
-    setRefreshEventId(latest)
-    setRefreshToken((current) => current + 1)
-  }
-
   const refreshUpdates = () => {
-    void acknowledgeRemoteChanges()
+    setSalesChangeVersion((current) => current + 1)
+    setTraderChangeVersion((current) => current + 1)
+    setRecentRevisionsChangeVersion((current) => current + 1)
   }
 
   const saveSettings = async (settings: PersonalSettingsDraft) => {
@@ -97,22 +86,33 @@ export function App() {
 
   useEffect(() => {
     if (typeof EventSource === 'undefined') return undefined
-    const source = new EventSource(`/api/events/stream?after=${refreshEventId}`)
-    source.addEventListener('changed', () => {
-      setRemoteChangeVersion((current) => current + 1)
-      void eventsQuery.refetch()
+    const source = new EventSource('/api/events/stream')
+    source.addEventListener('invalidation', (event) => {
+      const categories = new Set(
+        (event as MessageEvent<string>).data.split(','),
+      )
+      if (categories.has('sales-list'))
+        setSalesChangeVersion((current) => current + 1)
+      if (categories.has('trader-list'))
+        setTraderChangeVersion((current) => current + 1)
+      if (categories.has('recent-revisions'))
+        setRecentRevisionsChangeVersion((current) => current + 1)
+      if (categories.has('business-date')) {
+        void businessDateQuery.refetch()
+        setSalesChangeVersion((current) => current + 1)
+        setTraderChangeVersion((current) => current + 1)
+      }
     })
 
     return () => source.close()
-  }, [refreshEventId, eventsQuery.refetch])
+  }, [businessDateQuery.refetch])
 
   const outletContext: AppOutletContext = {
     currentUserId,
     businessDate: businessDateQuery.data?.date,
-    events: eventsQuery.data ?? [],
-    refreshToken,
-    remoteChangeVersion,
-    acknowledgeRemoteChanges,
+    salesChangeVersion,
+    traderChangeVersion,
+    recentRevisionsChangeVersion,
   }
 
   return (
@@ -122,7 +122,7 @@ export function App() {
         businessDate={businessDate}
         currentUserId={currentUserId}
         onIdentityChange={changeIdentity}
-        pendingUpdates={eventsQuery.data?.length ?? 0}
+        pendingUpdates={0}
         onRefreshUpdates={refreshUpdates}
         isTrader={currentUserQuery.data?.roles.includes('Trader') ?? false}
         themeMode={themeMode}

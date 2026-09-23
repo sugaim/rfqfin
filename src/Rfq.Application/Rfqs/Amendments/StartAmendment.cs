@@ -7,6 +7,7 @@ public sealed class StartAmendment(
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
+    IBusinessDateProvider businessDateProvider,
     TimeProvider timeProvider)
 {
     public async Task<AmendmentResult> ExecuteAsync(
@@ -15,11 +16,13 @@ public sealed class StartAmendment(
     {
         RfqCase rfq = await ClosedRfqUseCase.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanEditRevision(currentUser.User, rfq);
+        DateOnly businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
         AmendmentSaveResult transition = AmendmentTransitions.StartDraft(
             rfq,
             RevisionId.New(),
             currentUser.User.UserId,
             timeProvider.GetUtcNow(),
+            businessDate,
             command.ExpectedCurrentVersion);
         rfq = transition.Rfq;
         cases.Update(rfq);

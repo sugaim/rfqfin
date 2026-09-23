@@ -271,11 +271,9 @@
             "name": "limit",
             "in": "query",
             "schema": {
-              "maximum": 100,
-              "minimum": 1,
               "type": "integer",
               "format": "int32",
-              "default": 50
+              "default": null
             }
           }
         ],
@@ -3455,17 +3453,6 @@
         "tags": [
           "Events"
         ],
-        "parameters": [
-          {
-            "name": "after",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "default": 0
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -3522,6 +3509,35 @@
       }
     },
     "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/readiness": {
       "get": {
         "tags": [
           "Health"
@@ -5467,12 +5483,49 @@
       },
       "HealthResponse": {
         "required": [
-          "status"
+          "status",
+          "readModelAvailable",
+          "runtimeBusinessDate",
+          "snapshotBusinessDate",
+          "currentGeneration",
+          "publishedGeneration",
+          "lastSuccessfulRefreshAt",
+          "lastFailure"
         ],
         "type": "object",
         "properties": {
           "status": {
             "type": "string"
+          },
+          "readModelAvailable": {
+            "type": "boolean"
+          },
+          "runtimeBusinessDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "snapshotBusinessDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "currentGeneration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "publishedGeneration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastSuccessfulRefreshAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastFailure": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

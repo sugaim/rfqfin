@@ -35,7 +35,6 @@ describe('Live/Paused authoritative reconciliation', () => {
     const refetch = vi.fn().mockResolvedValue({
       data: [{ caseId: 1, value: 'fresh' }],
     })
-    const acknowledge = vi.fn().mockResolvedValue(undefined)
     const { result, rerender } = renderHook(
       ({ version, rows }) =>
         useLivePausedRows({
@@ -43,7 +42,6 @@ describe('Live/Paused authoritative reconciliation', () => {
           remoteChangeVersion: version,
           protectedState: false,
           refetch,
-          acknowledgeRemoteChanges: acknowledge,
           keyOf,
         }),
       {
@@ -62,7 +60,6 @@ describe('Live/Paused authoritative reconciliation', () => {
 
   it('defers one Live catch-up while protected and runs it when protection ends', async () => {
     const refetch = vi.fn().mockResolvedValue({ data: [] })
-    const acknowledge = vi.fn().mockResolvedValue(undefined)
     const { result, rerender } = renderHook(
       ({ version, protectedState }) =>
         useLivePausedRows<Row>({
@@ -70,7 +67,6 @@ describe('Live/Paused authoritative reconciliation', () => {
           remoteChangeVersion: version,
           protectedState,
           refetch,
-          acknowledgeRemoteChanges: acknowledge,
           keyOf,
         }),
       { initialProps: { version: 0, protectedState: true } },
@@ -87,7 +83,6 @@ describe('Live/Paused authoritative reconciliation', () => {
     const refetch = vi.fn().mockResolvedValue({
       data: [{ caseId: 1, value: 'fresh' }],
     })
-    const acknowledge = vi.fn().mockResolvedValue(undefined)
     const { result, rerender } = renderHook(
       ({ version, rows }) =>
         useLivePausedRows({
@@ -95,7 +90,6 @@ describe('Live/Paused authoritative reconciliation', () => {
           remoteChangeVersion: version,
           protectedState: false,
           refetch,
-          acknowledgeRemoteChanges: acknowledge,
           keyOf,
         }),
       {
@@ -120,7 +114,6 @@ describe('Live/Paused authoritative reconciliation', () => {
     const refetch = vi.fn().mockResolvedValue({
       data: [{ caseId: 1, value: 'fresh' }],
     })
-    const acknowledge = vi.fn().mockResolvedValue(undefined)
     const { result, rerender } = renderHook(
       ({ protectedState }) =>
         useLivePausedRows<Row>({
@@ -128,7 +121,6 @@ describe('Live/Paused authoritative reconciliation', () => {
           remoteChangeVersion: 0,
           protectedState,
           refetch,
-          acknowledgeRemoteChanges: acknowledge,
           keyOf,
         }),
       { initialProps: { protectedState: false } },
@@ -144,5 +136,37 @@ describe('Live/Paused authoritative reconciliation', () => {
     await act(() => result.current.changeMode('live'))
     expect(refetch).toHaveBeenCalledOnce()
     expect(result.current.mode).toBe('live')
+  })
+
+  it('runs another catch-up when invalidation advances during an in-flight read', async () => {
+    let completeFirst!: (value: { data: Row[] }) => void
+    const first = new Promise<{ data: Row[] }>((resolve) => {
+      completeFirst = resolve
+    })
+    const refetch = vi
+      .fn()
+      .mockImplementationOnce(() => first)
+      .mockResolvedValue({ data: [{ caseId: 1, value: 'generation-2' }] })
+    const { rerender } = renderHook(
+      ({ version }) =>
+        useLivePausedRows<Row>({
+          authoritativeRows: [],
+          remoteChangeVersion: version,
+          protectedState: false,
+          refetch,
+          keyOf,
+        }),
+      { initialProps: { version: 0 } },
+    )
+
+    rerender({ version: 1 })
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce())
+    rerender({ version: 2 })
+    await act(async () => {
+      completeFirst({ data: [{ caseId: 1, value: 'generation-1' }] })
+      await first
+    })
+
+    await waitFor(() => expect(refetch).toHaveBeenCalledTimes(2))
   })
 })

@@ -5,15 +5,29 @@ namespace Rfq.Application;
 public sealed class GetActiveTraderRfqs(
     ITraderRfqQueries activeRfqs,
     IRfqAuthorization authorization,
+    IBusinessDateProvider businessDateProvider,
     ICurrentUser currentUser)
 {
     public async Task<IReadOnlyList<TraderRfqListItem>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
         authorization.EnsureCanViewTraderScreen(currentUser.User);
-        return await activeRfqs.GetAsync(
-            currentUser.User.DeskId,
-            cancellationToken);
+        DateOnly businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
+        try
+        {
+            return await activeRfqs.GetAsync(
+                currentUser.User.DeskId,
+                businessDate,
+                cancellationToken);
+        }
+        catch (BusinessDateChangedException)
+        {
+            businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
+            return await activeRfqs.GetAsync(
+                currentUser.User.DeskId,
+                businessDate,
+                cancellationToken);
+        }
     }
 }
 

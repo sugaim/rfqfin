@@ -14,6 +14,8 @@ internal sealed class PostgreSqlRfqRevisionConfiguration : IEntityTypeConfigurat
         builder.Property(entity => entity.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30);
         builder.Property(entity => entity.Version).HasColumnName("version").IsConcurrencyToken();
         builder.Property(entity => entity.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone");
+        builder.Property(entity => entity.DraftCreatedBusinessDate)
+            .HasColumnName("draft_created_business_date").HasColumnType("date");
         builder.Property(entity => entity.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(entity => entity.SettlementDate).HasColumnName("settlement_date").HasColumnType("date");
         builder.Property(entity => entity.StandardSettlementDate).HasColumnName("standard_settlement_date").HasColumnType("date");
@@ -27,6 +29,8 @@ internal sealed class PostgreSqlRfqRevisionConfiguration : IEntityTypeConfigurat
             .HasForeignKey(entity => entity.CaseId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(entity => entity.CaseId).IsUnique().HasFilter("status = 'Draft'")
             .HasDatabaseName("ux_rfq_revisions_one_draft_per_case");
+        builder.HasIndex(entity => entity.DraftCreatedBusinessDate)
+            .HasDatabaseName("ix_rfq_revisions_draft_created_business_date");
         builder.HasOne<RfqRevisionEntity>().WithMany().HasForeignKey(entity => entity.QuoteSeedRevisionId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RfqRevisionEntity>().WithMany().HasForeignKey(entity => entity.CopiedFromRevisionId)

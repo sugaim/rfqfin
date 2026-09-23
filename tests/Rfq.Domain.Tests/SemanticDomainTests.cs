@@ -128,6 +128,7 @@ public sealed class SemanticDomainTests
             quoted.CurrentRevision.Terms,
             Sales,
             Now,
+            Today,
             quoted.Version);
         RfqCase cancelled = RfqLifecycleTransitions.Cancel(saved.Rfq, saved.Rfq.Version);
         Assert.IsType<CancelledRfq>(cancelled.Lifecycle);
@@ -296,6 +297,7 @@ public sealed class SemanticDomainTests
                 "changed"),
             Sales,
             Now,
+            Today,
             rfq.Version);
         AmendmentConfirmResult confirm = AmendmentTransitions.Confirm(
             save.Rfq, Today, Sales, Now, save.Rfq.Version, save.DraftRevision.Version);
@@ -311,7 +313,7 @@ public sealed class SemanticDomainTests
     {
         RfqCase rfq = Open();
         AmendmentSaveResult save = AmendmentTransitions.SaveDraft(
-            rfq, RevisionId.New(), rfq.CurrentRevision.Terms, Sales, Now, rfq.Version);
+            rfq, RevisionId.New(), rfq.CurrentRevision.Terms, Sales, Now, Today, rfq.Version);
         AmendmentDiscardResult discarded = AmendmentTransitions.Discard(
             save.Rfq, save.Rfq.Version, save.DraftRevision.Version);
         Assert.Equal(RevisionStatus.Discarded, discarded.DiscardedRevision.Status);
@@ -323,10 +325,11 @@ public sealed class SemanticDomainTests
     {
         RfqCase rfq = Open();
         AmendmentSaveResult started = AmendmentTransitions.StartDraft(
-            rfq, RevisionId.New(), Sales, Now, rfq.Version);
+            rfq, RevisionId.New(), Sales, Now, Today, rfq.Version);
 
         Assert.Equal(rfq.CurrentRevision.Terms, started.DraftRevision.Terms);
         Assert.NotNull(started.Rfq.PendingDraftRevision);
+        Assert.Equal(Today, started.DraftRevision.DraftCreatedBusinessDate);
         Assert.Throws<DomainRuleViolationException>(() => AmendmentTransitions.Confirm(
             started.Rfq,
             Today,
@@ -335,6 +338,27 @@ public sealed class SemanticDomainTests
             started.Rfq.Version,
             started.DraftRevision.Version));
         Assert.NotNull(started.Rfq.PendingDraftRevision);
+    }
+
+    [Fact]
+    public void Initial_draft_records_business_date_independently_from_timestamp()
+    {
+        RfqCase draft = RfqCase.CreateDraft(
+            new CaseId(2),
+            RevisionId.New(),
+            ClientId.Create("c"),
+            SecurityId.Create("s"),
+            CategoryId.Create("cat"),
+            Trader,
+            new RevisionTerms(1_000_000, Today.AddDays(2), Today.AddDays(2), ""),
+            Today,
+            Sales,
+            Now.AddDays(-1));
+
+        Assert.Equal(Today, draft.CurrentRevision.DraftCreatedBusinessDate);
+        Assert.NotEqual(
+            DateOnly.FromDateTime(draft.CurrentRevision.CreatedAt.UtcDateTime),
+            draft.CurrentRevision.DraftCreatedBusinessDate);
     }
 
     [Fact]
@@ -350,6 +374,7 @@ public sealed class SemanticDomainTests
             quoted.CurrentRevision.Terms,
             Sales,
             Now,
+            Today,
             quoted.Version);
         CloseTransitionResult closed = RfqLifecycleTransitions.CloseHit(
             save.Rfq,
@@ -395,6 +420,7 @@ public sealed class SemanticDomainTests
             CategoryId.Create("cat"),
             Trader,
             new RevisionTerms(1_000_000, Today.AddDays(2), Today.AddDays(2), ""),
+            Today,
             Sales,
             Now);
 
@@ -420,6 +446,7 @@ public sealed class SemanticDomainTests
                     "changed"),
                 Sales,
                 Now,
+                Today,
                 open.Version);
             return AmendmentTransitions.Confirm(
                 saved.Rfq,

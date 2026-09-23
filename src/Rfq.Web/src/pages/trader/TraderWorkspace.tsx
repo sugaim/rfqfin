@@ -58,12 +58,8 @@ import type {
 import { useLivePausedRows } from '@/shared/state/useLivePausedRows'
 
 export function TraderWorkspace() {
-  const {
-    currentUserId,
-    businessDate,
-    remoteChangeVersion,
-    acknowledgeRemoteChanges,
-  } = useOutletContext<AppOutletContext>()
+  const { currentUserId, businessDate, traderChangeVersion } =
+    useOutletContext<AppOutletContext>()
   const rfqsQuery = useGetActiveTraderRfqsQuery()
   const tradersQuery = useGetAssignableTradersQuery()
   const usersQuery = useGetContactOwnerCandidatesQuery()
@@ -114,10 +110,9 @@ export function TraderWorkspace() {
   const [refreshGeneration, setRefreshGeneration] = useState(0)
   const refresh = useLivePausedRows({
     authoritativeRows: rfqsQuery.data,
-    remoteChangeVersion,
+    remoteChangeVersion: traderChangeVersion,
     protectedState,
     refetch: rfqsQuery.refetch,
-    acknowledgeRemoteChanges,
     keyOf: (row: TraderRfq) => row.caseId,
     onAuthoritativeRefresh: () => setRefreshGeneration((value) => value + 1),
   })

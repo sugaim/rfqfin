@@ -12,7 +12,6 @@ interface UseLivePausedRowsInput<Row> {
   remoteChangeVersion: number
   protectedState: boolean
   refetch: () => Promise<AuthoritativeQueryResult<Row>>
-  acknowledgeRemoteChanges: () => Promise<void>
   keyOf: (row: Row) => number
   onAuthoritativeRefresh?: () => void
 }
@@ -60,7 +59,6 @@ export function useLivePausedRows<Row>({
   remoteChangeVersion,
   protectedState,
   refetch,
-  acknowledgeRemoteChanges,
   keyOf,
   onAuthoritativeRefresh,
 }: UseLivePausedRowsInput<Row>): LivePausedRowsController<Row> {
@@ -70,50 +68,47 @@ export function useLivePausedRows<Row>({
   const [liveUpdateDeferred, setLiveUpdateDeferred] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
   const observedRemoteVersion = useRef(remoteChangeVersion)
-  const inFlight = useRef<Promise<AuthoritativeQueryResult<Row>> | null>(null)
+  const latestRemoteVersion = useRef(remoteChangeVersion)
+  const catchUpInFlight = useRef<Promise<Row[] | null> | null>(null)
 
-  const fetchAuthoritative = useCallback(async () => {
-    if (!inFlight.current) {
-      inFlight.current = refetch().finally(() => {
-        inFlight.current = null
+  const catchUp = useCallback(async (): Promise<Row[] | null> => {
+    if (!catchUpInFlight.current) {
+      catchUpInFlight.current = (async () => {
+        setRefreshError(null)
+        while (true) {
+          const target = latestRemoteVersion.current
+          const result = await refetch()
+          if (result.error || !result.data) {
+            setRefreshError('The latest RFQ state could not be loaded.')
+
+            return null
+          }
+          if (latestRemoteVersion.current <= target) {
+            onAuthoritativeRefresh?.()
+
+            return result.data
+          }
+        }
+      })().finally(() => {
+        catchUpInFlight.current = null
       })
     }
 
-    return inFlight.current
-  }, [refetch])
-
-  const catchUp = useCallback(async (): Promise<Row[] | null> => {
-    setRefreshError(null)
-    const result = await fetchAuthoritative()
-    if (result.error || !result.data) {
-      setRefreshError('The latest RFQ state could not be loaded.')
-
-      return null
-    }
-    await acknowledgeRemoteChanges()
-    onAuthoritativeRefresh?.()
-
-    return result.data
-  }, [acknowledgeRemoteChanges, fetchAuthoritative, onAuthoritativeRefresh])
+    return catchUpInFlight.current
+  }, [onAuthoritativeRefresh, refetch])
 
   useEffect(() => {
+    latestRemoteVersion.current = remoteChangeVersion
     if (remoteChangeVersion === observedRemoteVersion.current) return
     observedRemoteVersion.current = remoteChangeVersion
     if (mode === 'paused') {
       setUpdatesPending(true)
-      void acknowledgeRemoteChanges()
     } else if (protectedState) {
       setLiveUpdateDeferred(true)
     } else {
       void catchUp()
     }
-  }, [
-    acknowledgeRemoteChanges,
-    catchUp,
-    mode,
-    protectedState,
-    remoteChangeVersion,
-  ])
+  }, [catchUp, mode, protectedState, remoteChangeVersion])
 
   useEffect(() => {
     if (mode !== 'live' || protectedState || !liveUpdateDeferred) return

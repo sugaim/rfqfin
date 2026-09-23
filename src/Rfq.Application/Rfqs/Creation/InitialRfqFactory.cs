@@ -8,6 +8,7 @@ public sealed class InitialRfqFactory(
     ResolveRfqCreationContext resolveCreationContext,
     AssignedTraderValidator assignedTraderValidator,
     ICurrentUser currentUser,
+    IBusinessDateProvider businessDateProvider,
     TimeProvider timeProvider)
 {
     public async Task<RfqCase> CreateAsync(
@@ -34,6 +35,7 @@ public sealed class InitialRfqFactory(
         UserId? salesId = currentUser.User.Roles.Contains(UserRole.Sales)
             ? currentUser.User.UserId
             : null;
+        DateOnly businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
 
         return RfqCase.CreateDraft(
             caseId,
@@ -47,6 +49,7 @@ public sealed class InitialRfqFactory(
                 command.SettlementDate,
                 command.StandardSettlementDate,
                 command.SalesAndTradingMessage),
+            businessDate,
             currentUser.User.UserId,
             timeProvider.GetUtcNow(),
             salesId,

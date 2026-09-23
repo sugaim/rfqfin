@@ -216,6 +216,7 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
       setTargetContactOwnerId(undefined)
     },
     onSelectRow: (row) => {
+      amendmentAutosave.current = null
       setActiveCaseId(row.caseId)
       setMemoDraft(row.salesMemo)
       setMemoExpectedVersion(row.salesMemoVersion)
@@ -320,7 +321,6 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
     if (!changed) return
     try {
       await coordinator.enqueue(delta)
-      await onReconcileCases([row.caseId])
     } catch (error) {
       const status = (error as { status?: number }).status
       operations.setActionError(
@@ -329,7 +329,10 @@ export function SalesScreen(props: SalesScreenProps): ReactElement {
           : 'The Amendment could not be autosaved. Your local input is preserved.',
       )
       await onReconcileCases([row.caseId]).catch(() => undefined)
+
+      return
     }
+    await onReconcileCases([row.caseId]).catch(() => undefined)
   }
 
   const editAmendment = async (event: CellEditRequestEvent<SalesRfq>) => {

@@ -82,6 +82,9 @@ public sealed class ApiErrorMiddleware(
             case RfqErrorKind.CalculationFailure:
                 mapped = (StatusCodes.Status422UnprocessableEntity, "CalculationFailure");
                 return true;
+            case RfqErrorKind.ServiceUnavailable:
+                mapped = (StatusCodes.Status503ServiceUnavailable, "ServiceUnavailable");
+                return true;
             default:
                 mapped = default;
                 return false;

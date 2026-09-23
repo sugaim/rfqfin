@@ -44,6 +44,7 @@ if (!generatingOpenApi)
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ICurrentUser, DevelopmentCurrentUser>();
     builder.Services.AddSingleton<IIncidentReporter, LoggingIncidentReporter>();
+    builder.Services.AddHostedService<RfqReadModelWorker>();
     builder.Services.AddHostedService<QuoteExpiryWorker>();
 }
 

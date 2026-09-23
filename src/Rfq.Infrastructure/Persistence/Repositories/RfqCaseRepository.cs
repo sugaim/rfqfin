@@ -17,6 +17,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
             Status = rfqCase.CurrentRevision.Status,
             Version = rfqCase.CurrentRevision.Version.Value,
             CreatedAt = rfqCase.CurrentRevision.CreatedAt,
+            DraftCreatedBusinessDate = rfqCase.CurrentRevision.DraftCreatedBusinessDate,
             CreatedBy = rfqCase.CurrentRevision.CreatedBy.Value,
             SettlementDate = rfqCase.CurrentRevision.SettlementDate,
             StandardSettlementDate = rfqCase.CurrentRevision.StandardSettlementDate,
@@ -244,6 +245,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
                 : new RevisionId(revision.QuoteSeedRevisionId.Value),
             new StateVersion(revision.Version),
             revision.CreatedAt,
+            revision.DraftCreatedBusinessDate,
             UserId.Create(revision.CreatedBy),
             revision.ConfirmedAt,
             revision.ConfirmedBy is null ? null : UserId.Create(revision.ConfirmedBy));
@@ -261,6 +263,7 @@ public sealed class RfqCaseRepository(RfqDbContext dbContext) : IRfqCaseReposito
         QuoteSeedRevisionId = revision.QuoteSeedRevisionId?.Value,
         Version = revision.Version.Value,
         CreatedAt = revision.CreatedAt,
+        DraftCreatedBusinessDate = revision.DraftCreatedBusinessDate,
         CreatedBy = revision.CreatedBy.Value,
         ConfirmedAt = revision.ConfirmedAt,
         ConfirmedBy = revision.ConfirmedBy?.Value,

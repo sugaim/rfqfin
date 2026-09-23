@@ -17,7 +17,6 @@ vi.mock('@/services/api', () => ({
   useGetMeQuery: () => ({
     data: { userId: 'sales-dev', roles: ['Sales'], deskId: 'jpy-credit' },
   }),
-  useGetEventsQuery: () => ({ data: [], refetch: vi.fn() }),
   useGetThemeQuery: () => ({
     data: { mode: 'Dark' },
     isLoading: false,

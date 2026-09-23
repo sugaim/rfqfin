@@ -1,12 +1,16 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Rfq.Application;
+using Rfq.Infrastructure;
 
 namespace Rfq.Api.Events;
 
 [ApiController]
 [Route("api/events")]
-public sealed class EventsController(IEventFeed events) : ControllerBase
+public sealed class EventsController(
+    IEventFeed events,
+    RfqInvalidationRegistry invalidations,
+    ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet]
     public async Task<IReadOnlyList<EventResponse>> GetAfter(
@@ -16,27 +20,35 @@ public sealed class EventsController(IEventFeed events) : ControllerBase
 
     [HttpGet("stream")]
     public async Task Stream(
-        [FromQuery] long after = 0,
         CancellationToken cancellationToken = default)
     {
         Response.Headers.ContentType = "text/event-stream";
         Response.Headers.CacheControl = "no-cache";
-        long cursor = after;
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        CurrentUser user = currentUser.User;
+        await using RfqInvalidationSubscription subscription = invalidations.Subscribe(
+            new RfqSubscriberIdentity(user.UserId, user.DeskId, user.Roles));
         await Response.WriteAsync(": connected\n\n", cancellationToken);
         await Response.Body.FlushAsync(cancellationToken);
-        while (await timer.WaitForNextTickAsync(cancellationToken))
+        try
         {
-            long latest = await events.GetLatestIdAsync(cancellationToken);
-            if (latest <= cursor)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                continue;
+                RfqInvalidationCategory categories = await subscription.WaitAsync(cancellationToken);
+                string payload = string.Join(',', GetCategoryNames(categories));
+                await Response.WriteAsync(
+                    $"event: invalidation\ndata: {payload}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
             }
-
-            cursor = latest;
-            await Response.WriteAsync($"event: changed\ndata: {latest}\n\n", cancellationToken);
-            await Response.Body.FlushAsync(cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private static IEnumerable<string> GetCategoryNames(RfqInvalidationCategory categories)
+    {
+        if (categories.HasFlag(RfqInvalidationCategory.SalesList)) yield return "sales-list";
+        if (categories.HasFlag(RfqInvalidationCategory.TraderList)) yield return "trader-list";
+        if (categories.HasFlag(RfqInvalidationCategory.RecentRevisions)) yield return "recent-revisions";
+        if (categories.HasFlag(RfqInvalidationCategory.BusinessDate)) yield return "business-date";
     }
 }
 

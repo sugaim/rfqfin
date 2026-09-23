@@ -23,7 +23,6 @@ vi.mock('@/services/api', () => ({
       deskId: 'jpy-credit',
     },
   }),
-  useGetEventsQuery: () => ({ data: [], refetch: vi.fn() }),
   useGetThemeQuery: () => ({
     data: { mode: settings.theme },
     isLoading: false,

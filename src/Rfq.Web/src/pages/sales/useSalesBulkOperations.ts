@@ -64,29 +64,32 @@ export function useSalesBulkOperations({
     if (!dialog) return
     const snapshot = dialog
     setDialog(null)
+    const eligible = snapshot.items
+      .filter((item) => item.eligible)
+      .map((item) => item.row)
+    let results: BulkItemResult[]
     try {
-      const eligible = snapshot.items
-        .filter((item) => item.eligible)
-        .map((item) => item.row)
-      const results = await actions.execute(snapshot.command, eligible)
-      const skipped: BulkItemResult[] = snapshot.items
-        .filter((item) => !item.eligible)
-        .map((item) => ({
-          caseId: item.row.caseId,
-          status: 'Skipped',
-          code: 'InvalidState',
-          message: item.reason ?? null,
-        }))
-      setResult({ command: snapshot.command, items: [...results, ...skipped] })
-      setResultExpanded(false)
-      await onReconcileCases(
-        results
-          .filter((item) => item.status === 'Succeeded')
-          .map((item) => item.caseId),
-      )
+      results = await actions.execute(snapshot.command, eligible)
     } catch {
       onError('The bulk operation could not be completed.')
+
+      return
     }
+    const skipped: BulkItemResult[] = snapshot.items
+      .filter((item) => !item.eligible)
+      .map((item) => ({
+        caseId: item.row.caseId,
+        status: 'Skipped',
+        code: 'InvalidState',
+        message: item.reason ?? null,
+      }))
+    setResult({ command: snapshot.command, items: [...results, ...skipped] })
+    setResultExpanded(false)
+    await onReconcileCases(
+      results
+        .filter((item) => item.status === 'Succeeded')
+        .map((item) => item.caseId),
+    ).catch(() => undefined)
   }
 
   return {

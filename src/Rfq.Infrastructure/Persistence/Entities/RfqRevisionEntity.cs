@@ -9,6 +9,7 @@ internal sealed class RfqRevisionEntity
     public RevisionStatus Status { get; set; }
     public long Version { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public DateOnly DraftCreatedBusinessDate { get; set; }
     public string CreatedBy { get; set; } = string.Empty;
     public DateOnly? SettlementDate { get; set; }
     public DateOnly StandardSettlementDate { get; set; }

@@ -11,6 +11,7 @@ import {
   requiresConfirmation,
   rowActionCommands,
 } from '@/pages/sales/salesModel'
+import { hasChangedDraftMessage } from '@/pages/sales/salesColumns'
 
 const row = (overrides: Partial<SalesRfq> = {}): SalesRfq => ({
   caseId: 101,
@@ -97,6 +98,19 @@ describe('Sales command eligibility', () => {
     expect(commandEligible('discard-amendment', unchanged, 'sales-dev')).toBe(
       true,
     )
+    expect(rowActionCommands(unchanged, 'sales-dev')).toContain(
+      'discard-amendment',
+    )
+    expect(rowActionCommands(unchanged, 'sales-dev')).not.toContain(
+      'confirm-amendment',
+    )
+    expect(hasChangedDraftMessage(unchanged)).toBe(false)
+    expect(
+      hasChangedDraftMessage({
+        ...unchanged,
+        draftSalesAndTradingMessage: 'changed',
+      }),
+    ).toBe(true)
     expect(hasAmendmentChanges({ ...unchanged, draftNotional: null })).toBe(
       true,
     )

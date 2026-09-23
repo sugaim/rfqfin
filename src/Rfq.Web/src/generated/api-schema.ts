@@ -2650,9 +2650,7 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: {
-                    after?: number;
-                };
+                query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -2716,6 +2714,43 @@ export interface paths {
         trace?: never;
     };
     "/api/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["HealthResponse"];
+                        "application/json": components["schemas"]["HealthResponse"];
+                        "text/json": components["schemas"]["HealthResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/readiness": {
         parameters: {
             query?: never;
             header?: never;
@@ -3530,6 +3565,18 @@ export interface components {
         };
         HealthResponse: {
             status: string;
+            readModelAvailable: boolean;
+            /** Format: date */
+            runtimeBusinessDate: string | null;
+            /** Format: date */
+            snapshotBusinessDate: string | null;
+            /** Format: int64 */
+            currentGeneration: number;
+            /** Format: int64 */
+            publishedGeneration: number;
+            /** Format: date-time */
+            lastSuccessfulRefreshAt: string | null;
+            lastFailure: string | null;
         };
         InitialRfqResponse: {
             /** Format: int64 */

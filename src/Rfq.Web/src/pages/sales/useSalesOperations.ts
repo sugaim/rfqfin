@@ -66,10 +66,6 @@ export function useSalesOperations({
     setConflict(false)
     try {
       await action()
-      onSuccess()
-      if (caseIds.length) await onReconcileCases(caseIds)
-
-      return true
     } catch (error) {
       const status = (error as { status?: number })?.status
       setConflict(status === 409)
@@ -81,9 +77,24 @@ export function useSalesOperations({
 
       return false
     }
+    onSuccess()
+    if (caseIds.length) await onReconcileCases(caseIds).catch(() => undefined)
+
+    return true
   }
 
   const execute = async (command: SalesCommand, row: SalesRfq) => {
+    if (command === 'create-from-existing') {
+      let createdCaseId: number | undefined
+      const succeeded = await run(async () => {
+        const created = await lifecycle.createFromExisting(row.caseId)
+        createdCaseId = created.caseId
+      })
+      if (succeeded && createdCaseId !== undefined)
+        await onReconcileCases([createdCaseId]).catch(() => undefined)
+
+      return
+    }
     await run(async () => {
       switch (command) {
         case 'present':
@@ -102,8 +113,6 @@ export function useSalesOperations({
           return amendment.confirm(row)
         case 'discard-amendment':
           return amendment.discard(row)
-        case 'create-from-existing':
-          return lifecycle.createFromExisting(row.caseId)
       }
     }, [row.caseId])
   }

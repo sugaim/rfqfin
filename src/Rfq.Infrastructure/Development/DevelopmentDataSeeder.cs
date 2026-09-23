@@ -105,6 +105,7 @@ public sealed class DevelopmentDataSeeder(RfqDbContext dbContext, TimeProvider t
                 Status = isDraft ? RevisionStatus.Draft : RevisionStatus.Confirmed,
                 Version = isDraft ? 1 : 2,
                 CreatedAt = created,
+                DraftCreatedBusinessDate = new DateOnly(2026, 9, 21),
                 CreatedBy = createdBy,
                 SettlementDate = new DateOnly(2026, 9, 23).AddDays(index % 20),
                 StandardSettlementDate = new DateOnly(2026, 9, 23),

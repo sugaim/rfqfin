@@ -588,6 +588,10 @@ namespace Rfq.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateOnly>("DraftCreatedBusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("draft_created_business_date");
+
                     b.Property<string>("CreatedBy")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -635,6 +639,9 @@ namespace Rfq.Infrastructure.Migrations
                         .HasFilter("status = 'Draft'");
 
                     b.HasIndex("CopiedFromRevisionId");
+
+                    b.HasIndex("DraftCreatedBusinessDate")
+                        .HasDatabaseName("ix_rfq_revisions_draft_created_business_date");
 
                     b.HasIndex("QuoteSeedRevisionId");
 

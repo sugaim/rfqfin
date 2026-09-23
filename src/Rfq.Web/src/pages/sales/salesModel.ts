@@ -60,8 +60,8 @@ export function rowActionCommands(
   if (row.contactOwnerId !== userId) return []
   if (row.revisionStatus === 'Draft') return ['confirm-draft', 'discard-draft']
   const commands: SalesRowCommand[] = []
-  if (row.draftRevisionId)
-    commands.push('confirm-amendment', 'discard-amendment')
+  if (hasAmendmentChanges(row)) commands.push('confirm-amendment')
+  if (row.draftRevisionId) commands.push('discard-amendment')
   for (const command of [
     'present',
     'unpresent',

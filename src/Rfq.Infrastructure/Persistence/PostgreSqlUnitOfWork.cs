@@ -6,9 +6,14 @@ namespace Rfq.Infrastructure;
 
 public sealed class PostgreSqlUnitOfWork(
     RfqDbContext dbContext,
-    PersistedEventSink eventSink) : IUnitOfWork
+    PersistedEventSink eventSink,
+    ICommittedRfqChangeSignal committedChangeSignal) : IUnitOfWork
 {
-    public PostgreSqlUnitOfWork(RfqDbContext dbContext) : this(dbContext, new PersistedEventSink()) { }
+    public PostgreSqlUnitOfWork(RfqDbContext dbContext)
+        : this(dbContext, new PersistedEventSink(), NoCommittedRfqChangeSignal.Instance) { }
+
+    public PostgreSqlUnitOfWork(RfqDbContext dbContext, PersistedEventSink eventSink)
+        : this(dbContext, eventSink, NoCommittedRfqChangeSignal.Instance) { }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -17,6 +22,7 @@ public sealed class PostgreSqlUnitOfWork(
             if (eventSink.Pending.Count == 0)
             {
                 await dbContext.SaveChangesAsync(cancellationToken);
+                committedChangeSignal.SignalCommittedChange();
                 return;
             }
 
@@ -64,6 +70,7 @@ public sealed class PostgreSqlUnitOfWork(
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             eventSink.Clear();
+            committedChangeSignal.SignalCommittedChange();
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -77,5 +84,11 @@ public sealed class PostgreSqlUnitOfWork(
     {
         dbContext.ChangeTracker.Clear();
         eventSink.Clear();
+    }
+
+    private sealed class NoCommittedRfqChangeSignal : ICommittedRfqChangeSignal
+    {
+        public static readonly NoCommittedRfqChangeSignal Instance = new();
+        public void SignalCommittedChange() { }
     }
 }

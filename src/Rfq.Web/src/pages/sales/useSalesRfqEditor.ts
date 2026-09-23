@@ -216,7 +216,7 @@ export function useSalesRfqEditor({
     if (succeeded) {
       setNewIntent(false)
       if (created) {
-        await onReconcileCases([created.caseId])
+        await onReconcileCases([created.caseId]).catch(() => undefined)
         onPersisted(created.caseId)
       }
     }
@@ -242,7 +242,6 @@ export function useSalesRfqEditor({
     if (attempted === effective) return
     try {
       await coordinator.enqueue(delta)
-      await onReconcileCases([selected.caseId])
     } catch (error) {
       const status = (error as { status?: number }).status
       onError(
@@ -251,7 +250,10 @@ export function useSalesRfqEditor({
           : 'The Draft could not be autosaved. Your local input is preserved.',
       )
       await onReconcileCases([selected.caseId]).catch(() => undefined)
+
+      return
     }
+    await onReconcileCases([selected.caseId]).catch(() => undefined)
   }
 
   return {

@@ -4,14 +4,28 @@ namespace Rfq.Application;
 
 public sealed class GetActiveSalesRfqs(
     ISalesRfqQueries activeRfqs,
+    IBusinessDateProvider businessDateProvider,
     ICurrentUser currentUser)
 {
-    public Task<IReadOnlyList<SalesRfqListItem>> ExecuteAsync(
+    public async Task<IReadOnlyList<SalesRfqListItem>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
-        return activeRfqs.GetAsync(
-            currentUser.User.UserId,
-            cancellationToken);
+        DateOnly businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
+        try
+        {
+            return await activeRfqs.GetAsync(
+                currentUser.User.UserId,
+                businessDate,
+                cancellationToken);
+        }
+        catch (BusinessDateChangedException)
+        {
+            businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
+            return await activeRfqs.GetAsync(
+                currentUser.User.UserId,
+                businessDate,
+                cancellationToken);
+        }
     }
 }
 

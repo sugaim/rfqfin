@@ -167,7 +167,6 @@ export function useWorkingQuoteCalculation({
 
         return next
       })
-      await onSuccess(row.caseId)
     } catch (error) {
       if (
         requestByCase.current[row.caseId] !== requestId ||
@@ -181,7 +180,10 @@ export function useWorkingQuoteCalculation({
         [row.caseId]: failureFrom(error, requestId),
       }))
       event.api.refreshCells({ rowNodes: [event.node], force: true })
+
+      return
     }
+    await Promise.resolve(onSuccess(row.caseId)).catch(() => undefined)
   }
 
   return {

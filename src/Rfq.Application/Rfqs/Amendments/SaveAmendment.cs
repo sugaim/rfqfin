@@ -7,6 +7,7 @@ public sealed class SaveAmendment(
     IRfqAuthorization authorization,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
+    IBusinessDateProvider businessDateProvider,
     TimeProvider timeProvider)
 {
     public async Task<AmendmentResult> ExecuteAsync(
@@ -15,6 +16,7 @@ public sealed class SaveAmendment(
     {
         RfqCase rfq = await ClosedRfqUseCase.LoadAsync(cases, command.CaseId, cancellationToken);
         authorization.EnsureCanEditRevision(currentUser.User, rfq);
+        DateOnly businessDate = await businessDateProvider.GetCurrentAsync(cancellationToken);
         AmendmentSaveResult transition = AmendmentTransitions.SaveDraft(
             rfq,
             RevisionId.New(),
@@ -25,6 +27,7 @@ public sealed class SaveAmendment(
                 command.SalesAndTradingMessage),
             currentUser.User.UserId,
             timeProvider.GetUtcNow(),
+            businessDate,
             command.ExpectedCurrentVersion,
             command.ExpectedDraftVersion);
         rfq = transition.Rfq;

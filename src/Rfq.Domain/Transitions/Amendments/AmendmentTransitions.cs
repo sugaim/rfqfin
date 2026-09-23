@@ -7,6 +7,7 @@ public static class AmendmentTransitions
         RevisionId newRevisionId,
         UserId editedBy,
         DateTimeOffset editedAt,
+        DateOnly draftCreatedBusinessDate,
         StateVersion expectedCaseVersion)
     {
         OpenRfq open = EnsureOpen(rfq, expectedCaseVersion);
@@ -20,6 +21,7 @@ public static class AmendmentTransitions
             rfq.CaseId,
             rfq.CurrentRevision.Terms,
             editedAt,
+            draftCreatedBusinessDate,
             editedBy,
             rfq.CurrentRevision.RevisionId,
             rfq.CurrentRevision.RevisionId);
@@ -32,6 +34,7 @@ public static class AmendmentTransitions
         RevisionTerms terms,
         UserId editedBy,
         DateTimeOffset editedAt,
+        DateOnly draftCreatedBusinessDate,
         StateVersion expectedCaseVersion,
         StateVersion? expectedDraftVersion = null,
         RevisionId? copiedFromRevisionId = null,
@@ -46,6 +49,7 @@ public static class AmendmentTransitions
                 rfq.CaseId,
                 terms,
                 editedAt,
+                draftCreatedBusinessDate,
                 editedBy,
                 copiedFromRevisionId ?? rfq.CurrentRevision.RevisionId,
                 quoteSeedRevisionId ?? rfq.CurrentRevision.RevisionId);

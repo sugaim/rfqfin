@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router'
 import type { AppOutletContext } from '@/app/App'
 import {
@@ -57,18 +57,11 @@ import type {
   SalesMemoActions,
 } from '@/pages/sales/salesContracts'
 import { useLivePausedRows } from '@/shared/state/useLivePausedRows'
-import {
-  hasRelevantRecentRevisionChange,
-  shouldLoadRecentRevisions,
-} from '@/pages/sales/recentRevisions'
+import { shouldLoadRecentRevisions } from '@/pages/sales/recentRevisions'
 
 export function SalesWorkspace() {
-  const {
-    currentUserId,
-    events,
-    remoteChangeVersion,
-    acknowledgeRemoteChanges,
-  } = useOutletContext<AppOutletContext>()
+  const { currentUserId, salesChangeVersion, recentRevisionsChangeVersion } =
+    useOutletContext<AppOutletContext>()
   const rfqsQuery = useGetActiveSalesRfqsQuery()
   const tradersQuery = useGetAssignableTradersQuery()
   const usersQuery = useGetContactOwnerCandidatesQuery()
@@ -123,26 +116,17 @@ export function SalesWorkspace() {
   const [recentOpen, setRecentOpen] = useState(false)
   const [recentGeneration, setRecentGeneration] = useState(1)
   const [loadedRecentGeneration, setLoadedRecentGeneration] = useState(0)
-  const observedRecentEventId = useRef(0)
   const refresh = useLivePausedRows({
     authoritativeRows: rfqsQuery.data,
-    remoteChangeVersion,
+    remoteChangeVersion: salesChangeVersion,
     protectedState,
     refetch: rfqsQuery.refetch,
-    acknowledgeRemoteChanges,
     keyOf: (row: SalesRfq) => row.caseId,
   })
 
   useEffect(() => {
-    const previousEventId = observedRecentEventId.current
-    const unseen = events.filter((event) => event.eventId > previousEventId)
-    if (unseen.length)
-      observedRecentEventId.current = Math.max(
-        ...unseen.map((event) => event.eventId),
-      )
-    if (hasRelevantRecentRevisionChange(events, previousEventId))
-      setRecentGeneration((value) => value + 1)
-  }, [events])
+    setRecentGeneration((value) => value + 1)
+  }, [recentRevisionsChangeVersion])
 
   useEffect(() => {
     if (
@@ -155,7 +139,7 @@ export function SalesWorkspace() {
     )
       return
     const requestedGeneration = recentGeneration
-    void loadRecent(50)
+    void loadRecent(undefined)
       .unwrap()
       .then(() => setLoadedRecentGeneration(requestedGeneration))
   }, [
@@ -307,10 +291,7 @@ export function SalesWorkspace() {
       })
         .unwrap()
         .then(() => undefined),
-    createFromExisting: (caseId) =>
-      createFromExisting(caseId)
-        .unwrap()
-        .then(() => undefined),
+    createFromExisting: (caseId) => createFromExisting(caseId).unwrap(),
   }
   const contactOwner: SalesContactOwnerActions = {
     change: (caseId, targetUserId, expectedCurrentVersion) =>

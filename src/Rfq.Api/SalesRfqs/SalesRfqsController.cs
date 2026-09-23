@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Rfq.Application;
+using Rfq.Infrastructure;
 
 namespace Rfq.Api.SalesRfqs;
 
@@ -9,17 +9,29 @@ namespace Rfq.Api.SalesRfqs;
 public sealed class SalesRfqsController(
     GetActiveSalesRfqs query,
     ISalesRecentRevisionQueries recentRevisions,
-    ICurrentUser currentUser) : ControllerBase
+    ICurrentUser currentUser,
+    RfqRuntimeOptions runtimeOptions) : ControllerBase
 {
     [HttpGet]
     public async Task<IReadOnlyList<SalesRfqResponse>> Get(CancellationToken token) =>
         [.. (await query.ExecuteAsync(token)).Select(SalesRfqsApiMapper.ToApi)];
 
     [HttpGet("recent-revisions")]
-    public async Task<IReadOnlyList<SalesRecentRevisionResponse>> GetRecentRevisions(
-        [FromQuery, Range(1, 100)] int limit = 50,
-        CancellationToken token = default) =>
-        [.. (await recentRevisions.GetAsync(currentUser.User.UserId, limit, token)).Select(SalesRfqsApiMapper.ToApi)];
+    public async Task<ActionResult<IReadOnlyList<SalesRecentRevisionResponse>>> GetRecentRevisions(
+        [FromQuery] int? limit = null,
+        CancellationToken token = default)
+    {
+        int requestedLimit = limit ?? runtimeOptions.RecentRevisionsDefaultLimit;
+        if (requestedLimit < 1 || requestedLimit > runtimeOptions.RecentRevisionsMaxLimit)
+        {
+            return BadRequest();
+        }
+
+        return Ok((await recentRevisions.GetAsync(
+            currentUser.User.UserId,
+            requestedLimit,
+            token)).Select(SalesRfqsApiMapper.ToApi).ToArray());
+    }
 }
 
 public enum RfqStatusValue

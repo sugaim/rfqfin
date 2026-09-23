@@ -4,7 +4,7 @@ using Rfq.Domain;
 
 namespace Rfq.Infrastructure;
 
-public sealed class EfCoreSalesRfqQueries(RfqDbContext dbContext) : ISalesRfqQueries
+internal sealed class EfCoreSalesRfqQueries(RfqDbContext dbContext)
 {
     private static readonly string[] StateRfqEvents =
     [
@@ -25,17 +25,16 @@ public sealed class EfCoreSalesRfqQueries(RfqDbContext dbContext) : ISalesRfqQue
         nameof(QuoteTransitionKind.Expired),
     ];
 
-    public async Task<IReadOnlyList<SalesRfqListItem>> GetAsync(
-        UserId salesUserId,
+    public async Task<IReadOnlyList<SalesRfqListItem>> LoadAllAsync(
+        DateOnly businessDate,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(salesUserId);
-
         List<SalesRow> rows = await dbContext.RfqCases
             .AsNoTracking()
             .Where(entity =>
-                (entity.SalesId == salesUserId.Value
-                    || entity.Current.ContactOwnerId == salesUserId.Value)
+                (entity.CreatedBusinessDate == businessDate
+                    || entity.Revisions.Any(revision =>
+                        revision.DraftCreatedBusinessDate == businessDate))
                 && entity.Current.CurrentRevision.Status != RevisionStatus.Discarded
                 && (entity.Current.Lifecycle == RfqLifecycleKind.Draft
                     || entity.Current.Lifecycle == RfqLifecycleKind.Open
@@ -121,16 +120,21 @@ public sealed class EfCoreSalesRfqQueries(RfqDbContext dbContext) : ISalesRfqQue
 
         List<StateEvent> rfqStateEvents = await dbContext.RfqEvents.AsNoTracking()
             .Where(item => caseIds.Contains(item.CaseId) && StateRfqEvents.Contains(item.Type))
-            .Select(item => new StateEvent(item.CaseId, item.Event.OccurredAt))
+            .GroupBy(item => item.CaseId)
+            .Select(group => new StateEvent(
+                group.Key,
+                group.Max(item => item.Event.OccurredAt)))
             .ToListAsync(cancellationToken);
         List<StateEvent> quoteStateEvents = await dbContext.QuoteEvents.AsNoTracking()
             .Where(item => StateQuoteEvents.Contains(item.Type)
                 && dbContext.ConfirmedQuotes.Any(quote => quote.QuoteId == item.QuoteId
                     && caseIds.Contains(quote.Revision.CaseId)))
-            .Select(item => new StateEvent(
-                dbContext.ConfirmedQuotes.Where(quote => quote.QuoteId == item.QuoteId)
-                    .Select(quote => quote.Revision.CaseId).Single(),
-                item.Event.OccurredAt))
+            .GroupBy(item => dbContext.ConfirmedQuotes
+                .Where(quote => quote.QuoteId == item.QuoteId)
+                .Select(quote => quote.Revision.CaseId).Single())
+            .Select(group => new StateEvent(
+                group.Key,
+                group.Max(item => item.Event.OccurredAt)))
             .ToListAsync(cancellationToken);
         var stateSince = rfqStateEvents.Concat(quoteStateEvents)
             .GroupBy(item => item.CaseId)

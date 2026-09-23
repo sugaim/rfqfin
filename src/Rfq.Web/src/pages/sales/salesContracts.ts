@@ -44,7 +44,7 @@ export interface SalesLifecycleActions {
   ) => Promise<void>
   cancel: (row: SalesRfq) => Promise<void>
   reopen: (row: SalesRfq) => Promise<void>
-  createFromExisting: (caseId: number) => Promise<void>
+  createFromExisting: (caseId: number) => Promise<InitialRfqResponse>
   correctOutcome: (
     caseId: number,
     outcome: 'Hit' | 'Away',

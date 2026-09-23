@@ -200,17 +200,18 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
     row = selected,
   ) => {
     setActionError(null)
+    let value: T | void
     try {
-      const value = await action()
-      if (row) await onReconcileCases([row.caseId])
-
-      return value
+      value = await action()
     } catch (error) {
       const detail = (error as { data?: ApiProblemDetails }).data?.detail
       setActionError(detail ?? 'The Trader operation could not be completed.')
 
       return undefined
     }
+    if (row) await onReconcileCases([row.caseId]).catch(() => undefined)
+
+    return value
   }
 
   const showPane = (tab: TraderPaneTab) => {
@@ -224,23 +225,21 @@ export function TraderScreen(props: TraderScreenProps): ReactElement {
     assignedTraderId?: string,
   ) => {
     setActionError(null)
+    let items: Awaited<ReturnType<typeof bulk.execute>>
     try {
-      const items = await bulk.execute(
-        command,
-        rows,
-        expiryMinutes,
-        assignedTraderId,
-      )
-      setResult({ label, items })
-      setResultExpanded(false)
-      await onReconcileCases(
-        items
-          .filter((item) => item.status === 'Succeeded')
-          .map((item) => item.caseId),
-      )
+      items = await bulk.execute(command, rows, expiryMinutes, assignedTraderId)
     } catch {
       setActionError(`${label} could not be completed.`)
+
+      return
     }
+    setResult({ label, items })
+    setResultExpanded(false)
+    await onReconcileCases(
+      items
+        .filter((item) => item.status === 'Succeeded')
+        .map((item) => item.caseId),
+    ).catch(() => undefined)
   }
 
   const editQuote = async (
