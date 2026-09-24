@@ -32,13 +32,15 @@ Major settled decisions include:
 - RfqTerms is an immutable Case-level child Entity.
 - Notional and SettlementDateRule may change within Inquiry only by creating a new RfqTerms and new PricingEpisode.
 - after first Presentation, Terms changes create a new Case rather than mutate the existing Case.
-- PricingEpisode is immutable and contains RfqTermsId, QuoteOwnerId, PricingDate, and exactly one PricingEpisodeOrigin.
-- PricingEpisode changes on Terms change, QuoteOwner change, PricingDate roll, RepricingRequested, and ContinueAfterAway.
-- PricingDate is part of the price-round identity.
+- PricingEpisode is immutable and contains RfqTermsId, QuoteOwnerId, PricingDate, AssumedTradeDate, and exactly one PricingEpisodeOrigin.
+- PricingEpisode changes on Terms change, QuoteOwner change, PricingDate roll, AssumedTradeDate change, RepricingRequested, and ContinueAfterAway.
+- PricingDate is the local date to which the pricing round belongs.
+- AssumedTradeDate is the trade date assumed when evaluating trade-date-dependent terms and is distinct from PricingDate.
+- RollPricingDate preserves AssumedTradeDate; ChangeAssumedTradeDate preserves PricingDate and creates a new PricingEpisode without carrying the current FirmQuote.
 - BusinessEntityLocalDate replaced the earlier NaiveBusinessDate concept.
 - BusinessEntityLocalDate is a local date under RfqCase.BusinessEntity and does not itself prove "business day."
-- SettlementDateRule is ExplicitDate or PricingDateLag.
-- PricingDateLag uses non-empty CityCalendarSymbol list, BusinessDayCount >= 0, and Following.
+- SettlementDateRule is ExplicitDate or TradeDateLag.
+- TradeDateLag uses non-empty CityCalendarSymbol list, BusinessDayCount >= 0, and Following, and resolves settlement from PricingEpisode.AssumedTradeDate while the RFQ is open.
 - Quote is immutable and belongs to PricingEpisode.
 - at most one FirmQuote is current.
 - WorkingQuote stays outside Domain.
@@ -48,7 +50,8 @@ Major settled decisions include:
 - CaseOutcome is Presented(PresentationOutcome) or Unpresented(Feedback).
 - TerminalState is Closed(CloseDate, CaseOutcome) or Cancelled(...).
 - HitDate/AwayDate and CloseDate are different concepts.
-- PricingDate == PresentationDate == HitDate is a normal-flow Hit invariant.
+- PricingDate, AssumedTradeDate, PresentationDate, and HitDate are distinct business facts; the Domain does not require equality among them.
+- normal Hit chronology requires HitDate not to precede PresentationDate, while HitAt must be no later than FirmQuote.ValidUntil.
 - AwayDate is not required to equal PresentationDate.
 - Negotiating non-Presented states carry LatestPresentation and optional LatestPresentationAwayOutcome.
 - CloseAway reuses an existing latest PresentationAwayOutcome, otherwise creates one.
