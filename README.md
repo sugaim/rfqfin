@@ -4,7 +4,7 @@ Bond RFQ application.
 
 ## Design
 
-The single canonical design document is [docs/design.md](docs/design.md). Git history is the design-document version history; historical implementation instructions are not kept as active documentation.
+The canonical Domain document is [docs/domain.md](docs/domain.md). See [docs/README.md](docs/README.md) for the documentation map. Historical design and refactoring material lives under `docs/_archive/` and is not active authority.
 
 ## Prerequisites
 

@@ -1,9 +1,9 @@
 # Archived documentation
 
-Files in this directory are retained for historical context only.
+Everything in this directory is historical context only and is not active design authority.
 
-They are not active design authority.
+Active documentation is mapped by `docs/README.md`. The canonical RFQ Domain authority is `docs/domain.md`.
 
-The active RFQ Domain authority is docs/design.md.
+This archive contains earlier design/engineering documents and historical refactoring instructions. They may explain why the current implementation has older concepts, but they must not be used to override the active Domain model.
 
-The archived design/engineering documents describe an earlier implementation-oriented model containing concepts such as Draft/Revision/Requested/Confirmed lifecycle states and the earlier NaiveBusinessDate semantics. They remain useful when understanding the current code or migration history, but new Domain decisions must not be derived from them when they conflict with docs/design.md.
+In particular, archived material may contain older concepts such as Draft/Revision/Requested/Confirmed lifecycle states, earlier business-date semantics, and implementation-oriented refactoring plans.

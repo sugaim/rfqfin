@@ -17,7 +17,7 @@ The sequence is:
 
 The positive-flow RfqCase model is now considered stable enough to be the canonical starting point.
 
-Read docs/design.md before this file. docs/design.md is authority; this file is a roadmap and discussion handoff.
+Read docs/domain.md before this file. docs/domain.md is authority; this file is a roadmap and discussion handoff.
 
 ## 2. What was completed
 
@@ -59,7 +59,7 @@ Major settled decisions include:
 - Domain operations are differentiated by semantic business effect/invariant, not by which role/use case invoked them.
 - InvalidateQuote, ExpireQuote, ReplaceFirmQuote, RequestRepricing, and ContinueAfterAway remain distinct because their business meanings differ even where state shapes overlap.
 
-The full transition table and invariants are in docs/design.md.
+The full transition table and invariants are in docs/domain.md.
 
 ## 3. Documentation restructuring performed
 
@@ -67,9 +67,9 @@ The previous active design/engineering documents described the pre-redesign mode
 
 They were archived under docs/_archive/.
 
-docs/design.md is now the canonical Domain authority.
+docs/domain.md is now the canonical Domain authority.
 
-docs/refactoring/ remains historical implementation/refactoring material and is not Domain authority.
+docs/_archive/refactoring/ remains historical implementation/refactoring material and is not Domain authority.
 
 The current code has not yet been migrated to the new Domain model.
 
@@ -243,7 +243,7 @@ The current implementation/docs history may contain older concepts that should n
 - a two-axis ClientState x QuoteWorkState model;
 - reconstructing Presentation solely from "Presented state" without a QuotePresentation entity.
 
-When Codex sees these in code, it should treat them as migration targets, not as evidence that docs/design.md is wrong.
+When Codex sees these in code, it should treat them as migration targets, not as evidence that docs/domain.md is wrong.
 
 ## 9. Recommended next-session start
 
@@ -251,7 +251,7 @@ Start a fresh session for RfqDraft.
 
 Give it the repository and instruct it to:
 
-1. read docs/design.md;
+1. read docs/domain.md;
 2. read this handoff;
 3. treat RfqCase positive flow as fixed unless a concrete contradiction is found;
 4. design RfqDraft as a separate aggregate;
