@@ -1179,7 +1179,7 @@ PublishDraft is allowed only from Active.
 
 Publication requires all current RfqDraftData fields listed in section 25.1 to be Determined.
 
-PublishDraft receives or is supplied externally with the new Case-local identities and dates required to construct the Case, including CaseId, initial RfqTermsId, initial PricingEpisodeId, OpenDate, and PricingDate. IDs and current BusinessEntityLocalDate resolution remain Application/external-context responsibilities.
+PublishDraft receives or is supplied externally with the identities and dates required to construct the Case, including CaseId, the initial Case-local RfqTermsId and PricingEpisodeId, OpenDate, and PricingDate. ID allocation and supplying BusinessEntityLocalDate values remain Application/external-context responsibilities.
 
 The generated RfqCase mapping is:
 
