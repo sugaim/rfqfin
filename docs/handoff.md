@@ -15,7 +15,7 @@ The sequence is:
 5. design Application use cases/authorization/composites against the settled Domain;
 6. then reconcile persistence, API, frontend, and implementation.
 
-The positive-flow RfqCase model is now considered stable enough to be the canonical starting point.
+The positive-flow RfqCase model and the pre-publication RfqDraft model are now canonical starting points.
 
 Read docs/domain.md before this file. docs/domain.md is authority; this file is a roadmap and discussion handoff.
 
@@ -25,11 +25,12 @@ The positive-flow RfqCase model was redesigned and fully re-walked for consisten
 
 Major settled decisions include:
 
-- RfqCase is the Aggregate Root.
-- Draft is not an RfqCase state.
-- A future RfqDraft should be a separate aggregate.
+- RfqCase is an Aggregate Root.
+- RfqDraft is a separate Aggregate Root with DraftId and is not an RfqCase state.
 - Case child IDs are Case-local.
 - RfqTerms is an immutable Case-level child Entity.
+- RfqTerms.Notional uses NotionalAmount, which is non-negative and does not duplicate security currency.
+- CleanPrice and Rate are explicit Domain value types for current QuoteValue semantics.
 - Notional and SettlementDateRule may change within Inquiry only by creating a new RfqTerms and new PricingEpisode.
 - after first Presentation, Terms changes create a new Case rather than mutate the existing Case.
 - PricingEpisode is immutable and contains RfqTermsId, QuoteOwnerId, PricingDate, AssumedTradeDate, and exactly one PricingEpisodeOrigin.
@@ -41,6 +42,7 @@ Major settled decisions include:
 - BusinessEntityLocalDate is a local date under RfqCase.BusinessEntity and does not itself prove "business day."
 - SettlementDateRule is ExplicitDate or TradeDateLag.
 - TradeDateLag uses non-empty CityCalendarSymbol list, BusinessDayCount >= 0, and Following, and resolves settlement from PricingEpisode.AssumedTradeDate while the RFQ is open.
+- for ExplicitDate settlement, an Open Case requires SettlementDate >= current PricingEpisode.AssumedTradeDate.
 - Quote is immutable and belongs to PricingEpisode.
 - at most one FirmQuote is current.
 - WorkingQuote stays outside Domain.
@@ -76,43 +78,58 @@ docs/_archive/refactoring/ remains historical implementation/refactoring materia
 
 The current code has not yet been migrated to the new Domain model.
 
-## 4. Next work item: RfqDraft
+## 4. RfqDraft design completed
 
-RfqDraft appears sufficiently independent that it should be designed in a fresh discussion/session.
+RfqDraft is now a separate Aggregate Root in the RFQ bounded context.
 
-Current direction:
+Current canonical shape:
 
-    RFQ bounded context
-    - RfqDraft [separate Aggregate Root]
-    - RfqCase  [Aggregate Root]
+    RfqDraft
+    - DraftId
+    - BusinessEntity
+    - DraftOwnerId
+    - Data : RfqDraftData
+    - State : RfqDraftState
 
-Likely Draft behavior:
+Draft publication fields use:
 
-- create;
-- amend;
-- discard;
-- publish -> create a valid RfqCase.
+    DraftField<T>
+    = Undetermined
+    | Determined(T)
 
-Likely creation rule:
+Current lifecycle:
 
-- CreateDraftFromCase(source Case), used when customer changes Terms after a Case has entered Negotiating.
+    RfqDraftState
+    = Active
+    | Deleted
+    | Published(CaseId)
 
-Important: do not add Draft back into RfqCase.State.
+Settled Draft operations:
 
-Questions to settle in the Draft discussion:
+- CreateDraft;
+- AmendDraft;
+- ChangeDraftOwner;
+- DeleteDraft / RestoreDraft;
+- CopyDraft from any Draft state;
+- SeedDraftFromCase from any RfqCase state;
+- PublishDraft, which atomically means Active -> Published(CaseId) plus creation of a valid new RfqCase.
 
-- exact Draft fields;
-- Draft identity;
-- Active/Published/Discarded lifecycle shape;
-- which fields may be incomplete;
-- amend rules;
-- publish invariants;
-- mapping from Draft to RfqCase, initial RfqTerms, and initial PricingEpisode;
-- whether SourceCaseId / DraftOrigin is a Domain fact or only Application/audit lineage;
-- how ownership fields are initialized;
-- whether Draft has its own BusinessEntityLocalDate facts.
+Important settled semantics:
 
-## 5. Then: exception/correction Domain
+- BusinessEntity is immutable for the Draft lifetime;
+- DraftOwner is required, changes only while Active, and is not carried into RfqCase;
+- Deleted is reversible logical deletion and retains Draft data;
+- Published is terminal but retains the publication-time RfqDraftData snapshot so it can be copied;
+- CopyDraft resets ContactOwnerId, QuoteOwnerId, and AssumedTradeDate to Undetermined;
+- SeedDraftFromCase is an explicit seed mapping, not a complete reverse conversion from Case to Draft;
+- Draft may be incomplete and may temporarily violate cross-field conditions required by RfqCase;
+- Publish requires all current Draft fields to be Determined and the generated RfqCase to satisfy every Case invariant;
+- OpenDate and PricingDate are supplied at publication and are not Draft fields;
+- current Domain aggregates do not carry SourceDraftId/SourceCaseId lineage; Application/audit persistence may preserve provenance.
+
+The full Draft state model, mappings, and operation table are in docs/domain.md.
+
+## 5. Next work item: exception/correction Domain
 
 Exception/correction was intentionally deferred until positive flow was stable.
 
@@ -184,7 +201,7 @@ Do not treat this as decided. Re-open from business use cases.
 
 ## 6. Then: Application use cases and authorization
 
-After Draft and exception semantics, map user workflows to Domain operations.
+After exception semantics, map user workflows to Domain operations.
 
 Known principles:
 
@@ -225,7 +242,7 @@ Do not accidentally decide these while implementing unrelated work:
 - typed Feedback taxonomy for statistics;
 - foreign-market explicit settlement-date context;
 - settlement amount/currency/FX rules;
-- Case copy/lineage semantics;
+- future promotion of Case/Draft provenance into first-class Domain lineage, if concrete business rules require it;
 - persistence loading strategy for historical child entities;
 - DTO/API migration shape;
 - event/audit schema under the new model.
@@ -250,16 +267,16 @@ When Codex sees these in code, it should treat them as migration targets, not as
 
 ## 9. Recommended next-session start
 
-Start a fresh session for RfqDraft.
+Start the next focused discussion with exception/correction semantics.
 
 Give it the repository and instruct it to:
 
-1. read docs/domain.md;
+1. read docs/domain.md first;
 2. read this handoff;
-3. treat RfqCase positive flow as fixed unless a concrete contradiction is found;
-4. design RfqDraft as a separate aggregate;
-5. stop and discuss before changing RfqCase;
-6. do not start exception/correction design until RfqDraft has been settled/documented.
+3. treat the positive-flow RfqCase and RfqDraft models as fixed unless a concrete contradiction is found;
+4. reopen correction/reversal/amendment choices from concrete business use cases rather than selecting a generic undo mechanism in advance;
+5. keep external/irreversible side effects separate from in-memory Domain correction;
+6. stop before Application/API/persistence migration choices unless they are needed to establish Domain meaning.
 
-After RfqDraft, use another focused pass for exception/correction if the discussion becomes large.
+After exception/correction is settled, proceed to the principal Application use cases and authorization/composite workflows.
 
