@@ -4,7 +4,7 @@ This directory separates active design authority from historical material.
 
 ## Active authority
 
-- [domain.md](domain.md) — canonical Bond RFQ Domain concepts, invariants, state model, Domain operations, and Domain/Application boundary.
+- [domain.md](domain.md) — canonical Bond RFQ Domain concepts, RfqCase and RfqDraft aggregates, invariants, state models, Domain operations, and Domain/Application boundary.
 
 Future concerns should be split by responsibility rather than accumulated into one generic design document. Likely future active documents include:
 
@@ -27,7 +27,7 @@ Accordingly:
 - treat repeated explanations as a maintenance cost to monitor, not as an automatic refactoring trigger;
 - when a Domain decision changes, update every normative statement that expresses that decision rather than allowing duplicate sections to diverge.
 
-The expected long-term direction is different. Once the Domain is materially stable — in particular after major remaining topics such as `RfqDraft`, correction/exception semantics, and the principal Application use cases have been settled — the documentation should be reviewed for separation of concerns.
+The expected long-term direction is different. Once the Domain is materially stable — in particular after remaining major topics such as correction/exception semantics and the principal Application use cases have been settled — the documentation should be reviewed for separation of concerns.
 
 At that point, prefer:
 
