@@ -123,7 +123,7 @@ Important settled semantics:
 - CopyDraft resets ContactOwnerId, QuoteOwnerId, and AssumedTradeDate to Undetermined;
 - SeedDraftFromCase is an explicit seed mapping, not a complete reverse conversion from Case to Draft;
 - Draft may be incomplete and may temporarily violate cross-field conditions required by RfqCase;
-- Publish requires all current Draft fields to be Determined and the generated RfqCase to satisfy every Case invariant;
+- Publish requires every current required DraftField to be Determined and the generated RfqCase to satisfy every Case invariant;
 - OpenDate and PricingDate are supplied at publication and are not Draft fields;
 - current Domain aggregates do not carry SourceDraftId/SourceCaseId lineage; Application/audit persistence may preserve provenance.
 
