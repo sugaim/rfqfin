@@ -1177,7 +1177,7 @@ Future Draft fields are not assumed to be reconstructible from every RfqCase sta
 
 PublishDraft is allowed only from Active.
 
-Publication requires all current RfqDraftData fields listed in section 25.1 to be Determined.
+Publication requires every current RfqDraftData field modeled as DraftField<T> in section 25.1 to be Determined.
 
 PublishDraft receives or is supplied externally with the identities and dates required to construct the Case, including CaseId, the initial Case-local RfqTermsId and PricingEpisodeId, OpenDate, and PricingDate. ID allocation and supplying BusinessEntityLocalDate values remain Application/external-context responsibilities.
 
