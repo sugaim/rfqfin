@@ -61,7 +61,7 @@ Examples:
 
 - a Presented state must point to the same Quote as the current FirmQuote;
 - a Hit must apply to the current presentation and must occur no later than FirmQuote.ValidUntil;
-- PresentationDate must match the PricingDate of the PricingEpisode whose Quote is being presented;
+- changing AssumedTradeDate creates a new immutable PricingEpisode and does not carry a current FirmQuote into the new Episode;
 - a PricingEpisode change creates a new immutable PricingEpisode rather than mutating the previous one;
 - a PricingEpisode created for changed Terms must refer to the new RfqTerms;
 - a Close-as-Away from a Negotiating state must use the latest presentation and must ensure that presentation has an Away outcome.
@@ -124,7 +124,7 @@ Variation names should describe the semantic variant, not implementation mechani
 Examples:
 
 - SettlementDateRule.ExplicitDate;
-- SettlementDateRule.PricingDateLag;
+- SettlementDateRule.TradeDateLag;
 - PresentationOutcome.Hit;
 - PresentationOutcome.Away;
 - CaseOutcome.Presented;
@@ -249,11 +249,11 @@ SettlementDateRule answers "how is the settlement date determined?"
 
     SettlementDateRule
     = ExplicitDate(BusinessEntityLocalDate)
-    | PricingDateLag(SettlementLag)
+    | TradeDateLag(SettlementLag)
 
-ExplicitDate means the explicitly supplied BusinessEntity-local date is the settlement date. It remains fixed when PricingDate rolls.
+ExplicitDate means the explicitly supplied BusinessEntity-local date is the settlement date. It is independent of PricingDate and AssumedTradeDate changes.
 
-PricingDateLag means settlement date is resolved from the PricingEpisode.PricingDate using SettlementLag. Therefore a PricingDate roll can change the resolved settlement date without creating new RfqTerms.
+TradeDateLag expresses settlement relative to trade date. While the RFQ is open, settlement date is resolved from PricingEpisode.AssumedTradeDate using SettlementLag. AssumedTradeDate is an explicit pricing assumption, not the eventual executed TradeDate. Changing it can therefore change the resolved settlement date without creating new RfqTerms.
 
 There is intentionally no separate SettlementDate Domain Object in the current scope.
 
@@ -284,11 +284,18 @@ PricingEpisode is an immutable Case-local child Entity.
     - RfqTermsId
     - QuoteOwnerId
     - PricingDate : BusinessEntityLocalDate
+    - AssumedTradeDate : BusinessEntityLocalDate
     - Origin : PricingEpisodeOrigin
 
 Meaning:
 
-A PricingEpisode is one logical pricing round for one RfqTerms, owned by one QuoteOwner and attributed to one PricingDate.
+A PricingEpisode is one logical pricing round for one RfqTerms, owned by one QuoteOwner, attributed to one PricingDate, and evaluated under one AssumedTradeDate.
+
+PricingDate and AssumedTradeDate are distinct business concepts:
+
+- PricingDate is the local date to which the pricing round belongs;
+- AssumedTradeDate is the trade date assumed when evaluating trade-date-dependent terms such as TradeDateLag settlement;
+- equality between PricingDate and AssumedTradeDate is not a Domain invariant.
 
 It is not a complete snapshot of every screen value or every piece of information the trader saw.
 
@@ -307,6 +314,7 @@ In particular it does not contain:
     | RfqTermsChanged(PreviousPricingEpisodeId)
     | QuoteOwnerChanged(PreviousPricingEpisodeId)
     | PricingDateRolled(PreviousPricingEpisodeId)
+    | AssumedTradeDateChanged(PreviousPricingEpisodeId)
     | RepricingRequested(
           PreviousPricingEpisodeId,
           QuoteId,
@@ -587,11 +595,6 @@ In Negotiating.Presented:
     Presentation.QuoteId
     == FirmQuote.Quote.QuoteId
 
-and:
-
-    Presentation.PresentationDate
-    == PricingEpisode.PricingDate
-
 ### 16.4 Latest Presentation Away outcome
 
 When LatestPresentationAwayOutcome exists:
@@ -610,14 +613,12 @@ For a normal Hit:
     PresentationHitOutcome.PresentationId
     == Presentation.PresentationId
 
-    PresentationHitOutcome.HitDate
-    == Presentation.PresentationDate
-    == PricingEpisode.PricingDate
-
     PresentationHitOutcome.HitAt
     <= FirmQuote.ValidUntil
 
-Business-date equality is a real business rule. ValidUntil extending into a later local date does not permit a normal-flow next-day Hit.
+Normal chronology requires PresentationHitOutcome.HitDate not to precede Presentation.PresentationDate.
+
+PricingDate, PresentationDate, and HitDate are distinct business facts. The Domain does not require equality between them.
 
 ### 16.6 Away timing
 
@@ -643,7 +644,19 @@ Normal-flow roll requires:
 
 The Domain does not discover "today" itself. Application supplies the BusinessEntityLocalDate.
 
-### 16.9 Time does not mutate state
+RollPricingDate preserves AssumedTradeDate.
+
+### 16.9 AssumedTradeDate change
+
+ChangeAssumedTradeDate creates a new PricingEpisode.
+
+Normal-flow change requires:
+
+    NewAssumedTradeDate != PreviousAssumedTradeDate
+
+PricingDate is preserved. The new Episode does not carry a FirmQuote from the previous Episode, so a Quote must be reaffirmed in the new Episode before it can become current and firm again. This does not imply that the numerical Quote value must change; for example, an ExplicitDate settlement rule may be unaffected by the AssumedTradeDate change.
+
+### 16.10 Time does not mutate state
 
 Clock passage alone does not change Domain state.
 
@@ -665,6 +678,7 @@ Every distinct Domain operation is numbered even when two operations share the s
       --[T07 ChangeRfqTerms]-----> Inquiry.Pricing
       --[T09 ChangeQuoteOwner]---> Inquiry.Pricing
       --[T10 RollPricingDate]----> Inquiry.Pricing
+      --[T38 ChangeAssumedTradeDate]--> Inquiry.Pricing
       --[T31 CloseAway]----------> Terminal.Closed
       --[T36 Cancel]-------------> Terminal.Cancelled
 
@@ -675,6 +689,7 @@ Every distinct Domain operation is numbered even when two operations share the s
       --[T06 RequestRepricing]---> Inquiry.Pricing
       --[T08 ChangeRfqTerms]-----> Inquiry.Pricing
       --[T11 RollPricingDate]----> Inquiry.Pricing
+      --[T39 ChangeAssumedTradeDate]--> Inquiry.Pricing
       --[T12 PresentQuote]-------> Negotiating.Presented
       --[T13 ExtendValidUntil]---> Inquiry.PendingPresentation
       --[T32 CloseAway]----------> Terminal.Closed
@@ -686,6 +701,7 @@ Every distinct Domain operation is numbered even when two operations share the s
       --[T14 CommitQuote]--------> Negotiating.PendingPresentation
       --[T21 ChangeQuoteOwner]---> Negotiating.Pricing
       --[T22 RollPricingDate]----> Negotiating.Pricing
+      --[T40 ChangeAssumedTradeDate]--> Negotiating.Pricing
       --[T33 CloseAway]----------> Terminal.Closed
       --[T36 Cancel]-------------> Terminal.Cancelled
 
@@ -697,6 +713,7 @@ Every distinct Domain operation is numbered even when two operations share the s
       --[T19 PresentQuote]-------> Negotiating.Presented
       --[T20 ExtendValidUntil]---> Negotiating.PendingPresentation
       --[T23 RollPricingDate]----> Negotiating.Pricing
+      --[T41 ChangeAssumedTradeDate]--> Negotiating.Pricing
       --[T34 CloseAway]----------> Terminal.Closed
       --[T36 Cancel]-------------> Terminal.Cancelled
 
@@ -706,6 +723,7 @@ Every distinct Domain operation is numbered even when two operations share the s
       --[T26 ExpireQuote]--------> Negotiating.Pricing
       --[T27 ContinueAfterAway]--> Negotiating.Pricing
       --[T28 RollPricingDate]----> Negotiating.Pricing
+      --[T42 ChangeAssumedTradeDate]--> Negotiating.Pricing
       --[T29 ExtendValidUntil]---> Negotiating.Presented
       --[T30 Hit]----------------> Terminal.Closed
       --[T35 CloseAway]----------> Terminal.Closed
@@ -733,7 +751,7 @@ ChangeContactOwner changes ContactOwnerId but does not change PricingEpisode, Qu
 | T09 | ChangeQuoteOwner | Change pricing responsibility in Inquiry.Pricing | new, Origin=QuoteOwnerChanged | only allowed when no current FirmQuote |
 | T10 | RollPricingDate | Start pricing on later local date | new, Origin=PricingDateRolled | NewPricingDate > old; no FirmQuote carried |
 | T11 | RollPricingDate | Roll date from Inquiry/Pending | new, Origin=PricingDateRolled | old unpresented FirmQuote is not current in new Episode |
-| T12 | PresentQuote | First customer presentation | preserve | create QuotePresentation; PresentationDate=PricingDate; phase becomes Negotiating |
+| T12 | PresentQuote | First customer presentation | preserve | create QuotePresentation; phase becomes Negotiating |
 | T13 | ExtendValidUntil | Extend current unpresented FirmQuote | preserve | same QuoteId; only before expiry; new validity later than old |
 | T14 | CommitQuote | Create current firm price after prior presentation history | preserve | preserves LatestPresentation information |
 | T15 | ReplaceFirmQuote | Replace current unpresented FirmQuote | preserve | prior latest customer Presentation remains unchanged |
@@ -751,7 +769,7 @@ ChangeContactOwner changes ContactOwnerId but does not change PricingEpisode, Qu
 | T27 | ContinueAfterAway | Customer proposal goes Away but Case continues | new, Origin=ContinuedAfterAway | create PresentationAwayOutcome; carry Presentation + Away outcome as latest |
 | T28 | RollPricingDate | Start a later-date pricing round from Presented | new, Origin=PricingDateRolled | current Presentation becomes latest; no Away outcome is fabricated |
 | T29 | ExtendValidUntil | Extend still-valid Presented FirmQuote | preserve | same Quote and same Presentation |
-| T30 | Hit | Customer accepts current Presented FirmQuote | preserve/terminal | create PresentationHitOutcome; HitDate=PresentationDate=PricingDate; HitAt<=ValidUntil |
+| T30 | Hit | Customer accepts current Presented FirmQuote | preserve/terminal | create PresentationHitOutcome; HitDate does not precede PresentationDate; HitAt<=ValidUntil |
 | T31 | CloseAway | Close an Inquiry Case before any Presentation | terminal | CaseOutcome.Unpresented(Feedback?) |
 | T32 | CloseAway | Close an Inquiry Case with unpresented FirmQuote | terminal | still CaseOutcome.Unpresented; current Quote gets no Presentation outcome |
 | T33 | CloseAway | Close Negotiating.Pricing as Away | terminal | use LatestPresentation Away outcome if present; otherwise create it |
@@ -759,6 +777,11 @@ ChangeContactOwner changes ContactOwnerId but does not change PricingEpisode, Qu
 | T35 | CloseAway | Close current Presented proposal as Away | terminal | create PresentationAwayOutcome for current Presentation |
 | T36 | Cancel | Mark Case invalid/non-normal outcome | terminal | no ordinary Hit/Away result is manufactured; typed reason details deferred |
 | T37 | ChangeContactOwner | Reassign customer-contact ownership | preserve | state shape and PricingEpisode unchanged |
+| T38 | ChangeAssumedTradeDate | Change trade-date assumption in Inquiry.Pricing | new, Origin=AssumedTradeDateChanged | PricingDate preserved; no FirmQuote to carry |
+| T39 | ChangeAssumedTradeDate | Change trade-date assumption from Inquiry.Pending | new, Origin=AssumedTradeDateChanged | PricingDate preserved; current FirmQuote is not carried forward |
+| T40 | ChangeAssumedTradeDate | Change trade-date assumption in Negotiating.Pricing | new, Origin=AssumedTradeDateChanged | PricingDate and latest Presentation/outcome preserved |
+| T41 | ChangeAssumedTradeDate | Change trade-date assumption from Negotiating.Pending | new, Origin=AssumedTradeDateChanged | PricingDate preserved; FirmQuote removed; latest Presentation/outcome preserved |
+| T42 | ChangeAssumedTradeDate | Change trade-date assumption from Presented | new, Origin=AssumedTradeDateChanged | PricingDate preserved; current Presentation becomes latest; no Away outcome is fabricated |
 
 ## 19. PricingEpisode creation matrix
 
@@ -770,8 +793,11 @@ Operations that create a new PricingEpisode:
 | ChangeRfqTerms | yes | RfqTermsChanged(previous Episode) |
 | ChangeQuoteOwner | no | QuoteOwnerChanged(previous Episode) |
 | RollPricingDate | no | PricingDateRolled(previous Episode) |
+| ChangeAssumedTradeDate | no | AssumedTradeDateChanged(previous Episode) |
 | RequestRepricing | no | RepricingRequested(previous Episode, QuoteId, Feedback?) |
 | ContinueAfterAway | no | ContinuedAfterAway(previous Episode, PresentationAwayOutcomeRef) |
+
+CreateCase supplies the initial PricingDate and AssumedTradeDate. RollPricingDate changes PricingDate and preserves AssumedTradeDate. ChangeAssumedTradeDate changes AssumedTradeDate and preserves PricingDate. Other Episode-creating operations preserve both date fields from the previous Episode.
 
 Operations that preserve the Episode:
 
@@ -837,17 +863,16 @@ All local dates below are BusinessEntityLocalDate and are interpreted under RfqC
 
 - OpenDate: Case initiation/open date.
 - PricingDate: local date to which a PricingEpisode's pricing belongs.
+- AssumedTradeDate: trade date assumed for the PricingEpisode when evaluating trade-date-dependent terms; it is not the eventual executed TradeDate.
 - PresentationDate: local date on which the Quote was presented to the customer.
 - HitDate: local date on which the customer and desk agreed.
 - AwayDate: local date on which a specific Presentation became Away.
 - CloseDate: local date on which the Case itself was closed.
 - CancellationDate: local date on which the Case was cancelled.
 
-Normal Hit requires:
+PricingDate, AssumedTradeDate, PresentationDate, and HitDate are distinct business concepts. The current Domain does not require equality among them.
 
-    PricingDate == PresentationDate == HitDate
-
-CloseDate remains separate.
+For Hit, normal chronology requires HitDate not to precede PresentationDate. CloseDate remains separate.
 
 Normal Away does not require:
 
@@ -1008,7 +1033,7 @@ The Domain operations must remain actor-neutral unless actor identity itself bec
 
 ### 25.7 Foreign-market settlement semantics
 
-Current explicit settlement dates are BusinessEntityLocalDate, and PricingDateLag resolves to BusinessEntityLocalDate.
+Current explicit settlement dates are BusinessEntityLocalDate, and TradeDateLag resolves from PricingEpisode.AssumedTradeDate to BusinessEntityLocalDate.
 
 This is an intentional current-scope simplification based on the workflows currently modeled. If foreign settlement requires a distinct market-local date context, extend the model rather than weakening the meaning of BusinessEntityLocalDate.
 
