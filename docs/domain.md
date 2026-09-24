@@ -14,8 +14,11 @@ This document defines the Domain model for an internal Bond RFQ workflow.
 
 The model is centered on the internal coordination between:
 
+- the **Draft Owner**, who owns pre-publication responsibility for an RfqDraft;
 - the **Contact Owner**, who owns the customer-facing RFQ interaction; and
 - the **Quote Owner**, who owns pricing responsibility for the RFQ.
+
+Draft Owner is a pre-publication concept. It is not carried into RfqCase when a Draft is published.
 
 The Domain does not assume that the entire customer interaction is conducted electronically through this system. Customer communication may occur through external channels, while this system records and coordinates the internally relevant business facts such as pricing rounds, firm quotes, customer presentations, presentation outcomes, and Case closure.
 
@@ -97,7 +100,7 @@ The following are intentionally outside the RfqCase aggregate model:
 - WorkingQuote and other mutable pricing work-in-progress;
 - ContextNote, TraderNote, and SalesNote;
 - UI state;
-- Draft creation/editing. A future RfqDraft is expected to be a separate aggregate, not an RfqCase state;
+- RfqDraft lifecycle/editing, which belongs to the separate RfqDraft aggregate rather than RfqCase.State;
 - the complete historical collections of Terms, Episodes, Quotes, Presentations, and Outcomes;
 - correction/reversal/amendment mechanics;
 - booking;
@@ -111,9 +114,9 @@ The domain documentation uses C#-compatible PascalCase for type names, field nam
 
 Use:
 
-- RfqCase, RfqTerms, PricingEpisode;
-- CaseId, QuoteId, PresentationId;
-- CommitQuote, PresentQuote, ContinueAfterAway.
+- RfqCase, RfqDraft, RfqTerms, PricingEpisode;
+- CaseId, DraftId, QuoteId, PresentationId;
+- CommitQuote, PresentQuote, ContinueAfterAway, PublishDraft.
 
 Do not mix snake_case into the domain vocabulary.
 
@@ -132,9 +135,11 @@ Examples:
 
 ## 5. Identity model
 
-RfqCase is the Aggregate Root and has CaseId.
+RfqCase is an Aggregate Root and has CaseId.
 
-Child identity is Case-local unless explicitly stated otherwise.
+RfqDraft is a separate Aggregate Root and has DraftId. DraftId and CaseId are distinct identity types; publication creates a new CaseId rather than reusing DraftId.
+
+Child identity of RfqCase is Case-local unless explicitly stated otherwise.
 
 Current Case-local IDs:
 
@@ -155,15 +160,15 @@ Typed references may still be used where the type must prove the existence/type 
 
 BusinessEntity is a Domain Object whose underlying representation may be a string.
 
-It identifies the organizational/business entity that owns the Case and provides the local-date context for all BusinessEntityLocalDate values in the Case.
+It identifies the organizational/business entity that owns an RfqCase or RfqDraft and provides the local-date context for that aggregate's BusinessEntityLocalDate values.
 
-BusinessEntity is immutable for an RfqCase. No normal Domain operation changes it.
+BusinessEntity is immutable for both RfqCase and RfqDraft. No normal Domain operation changes it.
 
 The exact vocabulary of BusinessEntity is intentionally not fixed here.
 
 ### 6.2 BusinessEntityLocalDate
 
-BusinessEntityLocalDate is a Domain Object representing a local calendar date in the context of RfqCase.BusinessEntity.
+BusinessEntityLocalDate is a Domain Object representing a local calendar date in the context of the owning RfqCase.BusinessEntity or RfqDraft.BusinessEntity.
 
 Important:
 
@@ -189,7 +194,28 @@ Current uses include:
 
 CityCalendarSymbol is a Domain Object backed by a string and identifies a city/business calendar used by settlement-date lag calculation.
 
-### 6.5 Feedback
+### 6.5 NotionalAmount
+
+NotionalAmount is a Domain Object representing the numeric notional/face amount used by the RFQ.
+
+    NotionalAmount
+    - Value : decimal >= 0
+
+NotionalAmount does not carry currency. The security determines the denomination context; duplicating currency on NotionalAmount would introduce a second potentially conflicting source of truth.
+
+### 6.6 CleanPrice
+
+CleanPrice is a Domain Object representing a clean-price quote value.
+
+Its exact underlying representation is intentionally not fixed here. No numeric range invariant is currently imposed. No generic Price Domain Object is introduced by this decision.
+
+### 6.7 Rate
+
+Rate is a Domain Object representing a rate level used by rate-valued Domain facts such as Yield quotes.
+
+No numeric range invariant is currently imposed. Exact underlying representation and external unit conversion are implementation/boundary concerns unless a future business requirement makes them Domain-significant.
+
+### 6.8 Feedback
 
 Feedback is currently free-form optional string data.
 
@@ -226,7 +252,7 @@ RfqTerms is an immutable Case-local child Entity.
     - ClientId
     - Side
     - SecurityId
-    - Notional
+    - Notional : NotionalAmount
     - SettlementDateRule
 
 All fields are immutable on a particular RfqTerms instance.
@@ -241,7 +267,7 @@ Current same-Case change policy:
 - Notional: may change only while the Case is in Inquiry phase;
 - SettlementDateRule: may change only while the Case is in Inquiry phase.
 
-After the first customer presentation, a change to Notional or SettlementDateRule creates a new Case rather than changing the existing Case. The future Draft/Copy use case is expected to support this workflow.
+After the first customer presentation, a change to Notional or SettlementDateRule creates a new Case rather than changing the existing Case. SeedDraftFromCase supports starting that new-RFQ workflow from the existing Case.
 
 ### 8.1 SettlementDateRule
 
@@ -343,9 +369,9 @@ Quote is an immutable Case-local child Entity.
 Current QuoteValue:
 
     QuoteValue
-    = CleanPrice(Price : decimal)
+    = CleanPrice(CleanPriceValue : CleanPrice)
     | Yield(
-          YieldValue : decimal,
+          YieldRate : Rate,
           YieldConventionId
       )
 
@@ -656,7 +682,21 @@ Normal-flow change requires:
 
 PricingDate is preserved. The new Episode does not carry a FirmQuote from the previous Episode, so a Quote must be reaffirmed in the new Episode before it can become current and firm again. This does not imply that the numerical Quote value must change; for example, an ExplicitDate settlement rule may be unaffected by the AssumedTradeDate change.
 
-### 16.10 Time does not mutate state
+### 16.10 Settlement and AssumedTradeDate consistency
+
+For every Open state, when the current RfqTerms uses ExplicitDate:
+
+    RfqTerms.SettlementDateRule = ExplicitDate(SettlementDate)
+
+the following must hold:
+
+    SettlementDate >= State.PricingEpisode.AssumedTradeDate
+
+TradeDateLag does not require an equivalent cross-field check because SettlementLag has a non-negative BusinessDayCount and Following semantics.
+
+This invariant applies to every Domain operation that can establish a new current Terms/Episode combination, including CreateCase, ChangeRfqTerms, ChangeAssumedTradeDate, and PublishDraft through the RfqCase it creates.
+
+### 16.11 Time does not mutate state
 
 Clock passage alone does not change Domain state.
 
@@ -909,13 +949,13 @@ The following earlier ideas were considered and rejected or deferred. Do not res
 
 Rejected for the current RfqCase model.
 
-RfqCase enters Domain only after QuoteOwner is known. Pre-publication work belongs to future RfqDraft/Application workflow.
+RfqCase enters Domain only after QuoteOwner is known. Pre-publication work belongs to the separate RfqDraft aggregate and its Application workflows.
 
 ### Draft as RfqCase state
 
 Rejected.
 
-A future RfqDraft is expected to be a separate aggregate with its own amend/discard/publish lifecycle.
+RfqDraft is a separate Aggregate Root with its own lifecycle and operations defined below. Do not reintroduce Draft into RfqCase.State.
 
 ### Repricing Domain state
 
@@ -961,11 +1001,236 @@ Not adopted.
 
 Application normally supplies equal dates, but Domain does not currently reject a difference.
 
-## 25. Deferred domain topics
+## 25. RfqDraft
+
+RfqDraft is a separate Aggregate Root within the RFQ bounded context. It represents pre-publication business work used to assemble a customer RFQ before that RFQ is formally issued into the RfqCase workflow.
+
+Draft creation is not itself formal RFQ issuance. PublishDraft is the business boundary at which the customer request enters the formal RFQ flow and a valid RfqCase is created.
+
+RfqDraft is intentionally more permissive than RfqCase: required publication fields may still be undetermined, and cross-field combinations that would not form a valid RfqCase may exist while the Draft is being edited. Publication, not Draft editing, is the boundary at which complete RfqCase validity is required.
+
+### 25.1 DraftField and RfqDraftData
+
+A field required by publication but not yet decided is represented explicitly:
+
+    DraftField<T>
+    = Undetermined
+    | Determined(T)
+
+Undetermined means "not yet determined." It does not mean that the business field is permanently optional or not applicable.
+
+Determined(T) assumes T is already a valid value of its own Domain type. RfqDraft does not duplicate local validation owned by T.
+
+Current Draft data is:
+
+    RfqDraftData
+    - ContactOwnerId : DraftField<ContactOwnerId>
+    - ClientId : DraftField<ClientId>
+    - Side : DraftField<Side>
+    - SecurityId : DraftField<SecurityId>
+    - Notional : DraftField<NotionalAmount>
+    - SettlementDateRule : DraftField<SettlementDateRule>
+    - AssumedTradeDate : DraftField<BusinessEntityLocalDate>
+    - QuoteOwnerId : DraftField<QuoteOwnerId>
+
+A future field that is genuinely optional even for publication should be modeled as such rather than overloading Undetermined.
+
+RfqDraft itself is:
+
+    RfqDraft
+    - DraftId
+    - BusinessEntity
+    - DraftOwnerId
+    - Data : RfqDraftData
+    - State : RfqDraftState
+
+Semantics:
+
+- BusinessEntity is required and immutable for the Draft lifetime;
+- DraftOwnerId is required and may change only while Active;
+- Data is retained in every Draft state;
+- Data may change only while Active through AmendDraft;
+- DraftOwner is responsibility for the pre-publication Draft and is not copied into RfqCase on publication.
+
+### 25.2 RfqDraft lifecycle
+
+    RfqDraftState
+    = Active
+    | Deleted
+    | Published(CaseId)
+
+Active is the editable pre-publication state.
+
+Deleted is a logical deletion, not physical removal. Draft data and ownership are retained so the Draft can be restored or copied.
+
+Published means the Draft has already created the identified RfqCase. Published is terminal for that Draft. Its RfqDraftData remains as the immutable publication-time Draft snapshot and may be used as the source of CopyDraft; the resulting RfqCase remains authoritative for the Case's subsequent lifecycle.
+
+### 25.3 RfqDraft operations
+
+Domain operations are defined by their semantic effect; this notation does not require a member-function implementation.
+
+    [D01] CreateDraft
+          -> Active
+
+    Active
+      --[D02 AmendDraft]----------> Active
+      --[D03 ChangeDraftOwner]----> Active
+      --[D04 DeleteDraft]---------> Deleted
+      --[D08 PublishDraft]--------> Published(CaseId)
+
+    Deleted
+      --[D05 RestoreDraft]--------> Active
+
+CopyDraft does not transition its source:
+
+    [D06] CopyDraft
+          Active | Deleted | Published
+          -> new Active RfqDraft
+
+SeedDraftFromCase does not transition its source Case:
+
+    [D07] SeedDraftFromCase
+          any RfqCase state
+          -> new Active RfqDraft
+
+Operation semantics:
+
+| No. | Operation | Source | Main semantic effect |
+| --- | --- | --- | --- |
+| D01 | CreateDraft | none | Create Active Draft from given DraftId, BusinessEntity, DraftOwnerId, and RfqDraftData |
+| D02 | AmendDraft | Active | Replace Data with a new RfqDraftData; fields may move between Undetermined and Determined |
+| D03 | ChangeDraftOwner | Active | Change DraftOwnerId without changing Data or lifecycle state |
+| D04 | DeleteDraft | Active | Logically delete the Draft while retaining Data and DraftOwnerId |
+| D05 | RestoreDraft | Deleted | Restore the same Draft, Data, and DraftOwnerId to Active |
+| D06 | CopyDraft | any Draft state | Create a new Active Draft using field-specific copy/reset rules; source is unchanged |
+| D07 | SeedDraftFromCase | any RfqCase state | Create a new Active Draft from explicitly reusable current Case facts; source is unchanged |
+| D08 | PublishDraft | Active | Publish the Draft and create a valid new RfqCase as one Domain operation |
+
+Deleted permits no amend, owner-change, or publish operation. Published is terminal and permits no operation on that Draft other than acting as a CopyDraft source.
+
+Actor authorization, audit actor/time, ID allocation, external routing, and persistence transaction management remain Application concerns.
+
+### 25.4 CreateDraft and AmendDraft
+
+CreateDraft receives DraftId, BusinessEntity, DraftOwnerId, and an RfqDraftData. Any DraftField may initially be Undetermined or Determined. CreateDraft does not require publication completeness or RfqCase cross-field consistency.
+
+AmendDraft receives a replacement RfqDraftData for an Active Draft. It may change multiple fields atomically and may return previously Determined fields to Undetermined.
+
+This permissiveness is intentional. RfqDraft represents pre-publication work; it is not a partially valid RfqCase.
+
+### 25.5 DeleteDraft and RestoreDraft
+
+DeleteDraft is a reversible logical deletion:
+
+    Active -> Deleted
+
+RestoreDraft restores the same Draft:
+
+    Deleted -> Active
+
+Both operations preserve DraftId, BusinessEntity, DraftOwnerId, and RfqDraftData.
+
+No DeletionReason is currently modeled. Actor, reason, and timestamp may be retained as audit/Application facts unless a concrete requirement makes them Domain-significant.
+
+### 25.6 CopyDraft
+
+CopyDraft may use an Active, Deleted, or Published Draft as its source. The source is unchanged.
+
+The new Draft:
+
+- receives a new DraftId;
+- receives a supplied DraftOwnerId;
+- preserves BusinessEntity;
+- is Active;
+- copies ClientId, Side, SecurityId, Notional, and SettlementDateRule exactly as DraftField values from the source;
+- sets ContactOwnerId, QuoteOwnerId, and AssumedTradeDate to Undetermined.
+
+Ownership and AssumedTradeDate are deliberately re-established for the new RFQ rather than inherited.
+
+Copy semantics are field-specific. When a new RfqDraftData field is added, its copy/reset behavior must be decided explicitly rather than implicitly copying every future field.
+
+### 25.7 SeedDraftFromCase
+
+SeedDraftFromCase creates a new Active Draft from any RfqCase state.
+
+It is not a complete reverse mapping from RfqCase to RfqDraft. It seeds only facts that remain semantically reusable for a new RFQ.
+
+Current mapping:
+
+- BusinessEntity <- source RfqCase.BusinessEntity;
+- ClientId <- Determined(source current RfqTerms.ClientId);
+- Side <- Determined(source current RfqTerms.Side);
+- SecurityId <- Determined(source current RfqTerms.SecurityId);
+- Notional <- Determined(source current RfqTerms.Notional);
+- SettlementDateRule <- Determined(source current RfqTerms.SettlementDateRule);
+- DraftOwnerId <- supplied for the new Draft;
+- ContactOwnerId <- Undetermined;
+- QuoteOwnerId <- Undetermined;
+- AssumedTradeDate <- Undetermined;
+- State <- Active.
+
+PricingDate is not a Draft field and is not seeded.
+
+Future Draft fields are not assumed to be reconstructible from every RfqCase state. A new field must explicitly define whether SeedDraftFromCase seeds it from an available Case fact or leaves it Undetermined.
+
+### 25.8 PublishDraft
+
+PublishDraft is allowed only from Active.
+
+Publication requires all current RfqDraftData fields listed in section 25.1 to be Determined.
+
+PublishDraft receives or is supplied externally with the new Case-local identities and dates required to construct the Case, including CaseId, initial RfqTermsId, initial PricingEpisodeId, OpenDate, and PricingDate. IDs and current BusinessEntityLocalDate resolution remain Application/external-context responsibilities.
+
+The generated RfqCase mapping is:
+
+    RfqDraft.BusinessEntity
+        -> RfqCase.BusinessEntity
+
+    RfqDraft.Data.ContactOwnerId
+        -> RfqCase.ContactOwnerId
+
+    RfqDraft.Data.{
+        ClientId,
+        Side,
+        SecurityId,
+        Notional,
+        SettlementDateRule
+    }
+        -> initial RfqTerms
+
+    RfqDraft.Data.QuoteOwnerId
+    RfqDraft.Data.AssumedTradeDate
+    supplied PricingDate
+        -> initial PricingEpisode
+
+    supplied OpenDate
+        -> RfqCase.OpenDate
+
+The initial PricingEpisode has Origin=Initial and the new Case begins in Inquiry.Pricing.
+
+DraftOwnerId is not carried into RfqCase.
+
+No equality invariant is introduced between OpenDate, PricingDate, or AssumedTradeDate.
+
+The resulting RfqCase must satisfy every normal RfqCase invariant. In particular, if SettlementDateRule is ExplicitDate(SettlementDate), publication requires:
+
+    SettlementDate >= AssumedTradeDate
+
+An Active Draft may temporarily contain Determined values that fail this cross-field Case invariant; such a Draft is simply not publishable until amended.
+
+PublishDraft has one indivisible Domain meaning: the source Draft becomes Published(CaseId) and the new valid RfqCase is created. Persisting both effects atomically is an Application/transaction responsibility.
+
+### 25.9 Draft provenance and lineage
+
+CopyDraft and SeedDraftFromCase do not currently add SourceDraftId, SourceCaseId, or generic lineage fields to RfqDraft or RfqCase.
+
+Application/audit persistence may record source-to-derived relationships so provenance is not lost. If future business rules, statistics, or workflow invariants depend on lineage, introduce a concrete Domain concept at that time rather than pre-generalizing the aggregates.
+
+## 26. Deferred domain topics
 
 The following topics are deliberately not completed in this document.
 
-### 25.1 Correction / reversal / historical amendment
+### 26.1 Correction / reversal / historical amendment
 
 Positive flow is intentionally completed first.
 
@@ -987,37 +1252,23 @@ Important concerns already identified:
 - external/irreversible side effects must be separated from in-memory state reversal;
 - correction must not become a generic mutation escape hatch.
 
-### 25.2 CancellationReason taxonomy
+### 26.2 CancellationReason taxonomy
 
 CancellationReason will be typed.
 
 Exact variants are deferred because they interact with exception/correction semantics and statistical treatment.
 
-### 25.3 Presented Case close disposition
+### 26.3 Presented Case close disposition
 
 No separate Case-level Presented-Away close classification is modeled yet.
 
 Future analytics may require typed dispositions such as ClientWithdrew, NoResponse, PriceRejected, TradedElsewhere, or operational late-close reason.
 
-### 25.4 RfqDraft
+### 26.4 Case and Draft lineage
 
-Draft is expected to be a separate aggregate within the RFQ bounded context.
+Current CopyDraft/SeedDraftFromCase provenance is intentionally kept outside the aggregates. Whether future Case/Draft lineage becomes a first-class Domain concept remains deferred until a concrete business rule depends on it.
 
-Candidate lifecycle:
-
-- amend;
-- discard;
-- publish -> create RfqCase.
-
-Creating a Draft from an existing RfqCase is a likely rule/use case for "same customer/security, changed Terms after presentation."
-
-Detailed design is intentionally deferred until this RfqCase positive-flow model is committed.
-
-### 25.5 Case copy / lineage
-
-Whether a copied/derived Case retains SourceCaseId as Domain lineage or only Application/audit metadata is not decided.
-
-### 25.6 Application use cases and authorization
+### 26.5 Application use cases and authorization
 
 To be designed after the positive Domain model.
 
@@ -1031,13 +1282,13 @@ Known examples include:
 
 The Domain operations must remain actor-neutral unless actor identity itself becomes a business invariant.
 
-### 25.7 Foreign-market settlement semantics
+### 26.6 Foreign-market settlement semantics
 
 Current explicit settlement dates are BusinessEntityLocalDate, and TradeDateLag resolves from PricingEpisode.AssumedTradeDate to BusinessEntityLocalDate.
 
 This is an intentional current-scope simplification based on the workflows currently modeled. If foreign settlement requires a distinct market-local date context, extend the model rather than weakening the meaning of BusinessEntityLocalDate.
 
-### 25.8 Settlement amount
+### 26.7 Settlement amount
 
 Settlement amount/currency/FX-conversion rule is a future orthogonal enhancement.
 
@@ -1045,7 +1296,7 @@ Example: foreign-currency security settled operationally in JPY.
 
 Do not force this into SettlementDateRule.
 
-## 26. Guidance for Codex / future implementation work
+## 27. Guidance for Codex / future implementation work
 
 Before changing the RFQ Domain implementation:
 
@@ -1055,7 +1306,8 @@ Before changing the RFQ Domain implementation:
 4. keep Application authorization separate from Domain state validity;
 5. do not introduce generic setters/update methods to make migration easier;
 6. implement typed states and operations from the transition table;
-7. preserve explicit Case-local child identity;
-8. add tests around invariants before broad API/UI rewiring;
-9. if a new requirement conflicts with this model, document the business requirement and revisit the model rather than silently adding a bypass.
+7. preserve explicit Case-local child identity and the separate DraftId identity;
+8. implement RfqDraft as a separate Aggregate Root with DraftField/RfqDraftData semantics rather than reviving the old Draft-as-RfqCase-state model;
+9. add tests around invariants before broad API/UI rewiring;
+10. if a new requirement conflicts with this model, document the business requirement and revisit the model rather than silently adding a bypass.
 
