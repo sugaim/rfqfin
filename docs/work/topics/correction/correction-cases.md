@@ -191,20 +191,17 @@ What this tests:
 - the business interaction may remain the same while quoted content changes;
 - support must eventually decide whether internal Quote identity matters or only the customer-facing proposition/value does.
 
-### Case 7 — Presentation time/date wrong
+### Case 7 — Presentation timing/date wrong
 
-Recorded:
+The canonical model currently carries `PresentationDate`. During the Support discussion, a finer customer-facing `PresentedAt` observation was also considered, but it is not a canonical Domain field.
 
-    ... -> P1(PresentationDate/PresentedAt = wrong) -> ...
-
-Expected truth:
-
-    ... -> P1(PresentationDate/PresentedAt = correct) -> ...
+Recorded and expected truth differ in the relevant Presentation timing information while the Presentation occurrence itself remains real.
 
 What this tests:
 
-- the Presentation occurrence can remain real while timing is corrected;
-- chronology invariants may need revalidation after correction.
+- the Presentation occurrence can remain real while its timing is corrected;
+- chronology invariants may need revalidation after correction;
+- whether correction equivalence needs date-only or finer presentation time remains open.
 
 ### Case 12A — Entire Presentation was erroneous
 
