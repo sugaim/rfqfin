@@ -2,412 +2,390 @@
 
 ## Status
 
-This is a non-canonical working note for the RfqCase correction design unit.
+This is a non-canonical working model for the RfqCase correction design unit.
 
-It records the motivation, external research, case analysis, and the semantic model currently being developed. It is intentionally earlier than a concrete correction API or canonical Domain design.
+Its purpose is to let a later discussion rebuild the correction context quickly without replaying the exploratory conversation.
 
-Read together with:
+Read in this order:
 
-- `../../handoff.md` for the active correction goal and design boundaries;
-- `../../../domain.md` for the current canonical positive-flow Domain model;
-- `../../README.md` for working-document rules.
+1. `../../../domain.md` — canonical positive-flow Domain model;
+2. `../../handoff.md` — active design target and boundaries;
+3. this file — current correction semantics;
+4. `correction-cases.md` — concrete cases used to challenge the model.
 
-The active goal from the handoff is to design **RfqCase correction / reversal / historical amendment** from concrete business cases, while preserving the current positive-flow model unless correction reveals a concrete contradiction.
+This file does **not** define a correction API and does **not** override `domain.md`.
 
-## Why this topic became a separate modeling problem
+## Goal
 
-The initial question was whether correction could be represented as a set of explicit reverse/amend operations over the current RfqCase model.
+The active design goal is the one stated in `../../handoff.md`:
 
-A fairly large set of correction cases was examined before choosing a direction. The cases included, among others:
+> design RfqCase correction / reversal / historical amendment from concrete business cases, while preserving the settled positive-flow model unless correction exposes a concrete contradiction.
 
-- an erroneously recorded Hit that should not exist;
-- a real Hit whose date/time was recorded incorrectly;
-- a corrected Hit time that invalidates the recorded Hit under quote validity;
-- a recorded Hit that should instead have been Away followed by continued pricing;
-- a recorded Away/continue path that should instead have remained on the original pricing episode;
-- an incorrect Quote value where the Presentation and eventual Hit were otherwise real;
-- incorrect Terms where pricing actually used the correct Terms;
-- incorrect Terms where pricing actually used the wrong Terms and business truth therefore must be resolved outside the system;
-- a real Terms change or repricing that was omitted from the record;
-- an incorrect Presentation date;
-- an ownership value that was recorded incorrectly versus an ownership handoff that actually happened but was not recorded;
-- cancellation versus normal close errors;
-- a missing late/EOD close that may be ordinary positive flow rather than correction;
-- ValidUntil mistakes and their effect on expiry or Hit validity;
-- an erroneous Presentation that incorrectly moved a Case from Inquiry to Negotiating;
-- historical ContactOwner mistakes whose authorization meaning belongs primarily to Application;
-- confusion between InvalidateQuote and RequestRepricing;
-- confusion between RollPricingDate and ChangeAssumedTradeDate;
-- two real episode-changing operations recorded as one;
-- one real episode-changing operation recorded as two;
-- an incorrect OpenDate or BusinessEntity;
-- correction of a previous correction;
-- upstream/master-data errors;
-- a wrong current FirmQuote or current Terms while the Case remains Open;
-- a correction where only part of an earlier correction was wrong;
-- one recorded Case that should have been two;
-- an invalid/duplicate Case versus a valid Case with many incorrect historical facts;
-- facts attached to the wrong one of two real Cases;
-- duplicate/split Cases whose histories are distributed, duplicated, or mixed.
+The immediate sub-goal is narrower:
 
-These cases exposed two important properties.
+> define what makes a corrected business History an acceptable representation of the business history that should have happened.
 
-First, correction is not reliably characterized as “undo the last operation.” The incorrect portion may be historical rather than current, an earlier correction may itself need correction, and the correct history may preserve some facts while removing or re-associating others.
+That question must be answered before choosing concrete correction commands, revision persistence, or UI workflow.
 
-Second, defining a complete family of precise correction operations appears difficult and potentially brittle. A correction API that mirrors every future Domain concept or every possible historical mistake would tend to grow together with the Domain and could become a barrier to future model changes.
+## Why correction needs a separate semantic model
 
-This does not mean explicit correction operations are never useful. It means they should not be assumed to be the semantic foundation of correction.
+A large correction-case survey was performed before committing to an abstraction. The normalized catalog is in `correction-cases.md`.
 
-## What was learned from external approaches
+The cases cover:
 
-Several existing approaches were reviewed for useful ideas. None maps directly onto this RFQ problem, but each contributes a useful implication.
+- wrong or missing Hit/Away outcomes;
+- wrong Quote/Presentation values or timing;
+- omitted or extra PricingEpisodes;
+- Terms and ownership mistakes;
+- corrections that change only historical facts while leaving current state similar;
+- correction-of-correction;
+- upstream-data mistakes;
+- one Case that should have been two;
+- two Cases whose histories were mixed or duplicated.
 
-### System-versioned / temporal persistence
+The main conclusion from that survey is not a concrete operation set. It is that correction is too varied to model safely as a generic inverse of the last operation.
 
-SQL Server system-versioned temporal tables keep a current row and automatically retain previous row versions in a history table. This is useful evidence that **mutable effective truth and immutable historical record can coexist** without making every historical version part of the business object model.
+Several patterns recur:
+
+- the wrong part may be historical rather than current;
+- a valid later fact may need to survive while an earlier fact is removed;
+- removing an intermediate state may require later facts to be re-associated;
+- the final state may be identical while the business history is materially different;
+- a previous correction may itself be only partly wrong;
+- changing one historical fact can invalidate dependent facts;
+- sometimes the intended truth is underdetermined until business investigation resolves it.
+
+A second pressure is maintainability. A correction subsystem that mirrors every Domain field and operation with dedicated amend/reverse variants would tend to grow in lockstep with the Domain and could become an obstacle to future Domain changes.
+
+The working model therefore starts from **the desired corrected history**, not from a closed catalog of correction operations.
+
+## External approaches and their implications
+
+External approaches were reviewed for ideas, not selected as architectures.
+
+### Temporal / system-versioned persistence
+
+Temporal tables show that current effective truth and immutable prior representations can coexist.
+
+Implication:
+
+> retaining prior representations for audit does not require correction itself to be a Domain transition.
 
 Reference:
 
 - https://learn.microsoft.com/en-us/sql/relational-databases/tables/temporal/overview
 
-Implication here: retaining prior representations for audit does not require correction itself to be modeled as a Domain transition.
+### Bitemporal modeling
 
-### Bitemporal history
+Bitemporal modeling distinguishes, in different terminology, between:
 
-Bitemporal modeling distinguishes the history of what should have been true in the business world from the history of what the system believed or recorded at different times. Martin Fowler describes this as actual/record history, also commonly called valid/transaction time.
+- what should be treated as true in the business world; and
+- what the system recorded or believed at different transaction times.
+
+Implication:
+
+> **business History** and **revision/audit history** are different dimensions.
+
+For correction, these answer different questions:
+
+- Business History: “Given what is now known, what should we treat as having happened?”
+- Revision history: “What representation did the system hold at each point in time?”
+
+The current model borrows this distinction without committing to a full bitemporal database design.
 
 Reference:
 
 - https://www.martinfowler.com/articles/bitemporal-history.html
 
-This distinction is particularly relevant to RFQ correction.
+### Explicit cancel/correct protocols
 
-A corrected RFQ history answers a question like:
+FIX-style cancel/correct chains show that explicit typed correction works well where the corrected object and correction semantics are narrowly standardized.
 
-> Given what is now known, what business history should be treated as having happened?
+Implication:
 
-The sequence of recorded revisions answers a different question:
+> specific correction facts may eventually justify typed correction operations, but this does not solve arbitrary RfqCase history correction by itself.
 
-> What did the system believe at each point in time?
-
-The current direction therefore does **not** identify business History with revision/audit history. A full bitemporal database design is not implied; the important implication is the separation of these two meanings.
-
-### Explicit trade cancel/correct protocols
-
-FIX defines explicit Trade Cancel and Trade Correct semantics, with references to the execution being cancelled or corrected and chaining rules for repeated corrections.
-
-Reference:
+References:
 
 - https://www.fixtrading.org/online-specification/trade-appendix/
 - https://www.fixtrading.org/wp-content/uploads/download-manager-files/FIX-Latest-Specification-Trade.pdf
 
-Implication here: explicit typed correction and provenance chains can work well when the corrected business object and correction semantics are tightly standardized. This remains a useful pattern for specific RFQ facts, but does not by itself solve arbitrary historical Case correction.
+### Workflow repair, redrive, alignment, and planning
 
-### Workflow-instance modification
+Camunda process modification, AWS Step Functions redrive, process-mining alignment, and classical planning all provide variants of:
 
-Camunda exposes process-instance modification operations such as starting before/after an activity or cancelling an activity instance.
+- preserve a valid prefix;
+- move/reconstruct execution;
+- compare an observed trace with a valid process;
+- search for a legal action sequence reaching a target.
 
-Reference:
+Implication:
+
+> Domain commands may be useful **construction and validation tools** for correction even if the command sequence is not itself the historical truth.
+
+References:
 
 - https://docs.camunda.org/javadoc/camunda-bpm-platform/7.24-SNAPSHOT/org/camunda/bpm/engine/runtime/ProcessInstanceModificationBuilder.html
-
-Implication here: operational repair of a running process can be powerful, but a generic “move/skip/cancel anywhere” mechanism is not a good substitute for business semantics. Correction must still define what resulting history is acceptable.
-
-### Redrive / resume
-
-AWS Step Functions redrive continues an unsuccessful execution from the failed point, preserves successful prior results, and reruns only the unsuccessful suffix under explicit eligibility constraints. If the workflow definition changes, a new execution is required.
-
-Reference:
-
 - https://docs.aws.amazon.com/step-functions/latest/dg/redrive-executions.html
-
-Implication here: preserving a valid prefix and reconstructing only an affected suffix can be a useful implementation strategy. It is not sufficient as the general semantic definition because RFQ correction can alter facts earlier than a simple failed suffix.
-
-### Process-mining conformance and alignment
-
-Process-mining tools such as PM4Py compare an observed trace with a process model and support replay/alignment-based conformance checking.
-
-Reference:
-
 - https://github.com/process-intelligence-solutions/pm4py/blob/release/docs/source/api.rst
-
-Implication here: a recorded or desired trace can be compared with the valid business transition model, and a nearby valid trace can potentially be constructed. This is relevant to correction tooling even if the RFQ Domain itself does not become a process-mining model.
-
-### Classical planning
-
-Classical planners such as Fast Downward search for an action sequence from an initial state to a goal under action preconditions/effects.
-
-Reference:
-
 - https://www.fast-downward.org/latest/documentation/planner-usage/
 
-Implication here: once desired correction facts are known, an Application-side helper could search for a sequence of ordinary Domain commands that constructs a valid corrected history. The command sequence would be a construction witness, not a claim about what historically happened.
+Event sourcing, model finding, and labeled-transition/process-algebra ideas were also considered. No decision has been made to adopt any of them.
 
-### Other approaches considered
+## Revision: useful implementation direction, not the semantic definition
 
-Event-sourcing compensation/replay, model finding, and labeled-transition/process-algebra style reasoning were also considered. They reinforce useful ideas such as append-only provenance, explicit state-transition validity, trace equivalence, and constraint-based reconstruction, but no decision has been made to adopt any of those architectures.
-
-## Why revision became attractive
-
-A strong candidate implementation direction emerged from the case analysis: treat a correction as producing a new **whole-Case history representation**, while retaining prior representations immutably.
-
-This has several attractive properties.
-
-### Immutability and correction-of-correction
-
-Instead of mutating an old historical object graph in place, each accepted correction can produce another immutable representation.
+Whole-History revision became attractive during the case analysis.
 
 Conceptually:
 
-    Revision 1 -> History H1
-    Revision 2 -> History H2
-    Revision 3 -> History H3
+    Revision 1 -> H1
+    Revision 2 -> H2
+    Revision 3 -> H3
 
-If Revision 2 was partly wrong, Revision 3 does not need to “undo the undo.” It can simply express the better current understanding of the business history.
+Each revision can retain an immutable complete logical representation of the Case history understood at that point.
 
-### It matches the business question
+This is attractive because:
 
-The business question is usually not:
+- prior representations remain available for audit;
+- correction-of-correction does not require “undoing the undo”;
+- a new revision can simply express the best History now believed;
+- correction machinery need not mirror every future Domain field;
+- the logical unit is a finite RfqCase History.
 
-> Which compensating operation should be applied to the current internal graph?
+The last point is specifically useful here: an RFQ Case has a finite history at any observation point. That makes a whole-History logical value tractable even if the physical persistence layer later stores shared structure or deltas rather than copying every object.
 
-It is closer to:
+However:
 
-> Given the evidence now available, what should the Case history be understood to have been?
+> **Revision is not currently part of the correction semantics.**
 
-That favors constructing the intended result over encoding correction as a procedural inverse of the mistake.
+A revision identifier/version is presently best understood as an Application/Persistence coordinate over immutable representations.
 
-### It reduces coupling between correction and future Domain growth
+The semantic correction question is instead:
 
-If correction is modeled as a parallel family of field-specific amend/reverse operations, every new Domain fact may require new correction machinery.
+> what History should now be effective?
 
-A history-level replacement model can instead reuse the normal validity semantics of the Domain and place much of the complexity in constructing and validating a candidate corrected history.
+This separation is deliberate.
 
-### Finite Case histories are a favorable property
+## Core semantic model
 
-At any point in time, an individual RFQ Case has a finite business history.
-
-That makes a complete-history value or snapshot conceptually tractable: a revision can denote one finite candidate History rather than an unbounded live process.
-
-This is not yet a claim about the optimal physical storage format. Persistence may later share structure, store deltas, or otherwise optimize representation. The useful point is that the **logical correction unit can remain the finite whole History** even if storage is not a naïve full copy.
-
-## Revision is not currently a Domain transition
-
-The discussion initially used “Revision” as though it might be a first-class Domain concept. The current direction is more conservative.
-
-A revision/version number can be understood as a Persistence/Application coordinate over immutable representations:
-
-1. an effective recorded History exists;
-2. business investigation establishes what the corrected business history should mean;
-3. a new valid History is constructed;
-4. the new History is checked against the required correction semantics;
-5. the new History becomes the effective representation;
-6. previous representations remain available for audit/provenance.
-
-Under this view, **Revision is not itself an RfqCase business transition**.
-
-This is deliberately separate from the question of whether a future business requirement may introduce a first-class correction/amendment fact. Nothing currently requires that stronger commitment.
-
-## Correction is about realizing the intended history, not replaying the “right correction operation”
-
-This is the main conceptual shift.
-
-The semantic target of correction is not:
-
-    old recorded state
-      + the correct correction command
-      = corrected state
-
-Instead it is closer to:
-
-    expected business truth
-      -> construct an acceptable valid History
-      -> make that History effective
-
-The old recorded History remains important for:
-
-- identifying what changed;
-- authorization and operational workflow;
-- explaining/auditing why a revision was created;
-- determining downstream deltas;
-- deciding which external side effects may need follow-up.
-
-But the old History is not, by itself, the semantic criterion for whether the corrected History is correct.
-
-## Semantic model currently being defined
-
-The current discussion is deliberately defining a small metamodel before defining concrete RFQ correction operations.
+The model below is a working metamodel. It is intended to be general enough to reason about correction without forcing the current in-memory RfqCase shape to carry full history.
 
 ### State
 
 Let:
 
-    S = business state
+    S = set/type of business States
 
-For RfqCase, this should be understood as a complete effective business state sufficient to determine future Domain behavior, not merely the enum-like RfqCase.State variant.
+For RfqCase, a State means the complete effective business state needed to determine valid future business behavior, not merely the enum-like `RfqCase.State` variant.
 
-### Business command / operation
+### Business operation / command
 
 Let:
 
-    C = business command / operation
+    C = set/type of business operations
 
 and:
 
     δ : S × C ⇀ S
 
-where δ is partial because some operations are invalid from some states.
+where `δ` is partial because not every operation is permitted from every State.
 
-The intended reading is:
+Interpretation:
 
-> δ executes a business-permitted state transition.
+> `δ` executes a business-permitted state transition.
 
-C should not be read as “the exact set of endpoints currently exposed by the Application.” The current Application may support only part of the broader business operation vocabulary.
+`C` should not be confused with the exact set of current Application endpoints. The Application may expose only some business operations directly.
 
 ### History
 
-Define the set of valid Histories as finite state sequences connected by business-permitted operations:
+Let `H` be the set of finite valid State sequences:
 
     H =
     {
       (s0, ..., sn)
       |
       for every i < n,
-      there exists ci in C such that δ(si, ci) = s(i+1)
+      there exists ci in C such that
+      δ(si, ci) = s(i+1)
     }
 
-History therefore contains **States**, not the command sequence itself.
+Therefore:
 
-Commands witness that adjacent states can be connected by a valid business transition. They are useful for construction and validation, but are not automatically part of business History.
+> **History is a finite sequence of business States connected by permitted business operations.**
 
-This is intentional. If a distinction between two transitions must survive historically, the preference is to represent that distinction in business State where possible. PricingEpisode.Origin is an existing example: the resulting state preserves why a new pricing episode exists.
+Commands are not themselves part of History under the current model.
 
-If a concrete future case exposes business-significant transition meaning that cannot reasonably be recovered from states, the model may need an explicit transition observation/fact. That is an escape hatch, not a current assumption.
+They witness that adjacent States can be connected legally and may help construct/validate Histories.
 
-### Support relation
+If a transition distinction is business-significant and must survive historically, the current preference is to represent that distinction in State where reasonable. `PricingEpisode.Origin` is an existing example.
+
+If a concrete case later proves that some business-significant transition meaning cannot reasonably be represented or recovered from States, the model may need an explicit transition observation/fact. That is not assumed yet.
+
+## Correction target
 
 Let:
 
+    H_recorded ∈ H
+
+be the currently effective recorded History, and let:
+
+    H_true ∈ H
+
+stand for the business History that investigation says should be represented.
+
+Current scope assumes that the intended business truth is expressible in the current Domain vocabulary. If it is not, that is first a Domain-model enhancement problem.
+
+A correction candidate is:
+
+    H_corrected ∈ H
+
+The semantic target is **not** defined as an inverse operation over `H_recorded`.
+
+Instead, correction aims to produce a valid History that sufficiently represents `H_true`.
+
+The recorded History still matters for:
+
+- identifying what changed;
+- authorization/workflow;
+- audit/provenance;
+- downstream delta handling;
+- side-effect reconciliation.
+
+But it is not the sole semantic criterion for correctness.
+
+## Support relation
+
+Introduce an intentionally abstract relation:
+
     Supports : H × H -> Bool
 
-with the intended direction:
+with direction:
 
     Supports(H_rep, H_true)
 
 meaning:
 
-> H_rep is an acceptable representation of the business meaning that must be preserved from H_true.
+> `H_rep` is a sufficient business representation of the meaning that must be preserved from `H_true`.
 
-This relation is intentionally abstract at this stage.
+A corrected History should satisfy:
 
-No symmetry, transitivity, equivalence, or observation-based implementation is assumed yet.
-
-The corrected History should satisfy:
-
-    H_corrected in H
+    H_corrected ∈ H
 
 and:
 
     Supports(H_corrected, H_true)
 
-The current scope assumes that the business truth being corrected is expressible in the current Domain vocabulary. If the real-world fact cannot be represented by the Domain at all, that is first a Domain-enhancement problem rather than merely a correction problem.
+No symmetry, transitivity, equivalence, preorder, or observation-based implementation is assumed yet.
 
-### Why Support is not simple History equality
+### Why Support is needed
 
-Correction may not need to reproduce every internal intermediate state that actually occurred.
+Exact History equality may be too strong.
 
-For example, the true process might contain pricing loops or internal transitions that are not required to preserve the business meaning relevant to correction.
+The true business process may contain internal intermediate states that do not need to be retained to preserve the business meaning relevant to correction.
 
-Therefore:
+Final-state equality is clearly too weak.
 
-    H_corrected == H_true
+The case catalog contains examples where the same final lifecycle state hides different:
 
-may be stronger than necessary.
+- customer presentations;
+- outcomes;
+- pricing rounds;
+- ownership changes;
+- Terms histories.
 
-Conversely, comparing only final current state is generally too weak: two Cases can end in the same state while having materially different customer interactions, outcomes, or historical facts.
+`Supports` is the placeholder for the business-equivalence strength required between those extremes.
 
-The Support relation is intended to capture the required middle ground.
+## Observation discussion: current frontier, not a decision
 
-Exactly what must be preserved is **not yet settled**.
+The latest discussion began testing whether `Supports` could be defined from business observations extracted from History.
 
-## Early observation discussion — deliberately unresolved
+Candidate observation categories included:
 
-The discussion briefly tested how Support might later be defined through observable business facts.
+- existence/absence of a customer interaction;
+- what was presented;
+- when it was presented;
+- Hit/Away result and timing;
+- ordering;
+- values;
+- identity/reference relationships where identity itself is business-significant.
 
-Examples considered include:
+One useful emerging distinction is:
 
-- existence or absence of customer Presentations;
-- what was presented and when;
-- Hit/Away business outcomes and their timing;
-- ordering of business interactions;
-- identity/reference relationships where identity is itself business-significant;
-- values such as Quote/Terms content.
+> internal Domain identity and business-history equivalence are not automatically the same thing.
 
-An important emerging distinction is that internal Domain identity and business-history equivalence need not be the same thing.
+For example, in a customer-facing comparison it may matter that a particular price was shown at a particular time and then accepted, while the internal `QuoteId` or `PresentationId` used to represent that interaction may or may not matter to business equivalence.
 
-For example, in a customer-facing interpretation, it may matter that “99.75 was presented at 14:30 and later Hit,” while the particular internal QuoteId or PresentationId used to represent that interaction may not itself be part of the business equivalence relation.
+This is **not settled**. No preservation rule for Quote, Presentation, Outcome, Terms, Episode, or IDs has yet been accepted.
 
-This is only an illustration. No concrete Support rule for Presentation, Quote, Outcome, Terms, or Episode has been accepted yet.
+The next discussion should resume here.
 
-The next design work should continue here rather than silently turning these examples into rules.
+## Command replay / planning as an Application helper
 
-## Application-side command replay / planning may reduce correction workload
+Although command sequences are not History, they may be highly useful operationally.
 
-Although command sequences are not the semantic definition of History, they may still be operationally useful.
+A possible future correction workflow is:
 
-A possible correction workflow is:
+    business establishes intended facts
+        ↓
+    derive target constraints / observations
+        ↓
+    search for or construct ordinary Domain command sequence
+        ↓
+    replay through δ
+        ↓
+    obtain valid candidate H_corrected
+        ↓
+    verify Supports(H_corrected, H_true)
+        ↓
+    make candidate effective
 
-1. business users establish the facts that the corrected History must express;
-2. Application derives constraints or target observations from those facts;
-3. Application searches for or constructs a sequence of ordinary Domain commands;
-4. the commands are replayed from a suitable starting state to construct a valid candidate History;
-5. the candidate is validated against the required Support relation;
-6. only unresolved or ambiguous facts are surfaced for manual business judgment.
+This could reduce manual correction work because the Application could use the ordinary positive-flow Domain to construct much of the candidate History and surface only ambiguous business decisions.
 
-This resembles replay/alignment/planning techniques found in process mining and classical planning.
+The command sequence would be a **construction witness**, not a claim that those commands literally occurred historically.
 
-The goal would **not** be to infer historical truth from the Domain automatically. Multiple valid command sequences may exist, and the system cannot decide business truth merely because one sequence is legal.
+This distinction matters: legality can help construct a valid candidate, but it cannot infer business truth.
 
-The potential value is narrower but important: once the intended truth is known, the system may be able to minimize manual correction work by using the ordinary positive-flow Domain to construct as much of the corrected History as possible.
+## Current working conclusions
 
-This would also preserve an important safety property: correction tooling can reuse normal Domain invariants rather than implementing unrestricted graph mutation.
+Treat these as the current discussion baseline, not canonical Domain law:
 
-## What is currently decided versus open
+- Correction is not modeled as generic undo.
+- History is a finite valid State sequence.
+- Business operations connect States but are not themselves currently part of History.
+- Correction is about making the intended business History effective, not finding a unique inverse command.
+- Whole-History revision/replacement is a strong implementation direction.
+- Revision/version identity is currently Application/Persistence machinery, not an RfqCase business transition.
+- Previous immutable revisions are useful for audit and correction-of-correction.
+- The old recorded History matters operationally but does not define semantic adequacy.
+- `Supports(H_rep, H_true)` is the current abstraction for semantic adequacy.
+- Command replay/search may be useful as a construction/validation helper.
 
-Current working direction:
+## Intentionally open
 
-- Correction is not assumed to be generic undo.
-- Business History is modeled as a finite sequence of valid business States.
-- Business operations connect valid adjacent states but are not themselves automatically stored as History.
-- Correction aims to make an acceptable corrected History effective, not to discover a unique inverse operation over the old record.
-- Whole-History revision/replacement is a strong implementation direction because it supports immutability, correction-of-correction, and finite-history reasoning.
-- Revision/version identity is currently treated as Application/Persistence machinery rather than core RfqCase Domain semantics.
-- The old recorded History matters operationally and for provenance, but semantic adequacy is judged against intended business truth.
-- Command replay/search may become an Application helper for constructing a valid candidate History.
-
-Still open:
+Do not silently decide these while using this note:
 
 - the concrete definition of `Supports`;
-- whether Support should be defined through a family of observations, direct predicates, or another formulation;
-- which customer-facing and internal facts must be preserved;
-- where object identity is business-significant versus merely representational;
-- whether any transition-only business facts are required beyond state sequences;
-- exact representation and persistence of revisions;
-- authorization and review/approval workflow for correction;
-- downstream change propagation after an effective History changes;
-- cross-Case correction, split/merge, and reassociation;
-- how Domain enhancement interacts with correction of older histories.
+- whether Support is defined by observations, direct predicates, or another structure;
+- which business facts must be preserved exactly;
+- which internal IDs are business-significant versus representational;
+- whether transition-only business facts are required;
+- exact revision storage/version schema;
+- correction authorization/approval workflow;
+- downstream propagation/reconciliation;
+- multi-Case split/merge/reassociation;
+- interaction between Domain evolution and correction of older Histories;
+- concrete correction API/commands.
 
 ## Immediate next discussion target
 
-Continue from:
+Start from:
 
     Supports(H_rep, H_true)
 
-without yet designing a complete correction command API.
+and use `correction-cases.md` as the regression catalog.
 
 The next question is:
 
 > What business observations or requirements make one valid History a sufficient representation of another for correction purposes?
 
-Concrete RFQ examples should be used to answer that question, but examples must remain examples until an explicit preservation rule is accepted.
+Do not design the full correction API before this relation is understood well enough to reject materially wrong histories.
