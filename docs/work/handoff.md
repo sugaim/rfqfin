@@ -7,133 +7,195 @@ This is the single active working handoff. It is non-canonical.
 Read in this order:
 
 1. `../domain.md` — canonical Domain authority.
-2. `README.md` — working-document rules and discussion method.
-3. `sessions/01-rfqcase-positive-flow.md` — completed RfqCase positive-flow design unit.
-4. `sessions/02-rfqdraft.md` — completed RfqDraft design unit.
+2. `README.md` — working-document roles and discussion method.
+3. `topics/correction/correction-history-model.md` — current correction semantic model and exact discussion frontier.
+4. `topics/correction/correction-cases.md` — concrete correction cases used as regression material.
+5. `sessions/03-rfqcase-correction-foundation.md` — rationale and major refinements from the completed correction-foundation unit.
 
-The session records preserve rationale and boundaries. They do not override `../domain.md`.
+Read `sessions/01-rfqcase-positive-flow.md` and `sessions/02-rfqdraft.md` only when their rationale is needed.
+
+Topic/session material does not override `../domain.md`.
 
 ## Current status
 
-Two design units are complete:
+Completed design units:
 
 - positive-flow RfqCase;
-- pre-publication RfqDraft, including the immediate Domain/Application boundary needed to interpret Draft behavior.
+- pre-publication RfqDraft;
+- correction foundation / history-model exploration.
 
-The canonical Domain currently includes:
+The first two are incorporated into canonical `../domain.md`.
 
-- the positive-flow RfqCase aggregate/state model;
-- immutable RfqTerms/PricingEpisode/Quote/QuotePresentation concepts;
-- PresentationOutcome and CaseOutcome separation;
-- AssumedTradeDate and TradeDateLag settlement semantics;
-- explicit date/chronology invariants;
-- the separate RfqDraft Aggregate Root;
-- DraftField<T>, RfqDraftData, responsibility fields, lifecycle, and Domain operations;
-- CopyDraft, SeedDraftFromCase, and PublishDraft mappings;
-- NotionalAmount, CleanPrice, and Rate value semantics.
+The correction foundation is intentionally **not yet canonical**. It reduced the problem to a narrower semantic question and is maintained under `topics/correction/`.
 
-Do not use this handoff as a substitute for reading `../domain.md`.
+The canonical positive-flow model remains unchanged.
 
 ## Settled models to treat as fixed
 
-Treat the current positive-flow RfqCase and RfqDraft models as fixed unless the correction discussion exposes a **concrete business contradiction**.
-
-Do not reopen them merely because a different structure might also be possible.
+Treat the current positive-flow RfqCase and RfqDraft models as fixed unless correction exposes a **concrete business contradiction**.
 
 In particular:
 
 - Draft must not be reintroduced into RfqCase.State;
-- old Revision/Requested/Confirmed implementation concepts are not current Domain authority;
 - WorkingQuote remains outside RfqCase Domain;
 - actor authorization does not define Domain operation identity;
-- full historical collections are not assumed to be loaded into RfqCase;
 - PricingDate and AssumedTradeDate remain distinct;
-- correction design must not silently weaken existing positive-flow invariants.
+- full historical collections are not assumed to be loaded into the current RfqCase aggregate;
+- correction design must not silently weaken existing positive-flow invariants;
+- exploratory Entity/Value Object questions from correction are not permission to redesign current child identities without a concrete Support requirement.
 
-## Relevant settled Application-side Draft policies
+## Correction foundation now established
 
-These are not RfqDraft Domain invariants, but they were settled during Session 02 and should not be accidentally redesigned while working on correction.
+The case survey showed that correction cannot safely be reduced to generic undo or reversal.
 
-- DraftOwner may edit ordinary Draft content and manage normal Draft lifecycle.
-- DraftOwner may grant/revoke ordinary edit access.
-- GrantedEditor may edit ordinary RfqDraftData only.
-- DraftOwner alone assigns/changes ContactOwner.
-- DraftOwner or ContactOwner may manually assign/override QuoteOwner.
-- ContactOwner alone may Publish.
-- ChangeDraftOwner revokes existing edit grants.
-- QuoteOwner routing from SecurityId is Application-side defaulting, not a Domain eligibility invariant.
-- A non-default QuoteOwner does not block Publish.
-- shared Draft updates should use optimistic concurrency rather than silent last-write-wins.
-- Publish must reject a stale observed Draft version.
-- publishing the Draft and creating the new RfqCase must be persisted atomically and only once.
+Current working model:
 
-These belong in future Application/Persistence design rather than being pulled into correction Domain semantics without a concrete reason.
+    S = business State
+    C = business operation / command
+    δ : S × C ⇀ S
+
+    H =
+    {
+      (s0, ..., sn)
+      |
+      each adjacent pair is connected by some permitted command
+    }
+
+History is currently modeled as a **finite sequence of valid business States**. Commands witness legal transitions but are not themselves part of History.
+
+Correction aims to make an acceptable corrected History effective rather than to discover a unique inverse command over the recorded History.
+
+Introduce:
+
+    Supports : H × H -> Bool
+
+with:
+
+    Supports(H_rep, H_true)
+
+meaning that `H_rep` sufficiently represents the business meaning that must be preserved from `H_true`.
+
+No concrete definition of `Supports` has yet been accepted.
+
+## Revision direction
+
+Whole-History revision/replacement is a strong implementation direction because it provides:
+
+- immutable prior representations;
+- straightforward correction-of-correction;
+- weaker coupling between correction machinery and future Domain additions;
+- a natural logical unit because an individual Case history is finite at any point in time.
+
+However:
+
+- Revision is **not currently an RfqCase business transition**;
+- revision/version identity is presently treated as Application/Persistence machinery;
+- physical storage is unresolved and need not copy every historical object naïvely.
+
+The useful distinction borrowed from bitemporal reasoning is:
+
+- business History: what should now be treated as having happened;
+- revision/audit history: what representation the system held over time.
+
+Do not collapse those dimensions.
+
+## Command replay/planning idea
+
+Command-based reconstruction remains potentially useful.
+
+Application may eventually:
+
+1. obtain the business facts/constraints that correction must express;
+2. search for or construct ordinary business commands;
+3. replay them through the positive-flow Domain;
+4. produce a valid candidate History;
+5. verify the candidate using `Supports`;
+6. surface only ambiguous business decisions for manual resolution.
+
+Such a command sequence is a construction witness, not automatically the literal historical command sequence.
+
+This is an Application possibility, not a selected implementation.
 
 ## Next design target
 
-Design:
+Continue from:
 
-    RfqCase correction / reversal / historical amendment
+    Supports(H_rep, H_true)
 
-Start from **concrete correction use cases**, not from a generic undo mechanism.
+The immediate question is:
 
-The current Domain deliberately leaves several candidate directions unresolved:
+> What business observations or requirements make one valid History a sufficient representation of another for correction purposes?
 
-- explicit operation reversal / Revert-style correction;
-- restoring or jumping to a prior effective state;
-- direct typed amendment/correction of historical facts;
-- a combination of reversal plus explicit amendment.
+Use `topics/correction/correction-cases.md` as the regression catalog.
 
-None of these is selected yet.
+Do **not** jump yet to:
 
-## Questions the next discussion should answer
+- a full correction command/API catalog;
+- exact revision schema;
+- UI/workflow;
+- unrestricted graph mutation;
+- event sourcing;
+- multi-Case implementation mechanics.
 
-The next design unit should determine, from concrete business cases:
+## Important frontier from the previous discussion
 
-- what kinds of mistakes/corrections actually occur;
-- whether correction changes current effective state, historical facts, or both;
-- which existing Domain operations/facts can be reversed safely;
-- how correction interacts with terminal Hit/Away/Cancelled states;
-- how references among Terms, Episodes, Quotes, Presentations, and Outcomes remain interpretable after correction;
-- whether correction should create new immutable facts, mark earlier facts ineffective, or explicitly amend them;
-- how to preserve auditability without turning Domain into unrestricted mutable history;
-- which concerns belong to Domain versus Application/audit/persistence;
-- which external/irreversible side effects must remain outside in-memory correction semantics.
+Observation-based Support was only explored, not settled.
 
-Do not assume event sourcing, a generic historical-state graph, or unrestricted mutation unless a concrete business requirement justifies it.
+Examples discussed include:
 
-## Intentionally deferred beyond correction
+- whether a Presentation occurred;
+- what was presented;
+- when it was presented;
+- Hit/Away result and timing;
+- ordering;
+- values;
+- internal identities/references.
 
-Unless correction itself requires them, do not expand scope into:
+A useful but still provisional distinction is:
+
+> internal Domain identity and business-history equivalence are not automatically the same thing.
+
+For example, a customer-facing business fact may be “price X was shown at time T and accepted,” while the internal QuoteId/PresentationId may or may not belong to the equivalence relation.
+
+Do not treat any particular Presentation/Quote/Outcome observation rule as decided.
+
+## Intentionally deferred
+
+Unless the Support discussion itself requires them, defer:
 
 - exact CancellationReason taxonomy;
 - final Presented-Away Case-level disposition taxonomy;
 - typed analytics/Feedback taxonomy;
-- foreign-market settlement-date context;
+- foreign-market settlement context;
 - settlement amount/currency/FX semantics;
 - first-class Case/Draft lineage;
 - exact audit/event schema;
 - broad API/DTO/frontend migration;
-- the full Application authorization/use-case design.
+- full Application authorization/use-case design;
+- exact revision persistence;
+- downstream propagation/reconciliation;
+- cross-Case split/merge/reassociation implementation.
 
-## Working approach
+## Working approach for the next session
 
-Use the working method in `README.md`.
+- Start from the current model, not from the exploratory chat history.
+- Take one coherent Support question at a time.
+- Test every proposed rule against concrete cases.
+- Distinguish accepted rule, hypothesis, and example.
+- Preserve positive-flow invariants.
+- If a Support requirement creates a concrete contradiction with the canonical Domain model, stop and discuss that contradiction before editing `domain.md`.
+- Do not infer business truth merely because a command sequence is legal.
 
-For this next unit in particular:
+## Why start a fresh session now
 
-- read canonical docs before relying on session history;
-- challenge the settled model only with concrete contradictions;
-- separate Domain validity/effective business meaning from Application authorization and Persistence mechanics;
-- do not import RfqDraft-specific patterns merely because they worked for Draft;
-- discuss one coherent correction problem at a time;
-- prefer partial, typed correction semantics over a generic mutation escape hatch;
-- before writing canonical changes, re-scan active docs for contradictions and stale statements.
+The correction-foundation discussion deliberately explored many directions: concrete cases, generic reversal, revision shapes, bitemporal implications, identity, observations, and command replay.
 
-## Why start a fresh session
+That exploration was useful, but carrying the conversational path forward would risk anchoring the next discussion on abandoned or provisional ideas.
 
-RfqDraft is now a completed design unit.
+The reusable context has therefore been normalized into:
 
-Correction is a materially different problem: it concerns the interpretation and modification of historical/effective RfqCase facts rather than assembly of a pre-publication Draft.
+- `topics/correction/correction-history-model.md`;
+- `topics/correction/correction-cases.md`;
+- `sessions/03-rfqcase-correction-foundation.md`.
 
-Starting correction in a fresh discussion reduces anchoring on Draft-specific design choices while preserving the required background through `../domain.md` and the two session completion records.
+The next session should use those files rather than rely on the prior chat transcript.
