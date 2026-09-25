@@ -152,7 +152,7 @@ The complete persistent identity of a child is therefore conceptually (CaseId, L
 
 No separate OutcomeId is introduced. A Presentation outcome is identified by its PresentationId because one Presentation has at most one effective outcome.
 
-Typed references may still be used where the type must prove the existence/type of a referenced fact. For example, PresentationAwayOutcomeRef semantically means "the Away outcome for this Presentation exists"; it is not an arbitrary PresentationId wrapper constructible from any value.
+No separate typed reference is required for a Presentation Away outcome. Where a later Domain fact needs the Away result itself, it carries the immutable PresentationAwayOutcome value, which already identifies the Presentation through PresentationId.
 
 ## 6. Scalar and supporting Domain Objects
 
@@ -348,14 +348,14 @@ In particular it does not contain:
       )
     | ContinuedAfterAway(
           PreviousPricingEpisodeId,
-          PresentationAwayOutcomeRef
+          PresentationAwayOutcome
       )
 
 Origin is exactly one variant, not a bag/list of causes.
 
 If an Application composite performs two episode-changing Domain operations, two episodes are created in sequence. The current episode is the latest one.
 
-Origin stores only information needed to explain why the new pricing round exists. It does not duplicate data already available from the referenced previous/current entities.
+Origin stores only information needed to explain why the new pricing round exists. Most variants identify the previous PricingEpisode so the Episode lineage remains explicit. ContinuedAfterAway additionally retains the immutable PresentationAwayOutcome that caused continuation; this intentional value duplication keeps the Episode's business provenance stable even after the Case moves on to later Presentations.
 
 ## 10. Quote and FirmQuote
 
@@ -806,7 +806,7 @@ ChangeContactOwner changes ContactOwnerId but does not change PricingEpisode, Qu
 | T24 | ReplaceFirmQuote | Commit a new firm price while a previous quote is Presented | preserve | current Presentation becomes LatestPresentation with no outcome; new FirmQuote is PendingPresentation |
 | T25 | InvalidateQuote | Withdraw the currently Presented FirmQuote | preserve | current Presentation becomes LatestPresentation with no outcome |
 | T26 | ExpireQuote | Presented FirmQuote expires | preserve | current Presentation becomes LatestPresentation with no outcome |
-| T27 | ContinueAfterAway | Customer proposal goes Away but Case continues | new, Origin=ContinuedAfterAway | create PresentationAwayOutcome; carry Presentation + Away outcome as latest |
+| T27 | ContinueAfterAway | Customer proposal goes Away but Case continues | new, Origin=ContinuedAfterAway | create PresentationAwayOutcome; retain that Away outcome in Origin; carry Presentation + Away outcome as latest |
 | T28 | RollPricingDate | Start a later-date pricing round from Presented | new, Origin=PricingDateRolled | current Presentation becomes latest; no Away outcome is fabricated |
 | T29 | ExtendValidUntil | Extend still-valid Presented FirmQuote | preserve | same Quote and same Presentation |
 | T30 | Hit | Customer accepts current Presented FirmQuote | preserve/terminal | create PresentationHitOutcome; HitDate does not precede PresentationDate; HitAt<=ValidUntil |
@@ -835,7 +835,7 @@ Operations that create a new PricingEpisode:
 | RollPricingDate | no | PricingDateRolled(previous Episode) |
 | ChangeAssumedTradeDate | no | AssumedTradeDateChanged(previous Episode) |
 | RequestRepricing | no | RepricingRequested(previous Episode, QuoteId, Feedback?) |
-| ContinueAfterAway | no | ContinuedAfterAway(previous Episode, PresentationAwayOutcomeRef) |
+| ContinueAfterAway | no | ContinuedAfterAway(previous Episode, PresentationAwayOutcome) |
 
 CreateCase supplies the initial PricingDate and AssumedTradeDate. RollPricingDate changes PricingDate and preserves AssumedTradeDate. ChangeAssumedTradeDate changes AssumedTradeDate and preserves PricingDate. Other Episode-creating operations preserve both date fields from the previous Episode.
 
@@ -877,7 +877,7 @@ InvalidateQuote preserves the current PricingEpisode.
 
 ### ContinueAfterAway versus simple repricing
 
-ContinueAfterAway creates a PresentationAwayOutcome and a new PricingEpisode whose Origin references that outcome.
+ContinueAfterAway creates a PresentationAwayOutcome and a new PricingEpisode whose Origin retains that immutable Away outcome value.
 
 Application-side work on a better price while the current Presented FirmQuote remains live does not change Domain state at all.
 
@@ -1347,4 +1347,3 @@ Before changing the RFQ Domain implementation:
 8. implement RfqDraft as a separate Aggregate Root with DraftField/RfqDraftData semantics rather than reviving the old Draft-as-RfqCase-state model;
 9. add tests around invariants before broad API/UI rewiring;
 10. if a new requirement conflicts with this model, document the business requirement and revisit the model rather than silently adding a bypass.
-
