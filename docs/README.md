@@ -1,6 +1,6 @@
 # Documentation
 
-This directory separates active design authority from historical material.
+This directory separates canonical design authority, active working context, and obsolete historical material.
 
 ## Active authority
 
@@ -37,9 +37,13 @@ At that point, prefer:
 
 Split documentation when the Domain is materially stable and duplicated rationale has become a real maintenance risk. Do not split merely to reduce file length or to make the document look cleaner during active design convergence.
 
-## Working handoff
+## Working design data
 
-- [handoff.md](handoff.md) — context for the next design discussion. It is intentionally useful to ChatGPT/Codex, but it is not canonical Domain authority.
+- [work/README.md](work/README.md) — rules for active handoff and design-session completion records, including the expected discussion method for ChatGPT/Codex.
+- [work/handoff.md](work/handoff.md) — the single active working handoff. It describes current status and the next design target, but it is not canonical Domain authority.
+- `work/sessions/` — completion records for finished design units. They preserve useful rationale and boundaries without becoming alternative Domain specifications.
+
+Working session records are different from `_archive/`: they belong to the current redesign timeline and may be useful context for later discussions. When any working document conflicts with `domain.md` on Domain meaning, `domain.md` wins.
 
 ## Historical material
 
@@ -48,4 +52,4 @@ Split documentation when the Domain is materially stable and duplicated rational
 
 Current source code may still reflect archived concepts. When current code conflicts with `domain.md` on Domain meaning, `domain.md` is authoritative until implementation migration is completed.
 
-Git history is the version history of active documentation.
+Git history is the mechanical version history of active documentation. Working session records preserve design-unit context, not commit history.
