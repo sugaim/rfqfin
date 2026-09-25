@@ -255,9 +255,9 @@ The recorded History still matters for:
 
 But it is not the sole semantic criterion for correctness.
 
-## Support relation
+## Adequacy relation — provisional name and shape
 
-Introduce an intentionally abstract relation:
+The previous discussion introduced an intentionally abstract relation:
 
     Supports : H × H -> Bool
 
@@ -265,61 +265,147 @@ with direction:
 
     Supports(H_rep, H_true)
 
-meaning:
+meaning approximately:
 
 > `H_rep` is a sufficient business representation of the meaning that must be preserved from `H_true`.
 
-A corrected History should satisfy:
+The name `Supports` is **provisional**. It may be replaced if the next discussion finds that `Preserves`, `Satisfies`, or a requirement-oriented formulation expresses the model more accurately.
+
+No symmetry, transitivity, equivalence, preorder, or observation-based implementation is assumed.
+
+A corrected candidate must at least be a valid History:
 
     H_corrected ∈ H
 
-and:
+What remains unresolved is the additional adequacy requirement that makes it an acceptable correction.
 
-    Supports(H_corrected, H_true)
-
-No symmetry, transitivity, equivalence, preorder, or observation-based implementation is assumed yet.
-
-### Why Support is needed
+### Why exact History equality is not the default
 
 Exact History equality may be too strong.
 
-The true business process may contain internal intermediate states that do not need to be retained to preserve the business meaning relevant to correction.
+The true business process may contain intermediate internal states that are not needed for the purpose of correction. Conversely, final/current-state equality can be too weak: the case catalog contains examples where equal final lifecycle states hide different customer interactions, outcomes, pricing rounds, ownership changes, or Terms histories.
 
-Final-state equality is clearly too weak.
+There may also be cases where current truth is genuinely sufficient and preserving richer history would add cost without business value. The next discussion should therefore avoid assuming one globally maximal preservation rule.
 
-The case catalog contains examples where the same final lifecycle state hides different:
+## Immediate modeling problem: what must correction preserve?
 
-- customer presentations;
-- outcomes;
-- pricing rounds;
+Before defining the adequacy relation precisely, organize the current Domain concepts by **why their history may need to survive correction**.
+
+The following requirement dimensions have been identified as candidates.
+
+### Customer-facing business truth
+
+Examples:
+
+- what proposition/value was shown to the customer;
+- when it was shown;
+- whether it was Hit or Away;
+- when the outcome occurred.
+
+Under this view, internal object identity may be irrelevant where the customer-visible proposition is unchanged. For example, two different `QuoteId` values may be equivalent if they represent the same externally relevant quotation.
+
+### Internal business/process meaning
+
+Some facts may matter even when they are not directly customer-visible.
+
+Examples include possible requirements around:
+
+- `ContinueAfterAway`;
+- repricing rounds;
 - ownership changes;
-- Terms histories.
+- Terms changes;
+- distinctions encoded in `PricingEpisode.Origin`.
 
-`Supports` is the placeholder for the business-equivalence strength required between those extremes.
+These may be needed for business analysis, workflow interpretation, or future Domain behavior.
 
-## Observation discussion: current frontier, not a decision
+Whether each such fact must be preserved is not yet decided.
 
-The latest discussion began testing whether `Supports` could be defined from business observations extracted from History.
+### Current operational truth
 
-Candidate observation categories included:
+For some correction classes, preserving the correct current business state may be sufficient even if historical detail is intentionally not reconstructed.
 
-- existence/absence of a customer interaction;
-- what was presented;
-- when it was presented;
-- Hit/Away result and timing;
-- ordering;
-- values;
-- identity/reference relationships where identity itself is business-significant.
+This possibility should be evaluated rather than ruled out merely because richer histories are available.
 
-One useful emerging distinction is:
+### Referential continuity
 
-> internal Domain identity and business-history equivalence are not automatically the same thing.
+Identity/reference integrity is a separate concern from business equivalence.
 
-For example, in a customer-facing comparison it may matter that a particular price was shown at a particular time and then accepted, while the internal `QuoteId` or `PresentationId` used to represent that interaction may or may not matter to business equivalence.
+An internal ID may be irrelevant to customer/business meaning but still be referenced by:
 
-This is **not settled**. No preservation rule for Quote, Presentation, Outcome, Terms, Episode, or IDs has yet been accepted.
+- unaffected persisted facts;
+- downstream systems;
+- analytics;
+- audit/provenance records.
 
-The next discussion should resume here.
+Possible strategies include preserving the ID, retaining an old-to-new correspondence, or updating dependents. Which is appropriate belongs partly outside pure business-history equivalence.
+
+Do not treat referential continuity as proof that an ID must be part of the business adequacy relation.
+
+### Audit / revision history
+
+Prior recorded representations, correction actor/time, and the fact that a correction occurred may need to be retained for audit.
+
+Those requirements belong to revision/audit history unless a concrete business rule makes them part of business History.
+
+They should not be mixed into the corrected History merely because they must be persisted.
+
+## Domain-oriented requirement analysis
+
+The next discussion should walk through the existing Domain concepts and ask, for each one:
+
+> What business purpose, if any, requires this concept or some projection of it to be preserved across correction?
+
+Relevant concepts include:
+
+- RfqTerms;
+- PricingEpisode and PricingEpisode.Origin;
+- Quote and FirmQuote;
+- QuotePresentation;
+- PresentationOutcome;
+- CaseOutcome;
+- ContactOwner;
+- root-level dates/context;
+- current state.
+
+For each concept, distinguish at least:
+
+- exact identity/value preservation;
+- semantic/value preservation with different internal identity allowed;
+- structural/occurrence/order preservation;
+- current-only preservation;
+- no business-history preservation requirement;
+- reference-continuity requirement outside business equivalence.
+
+This classification is a **discussion tool**, not yet a formal type system or accepted list of levels.
+
+## Relation should follow requirements, not precede them
+
+The adequacy relation should be derived after the preservation requirements are understood.
+
+One possible eventual shape is still:
+
+    Supports(H_rep, H_true)
+
+but another plausible shape is requirement-oriented, for example:
+
+    Requirements(H_true) -> R
+    Satisfies(H_rep, R)
+
+or equivalently a parameterized preservation relation.
+
+No formulation is selected yet.
+
+The important ordering is:
+
+    understand Domain preservation requirements
+        ↓
+    decide what corrected History must retain
+        ↓
+    define the adequacy relation
+        ↓
+    later design correction construction/API
+
+The next discussion should resume at the first step, not by assuming the current `Supports` name or shape is final.
 
 ## Command replay / planning as an Application helper
 
@@ -359,16 +445,19 @@ Treat these as the current discussion baseline, not canonical Domain law:
 - Revision/version identity is currently Application/Persistence machinery, not an RfqCase business transition.
 - Previous immutable revisions are useful for audit and correction-of-correction.
 - The old recorded History matters operationally but does not define semantic adequacy.
-- `Supports(H_rep, H_true)` is the current abstraction for semantic adequacy.
+- An adequacy relation between corrected and intended History is still needed; `Supports(H_rep, H_true)` is only the current provisional notation.
+- The next step is to determine preservation requirements from the existing Domain concepts before fixing that relation.
+- Customer-facing truth, internal process meaning, current-state sufficiency, referential continuity, and audit/revision history must not be conflated.
 - Command replay/search may be useful as a construction/validation helper.
 
 ## Intentionally open
 
 Do not silently decide these while using this note:
 
-- the concrete definition of `Supports`;
-- whether Support is defined by observations, direct predicates, or another structure;
-- which business facts must be preserved exactly;
+- the final name and shape of the adequacy relation currently written as `Supports`;
+- which preservation requirements exist for each current Domain concept;
+- whether those requirements are expressed through observations, direct predicates, requirement objects, or another structure;
+- which business facts must be preserved exactly, semantically, structurally, only currently, or not at all;
 - which internal IDs are business-significant versus representational;
 - whether transition-only business facts are required;
 - exact revision storage/version schema;
@@ -380,14 +469,20 @@ Do not silently decide these while using this note:
 
 ## Immediate next discussion target
 
-Start from:
-
-    Supports(H_rep, H_true)
-
-and use `correction-cases.md` as the regression catalog.
+Use `correction-cases.md` as regression material, but begin from the current Domain model rather than from the provisional `Supports` predicate.
 
 The next question is:
 
-> What business observations or requirements make one valid History a sufficient representation of another for correction purposes?
+> For each business concept represented by RfqCase, what must a corrected History preserve, and for what purpose?
 
-Do not design the full correction API before this relation is understood well enough to reject materially wrong histories.
+In particular, separate:
+
+- customer-facing truth;
+- internal business/process meaning;
+- current operational truth;
+- referential continuity;
+- audit/revision history.
+
+Then use those requirements to decide whether the adequacy relation should remain `Supports(H_rep, H_true)` or be reformulated.
+
+Do not design the full correction API before these preservation requirements are understood well enough to reject materially wrong histories.
