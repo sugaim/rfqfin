@@ -1021,17 +1021,19 @@ Undetermined means "not yet determined." It does not mean that the business fiel
 
 Determined(T) assumes T is already a valid value of its own Domain type. RfqDraft does not duplicate local validation owned by T.
 
-Current Draft data is:
+RfqDraftData represents the RFQ content being assembled before publication:
 
     RfqDraftData
-    - ContactOwnerId : DraftField<ContactOwnerId>
     - ClientId : DraftField<ClientId>
     - Side : DraftField<Side>
     - SecurityId : DraftField<SecurityId>
     - Notional : DraftField<NotionalAmount>
     - SettlementDateRule : DraftField<SettlementDateRule>
     - AssumedTradeDate : DraftField<BusinessEntityLocalDate>
-    - QuoteOwnerId : DraftField<QuoteOwnerId>
+
+AssumedTradeDate is included in RfqDraftData because it is part of the RFQ input being established before publication. It is not an RfqTerms field: after publication it becomes a PricingEpisode assumption used when evaluating trade-date-dependent terms such as TradeDateLag settlement.
+
+ContactOwnerId and QuoteOwnerId are not part of RfqDraftData. They represent distinct responsibility assignments rather than RFQ content, and they have their own Domain operations.
 
 A future field that is genuinely optional even for publication should be modeled as such rather than overloading Undetermined.
 
@@ -1042,15 +1044,20 @@ RfqDraft itself is:
     - BusinessEntity
     - DraftOwnerId
     - Data : RfqDraftData
+    - ContactOwnerId : DraftField<ContactOwnerId>
+    - QuoteOwnerId : DraftField<QuoteOwnerId>
     - State : RfqDraftState
 
 Semantics:
 
 - BusinessEntity is required and immutable for the Draft lifetime;
 - DraftOwnerId is required and may change only while Active;
-- Data is retained in every Draft state;
-- Data may change only while Active through AmendDraft;
-- DraftOwner is responsibility for the pre-publication Draft and is not copied into RfqCase on publication.
+- Data, ContactOwnerId, and QuoteOwnerId are retained in every Draft state;
+- Data may change only while Active through AmendDraftData;
+- ContactOwnerId and QuoteOwnerId may change only while Active through their dedicated operations;
+- DraftOwner is responsibility for the pre-publication Draft and is not copied into RfqCase on publication;
+- ContactOwner is customer-facing responsibility for the RFQ;
+- QuoteOwner is pricing responsibility for the RFQ.
 
 ### 25.2 RfqDraft lifecycle
 
@@ -1061,9 +1068,9 @@ Semantics:
 
 Active is the editable pre-publication state.
 
-Deleted is a logical deletion, not physical removal. Draft data and ownership are retained so the Draft can be restored or copied.
+Deleted is a logical deletion, not physical removal. Draft content and responsibility assignments are retained so the Draft can be restored or copied.
 
-Published means the Draft has already created the identified RfqCase. Published is terminal for that Draft. Its RfqDraftData remains as the immutable publication-time Draft snapshot and may be used as the source of CopyDraft; the resulting RfqCase remains authoritative for the Case's subsequent lifecycle.
+Published means the Draft has already created the identified RfqCase. Published is terminal for that Draft. Its Data, ContactOwnerId, and QuoteOwnerId remain as the publication-time Draft snapshot and may be used as the source of CopyDraft; the resulting RfqCase remains authoritative for the Case's subsequent lifecycle.
 
 ### 25.3 RfqDraft operations
 
@@ -1073,23 +1080,25 @@ Domain operations are defined by their semantic effect; this notation does not r
           -> Active
 
     Active
-      --[D02 AmendDraft]----------> Active
-      --[D03 ChangeDraftOwner]----> Active
-      --[D04 DeleteDraft]---------> Deleted
-      --[D08 PublishDraft]--------> Published(CaseId)
+      --[D02 AmendDraftData]-----------> Active
+      --[D03 ChangeDraftOwner]---------> Active
+      --[D04 ChangeDraftContactOwner]--> Active
+      --[D05 ChangeDraftQuoteOwner]----> Active
+      --[D06 DeleteDraft]--------------> Deleted
+      --[D10 PublishDraft]-------------> Published(CaseId)
 
     Deleted
-      --[D05 RestoreDraft]--------> Active
+      --[D07 RestoreDraft]-------------> Active
 
 CopyDraft does not transition its source:
 
-    [D06] CopyDraft
+    [D08] CopyDraft
           Active | Deleted | Published
           -> new Active RfqDraft
 
 SeedDraftFromCase does not transition its source Case:
 
-    [D07] SeedDraftFromCase
+    [D09] SeedDraftFromCase
           any RfqCase state
           -> new Active RfqDraft
 
@@ -1097,28 +1106,54 @@ Operation semantics:
 
 | No. | Operation | Source | Main semantic effect |
 | --- | --- | --- | --- |
-| D01 | CreateDraft | none | Create Active Draft from given DraftId, BusinessEntity, DraftOwnerId, and RfqDraftData |
-| D02 | AmendDraft | Active | Replace Data with a new RfqDraftData; fields may move between Undetermined and Determined |
-| D03 | ChangeDraftOwner | Active | Change DraftOwnerId without changing Data or lifecycle state |
-| D04 | DeleteDraft | Active | Logically delete the Draft while retaining Data and DraftOwnerId |
-| D05 | RestoreDraft | Deleted | Restore the same Draft, Data, and DraftOwnerId to Active |
-| D06 | CopyDraft | any Draft state | Create a new Active Draft using field-specific copy/reset rules; source is unchanged |
-| D07 | SeedDraftFromCase | any RfqCase state | Create a new Active Draft from explicitly reusable current Case facts; source is unchanged |
-| D08 | PublishDraft | Active | Publish the Draft and create a valid new RfqCase as one Domain operation |
+| D01 | CreateDraft | none | Create Active Draft from given DraftId, BusinessEntity, DraftOwnerId, RfqDraftData, ContactOwnerId field, and QuoteOwnerId field |
+| D02 | AmendDraftData | Active | Replace Data with a new RfqDraftData; Data fields may move between Undetermined and Determined |
+| D03 | ChangeDraftOwner | Active | Change DraftOwnerId without changing RFQ content, responsibility assignments, or lifecycle state |
+| D04 | ChangeDraftContactOwner | Active | Change ContactOwnerId between Undetermined and Determined states without changing Data |
+| D05 | ChangeDraftQuoteOwner | Active | Change QuoteOwnerId between Undetermined and Determined states without changing Data |
+| D06 | DeleteDraft | Active | Logically delete the Draft while retaining content and responsibility assignments |
+| D07 | RestoreDraft | Deleted | Restore the same Draft and retained fields to Active |
+| D08 | CopyDraft | any Draft state | Create a new Active Draft using field-specific copy/reset rules; source is unchanged |
+| D09 | SeedDraftFromCase | any RfqCase state | Create a new Active Draft from explicitly reusable current Case facts; source is unchanged |
+| D10 | PublishDraft | Active | Publish the Draft and create a valid new RfqCase as one Domain operation |
 
-Deleted permits no amend, owner-change, or publish operation. Published is terminal and permits no operation on that Draft other than acting as a CopyDraft source.
+Deleted permits no content amendment, responsibility change, owner change, or publish operation. Published is terminal and permits no operation on that Draft other than acting as a CopyDraft source.
 
-Actor authorization, audit actor/time, ID allocation, external routing, and persistence transaction management remain Application concerns.
+The dedicated ContactOwner/QuoteOwner operations express different Domain meanings from changing RFQ content. They do not imply actor-specific authorization rules. Actor authorization, edit delegation, audit actor/time, ID allocation, external routing, optimistic concurrency, and persistence transaction management remain Application/Persistence concerns.
 
-### 25.4 CreateDraft and AmendDraft
+### 25.4 CreateDraft and AmendDraftData
 
-CreateDraft receives DraftId, BusinessEntity, DraftOwnerId, and an RfqDraftData. Any DraftField may initially be Undetermined or Determined. CreateDraft does not require publication completeness or RfqCase cross-field consistency.
+CreateDraft receives DraftId, BusinessEntity, DraftOwnerId, an RfqDraftData, a DraftField<ContactOwnerId>, and a DraftField<QuoteOwnerId>. Any DraftField may initially be Undetermined or Determined. CreateDraft does not require publication completeness or RfqCase cross-field consistency.
 
-AmendDraft receives a replacement RfqDraftData for an Active Draft. It may change multiple fields atomically and may return previously Determined fields to Undetermined.
+AmendDraftData receives a replacement RfqDraftData for an Active Draft. It may change multiple RFQ-content fields atomically and may return previously Determined Data fields to Undetermined. It does not change DraftOwnerId, ContactOwnerId, or QuoteOwnerId.
 
 This permissiveness is intentional. RfqDraft represents pre-publication work; it is not a partially valid RfqCase.
 
-### 25.5 DeleteDraft and RestoreDraft
+### 25.5 Draft responsibility changes
+
+ChangeDraftOwner changes responsibility for managing the Draft itself.
+
+ChangeDraftContactOwner changes the customer-facing responsibility assignment:
+
+    DraftField<ContactOwnerId>
+    = Undetermined
+    | Determined(ContactOwnerId)
+
+ChangeDraftQuoteOwner changes the pricing responsibility assignment:
+
+    DraftField<QuoteOwnerId>
+    = Undetermined
+    | Determined(QuoteOwnerId)
+
+Both ContactOwnerId and QuoteOwnerId may therefore move:
+
+- Undetermined -> Determined;
+- Determined -> another Determined value;
+- Determined -> Undetermined.
+
+No SecurityId-to-QuoteOwner eligibility invariant is currently imposed by Domain. Automatic QuoteOwner routing, clearing/re-routing after SecurityId changes, and authorization for manual responsibility assignment are Application concerns.
+
+### 25.6 DeleteDraft and RestoreDraft
 
 DeleteDraft is a reversible logical deletion:
 
@@ -1128,11 +1163,11 @@ RestoreDraft restores the same Draft:
 
     Deleted -> Active
 
-Both operations preserve DraftId, BusinessEntity, DraftOwnerId, and RfqDraftData.
+Both operations preserve DraftId, BusinessEntity, DraftOwnerId, RfqDraftData, ContactOwnerId, and QuoteOwnerId.
 
 No DeletionReason is currently modeled. Actor, reason, and timestamp may be retained as audit/Application facts unless a concrete requirement makes them Domain-significant.
 
-### 25.6 CopyDraft
+### 25.7 CopyDraft
 
 CopyDraft may use an Active, Deleted, or Published Draft as its source. The source is unchanged.
 
@@ -1142,14 +1177,16 @@ The new Draft:
 - receives a supplied DraftOwnerId;
 - preserves BusinessEntity;
 - is Active;
-- copies ClientId, Side, SecurityId, Notional, and SettlementDateRule exactly as DraftField values from the source;
-- sets ContactOwnerId, QuoteOwnerId, and AssumedTradeDate to Undetermined.
+- copies ClientId, Side, SecurityId, Notional, and SettlementDateRule exactly as DraftField values from source Data;
+- sets Data.AssumedTradeDate to Undetermined;
+- sets ContactOwnerId to Undetermined;
+- sets QuoteOwnerId to Undetermined.
 
-Ownership and AssumedTradeDate are deliberately re-established for the new RFQ rather than inherited.
+AssumedTradeDate and responsibility assignments are deliberately re-established for the new RFQ rather than inherited.
 
-Copy semantics are field-specific. When a new RfqDraftData field is added, its copy/reset behavior must be decided explicitly rather than implicitly copying every future field.
+Copy semantics are field-specific. When a new RfqDraftData or root-level DraftField is added, its copy/reset behavior must be decided explicitly rather than implicitly copying every future field.
 
-### 25.7 SeedDraftFromCase
+### 25.8 SeedDraftFromCase
 
 SeedDraftFromCase creates a new Active Draft from any RfqCase state.
 
@@ -1158,26 +1195,26 @@ It is not a complete reverse mapping from RfqCase to RfqDraft. It seeds only fac
 Current mapping:
 
 - BusinessEntity <- source RfqCase.BusinessEntity;
-- ClientId <- Determined(source current RfqTerms.ClientId);
-- Side <- Determined(source current RfqTerms.Side);
-- SecurityId <- Determined(source current RfqTerms.SecurityId);
-- Notional <- Determined(source current RfqTerms.Notional);
-- SettlementDateRule <- Determined(source current RfqTerms.SettlementDateRule);
+- Data.ClientId <- Determined(source current RfqTerms.ClientId);
+- Data.Side <- Determined(source current RfqTerms.Side);
+- Data.SecurityId <- Determined(source current RfqTerms.SecurityId);
+- Data.Notional <- Determined(source current RfqTerms.Notional);
+- Data.SettlementDateRule <- Determined(source current RfqTerms.SettlementDateRule);
+- Data.AssumedTradeDate <- Undetermined;
 - DraftOwnerId <- supplied for the new Draft;
 - ContactOwnerId <- Undetermined;
 - QuoteOwnerId <- Undetermined;
-- AssumedTradeDate <- Undetermined;
 - State <- Active.
 
 PricingDate is not a Draft field and is not seeded.
 
 Future Draft fields are not assumed to be reconstructible from every RfqCase state. A new field must explicitly define whether SeedDraftFromCase seeds it from an available Case fact or leaves it Undetermined.
 
-### 25.8 PublishDraft
+### 25.9 PublishDraft
 
 PublishDraft is allowed only from Active.
 
-Publication requires every current RfqDraftData field modeled as DraftField<T> in section 25.1 to be Determined.
+Publication requires every RfqDraftData field modeled as DraftField<T>, ContactOwnerId, and QuoteOwnerId to be Determined.
 
 PublishDraft receives or is supplied externally with the identities and dates required to construct the Case, including CaseId, the initial Case-local RfqTermsId and PricingEpisodeId, OpenDate, and PricingDate. ID allocation and supplying BusinessEntityLocalDate values remain Application/external-context responsibilities.
 
@@ -1186,7 +1223,7 @@ The generated RfqCase mapping is:
     RfqDraft.BusinessEntity
         -> RfqCase.BusinessEntity
 
-    RfqDraft.Data.ContactOwnerId
+    RfqDraft.ContactOwnerId
         -> RfqCase.ContactOwnerId
 
     RfqDraft.Data.{
@@ -1198,7 +1235,7 @@ The generated RfqCase mapping is:
     }
         -> initial RfqTerms
 
-    RfqDraft.Data.QuoteOwnerId
+    RfqDraft.QuoteOwnerId
     RfqDraft.Data.AssumedTradeDate
     supplied PricingDate
         -> initial PricingEpisode
@@ -1218,9 +1255,9 @@ The resulting RfqCase must satisfy every normal RfqCase invariant. In particular
 
 An Active Draft may temporarily contain Determined values that fail this cross-field Case invariant; such a Draft is simply not publishable until amended.
 
-PublishDraft has one indivisible Domain meaning: the source Draft becomes Published(CaseId) and the new valid RfqCase is created. Persisting both effects atomically is an Application/transaction responsibility.
+PublishDraft has one indivisible Domain meaning: the source Draft becomes Published(CaseId) and the new valid RfqCase is created. Persisting both effects atomically, ensuring single publication, and rejecting publication based on a stale observed Draft version are Application/Persistence responsibilities.
 
-### 25.9 Draft provenance and lineage
+### 25.10 Draft provenance and lineage
 
 CopyDraft and SeedDraftFromCase do not currently add SourceDraftId, SourceCaseId, or generic lineage fields to RfqDraft or RfqCase.
 
