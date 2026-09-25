@@ -8,13 +8,19 @@ Read in this order:
 
 1. `../domain.md` — canonical Domain authority.
 2. `README.md` — working-document roles and discussion method.
-3. `topics/correction/correction-history-model.md` — current correction semantic model and exact discussion frontier.
-4. `topics/correction/correction-cases.md` — concrete correction cases used as regression material.
-5. `sessions/03-rfqcase-correction-foundation.md` — rationale and major refinements from the completed correction-foundation unit.
+3. `topics/correction/operational-correction.md` — current design target and unresolved operational-correction questions.
 
-Read `sessions/01-rfqcase-positive-flow.md` and `sessions/02-rfqdraft.md` only when their rationale is needed.
+Read `sessions/04-continued-after-away-provenance.md` only if the rationale for the just-completed positive-flow refinement is needed.
 
-Topic/session material does not override `../domain.md`.
+Do **not** start this design unit by reading:
+
+- `topics/correction/correction-history-model.md`;
+- `topics/correction/correction-cases.md`;
+- `sessions/03-rfqcase-correction-foundation.md`.
+
+Those files belong to the earlier broad/abstract correction exploration and are intentionally deferred for the later historical-correction unit. They are not prerequisite context for the operational problem.
+
+When working material disagrees with `../domain.md`, the canonical Domain wins.
 
 ## Current status
 
@@ -22,191 +28,95 @@ Completed design units:
 
 - positive-flow RfqCase;
 - pre-publication RfqDraft;
-- correction foundation / history-model exploration.
+- correction-foundation exploration;
+- ContinuedAfterAway provenance refinement.
 
-The first two are incorporated into canonical `../domain.md`.
+The latest canonical refinement changed:
 
-The correction foundation is intentionally **not yet canonical**. It reduced the problem to a narrower semantic question and is maintained under `topics/correction/`.
+    ContinuedAfterAway(
+        PreviousPricingEpisodeId,
+        PresentationAwayOutcome
+    )
 
-The canonical positive-flow model remains unchanged.
+`PresentationAwayOutcomeRef` is removed.
 
-## Settled models to treat as fixed
+`QuotePresentation` remains immutable. The Away outcome remains a separate immutable business fact.
 
-Treat the current positive-flow RfqCase and RfqDraft models as fixed unless correction exposes a **concrete business contradiction**.
+## Current design target
 
-In particular:
+Design **operational correction** for an active/same-day RfqCase.
 
-- Draft must not be reintroduced into RfqCase.State;
-- WorkingQuote remains outside RfqCase Domain;
-- actor authorization does not define Domain operation identity;
-- PricingDate and AssumedTradeDate remain distinct;
-- full historical collections are not assumed to be loaded into the current RfqCase aggregate;
-- correction design must not silently weaken existing positive-flow invariants;
-- exploratory Entity/Value Object questions from correction are not permission to redesign current child identities without a concrete Support requirement.
+The concrete pattern is:
 
-## Correction foundation now established
+    prior valid Case state
+      -> one or more mistaken ordinary operations
+      -> mistake discovered
+      -> return to a previously valid Case state
+      -> continue ordinary positive-flow processing
 
-The case survey showed that correction cannot safely be reduced to generic undo or reversal.
+A restore/jump to a previous valid Case representation is currently considered a plausible mechanism.
 
-Current working model:
+This unit must remain separate from later **historical correction**, where the goal is to construct the minimal persistent/effective business history that should be treated as true.
 
-    S = business State
-    C = business operation / command
-    δ : S × C ⇀ S
+## Working direction, not yet settled
 
-    H =
-    {
-      (s0, ..., sn)
-      |
-      each adjacent pair is connected by some permitted command
-    }
+Candidate chronology:
 
-History is currently modeled as a **finite sequence of valid business States**. Commands witness legal transitions but are not themselves part of History.
+    v10 = earlier valid state
+    ...
+    v20 = current mistaken path
 
-Correction aims to make an acceptable corrected History effective rather than to discover a unique inverse command over the recorded History.
+    restore v10
 
-A provisional adequacy relation was introduced:
+    v21 = new current version with Case contents equivalent to v10
 
-    Supports : H × H -> Bool
+Then ordinary commands continue from v21.
 
-with:
+The important working properties are:
 
-    Supports(H_rep, H_true)
+- versions remain monotone; do not decrement back to v10;
+- prior versions remain immutable;
+- the mistaken path remains available as operational/audit chronology;
+- the restored current Case again satisfies the normal positive-flow Domain invariants;
+- restore does not automatically reverse external side effects.
 
-meaning approximately that `H_rep` sufficiently represents the business meaning that must be preserved from `H_true`.
+Do not treat these as canonical until the next design unit confirms their semantics and ownership.
 
-Both the **name** and the **formal shape** are provisional. The next discussion should not assume that `Supports` is the final abstraction.
+## First questions to resolve
 
-## Revision direction
+Discuss these in order:
 
-Whole-History revision/replacement is a strong implementation direction because it provides:
+1. Is operational restore itself a Domain operation, or does Application/Persistence reconstruct a prior valid Case state as the next current version?
+2. May restore target only the immediately previous version, or any earlier version of the same Case?
+3. May a terminal Case be restored to an earlier Open state?
+4. Does restore reuse the exact Case-local child identities from the selected version?
+5. Does every accepted ordinary Domain command create a CaseVersion, and does one restore create exactly one new version?
+6. Is any `RestoredFromVersion` / source-version metadata business meaning or merely audit/persistence metadata?
+7. Is an explicit branch/finalization model needed for the abandoned v11..v20 path, or is chronological version history plus current pointer sufficient?
+8. How should stale/concurrent restore requests and external side effects be handled at the Application/Persistence boundary?
 
-- immutable prior representations;
-- straightforward correction-of-correction;
-- weaker coupling between correction machinery and future Domain additions;
-- a natural logical unit because an individual Case history is finite at any point in time.
+Do not design historical-correction representation, Support/equivalence relations, cross-Case correction, or broad correction APIs in this unit unless a concrete dependency is discovered.
 
-However:
+## Settled models to preserve
 
-- Revision is **not currently an RfqCase business transition**;
-- revision/version identity is presently treated as Application/Persistence machinery;
-- physical storage is unresolved and need not copy every historical object naïvely.
+Unless operational correction exposes a concrete contradiction:
 
-The useful distinction borrowed from bitemporal reasoning is:
+- preserve the canonical positive-flow RfqCase state machine;
+- preserve immutable RfqTerms, PricingEpisode, Quote, and QuotePresentation occurrences;
+- preserve Case-local child identities;
+- preserve explicit PricingEpisode lineage through PreviousPricingEpisodeId;
+- keep WorkingQuote outside RfqCase;
+- keep actor authorization outside Domain validity;
+- do not weaken ordinary positive-flow invariants merely to make restore easier.
 
-- business History: what should now be treated as having happened;
-- revision/audit history: what representation the system held over time.
+## Expected result of the next session
 
-Do not collapse those dimensions.
+The next design unit should finish with a compact operational-correction model covering:
 
-## Command replay/planning idea
+- business meaning and naming;
+- Domain/Application/Persistence boundary;
+- legal restore targets;
+- identity behavior;
+- minimum CaseVersion semantics.
 
-Command-based reconstruction remains potentially useful.
-
-Application may eventually:
-
-1. obtain the business facts/constraints that correction must express;
-2. search for or construct ordinary business commands;
-3. replay them through the positive-flow Domain;
-4. produce a valid candidate History;
-5. verify the candidate using `Supports`;
-6. surface only ambiguous business decisions for manual resolution.
-
-Such a command sequence is a construction witness, not automatically the literal historical command sequence.
-
-This is an Application possibility, not a selected implementation.
-
-## Next design target
-
-Before fixing the adequacy relation, organize the **preservation requirements** implied by the current RfqCase Domain model.
-
-The immediate question is:
-
-> For each business concept represented by RfqCase, what must a corrected History preserve, and for what purpose?
-
-Use `topics/correction/correction-cases.md` as regression material.
-
-At minimum, keep these requirement dimensions separate:
-
-- customer-facing business truth — e.g. what was shown, when, and its Hit/Away result;
-- internal business/process meaning — e.g. whether ContinueAfterAway, repricing, ownership/Terms changes, or PricingEpisode.Origin matter historically;
-- current operational truth — some correction classes may need only the correct current state;
-- referential continuity — IDs may need preservation/mapping because unaffected or downstream data refer to them even when the IDs are not business-equivalence facts;
-- audit/revision history — prior recorded representations and correction metadata are a separate dimension from corrected business History.
-
-After these are understood, decide whether the adequacy relation should remain `Supports(H_rep, H_true)`, be renamed (for example toward preservation), or be reformulated in requirement-oriented terms such as `Satisfies(H_rep, Requirements(H_true))`.
-
-Do **not** jump yet to:
-
-- a full correction command/API catalog;
-- exact revision schema;
-- UI/workflow;
-- unrestricted graph mutation;
-- event sourcing;
-- multi-Case implementation mechanics.
-
-## Important frontier from the previous discussion
-
-Observation-based adequacy was only explored, not settled.
-
-Examples discussed include:
-
-- whether a Presentation occurred;
-- what was presented;
-- when it was presented;
-- Hit/Away result and timing;
-- ordering;
-- internal process events such as ContinueAfterAway;
-- values;
-- internal identities/references.
-
-Two distinctions should be preserved in the next discussion:
-
-1. internal Domain identity and business-history equivalence are not automatically the same thing;
-2. business equivalence and referential continuity are not automatically the same thing.
-
-For example, from a customer-facing perspective a Quote may matter only by its value/proposition, while an unchanged downstream record may still require the old QuoteId to remain resolvable or mapped.
-
-Do not treat any particular Presentation/Quote/Outcome observation or preservation rule as decided.
-
-## Intentionally deferred
-
-Unless the Support discussion itself requires them, defer:
-
-- exact CancellationReason taxonomy;
-- final Presented-Away Case-level disposition taxonomy;
-- typed analytics/Feedback taxonomy;
-- foreign-market settlement context;
-- settlement amount/currency/FX semantics;
-- first-class Case/Draft lineage;
-- exact audit/event schema;
-- broad API/DTO/frontend migration;
-- full Application authorization/use-case design;
-- exact revision persistence;
-- downstream propagation/reconciliation;
-- cross-Case split/merge/reassociation implementation.
-
-## Working approach for the next session
-
-- Start from the current model, not from the exploratory chat history.
-- Start by reviewing the current Domain concepts one at a time and asking what preservation requirement, if any, each one creates.
-- Keep customer-facing truth, internal process meaning, current-state sufficiency, referential continuity, and audit/revision history separate.
-- Test every proposed requirement against concrete cases.
-- Distinguish accepted rule, hypothesis, and example.
-- Preserve positive-flow invariants.
-- If a Support requirement creates a concrete contradiction with the canonical Domain model, stop and discuss that contradiction before editing `domain.md`.
-- Do not infer business truth merely because a command sequence is legal.
-
-## Why start a fresh session now
-
-The correction-foundation discussion deliberately explored many directions: concrete cases, generic reversal, revision shapes, bitemporal implications, identity, observations, and command replay.
-
-That exploration was useful, but carrying the conversational path forward would risk anchoring the next discussion on abandoned or provisional ideas.
-
-The reusable context has therefore been normalized into:
-
-- `topics/correction/correction-history-model.md`;
-- `topics/correction/correction-cases.md`;
-- `sessions/03-rfqcase-correction-foundation.md`.
-
-The next session should use those files rather than rely on the prior chat transcript.
+Only after that unit is complete should the work move to the separate historical-correction representation.
