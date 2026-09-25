@@ -194,7 +194,7 @@ Interpretation:
 
 > `δ` executes a business-permitted state transition.
 
-`C` should not be confused with the exact set of current Application endpoints. The Application may expose only some business operations directly.
+`C` should not be confused with the exact set of current Application endpoints or the exact set of operations currently implemented as Domain APIs. It is a business-semantic operation vocabulary; current Domain operations may realize only part of it.
 
 ### History
 
@@ -225,13 +225,15 @@ If a concrete case later proves that some business-significant transition meanin
 
 Let:
 
-    H_recorded ∈ H
+    R_recorded
 
-be the currently effective recorded History, and let:
+denote the currently effective recorded representation, and let:
 
     H_true ∈ H
 
 stand for the business History that investigation says should be represented.
+
+The metamodel does not require `R_recorded` itself to be a member of `H`. A recorded representation may contain legacy or erroneous structure; the validity requirement applies to the business truth being modeled and to the corrected candidate.
 
 Current scope assumes that the intended business truth is expressible in the current Domain vocabulary. If it is not, that is first a Domain-model enhancement problem.
 
@@ -239,7 +241,7 @@ A correction candidate is:
 
     H_corrected ∈ H
 
-The semantic target is **not** defined as an inverse operation over `H_recorded`.
+The semantic target is **not** defined as an inverse operation over `R_recorded`.
 
 Instead, correction aims to produce a valid History that sufficiently represents `H_true`.
 
