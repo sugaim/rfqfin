@@ -142,7 +142,7 @@ Let:
 
 `δ` is partial and executes business-permitted transitions.
 
-`C` is not restricted to the exact endpoints currently exposed by the Application.
+`C` is not restricted to the exact endpoints currently exposed by the Application or to the exact operations currently implemented as Domain APIs. It represents business-permitted operation semantics at this modeling level.
 
 For RfqCase, `S` means a complete effective business state sufficient for future Domain behavior, not merely the enum-like state variant.
 
@@ -187,9 +187,11 @@ It also means that if two histories contain pairwise equal States, hidden differ
 
 The discussion then separated:
 
-- `H_recorded` — the currently effective recorded History;
-- `H_true` — the business History investigation says should be represented;
-- `H_corrected` — a valid candidate replacement.
+- `R_recorded` — the currently effective recorded representation;
+- `H_true ∈ H` — the business History investigation says should be represented;
+- `H_corrected ∈ H` — a valid candidate replacement.
+
+`R_recorded` is not required by this metamodel to be a valid member of `H`; legacy or erroneous recorded structure need not be promoted into the definition of business-valid History.
 
 The semantic target is not defined by its relationship to the immediately previous recorded revision.
 
@@ -270,15 +272,17 @@ The generated command sequence is a **construction witness**, not necessarily th
 
 This may substantially reduce the operational burden of correction while reusing positive-flow Domain invariants.
 
-## Domain / Application / Persistence boundary at session end
+## Business semantics / Application / Persistence boundary at session end
 
 Current working separation:
 
-### Domain / business semantics
+### Business semantics
 
 - business States and permitted transitions;
 - valid History;
 - eventually, the semantic adequacy relation expressed by `Supports` or an equivalent formulation.
+
+The exact implementation placement of these concepts is not yet decided. In particular, this metamodel must not be read as requiring every business-permitted transition or Support rule to become a public Domain operation/type.
 
 ### Application
 
