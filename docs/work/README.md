@@ -100,8 +100,10 @@ The following working method proved useful during the RfqCase/RfqDraft redesign 
 ## Current working files
 
 - `handoff.md` — active handoff.
-- `topics/correction/correction-history-model.md` — active correction semantic model and discussion frontier.
-- `topics/correction/correction-cases.md` — concrete correction regression/test-case catalog.
+- `topics/correction/operational-correction.md` — active working note for the next operational-correction design unit.
+- `topics/correction/correction-history-model.md` — retained broad historical-correction working model; intentionally **not** part of the operational-correction reading set.
+- `topics/correction/correction-cases.md` — retained historical-correction regression/test-case catalog; intentionally **not** part of the operational-correction reading set.
 - `sessions/01-rfqcase-positive-flow.md` — completion record for the positive-flow RfqCase design unit.
 - `sessions/02-rfqdraft.md` — completion record for the RfqDraft design unit.
-- `sessions/03-rfqcase-correction-foundation.md` — completion record for the correction-foundation design unit.
+- `sessions/03-rfqcase-correction-foundation.md` — completion record for the earlier broad correction-foundation unit; defer for the later historical-correction discussion.
+- `sessions/04-continued-after-away-provenance.md` — completion record for the ContinuedAfterAway/Away-outcome positive-flow refinement.
