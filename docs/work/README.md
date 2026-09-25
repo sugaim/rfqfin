@@ -73,5 +73,5 @@ The following working method proved useful during the RfqCase/RfqDraft redesign 
 ## Current working files
 
 - `handoff.md` — active handoff.
+- `sessions/01-rfqcase-positive-flow.md` — completion record for the positive-flow RfqCase design unit.
 - `sessions/02-rfqdraft.md` — completion record for the RfqDraft design unit.
-- `previous-session-request.md` — temporary request to reconstruct the preceding RfqCase positive-flow session record. Remove it after `sessions/01-rfqcase-positive-flow.md` has been created and reviewed.
