@@ -2,9 +2,11 @@
 
 ## Status
 
-This is an active, non-canonical working note.
+This is a retained working-rationale note for the completed operational-history / restore / Trace design unit.
 
-It records the current design checkpoint for:
+Its settled Domain conclusions have been incorporated into `../../../domain.md`. When wording differs, the canonical Domain document is authoritative.
+
+It records the design checkpoint for:
 
 - operational RfqCase chronology;
 - operational restore;
@@ -898,25 +900,22 @@ Whatever terminology is chosen later, it must not imply:
 - TraceData is owned by operational history;
 - operational history must live as long as TraceData.
 
-## 16. Canonical documentation changes implied by this checkpoint
+## 16. Canonical incorporation
 
-The current canonical `docs/domain.md` will require reconciliation before this design is considered complete.
+The settled conclusions from this checkpoint have been incorporated into `../../../domain.md`.
 
-Known changes include:
+Canonical changes include:
 
-- reconsider the statement that RfqCase itself is the Aggregate Root;
-- introduce RfqCaseRevision / CaseVersionNumber / RfqCaseTransition semantics;
-- make PublishDraft create the initial `Published(DraftId)` revision;
-- wrap accepted ordinary operations in revision semantics;
-- introduce operational Restore as Domain behavior;
-- update the current statement that correction/reversal mechanics are Domain-external;
-- add ActorId and the committed/presented/closed/cancelled actor/time fields;
-- update Timepoint usage accordingly;
-- remove the current statement that Quote has no committed actor/time;
-- define terminal and restore operations as Trace-producing history-dependent operations;
-- document TraceData as a durable Domain representation with a lifecycle independent of operational history.
+- RfqCase is described as one valid business state rather than as "the latest Case";
+- RfqCaseRevision / CaseVersionNumber / RfqCaseTransition chronology;
+- PublishDraft creates the initial Published(DraftId) revision;
+- accepted ordinary operations produce Applied(CaseCommand) revisions;
+- operational Restore is Domain behavior with earlier-Open target semantics;
+- ActorId plus committed/presented/closed/cancelled actor/time facts;
+- terminal and Restore operations materialize durable TraceData;
+- TraceData has a lifecycle independent of operational-history retention.
 
-The existing positive-flow RfqCase state machine and its business invariants should remain intact unless one of these revisions exposes a concrete contradiction.
+The current canonical model deliberately does not assign a new broad Aggregate Root label to RfqCaseHistory merely to describe loading/persistence mechanics.
 
 ## 17. Deliberately unresolved for the next design unit
 
@@ -929,7 +928,7 @@ The following are not blockers for this checkpoint and should not be guessed int
 - historical-correction validation rules and correction-of-correction semantics;
 - the exact persistence-level Trace sequence/revision wrapper;
 - operational-history retention duration;
-- final Aggregate Root terminology;
+- exact repository/consistency-boundary implementation terminology beyond the canonical state/revision/history roles;
 - whether later requirements justify retaining additional currently compressed activity facts.
 
 ## 18. Design checkpoint
