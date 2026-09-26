@@ -376,14 +376,28 @@ In particular it does not contain:
           PreviousPricingEpisodeId,
           PresentationAwayOutcome
       )
+    | ReopenedFromAway(
+          PreviousPricingEpisodeId,
+          PresentationAwayOutcome
+      )
+    | ReopenedFromUnpresented(
+          PreviousPricingEpisodeId,
+          Feedback?
+      )
+    | ReopenedFromCancellation(
+          PreviousPricingEpisodeId,
+          PriorPresentation?
+      )
 
 Origin is exactly one variant, not a bag/list of causes.
 
 If an Application composite performs two episode-changing Domain operations, two episodes are created in sequence. The current episode is the latest one.
 
-Origin stores only information needed to explain why the new pricing round exists. Most variants identify the previous PricingEpisode so Episode lineage remains explicit. Away additionally retains the immutable PresentationAwayOutcome that caused the new pricing round; this intentional value duplication keeps the Episode's business provenance stable even after the Case moves on to later Presentations.
+Origin stores only information needed to explain why the new pricing round exists. Most variants identify the previous PricingEpisode so Episode lineage remains explicit.
 
-The operation that creates an Away-origin Episode is RequestRepricingOnAway. The operation name describes the business action; PricingEpisodeOrigin.Away describes the business fact from which the new Episode originated.
+Away additionally retains the immutable PresentationAwayOutcome that caused an in-place continuation of pricing after the current Presentation went Away. ReopenedFromAway retains the genuine terminal Away outcome from which the same Case later resumed. ReopenedFromUnpresented retains any Feedback from the genuine unpresented close. ReopenedFromCancellation retains the prior Presentation context, when one existed, because a genuine withdrawal does not erase customer-facing pricing facts that may remain relevant when the same negotiation resumes.
+
+The operation that creates an Away-origin Episode is RequestRepricingOnAway. Reopen operations create the corresponding ReopenedFrom... origins. Operation names describe business actions; PricingEpisodeOrigin describes the business fact from which the new Episode originated.
 
 ## 10. Quote and FirmQuote
 
@@ -511,29 +525,47 @@ The outcome of a valid RFQ Case is modeled separately from cancellation.
     - ClosedBy : ActorId
     - ClosedAt : Timepoint
 
+    CancellationReason
+    = Withdrawn
+    | CreatedInError
+
     Cancellation
     - CancellationDate : BusinessEntityLocalDate
     - CancelledBy : ActorId
     - CancelledAt : Timepoint
-    - CancellationReason
+    - Reason : CancellationReason
 
     CaseOutcome
     = Presented(PresentationOutcome)
     | Unpresented(Feedback?)
 
+    PriorPresentation
+    - Presentation : QuotePresentation
+    - AwayOutcome : PresentationAwayOutcome?
+
+    TerminalPricingContext
+    - PricingEpisode
+    - PriorPresentation : PriorPresentation?
+
     TerminalState
     = Closed(
+          PricingContext : TerminalPricingContext,
           Close : CaseClose,
           Outcome : CaseOutcome
       )
-    | Cancelled(Cancellation)
+    | Cancelled(
+          PricingContext : TerminalPricingContext,
+          Cancellation
+      )
+
+TerminalPricingContext is the pricing context from which the Case terminated. It is a business fact of the Terminal state, not a Reopen-specific cache. It is therefore retained for Hit, Away, Unpresented, and Cancelled terminal states even when normal positive flow does not later reopen that terminal occurrence.
 
 Semantics:
 
 - Closed means a valid RFQ Case reached a normal business conclusion;
-- Cancelled means the Case should not be treated as an ordinary Hit/Away outcome, e.g. invalid, duplicate, or created in error;
-- exact CancellationReason variants are intentionally deferred until exception/correction requirements are designed;
-- CancellationReason is expected to be typed, not an unrestricted string.
+- Cancelled means the Case terminated without an ordinary CaseOutcome;
+- Withdrawn means a genuine Case was withdrawn/stopped and may later be eligible to reopen as the same negotiation context;
+- CreatedInError means the Case itself should not have been established as genuine business activity, including duplicate or mistaken creation cases; it is not reopenable in normal positive flow.
 
 CloseDate is the BusinessEntity-local date the Case itself was closed. ClosedAt is the absolute time of the closing action and ClosedBy is the internal actor that performed it. These are distinct from HitDate and AwayDate.
 
@@ -542,34 +574,63 @@ CancellationDate is likewise the BusinessEntity-local cancellation date, while C
 Examples:
 
 - a customer may Hit on one date and operational Case closure may be recorded later;
-- a Presentation may go Away, pricing may continue, and the Case may be closed on a later date.
+- a Presentation may go Away, pricing may continue, and the Case may be closed on a later date;
+- a genuine Withdrawn cancellation may later be reopened without implying that the cancellation was mistaken.
 
-### 13.1 Presented Case close and Away outcomes
+### 13.1 Terminal pricing context
+
+TerminalPricingContext captures only the current pricing lineage needed to describe the Terminal Case state. It does not preserve a FirmQuote.
+
+When an Open state becomes Terminal:
+
+- Inquiry.Pricing / Inquiry.PendingPresentation produce PriorPresentation=None;
+- Negotiating.Pricing / Negotiating.PendingPresentation preserve LatestPresentation and LatestPresentationAwayOutcome;
+- Negotiating.Presented preserves the current Presentation;
+- CloseCase(Away) stores the final Away outcome for the Presentation in PriorPresentation.AwayOutcome, whether that outcome was already recorded or was established by the CloseCase operation;
+- Cancel preserves the source Open state's prior Presentation context without manufacturing an outcome.
+
+A current FirmQuote is never carried into TerminalPricingContext.
+
+### 13.2 Presented Case close and Away outcomes
 
 When a Negotiating Case closes Away:
 
 - the outcome applies to the latest QuotePresentation;
 - if that Presentation already has a PresentationAwayOutcome, CloseCase uses the already-recorded outcome;
 - otherwise CloseCase records the PresentationAwayOutcome as part of closure;
-- the resulting CaseOutcome is Presented(Away(...)) in either path.
+- the resulting CaseOutcome is Presented(Away(...)) in either path;
+- TerminalPricingContext.PriorPresentation contains that same Presentation and Away outcome.
 
 Whether the Away outcome was already recorded is an operation-construction distinction, not a different business kind of Away.
 
-### 13.2 Unpresented close
+### 13.3 Unpresented close
 
 A Case that has never reached a customer Presentation closes as:
 
     CaseOutcome.Unpresented(Feedback?)
 
-There is no PresentationOutcome because no Presentation exists.
+There is no PresentationOutcome because no Presentation exists, and TerminalPricingContext.PriorPresentation is None.
 
-### 13.3 Genuine renewed interest after terminal close
+### 13.4 Genuine reopen after terminal business
 
-A later customer return after a genuinely correct Away/Close is not treated as Operational Restore merely because the business resumes.
+A genuinely correct terminal occurrence may later be followed by resumed business on the same CaseId when the operator/Application asserts that it is the same negotiation context.
 
-Operational Restore means abandoning a mistaken operational path and returning to an earlier valid Open revision. A genuinely correct terminal outcome followed by renewed customer interest is a different business meaning; it may require a new RFQ/Case or a future explicit reopen concept if a concrete requirement demands one.
+This is distinct from Operational Restore:
 
-### 13.4 Deferred close classification
+- Reopen means the terminal occurrence was genuine and remains durable business activity, but the same negotiation later resumes;
+- Restore means the prior operational path was mistaken and an earlier valid Open revision is selected instead.
+
+Normal positive-flow Reopen applicability is:
+
+- Closed(Presented(Away(...))) -> ReopenAway -> Negotiating.Pricing;
+- Closed(Unpresented(...)) -> ReopenUnpresented -> Inquiry.Pricing;
+- Cancelled(Reason=Withdrawn) -> ReopenCancellation -> Inquiry.Pricing when PriorPresentation=None, otherwise Negotiating.Pricing;
+- Closed(Presented(Hit(...))) is not reopenable through ordinary positive flow;
+- Cancelled(Reason=CreatedInError) is not reopenable through ordinary positive flow.
+
+Every Reopen creates a fresh PricingEpisode. It never restores a previous FirmQuote.
+
+### 13.5 Deferred close classification
 
 The model does not yet carry a separate Case-level Away classification/reason for a Presented Case after the latest Presentation already went Away.
 
@@ -668,7 +729,12 @@ For every Open state:
     RfqCase.RfqTerms.RfqTermsId
     == State.PricingEpisode.RfqTermsId
 
-Historical PricingEpisodes may refer to historical RfqTerms entities. The current state always refers to the current RfqTerms.
+For every Terminal state:
+
+    RfqCase.RfqTerms.RfqTermsId
+    == TerminalState.PricingContext.PricingEpisode.RfqTermsId
+
+Historical PricingEpisodes may refer to historical RfqTerms entities. The current Open state or TerminalPricingContext always refers to the current RfqTerms.
 
 ### 16.2 Current Quote chain
 
@@ -782,6 +848,36 @@ ExtendValidity may extend a structurally current FirmQuote even when ExtendedAt 
     NewValidUntil > CurrentValidUntil
 
 
+### 16.12 Terminal pricing and Reopen invariants
+
+Terminal-state consistency requires:
+
+    Closed(Unpresented)
+        => PricingContext.PriorPresentation == None
+
+    Closed(Presented(Away(away)))
+        => PricingContext.PriorPresentation == Some(prior)
+        && prior.Presentation.PresentationId == away.PresentationId
+        && prior.AwayOutcome == Some(away)
+
+    Closed(Presented(Hit(hit)))
+        => PricingContext.PriorPresentation == Some(prior)
+        && prior.Presentation.PresentationId == hit.PresentationId
+
+Cancelled preserves the source Open state's Presentation context and does not manufacture Hit/Away.
+
+Reopen always creates a new PricingEpisode with:
+
+    RfqTermsId       = source current RfqTerms.RfqTermsId
+    QuoteOwnerId     = source TerminalPricingContext.PricingEpisode.QuoteOwnerId
+    PricingDate      = ReopenDate
+    AssumedTradeDate = NewAssumedTradeDate
+
+The new Episode uses the corresponding ReopenedFrom... PricingEpisodeOrigin and carries no FirmQuote.
+
+No Domain chronology invariant requires ReopenDate or ReopenedAt to be on or after the preceding CloseDate / CancellationDate / ClosedAt / CancelledAt.
+
+
 ## 17. RfqCase Domain operations
 
 ### 17.1 Operation model
@@ -822,8 +918,9 @@ Current operation hierarchy:
     CaseOperation
     = Open(OpenOperation)
     | Terminal(TerminalOperation)
+    | Reopen(ReopenOperation)
 
-OpenOperation always produces another Open RfqCase. TerminalOperation produces a Terminal RfqCase.
+OpenOperation maps Open -> Open. TerminalOperation maps Open -> Terminal. ReopenOperation maps Terminal -> Open.
 
 PublishDraft is not a CaseOperation. It creates the initial RfqCaseRevision with Published(DraftId). Operational Restore is also separate because it selects an earlier revision rather than applying an ordinary business operation to the current Case state.
 
@@ -998,20 +1095,72 @@ CloseCase(Away) applies to the latest Presentation:
 
 CloseCase(Unpresented) is valid only when the Case has never reached a Presentation.
 
-Cancel creates TerminalState.Cancelled(Cancellation) and does not manufacture a Hit/Away outcome.
+Cancel creates TerminalState.Cancelled(PricingContext, Cancellation) and does not manufacture a Hit/Away outcome.
+
+CloseCase and Cancel construct TerminalPricingContext from the source Open state as defined in Section 13.1. A current FirmQuote is not retained in that context.
 
 The AlreadyRecorded / RecordNow distinction does not define two kinds of business Away. It states only whether the Away fact already exists in the source Case or is established by this CloseCase operation.
 
-### 17.5 Revision-level operation API
+### 17.5 ReopenOperation shapes and semantics
 
-The pure business-state semantics above may be implemented internally, but the public Domain API does not need to expose arbitrary terminal-state application or standalone Trace materialization.
+    ReopenOperation
+    = ReopenAway(ReopenAway)
+    | ReopenUnpresented(ReopenUnpresented)
+    | ReopenCancellation(ReopenCancellation)
 
-Conceptually, ordinary Open processing is:
+    ReopenAway
+    - NewPricingEpisodeId
+    - ReopenDate : BusinessEntityLocalDate
+    - NewAssumedTradeDate : BusinessEntityLocalDate
+    - ReopenedBy : ActorId
+    - ReopenedAt : Timepoint
+
+    ReopenUnpresented
+    - NewPricingEpisodeId
+    - ReopenDate : BusinessEntityLocalDate
+    - NewAssumedTradeDate : BusinessEntityLocalDate
+    - ReopenedBy : ActorId
+    - ReopenedAt : Timepoint
+
+    ReopenCancellation
+    - NewPricingEpisodeId
+    - ReopenDate : BusinessEntityLocalDate
+    - NewAssumedTradeDate : BusinessEntityLocalDate
+    - ReopenedBy : ActorId
+    - ReopenedAt : Timepoint
+
+Variant-specific provenance is derived from the source Terminal state rather than duplicated in the operation payload.
+
+ReopenAway applies only to Closed(Presented(Away(...))). It creates Negotiating.Pricing with a fresh PricingEpisode using ReopenedFromAway(previous Episode, terminal Away outcome), and preserves the prior Presentation/Away as latest customer context.
+
+ReopenUnpresented applies only to Closed(Unpresented(...)). It creates Inquiry.Pricing with a fresh PricingEpisode using ReopenedFromUnpresented(previous Episode, Feedback?).
+
+ReopenCancellation applies only to Cancelled(Reason=Withdrawn). It creates a fresh PricingEpisode using ReopenedFromCancellation(previous Episode, PriorPresentation). The result is Inquiry.Pricing when PriorPresentation=None and Negotiating.Pricing when PriorPresentation exists.
+
+Every Reopen starts a fresh pricing round and never resurrects a previous FirmQuote.
+
+Application/UI may default NewAssumedTradeDate as follows:
+
+    previous.AssumedTradeDate == previous.PricingDate
+        ? ReopenDate
+        : previous.AssumedTradeDate
+
+This is only a request-construction default. The Domain operation always carries an explicit NewAssumedTradeDate.
+
+### 17.6 Revision-level operation API
+
+Ordinary Open processing is:
 
     ApplyOpen(
         currentRevision,
         operation : OpenOperation
     ) -> nextRevision
+
+Operations that create a durable TraceRecord use one common result shape:
+
+    RevisionTraceResult
+    - Revision : RfqCaseRevision
+    - Trace : TraceRecord
 
 Terminal processing is:
 
@@ -1019,15 +1168,19 @@ Terminal processing is:
         currentRevision,
         operation : TerminalOperation,
         terminalTraceContext
-    ) -> TerminalResult
+    ) -> RevisionTraceResult
 
-    TerminalResult
-    - Revision : RfqCaseRevision
-    - Trace : TraceData
+Reopen processing is:
 
-terminalTraceContext contains the retained/resolved historical facts and Trace-recording context needed to materialize the durable terminal Trace. Its exact loaded representation is an implementation concern.
+    ApplyReopen(
+        currentRevision,
+        operation : ReopenOperation,
+        reopenTraceContext
+    ) -> RevisionTraceResult
 
-The API boundary should preserve the Domain invariant that a terminal accepted operation produces its terminal revision and corresponding Trace together. The fact that transition semantics can be reasoned about as RfqCase x TerminalOperation -> RfqCase does not imply that callers should be able to create a terminal revision without Trace or materialize TraceData from arbitrary snapshots.
+terminalTraceContext and reopenTraceContext contain retained/resolved historical facts plus Trace-recording context. Their exact loaded representations are implementation concerns.
+
+The API boundary preserves the Domain invariant that an accepted Terminal or Reopen operation produces its revision and corresponding TraceRecord together.
 
 ## 18. Operation applicability and state graph
 
@@ -1073,9 +1226,13 @@ The operation definition is canonical; this table lists valid source/target stat
 | CloseCase(Away.RecordNow) | Negotiating.Presented | Terminal.Closed | create Away outcome for current Presentation |
 | CloseCase(Away.RecordNow) | Negotiating.Pricing / Negotiating.PendingPresentation | Terminal.Closed | create Away for latest Presentation when none recorded |
 | CloseCase(Away.AlreadyRecorded) | Negotiating.Pricing / Negotiating.PendingPresentation | Terminal.Closed | reuse latest Presentation's existing Away |
-| Cancel | any Open | Terminal.Cancelled | no ordinary Presentation outcome fabricated |
+| Cancel | any Open | Terminal.Cancelled | capture TerminalPricingContext; no ordinary Presentation outcome fabricated |
+| ReopenAway | Terminal.Closed(Presented(Away)) | Negotiating.Pricing | new Episode; preserve prior Presentation/Away; no FirmQuote |
+| ReopenUnpresented | Terminal.Closed(Unpresented) | Inquiry.Pricing | new Episode; preserve close Feedback in Origin |
+| ReopenCancellation | Terminal.Cancelled(Withdrawn), PriorPresentation=None | Inquiry.Pricing | new Episode; genuine withdrawal resumes |
+| ReopenCancellation | Terminal.Cancelled(Withdrawn), PriorPresentation=Some | Negotiating.Pricing | new Episode; preserve prior Presentation context |
 
-Within any row, normal cross-field invariants still apply.
+Within any row, normal cross-field invariants still apply. Closed(Hit) and Cancelled(CreatedInError) have no ordinary Reopen transition.
 
 ### 18.2 State-centric graph
 
@@ -1138,6 +1295,18 @@ The graph is a cognitive/reference view of the operation definitions above. Repe
     any Open
       --ChangeContactOwner-------> same Open state shape
 
+    Terminal.Closed(Presented(Away))
+      --ReopenAway---------------> Negotiating.Pricing
+
+    Terminal.Closed(Unpresented)
+      --ReopenUnpresented--------> Inquiry.Pricing
+
+    Terminal.Cancelled(Withdrawn, PriorPresentation=None)
+      --ReopenCancellation-------> Inquiry.Pricing
+
+    Terminal.Cancelled(Withdrawn, PriorPresentation=Some)
+      --ReopenCancellation-------> Negotiating.Pricing
+
 ## 19. PricingEpisode creation matrix
 
 Operations that create a new PricingEpisode:
@@ -1151,18 +1320,17 @@ Operations that create a new PricingEpisode:
 | ChangeAssumedTradeDate | no | AssumedTradeDateChanged(previous Episode) |
 | RequestRepricing | no | RepricingRequested(previous Episode, QuoteId, Feedback?) |
 | RequestRepricingOnAway | no | Away(previous Episode, PresentationAwayOutcome) |
+| ReopenAway | no | ReopenedFromAway(previous Episode, PresentationAwayOutcome) |
+| ReopenUnpresented | no | ReopenedFromUnpresented(previous Episode, Feedback?) |
+| ReopenCancellation | no | ReopenedFromCancellation(previous Episode, PriorPresentation?) |
 
-PublishDraft supplies the initial PricingDate and AssumedTradeDate for the new Case. RollPricingDate changes PricingDate and preserves AssumedTradeDate. ChangeAssumedTradeDate changes AssumedTradeDate and preserves PricingDate. Other Episode-creating operations preserve both date fields from the previous Episode.
+PublishDraft supplies the initial PricingDate and AssumedTradeDate for the new Case. RollPricingDate changes PricingDate and preserves AssumedTradeDate. ChangeAssumedTradeDate changes AssumedTradeDate and preserves PricingDate. Other Open-operation Episode creation preserves both date fields from the previous Episode.
 
-Operations that preserve the Episode:
+Every Reopen sets PricingDate=ReopenDate and uses the explicitly supplied NewAssumedTradeDate.
 
-- CommitQuote;
-- ReplaceFirmQuote;
-- PresentQuote;
-- InvalidateQuote;
-- ExtendValidity;
-- ChangeContactOwner;
-- CloseCase/Cancel terminate rather than create another Episode.
+CommitQuote, ReplaceFirmQuote, PresentQuote, InvalidateQuote, ExtendValidity, and ChangeContactOwner preserve the current Open Episode.
+
+CloseCase and Cancel terminate while retaining their source PricingEpisode inside TerminalPricingContext. Reopen then creates a new Episode from that terminal pricing context.
 
 ## 20. Why some apparently similar operations remain distinct
 
@@ -1226,8 +1394,9 @@ All local dates below are BusinessEntityLocalDate and are interpreted under RfqC
 - AwayDate: business-effective local date attributed to a specific Presentation's Away outcome.
 - CloseDate: local date on which the Case itself was closed.
 - CancellationDate: local date on which the Case was cancelled.
+- ReopenDate: local date attributed to the resumed pricing round when a genuine terminal Case reopens.
 
-PricingDate, AssumedTradeDate, PresentationDate, HitDate, AwayDate, CloseDate, and CancellationDate are distinct business concepts. The current Domain does not require equality among them.
+PricingDate, AssumedTradeDate, PresentationDate, HitDate, AwayDate, CloseDate, CancellationDate, and ReopenDate are distinct business concepts. The current Domain does not require equality among them.
 
 Timepoint fields describe absolute business-action or business-event time where that distinction matters:
 
@@ -1237,6 +1406,7 @@ Timepoint fields describe absolute business-action or business-event time where 
 - PresentationAwayOutcome.RecordedAt: internal recording/establishment of the Away outcome;
 - InvalidatedAt / RequestedAt / ChangedAt / RolledAt / ExtendedAt: accepted Domain-operation action times;
 - ClosedAt / CancelledAt: Case terminal actions;
+- ReopenedAt: accepted Reopen action;
 - TraceData.RecordedAt: creation/recording of that Trace representation.
 
 These Timepoint values are Domain business facts, not persistence insertion timestamps.
