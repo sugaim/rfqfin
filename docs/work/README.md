@@ -113,3 +113,4 @@ The following working method proved useful during the RfqCase/RfqDraft redesign 
 - `sessions/07-reopen-and-activity-digest-trace.md` — completion record for genuine Reopen semantics and the TraceRecord / CaseActivityDigest redesign.
 - `sessions/08-trace-api-and-revision-checkpoint.md` — completion/checkpoint record for the History-based Trace API refinement and the pending TraceRevision redesign handoff.
 - `sessions/09-simplified-trace-semantics.md` — completion record for the canonical simplified Trace semantic model and implementation-feasibility review.
+- `sessions/10-actor-responsibility-and-audit-semantics.md` — completion record for the cross-cutting actor, responsibility, RFQ receipt, and audit-semantics review.
