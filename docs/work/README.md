@@ -99,11 +99,13 @@ The following working method proved useful during the RfqCase/RfqDraft redesign 
 
 ## Current working files
 
-- `handoff.md` — active handoff.
-- `topics/correction/operational-correction.md` — active working note for the next operational-correction design unit.
-- `topics/correction/correction-history-model.md` — retained broad historical-correction working model; intentionally **not** part of the operational-correction reading set.
-- `topics/correction/correction-cases.md` — retained historical-correction regression/test-case catalog; intentionally **not** part of the operational-correction reading set.
+- `handoff.md` — active handoff for historical correction.
+- `topics/correction/case-history-and-trace.md` — retained rationale for the canonical RfqCaseRevision / Restore / Trace foundation.
+- `topics/correction/correction-cases.md` — active concrete regression catalog for historical correction.
+- `topics/correction/operational-correction.md` — completed/superseded starting note for the operational-restore unit.
+- `topics/correction/correction-history-model.md` — retained earlier abstract correction exploration; **not** the current semantic starting point.
 - `sessions/01-rfqcase-positive-flow.md` — completion record for the positive-flow RfqCase design unit.
 - `sessions/02-rfqdraft.md` — completion record for the RfqDraft design unit.
-- `sessions/03-rfqcase-correction-foundation.md` — completion record for the earlier broad correction-foundation unit; defer for the later historical-correction discussion.
-- `sessions/04-continued-after-away-provenance.md` — completion record for the ContinuedAfterAway/Away-outcome positive-flow refinement.
+- `sessions/03-rfqcase-correction-foundation.md` — earlier abstract correction-foundation completion record; historical rationale only for the current unit.
+- `sessions/04-continued-after-away-provenance.md` — completion record for the ContinuedAfterAway/Away-outcome refinement.
+- `sessions/05-operational-history-restore-trace.md` — completion record for the operational chronology / Restore / durable Trace foundation.
