@@ -49,8 +49,11 @@ The current model therefore distinguishes:
 - durable business facts from workflow/UI convenience;
 - Domain state validity from actor authorization;
 - one business operation from another based on semantic effect, not on who invoked it;
-- current aggregate state from historical data that may exist in persistence but need not be loaded as an in-memory collection;
+- one valid RfqCase business state from the operational revision in which that state occurred;
+- retained operational chronology from durable TraceData that may outlive that chronology;
+- Domain history requirements from implementation loading strategy: a history-dependent operation does not imply eager loading or whole-history rewrite for every operation;
 - absolute time from Business-Entity-local calendar dates;
+- a responsibility owner from the ActorId that actually performed a durable business action;
 - a quote from the act of presenting that quote;
 - the outcome of a presentation from the final closure of the Case.
 
@@ -69,7 +72,7 @@ Examples:
 - a PricingEpisode created for changed Terms must refer to the new RfqTerms;
 - a Close-as-Away from a Negotiating state must use the latest presentation and must ensure that presentation has an Away outcome.
 
-### 3.2 Application owns actor, authorization, orchestration, and external context
+### 3.2 Application owns authorization, orchestration, and external context
 
 Domain operations are not split merely because different actors, roles, desks, or approval routes invoke them.
 
@@ -77,7 +80,8 @@ Examples:
 
 - a user handoff, a management reassignment, and a takeover workflow may all ultimately invoke the same Domain ownership-change operation if their Domain effect is identical;
 - authorization such as "only the Contact Owner may present" belongs in Application;
-- current user, current BusinessEntityLocalDate, external calculation, IDs, persistence, transaction management, and audit actor/timestamp belong outside Domain;
+- resolving the current authenticated actor belongs in Application, while a supplied ActorId may become a Domain fact when the identity of the actual committer/presenter/closer/canceller is part of durable business meaning;
+- current BusinessEntityLocalDate, external calculation, ID allocation, persistence, transaction management, and purely technical audit metadata belong outside Domain;
 - an Application use case may compose multiple Domain operations atomically.
 
 Conversely, two operations may share the same source and target state but remain different Domain operations when their business meaning differs. In particular, ExpireQuote and InvalidateQuote are not collapsed merely because both remove the current FirmQuote; expiry and an explicit business withdrawal are different facts.
@@ -90,23 +94,23 @@ If multiple operations create a new PricingEpisode, each operation creates its o
 
 Do not reinterpret "number of PricingEpisodes" as "number of quotes actually priced."
 
-### 3.4 Explicitly Domain-external for now
+### 3.4 Explicitly Domain-external or deferred for now
 
-The following are intentionally outside the RfqCase aggregate model:
+The following remain outside the positive-flow RfqCase state itself:
 
-- actor/role authorization;
-- CurrentUser;
-- audit actor and recorded/executed timestamps;
+- actor/role authorization and CurrentUser;
+- purely technical audit metadata beyond explicit Domain business facts;
 - WorkingQuote and other mutable pricing work-in-progress;
 - ContextNote, TraderNote, and SalesNote;
 - UI state;
-- RfqDraft lifecycle/editing, which belongs to the separate RfqDraft aggregate rather than RfqCase.State;
-- the complete historical collections of Terms, Episodes, Quotes, Presentations, and Outcomes;
-- correction/reversal/amendment mechanics;
+- RfqDraft lifecycle/editing, which belongs to the separate RfqDraft model rather than RfqCase.State;
+- eager in-memory ownership of complete historical collections of Terms, Episodes, Quotes, Presentations, and Outcomes;
 - booking;
 - final settlement amount/currency/FX-conversion rules.
 
-These decisions are intentional. Do not reintroduce these concepts into RfqCase solely because they exist in the workflow.
+Operational correction is no longer wholly Domain-external: operational Restore, RfqCaseRevision chronology, and durable TraceData are defined below.
+
+The broader historical-correction command language remains deliberately deferred. In particular, the exact replayable CaseCommand representation and the Trace-native EffectiveCommand model are not yet canonicalized beyond the minimum chronology semantics required here.
 
 ## 4. Naming and notation
 
@@ -135,11 +139,17 @@ Examples:
 
 ## 5. Identity model
 
-RfqCase is an Aggregate Root and has CaseId.
+CaseId identifies one longitudinal RFQ across its operational revisions. Every RfqCase state and every RfqCaseRevision in that chronology carries the same CaseId.
 
-RfqDraft is a separate Aggregate Root and has DraftId. DraftId and CaseId are distinct identity types; publication creates a new CaseId rather than reusing DraftId.
+RfqDraft has DraftId. DraftId and CaseId are distinct identity types; publication creates a new CaseId rather than reusing DraftId.
 
-Child identity of RfqCase is Case-local unless explicitly stated otherwise.
+The current model deliberately does not require an additional RfqCaseRevisionId. One operational revision is identified conceptually by:
+
+    (CaseId, CaseVersionNumber)
+
+TraceData also has no separate TraceId in the current Domain model. Persistence may add storage keys or sequence metadata without turning them into Domain identity unless later business rules require such identity.
+
+Child identity inside an RfqCase is Case-local unless explicitly stated otherwise.
 
 Current Case-local IDs:
 
@@ -188,13 +198,26 @@ The Domain model must not expose DateTimeOffset as the conceptual type. C# may u
 Current uses include:
 
 - FirmQuote.ValidUntil;
-- PresentationHitOutcome.HitAt.
+- Quote.CommittedAt;
+- QuotePresentation.PresentedAt;
+- PresentationHitOutcome.HitAt;
+- TerminalState.Closed.ClosedAt;
+- TerminalState.Cancelled.CancelledAt;
+- TraceData.RecordedAt.
 
-### 6.4 CityCalendarSymbol
+### 6.4 ActorId
+
+ActorId identifies the actual human or service actor that performed a durable business action.
+
+ActorId is distinct from responsibility identities such as ContactOwnerId and QuoteOwnerId. For example, a dealer may remain QuoteOwner while a Sales user or an automated service commits a price that the dealer authorized.
+
+The current model does not split ActorId into Human/System variants. Introduce actor-kind variants only if actor kind itself becomes business-significant.
+
+### 6.5 CityCalendarSymbol
 
 CityCalendarSymbol is a Domain Object backed by a string and identifies a city/business calendar used by settlement-date lag calculation.
 
-### 6.5 NotionalAmount
+### 6.6 NotionalAmount
 
 NotionalAmount is a Domain Object representing the numeric notional/face amount used by the RFQ.
 
@@ -203,25 +226,27 @@ NotionalAmount is a Domain Object representing the numeric notional/face amount 
 
 NotionalAmount does not carry currency. The security determines the denomination context; duplicating currency on NotionalAmount would introduce a second potentially conflicting source of truth.
 
-### 6.6 CleanPrice
+### 6.7 CleanPrice
 
 CleanPrice is a Domain Object representing a clean-price quote value.
 
 Its exact underlying representation is intentionally not fixed here. No numeric range invariant is currently imposed. No generic Price Domain Object is introduced by this decision.
 
-### 6.7 Rate
+### 6.8 Rate
 
 Rate is a Domain Object representing a rate level used by rate-valued Domain facts such as Yield quotes.
 
 No numeric range invariant is currently imposed. Exact underlying representation and external unit conversion are implementation/boundary concerns unless a future business requirement makes them Domain-significant.
 
-### 6.8 Feedback
+### 6.9 Feedback
 
 Feedback is currently free-form optional string data.
 
 This is deliberately provisional. Future statistics/analytics may require a typed disposition plus optional free text. Do not infer a stable taxonomy from the current string.
 
-## 7. Aggregate shape
+## 7. RfqCase business-state shape
+
+RfqCase is one complete valid business state of an RFQ. It is not, by itself, synonymous with "the latest Case"; operational currentness is represented by the current RfqCaseRevision defined in Section 23.
 
 The current RfqCase shape is:
 
@@ -365,6 +390,8 @@ Quote is an immutable Case-local child Entity.
     - QuoteId
     - PricingEpisodeId
     - Value : QuoteValue
+    - CommittedBy : ActorId
+    - CommittedAt : Timepoint
 
 Current QuoteValue:
 
@@ -375,7 +402,7 @@ Current QuoteValue:
           YieldConventionId
       )
 
-QuotedBy and QuotedAt are not Domain fields in the current model.
+CommittedBy and CommittedAt record who actually committed the Quote and when that commitment occurred. They are durable business facts and do not replace QuoteOwnerId, which remains pricing responsibility on PricingEpisode.
 
 A Quote means a price condition produced in a specific PricingEpisode. It does not by itself mean that the price is current, firm, or customer-visible.
 
@@ -403,8 +430,12 @@ QuotePresentation is an immutable Case-local child Entity.
     - PresentationId
     - QuoteId
     - PresentationDate : BusinessEntityLocalDate
+    - PresentedBy : ActorId
+    - PresentedAt : Timepoint
 
 A QuotePresentation represents a business proposal event: the Quote was actually presented to the customer.
+
+PresentedBy and PresentedAt record the actor and absolute time of that presentation action. They are distinct from ContactOwnerId, which represents customer-contact responsibility.
 
 Quote and QuotePresentation are deliberately separate because:
 
@@ -464,10 +495,14 @@ The outcome of a valid RFQ Case is modeled separately from cancellation.
     TerminalState
     = Closed(
           CloseDate : BusinessEntityLocalDate,
+          ClosedBy : ActorId,
+          ClosedAt : Timepoint,
           Outcome : CaseOutcome
       )
     | Cancelled(
           CancellationDate : BusinessEntityLocalDate,
+          CancelledBy : ActorId,
+          CancelledAt : Timepoint,
           CancellationReason
       )
 
@@ -478,7 +513,9 @@ Semantics:
 - exact CancellationReason variants are intentionally deferred until exception/correction requirements are designed;
 - CancellationReason is expected to be typed, not an unrestricted string.
 
-CloseDate is the date the Case itself was closed. It is distinct from HitDate and AwayDate.
+CloseDate is the BusinessEntity-local date the Case itself was closed. ClosedAt is the absolute time of the closing action and ClosedBy is the actual actor that performed it. These are distinct from HitDate and AwayDate.
+
+CancellationDate is likewise the BusinessEntity-local cancellation date, while CancelledAt and CancelledBy record the absolute action time and actor.
 
 Examples:
 
@@ -710,8 +747,10 @@ Every distinct Domain operation is numbered even when two operations share the s
 
 ### Inquiry transitions
 
-    [T01] CreateCase
+    [T01] PublishDraft / initial Case creation
           -> Inquiry.Pricing
+
+T01 is the Case-side effect of D10 PublishDraft. There is no separate normal RfqCase creation path in the current model.
 
     Inquiry.Pricing
       --[T02 CommitQuote]---------> Inquiry.PendingPresentation
@@ -780,7 +819,7 @@ ChangeContactOwner changes ContactOwnerId but does not change PricingEpisode, Qu
 
 | No. | Operation | Main semantic effect | PricingEpisode | Important invariants / generated facts |
 | --- | --- | --- | --- | --- |
-| T01 | CreateCase | Create a valid RfqCase directly in Inquiry.Pricing | new, Origin=Initial | QuoteOwner already known; Draft/Requested is not an RfqCase state |
+| T01 | PublishDraft / initial Case creation | Create the valid initial RfqCase in Inquiry.Pricing as the Case-side effect of D10 PublishDraft | new, Origin=Initial | initial RfqCaseRevision uses Published(DraftId); QuoteOwner already known |
 | T02 | CommitQuote | Make a new Quote current and firm | preserve | Quote.PricingEpisodeId=current Episode |
 | T03 | ReplaceFirmQuote | Replace unpresented current FirmQuote | preserve | old Quote becomes historical; no Away outcome |
 | T04 | InvalidateQuote | Explicitly withdraw unpresented FirmQuote | preserve | no automatic outcome |
@@ -829,7 +868,7 @@ Operations that create a new PricingEpisode:
 
 | Operation | New RfqTerms? | Origin |
 | --- | --- | --- |
-| CreateCase | yes, initial | Initial |
+| PublishDraft / initial Case creation | yes, initial | Initial |
 | ChangeRfqTerms | yes | RfqTermsChanged(previous Episode) |
 | ChangeQuoteOwner | no | QuoteOwnerChanged(previous Episode) |
 | RollPricingDate | no | PricingDateRolled(previous Episode) |
@@ -837,7 +876,7 @@ Operations that create a new PricingEpisode:
 | RequestRepricing | no | RepricingRequested(previous Episode, QuoteId, Feedback?) |
 | ContinueAfterAway | no | ContinuedAfterAway(previous Episode, PresentationAwayOutcome) |
 
-CreateCase supplies the initial PricingDate and AssumedTradeDate. RollPricingDate changes PricingDate and preserves AssumedTradeDate. ChangeAssumedTradeDate changes AssumedTradeDate and preserves PricingDate. Other Episode-creating operations preserve both date fields from the previous Episode.
+PublishDraft supplies the initial PricingDate and AssumedTradeDate for the new Case. RollPricingDate changes PricingDate and preserves AssumedTradeDate. ChangeAssumedTradeDate changes AssumedTradeDate and preserves PricingDate. Other Episode-creating operations preserve both date fields from the previous Episode.
 
 Operations that preserve the Episode:
 
@@ -920,26 +959,338 @@ Normal Away does not require:
 
 Timepoint is used only where absolute time matters, currently HitAt and ValidUntil.
 
-## 23. Historical persistence versus aggregate loading
+## 23. Operational revision chronology, restore, and durable TraceData
 
-The business model relies on historical facts:
+### 23.1 RfqCaseRevision and RfqCaseHistory
 
-- prior RfqTerms;
-- prior PricingEpisodes;
-- prior Quotes;
-- prior QuotePresentations;
-- Presentation outcomes.
+Positive-flow state semantics remain on RfqCase, but accepted operational changes are represented chronologically by immutable RfqCaseRevision values.
 
-This does not imply that every historical entity must be loaded as an in-memory collection on RfqCase.
+    RfqCaseRevision
+    - CaseId
+    - Version : CaseVersionNumber
+    - Case : RfqCase
+    - Transition : RfqCaseTransition
 
-The current state carries only historical facts required for current business validity, e.g.:
+Invariant:
 
-- LatestPresentation;
-- LatestPresentationAwayOutcome?.
+    RfqCaseRevision.CaseId == RfqCaseRevision.Case.CaseId
 
-Persistence/read models may retain and query the complete history.
+CaseVersionNumber is a Domain value with successor semantics:
 
-The exact persistence strategy is not part of this positive-flow Domain decision.
+    CaseVersionNumber
+    - Value
+    - Next()
+
+RfqCaseHistory denotes the retained chronology of RfqCaseRevision values for one CaseId. This is a Domain history concept, not a requirement to eagerly load one large in-memory collection.
+
+The current operational state is the RfqCase contained in the current/latest revision.
+
+### 23.2 Revision transition provenance
+
+    RfqCaseTransition
+    = Published(DraftId)
+    | Applied(CaseCommand)
+    | RestoredFrom(TargetVersion)
+
+Published(DraftId) is used only for the initial revision created by PublishDraft:
+
+    transition == Published(...)
+    => Version == InitialVersion
+
+Applied(CaseCommand) means an accepted ordinary Domain operation was applied to the immediately preceding revision.
+
+For every accepted ordinary operation after publication:
+
+    next.CaseId == current.CaseId
+    next.Version == current.Version.Next()
+    next.Transition == Applied(command)
+
+One accepted Domain operation creates exactly one next revision. Rejected operations and pure UI/Application work do not create revisions. An Application composite that executes several accepted Domain operations therefore creates several revisions even if they are persisted in one transaction.
+
+CaseCommand denotes the replayable accepted Domain-operation input needed to reproduce the transition. The exact closed command sum type and its serialization/versioning are deferred to the historical-correction design, but the chronology must preserve enough supplied facts to reproduce the accepted business transition.
+
+### 23.3 Operational Restore
+
+Operational Restore means abandoning the currently effective operational path and returning to a previously valid **Open** Case state so ordinary positive-flow processing can continue.
+
+Given:
+
+    v10 = earlier Open revision
+    ...
+    v20 = current revision
+
+Restore(v10) creates:
+
+    v21
+    - CaseId = v20.CaseId
+    - Version = v20.Version.Next()
+    - Case = v10.Case
+    - Transition = RestoredFrom(v10.Version)
+
+Restore semantics:
+
+- the current revision may be Open or Terminal;
+- the target must be an existing earlier Open revision of the same Case chronology;
+- terminal revisions are not Restore targets;
+- the target may be an Open revision on a previously superseded path;
+- v10 itself does not physically become current again;
+- versions never move backward;
+- the mistaken path remains immutable operational chronology;
+- Case-local child identities from the target revision are reused exactly;
+- later positive-flow operations create new Case-local identities normally;
+- no explicit Branch/Worldline Domain object is currently required.
+
+Reinstating an earlier terminal business outcome is a different meaning from operational Restore and is not currently modeled.
+
+Restore additionally produces exactly one superseding TraceData record for the path that was effective immediately before Restore:
+
+- restoring while current is Open produces a superseded Open representation;
+- restoring while current is Terminal produces a superseded Effective representation.
+
+Restore does not itself produce a new Effective terminal representation because the target is Open. A later terminal operation after restored processing produces the next Effective TraceData.
+
+### 23.4 Loading, persistence, and concurrency boundary
+
+Ordinary operations normally require only the current RfqCaseRevision.
+
+History-dependent operations may require more:
+
+- Restore requires current revision, target Open revision, and enough retained history to construct the superseding Trace;
+- Hit, CloseAway, and Cancel require current revision plus enough retained history to construct the terminal Trace.
+
+This does not imply eager loading or whole-history rewrite. Implementation may query, index, stream, or materialize only the required history.
+
+Application/Persistence owns stale-write protection. For example, a Restore requested while v20 is current should commit only if v20 is still current. A stale request is rejected rather than silently applied against a different current revision.
+
+A Domain operation that returns both a new RfqCaseRevision and TraceData should have those facts persisted atomically.
+
+Restore does not reverse external side effects such as already-sent customer communications, downstream notifications, or booking/integration effects. Such reconciliation belongs to Application/integration workflows.
+
+Operational RfqCaseHistory may have finite retention and may eventually be deleted.
+
+### 23.5 TraceData purpose and top-level structure
+
+TraceData is a durable, self-contained business-activity representation materialized from operational history. It is intentionally smaller than the full operational chronology and is expected to outlive RfqCaseHistory.
+
+    TraceData
+    - RecordedBy : ActorId
+    - RecordedAt : Timepoint
+    - RecordedBusinessDate : BusinessEntityLocalDate
+    - Origin : TraceOrigin
+    - Representation : TraceRepresentation
+
+    TraceOrigin
+    = CaseTermination
+    | OperationalRestore
+    | HistoricalCorrection
+
+    TraceRepresentation
+    - CaseId
+    - BusinessEntity
+    - CaseOpenDate : BusinessEntityLocalDate
+    - InitialContactOwnerId
+    - FirstPresentedContactOwnerId?
+    - State : TraceState
+
+RecordedBy / RecordedAt / RecordedBusinessDate / Origin describe creation of this TraceData record.
+
+TraceRepresentation is the durable business representation. InitialContactOwnerId is the ContactOwner at publication/open. FirstPresentedContactOwnerId is the ContactOwner at the first customer Presentation and is absent when no Presentation ever occurred. Intermediate ContactOwner changes are not retained in the current Trace model.
+
+RecordedBusinessDate is an explicitly supplied BusinessEntity-local business date. It is not required to be mechanically derived from RecordedAt.
+
+### 23.6 Trace state
+
+    TraceState
+    = Effective(EffectiveTrace)
+    | Superseded(SupersededTrace)
+
+    EffectiveTrace
+    = PresentedClosedTrace
+    | UnpresentedClosedTrace
+    | CancelledTrace
+
+    SupersededTrace
+    = Effective(
+          EffectiveTrace,
+          Reason : SupersessionReason
+      )
+    | Open(
+          OpenTrace,
+          Reason : SupersessionReason
+      )
+
+    SupersessionReason
+    = OperationalRestore
+    | HistoricalCorrection
+
+A superseding TraceData does not reference a previous TraceData by TraceId. It repeats the prior business representation as Superseded so the new record remains self-contained after operational history is deleted.
+
+The earlier TraceData record remains immutable. Its Recorded* metadata is not copied as part of the business representation being superseded.
+
+### 23.7 Durable terms and terminal shapes
+
+Trace terms remove Case-local RfqTermsId while retaining the durable business values:
+
+    TraceTerms
+    - ClientId
+    - Side
+    - SecurityId
+    - Notional : NotionalAmount
+    - SettlementDateRule
+
+    PresentedClosedTrace
+    - Terms : TraceTerms
+    - Presentations : NonEmpty<PresentationActivity>
+    - Terminal : PresentedClose
+
+    PresentedClose
+    - ChangesBeforeTerminal : ActivityChange[]
+    - CaseCloseDate : BusinessEntityLocalDate
+    - ClosedBy : ActorId
+    - ClosedAt : Timepoint
+    - Outcome : Hit | Away
+
+    Hit
+    - HitDate
+    - HitAt
+
+    Away
+    - AwayDate
+    - Feedback?
+
+    UnpresentedClosedTrace
+    - Terms : TraceTerms
+    - CaseCloseDate : BusinessEntityLocalDate
+    - ClosedBy : ActorId
+    - ClosedAt : Timepoint
+    - Feedback?
+
+    CancelledTrace
+    - Terms : TraceTerms
+    - Presentations : PresentationActivity[]
+    - Terminal : Cancellation
+
+    Cancellation
+    - ChangesBeforeTerminal : ActivityChange[]
+    - CaseCancellationDate : BusinessEntityLocalDate
+    - CancelledBy : ActorId
+    - CancelledAt : Timepoint
+    - CancellationReason
+
+    OpenTrace
+    - Terms : TraceTerms
+    - Presentations : PresentationActivity[]
+    - ChangesBeforeSupersession : ActivityChange[]
+
+OpenTrace currently appears only under TraceState.Superseded. Ordinary Open processing is represented by RfqCaseRevision rather than by an Effective Open TraceData record.
+
+A Restore of an Open Case that has never had a Presentation still produces a superseded Open Trace with:
+
+    Presentations = []
+    ChangesBeforeSupersession = []
+
+### 23.8 PresentationActivity and ActivityChange
+
+    PresentationActivity
+    - PricingContext
+    - Quote
+    - Presentation
+    - ChangesBeforePresentation : ActivityChange[]
+
+    PricingContext
+    - QuoteOwnerId
+    - PricingDate
+    - AssumedTradeDate
+
+    TraceQuote
+    - Value
+    - CommittedBy : ActorId
+    - CommittedAt : Timepoint
+    - EffectiveValidUntil : Timepoint
+
+    TracePresentation
+    - PresentationDate
+    - PresentedBy : ActorId
+    - PresentedAt : Timepoint
+
+TraceQuote and TracePresentation are descriptive names for the durable value shapes; Case-local QuoteId and PresentationId are not retained.
+
+EffectiveValidUntil is materialized from operational chronology. FirmQuote.ValidUntil remains the canonical source-state field. ExtendValidUntil does not move validity onto QuotePresentation and the sequence of extension operations is not currently retained in TraceData.
+
+Current ActivityChange variants are:
+
+    ActivityChange
+    = ContinuedAfterAway(
+          PreviousQuoteValue,
+          AwayDate,
+          Feedback?
+      )
+    | RepricingRequested(
+          RejectedQuoteValue,
+          Feedback?
+      )
+    | QuoteOwnerChanged(
+          PreviousQuoteOwnerId
+      )
+    | PricingDateRolled(
+          PreviousPricingDate
+      )
+    | AssumedTradeDateChanged(
+          PreviousAssumedTradeDate
+      )
+
+ActivityChange is a business-semantic digest, not a copy of CaseCommand or PricingEpisodeOrigin.
+
+Multiple changes between two Presentations are retained in order. The later Presentation carries the resulting current values; ActivityChange retains enough previous value/provenance to explain the path.
+
+### 23.9 Intentional Trace compression
+
+TraceData deliberately does not preserve complete pre-Presentation or operational workflow history.
+
+Before the first Presentation:
+
+- pricing/workflow changes are not retained as ActivityChange;
+- the first Presentation has ChangesBeforePresentation=[];
+- RfqTerms changes, QuoteOwner changes, PricingDate rolls, AssumedTradeDate changes, and Inquiry-phase RepricingRequested are compressed away;
+- ContactOwner is represented only by InitialContactOwnerId and FirstPresentedContactOwnerId?.
+
+After the first Presentation, RepricingRequested is retained because an unpresented rejected FirmQuote value could otherwise disappear from the durable activity record.
+
+The current Trace also does not preserve separate activity variants for ReplaceFirmQuote, InvalidateQuote, ExpireQuote, or ExtendValidUntil. Their distinctions remain important to positive-flow Domain behavior but are not currently required in the durable business-activity digest.
+
+Two distinct customer Presentations remain distinct PresentationActivity values even if their numerical Quote values are equal.
+
+### 23.10 History resolution and lifetime
+
+TraceData exposes no Case-local RfqTermsId, PricingEpisodeId, QuoteId, or PresentationId.
+
+Construction must resolve those identities to durable values while operational history is available. The implementation may use temporary maps, joins, repository indexes, streaming, or another resolved-history representation.
+
+For immutable Case-local entities, repeated use of the same ID across revisions must resolve to the same value.
+
+Some Trace facts are chronological rather than simple ID lookups. EffectiveValidUntil, for example, is the effective value across the relevant interval of one FirmQuote/Presentation occurrence.
+
+Because TraceData may outlive RfqCaseHistory, it must not require the retained revision chronology for interpretation.
+
+Historical correction may later replay Applied(CaseCommand) transitions while operational history remains available. The exact correction language, including any one-way switch into Trace-native EffectiveCommand processing, is intentionally deferred.
+
+### 23.11 Terminal operation results
+
+Hit, CloseAway, and Cancel are still positive-flow business transitions on RfqCase, but at the revision level they additionally materialize durable TraceData.
+
+Conceptually:
+
+    TerminalResult
+    - Revision : RfqCaseRevision
+    - Trace : TraceData
+
+Operational Restore similarly returns:
+
+    RestoreResult
+    - Revision : RfqCaseRevision
+    - Trace : TraceData
+
+Persistence appends the Domain-produced facts. The Domain determines Version.Next(), transition provenance, restored Case content, and Trace business meaning; persistence does not reconstruct those semantics after the fact.
 
 ## 24. Intentional negative decisions
 
@@ -1070,7 +1421,7 @@ Active is the editable pre-publication state.
 
 Deleted is a logical deletion, not physical removal. Draft content and responsibility assignments are retained so the Draft can be restored or copied.
 
-Published means the Draft has already created the identified RfqCase. Published is terminal for that Draft. Its Data, ContactOwnerId, and QuoteOwnerId remain as the publication-time Draft snapshot and may be used as the source of CopyDraft; the resulting RfqCase remains authoritative for the Case's subsequent lifecycle.
+Published means the Draft has already created the identified Case chronology. Published is terminal for that Draft. Its Data, ContactOwnerId, and QuoteOwnerId remain as the publication-time Draft snapshot and may be used as the source of CopyDraft; subsequent business state is carried by the Case's RfqCaseRevision chronology.
 
 ### 25.3 RfqDraft operations
 
@@ -1115,7 +1466,7 @@ Operation semantics:
 | D07 | RestoreDraft | Deleted | Restore the same Draft and retained fields to Active |
 | D08 | CopyDraft | any Draft state | Create a new Active Draft using field-specific copy/reset rules; source is unchanged |
 | D09 | SeedDraftFromCase | any RfqCase state | Create a new Active Draft from explicitly reusable current Case facts; source is unchanged |
-| D10 | PublishDraft | Active | Publish the Draft and create a valid new RfqCase as one Domain operation |
+| D10 | PublishDraft | Active | Publish the Draft and create the initial RfqCaseRevision containing a valid new RfqCase as one Domain operation |
 
 Deleted permits no content amendment, responsibility change, owner change, or publish operation. Published is terminal and permits no operation on that Draft other than acting as a CopyDraft source.
 
@@ -1255,7 +1606,7 @@ The resulting RfqCase must satisfy every normal RfqCase invariant. In particular
 
 An Active Draft may temporarily contain Determined values that fail this cross-field Case invariant; such a Draft is simply not publishable until amended.
 
-PublishDraft has one indivisible Domain meaning: the source Draft becomes Published(CaseId) and the new valid RfqCase is created. Persisting both effects atomically, ensuring single publication, and rejecting publication based on a stale observed Draft version are Application/Persistence responsibilities.
+PublishDraft has one indivisible Domain meaning: the source Draft becomes Published(CaseId) and the initial RfqCaseRevision is created with Version=InitialVersion and Transition=Published(DraftId). Its contained RfqCase is the valid Inquiry.Pricing state described above. Persisting both effects atomically, ensuring single publication, and rejecting publication based on a stale observed Draft version are Application/Persistence responsibilities.
 
 ### 25.10 Draft provenance and lineage
 
@@ -1342,8 +1693,11 @@ Before changing the RFQ Domain implementation:
 3. do not preserve an old abstraction solely because it exists in persistence or API;
 4. keep Application authorization separate from Domain state validity;
 5. do not introduce generic setters/update methods to make migration easier;
-6. implement typed states and operations from the transition table;
-7. preserve explicit Case-local child identity and the separate DraftId identity;
-8. implement RfqDraft as a separate Aggregate Root with DraftField/RfqDraftData semantics rather than reviving the old Draft-as-RfqCase-state model;
-9. add tests around invariants before broad API/UI rewiring;
-10. if a new requirement conflicts with this model, document the business requirement and revisit the model rather than silently adding a bypass.
+6. implement typed RfqCase states and operations from the transition table;
+7. wrap accepted Case operations in RfqCaseRevision chronology with Domain-declared Version.Next() and RfqCaseTransition provenance;
+8. preserve explicit Case-local child identity, the separate DraftId identity, and TraceData's deliberate removal of Case-local references;
+9. implement RfqDraft as a separate pre-publication model with DraftField/RfqDraftData semantics rather than reviving the old Draft-as-RfqCase-state model;
+10. do not interpret RfqCaseHistory as a requirement to eagerly load or rewrite the complete history for ordinary operations;
+11. persist revision + TraceData results atomically when one Domain operation produces both;
+12. add tests around positive-flow invariants, revision invariants, restore targets, and Trace materialization before broad API/UI rewiring;
+13. if a new requirement conflicts with this model, document the business requirement and revisit the model rather than silently adding a bypass.
