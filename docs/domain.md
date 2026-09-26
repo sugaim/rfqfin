@@ -625,9 +625,9 @@ This is distinct from Operational Restore:
 
 Normal positive-flow Reopen applicability is:
 
-- Closed(Presented(Away(...))) -> ReopenAway -> Negotiating.Pricing;
-- Closed(Unpresented(...)) -> ReopenUnpresented -> Inquiry.Pricing;
-- Cancelled(Reason=Withdrawn) -> ReopenCancellation -> Inquiry.Pricing when PriorPresentation=None, otherwise Negotiating.Pricing;
+- Closed(Presented(Away(...))) -> ReopenOperation -> Negotiating.Pricing;
+- Closed(Unpresented(...)) -> ReopenOperation -> Inquiry.Pricing;
+- Cancelled(Reason=Withdrawn) -> ReopenOperation -> Inquiry.Pricing when PriorPresentation=None, otherwise Negotiating.Pricing;
 - Closed(Presented(Hit(...))) is not reopenable through ordinary positive flow;
 - Cancelled(Reason=CreatedInError) is not reopenable through ordinary positive flow.
 
@@ -1104,41 +1104,24 @@ CloseCase and Cancel construct TerminalPricingContext from the source Open state
 
 The AlreadyRecorded / RecordNow distinction does not define two kinds of business Away. It states only whether the Away fact already exists in the source Case or is established by this CloseCase operation.
 
-### 17.5 ReopenOperation shapes and semantics
+### 17.5 ReopenOperation shape and semantics
 
     ReopenOperation
-    = ReopenAway(ReopenAway)
-    | ReopenUnpresented(ReopenUnpresented)
-    | ReopenCancellation(ReopenCancellation)
-
-    ReopenAway
     - NewPricingEpisodeId
     - ReopenDate : BusinessEntityLocalDate
     - NewAssumedTradeDate : BusinessEntityLocalDate
     - ReopenedBy : ActorId
     - ReopenedAt : Timepoint
 
-    ReopenUnpresented
-    - NewPricingEpisodeId
-    - ReopenDate : BusinessEntityLocalDate
-    - NewAssumedTradeDate : BusinessEntityLocalDate
-    - ReopenedBy : ActorId
-    - ReopenedAt : Timepoint
+ReopenOperation is one business operation. Its source Terminal state determines the reopen provenance and the resulting Open state; the caller does not select a separate reopen variant.
 
-    ReopenCancellation
-    - NewPricingEpisodeId
-    - ReopenDate : BusinessEntityLocalDate
-    - NewAssumedTradeDate : BusinessEntityLocalDate
-    - ReopenedBy : ActorId
-    - ReopenedAt : Timepoint
+ReopenOperation applies only to:
 
-Variant-specific provenance is derived from the source Terminal state rather than duplicated in the operation payload.
+- Closed(Presented(Away(...))). It creates Negotiating.Pricing with a fresh PricingEpisode using ReopenedFromAway(previous Episode, terminal Away outcome), and preserves the prior Presentation/Away as latest customer context.
+- Closed(Unpresented(...)). It creates Inquiry.Pricing with a fresh PricingEpisode using ReopenedFromUnpresented(previous Episode, Feedback?).
+- Cancelled(Reason=Withdrawn). It creates a fresh PricingEpisode using ReopenedFromCancellation(previous Episode, PriorPresentation). The result is Inquiry.Pricing when PriorPresentation=None and Negotiating.Pricing when PriorPresentation exists.
 
-ReopenAway applies only to Closed(Presented(Away(...))). It creates Negotiating.Pricing with a fresh PricingEpisode using ReopenedFromAway(previous Episode, terminal Away outcome), and preserves the prior Presentation/Away as latest customer context.
-
-ReopenUnpresented applies only to Closed(Unpresented(...)). It creates Inquiry.Pricing with a fresh PricingEpisode using ReopenedFromUnpresented(previous Episode, Feedback?).
-
-ReopenCancellation applies only to Cancelled(Reason=Withdrawn). It creates a fresh PricingEpisode using ReopenedFromCancellation(previous Episode, PriorPresentation). The result is Inquiry.Pricing when PriorPresentation=None and Negotiating.Pricing when PriorPresentation exists.
+Closed(Presented(Hit(...))) and Cancelled(Reason=CreatedInError) do not accept ordinary ReopenOperation.
 
 Every Reopen starts a fresh pricing round and never resurrects a previous FirmQuote.
 
@@ -1152,7 +1135,7 @@ This is only a request-construction default. The Domain operation always carries
 
 ### 17.6 Revision-level operation API
 
-Ordinary Open processing is:
+Ordinary Open processing remains revision-local:
 
     ApplyOpen(
         currentRevision,
@@ -1165,25 +1148,47 @@ Operations that create a durable TraceRecord use one common result shape:
     - Revision : RfqCaseRevision
     - Trace : TraceRecord
 
+Trace recording metadata is represented explicitly and is shared by every Trace-producing revision-level operation:
+
+    TraceContext
+    - RecordedBy : ActorId
+    - RecordedAt : Timepoint
+    - RecordedBusinessDate : BusinessEntityLocalDate
+
 Terminal processing is:
 
     ApplyTerminal(
-        currentRevision,
+        history : RfqCaseHistory,
         operation : TerminalOperation,
-        terminalTraceContext
+        traceContext : TraceContext
     ) -> RevisionTraceResult
 
 Reopen processing is:
 
     ApplyReopen(
-        currentRevision,
+        history : RfqCaseHistory,
         operation : ReopenOperation,
-        reopenTraceContext
+        traceContext : TraceContext
     ) -> RevisionTraceResult
 
-terminalTraceContext and reopenTraceContext contain retained/resolved historical facts plus Trace-recording context. Their exact loaded representations are implementation concerns.
+Operational Restore has its own revision-level Domain operation value:
 
-The API boundary preserves the Domain invariant that an accepted Terminal or Reopen operation produces its revision and corresponding TraceRecord together.
+    RestoreOperation
+    - TargetVersion : CaseVersionNumber
+
+and is applied as:
+
+    ApplyRestore(
+        history : RfqCaseHistory,
+        operation : RestoreOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
+
+RfqCaseHistory is the source of the current revision and of the retained operational chronology required to materialize Trace. Current RfqCase / current RfqCaseRevision are not supplied separately to these Trace-producing APIs.
+
+RestoreOperation is not a CaseOperation. It selects an earlier valid Open revision rather than applying an ordinary business operation to the current RfqCase.
+
+The API boundary preserves the Domain invariant that an accepted Terminal, Reopen, or Restore operation produces its revision and corresponding TraceRecord together.
 
 ## 18. Operation applicability and state graph
 
@@ -1230,10 +1235,10 @@ The operation definition is canonical; this table lists valid source/target stat
 | CloseCase(Away.RecordNow) | Negotiating.Pricing / Negotiating.PendingPresentation | Terminal.Closed | create Away for latest Presentation when none recorded |
 | CloseCase(Away.AlreadyRecorded) | Negotiating.Pricing / Negotiating.PendingPresentation | Terminal.Closed | reuse latest Presentation's existing Away |
 | Cancel | any Open | Terminal.Cancelled | capture TerminalPricingContext; no ordinary Presentation outcome fabricated |
-| ReopenAway | Terminal.Closed(Presented(Away)) | Negotiating.Pricing | new Episode; preserve prior Presentation/Away; no FirmQuote |
-| ReopenUnpresented | Terminal.Closed(Unpresented) | Inquiry.Pricing | new Episode; preserve close Feedback in Origin |
-| ReopenCancellation | Terminal.Cancelled(Withdrawn), PriorPresentation=None | Inquiry.Pricing | new Episode; genuine withdrawal resumes |
-| ReopenCancellation | Terminal.Cancelled(Withdrawn), PriorPresentation=Some | Negotiating.Pricing | new Episode; preserve prior Presentation context |
+| Reopen | Terminal.Closed(Presented(Away)) | Negotiating.Pricing | new Episode; preserve prior Presentation/Away; no FirmQuote |
+| Reopen | Terminal.Closed(Unpresented) | Inquiry.Pricing | new Episode; preserve close Feedback in Origin |
+| Reopen | Terminal.Cancelled(Withdrawn), PriorPresentation=None | Inquiry.Pricing | new Episode; genuine withdrawal resumes |
+| Reopen | Terminal.Cancelled(Withdrawn), PriorPresentation=Some | Negotiating.Pricing | new Episode; preserve prior Presentation context |
 
 Within any row, normal cross-field invariants still apply. Closed(Hit) and Cancelled(CreatedInError) have no ordinary Reopen transition.
 
@@ -1299,16 +1304,16 @@ The graph is a cognitive/reference view of the operation definitions above. Repe
       --ChangeContactOwner-------> same Open state shape
 
     Terminal.Closed(Presented(Away))
-      --ReopenAway---------------> Negotiating.Pricing
+      --Reopen-------------------> Negotiating.Pricing
 
     Terminal.Closed(Unpresented)
-      --ReopenUnpresented--------> Inquiry.Pricing
+      --Reopen-------------------> Inquiry.Pricing
 
     Terminal.Cancelled(Withdrawn, PriorPresentation=None)
-      --ReopenCancellation-------> Inquiry.Pricing
+      --Reopen-------------------> Inquiry.Pricing
 
     Terminal.Cancelled(Withdrawn, PriorPresentation=Some)
-      --ReopenCancellation-------> Negotiating.Pricing
+      --Reopen-------------------> Negotiating.Pricing
 
 ## 19. PricingEpisode creation matrix
 
@@ -1323,9 +1328,9 @@ Operations that create a new PricingEpisode:
 | ChangeAssumedTradeDate | no | AssumedTradeDateChanged(previous Episode) |
 | RequestRepricing | no | RepricingRequested(previous Episode, QuoteId, Feedback?) |
 | RequestRepricingOnAway | no | Away(previous Episode, PresentationAwayOutcome) |
-| ReopenAway | no | ReopenedFromAway(previous Episode, PresentationAwayOutcome) |
-| ReopenUnpresented | no | ReopenedFromUnpresented(previous Episode, Feedback?) |
-| ReopenCancellation | no | ReopenedFromCancellation(previous Episode, PriorPresentation?) |
+| Reopen | no | ReopenedFromAway(previous Episode, PresentationAwayOutcome) |
+| Reopen | no | ReopenedFromUnpresented(previous Episode, Feedback?) |
+| Reopen | no | ReopenedFromCancellation(previous Episode, PriorPresentation?) |
 
 PublishDraft supplies the initial PricingDate and AssumedTradeDate for the new Case. RollPricingDate changes PricingDate and preserves AssumedTradeDate. ChangeAssumedTradeDate changes AssumedTradeDate and preserves PricingDate. Other Open-operation Episode creation preserves both date fields from the previous Episode.
 
@@ -1434,11 +1439,15 @@ Invariant:
 
     RfqCaseRevision.CaseId == RfqCaseRevision.Case.CaseId
 
-CaseVersionNumber is a Domain value with successor semantics:
+CaseVersionNumber is a Domain value with creation and adjacent-version navigation semantics:
 
     CaseVersionNumber
     - Value
+    - New()
     - Next()
+    - Prev() : CaseVersionNumber?
+
+New() creates the initial Case version. Prev() returns no value for that initial version.
 
 RfqCaseHistory denotes the retained chronology of RfqCaseRevision values for one CaseId. This is a Domain history concept, not a requirement to eagerly load one large in-memory collection.
 
@@ -1482,7 +1491,11 @@ Given:
     ...
     v20 = current revision
 
-Restore(v10) creates:
+Given:
+
+    operation = RestoreOperation(TargetVersion = v10.Version)
+
+ApplyRestore creates:
 
     v21
     - CaseId = v20.CaseId
@@ -1515,11 +1528,11 @@ A genuinely correct terminal occurrence followed by renewed activity is Reopen, 
 
 Ordinary Open operations normally require only the current RfqCaseRevision.
 
-History-dependent revision-level operations require more:
+History-dependent revision-level operations take RfqCaseHistory as their source of current state and retained chronology:
 
-- Restore requires current revision, target Open revision, and enough retained history to construct the RestoreSnapshot TraceRecord;
-- TerminalOperation requires current revision, its TerminalOperation value, and TerminalTraceContext containing enough retained/resolved history plus Trace-recording context;
-- ReopenOperation uses the current Terminal state's TerminalPricingContext to construct the new Open business state, but additionally requires ReopenTraceContext resolved from retained operational history to construct the Reopened TraceRecord.
+- ApplyRestore takes RfqCaseHistory, RestoreOperation, and TraceContext; TargetVersion identifies the earlier Open revision to select, while History supplies both the current revision and the chronology needed to construct the RestoreSnapshot TraceRecord;
+- ApplyTerminal takes RfqCaseHistory, TerminalOperation, and TraceContext;
+- ApplyReopen takes RfqCaseHistory, ReopenOperation, and TraceContext. Reopen state construction uses the current Terminal state's TerminalPricingContext, while the Reopened TraceRecord is materialized from retained operational history.
 
 This does not imply eager loading or whole-history rewrite. Implementation may query, index, stream, or materialize only the required historical facts.
 
@@ -1768,22 +1781,24 @@ Conceptually:
     - Trace : TraceRecord
 
     ApplyTerminal(
-        currentRevision,
+        history : RfqCaseHistory,
         operation : TerminalOperation,
-        terminalTraceContext
+        traceContext : TraceContext
     ) -> RevisionTraceResult
 
     ApplyReopen(
-        currentRevision,
+        history : RfqCaseHistory,
         operation : ReopenOperation,
-        reopenTraceContext
+        traceContext : TraceContext
     ) -> RevisionTraceResult
 
-    Restore(
-        currentRevision,
-        targetRevision,
-        restoreTraceContext
+    ApplyRestore(
+        history : RfqCaseHistory,
+        operation : RestoreOperation,
+        traceContext : TraceContext
     ) -> RevisionTraceResult
+
+History supplies the current revision and the operational chronology from which Trace is resolved. TraceContext supplies only the Trace-recording metadata.
 
 Persistence appends the Domain-produced facts. The Domain determines Version.Next(), transition provenance, resulting Case content, TraceRecord kind, and CaseActivityDigest meaning; persistence does not reconstruct those semantics after the fact.
 
