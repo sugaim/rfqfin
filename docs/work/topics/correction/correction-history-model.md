@@ -2,18 +2,18 @@
 
 ## Status
 
-This is a non-canonical working model for the RfqCase correction design unit.
+This is a retained **historical exploration**, not the current correction model.
 
-Its purpose is to let a later discussion rebuild the correction context quickly without replaying the exploratory conversation.
+The later operational-history / Restore / Trace design changed several assumptions that this document treated as open. Current work must start from:
 
-Read in this order:
+1. `../../../domain.md` — canonical Domain model;
+2. `../../handoff.md` — active historical-correction target;
+3. `case-history-and-trace.md` — rationale for the current revision/Trace foundation;
+4. `correction-cases.md` — concrete regression material.
 
-1. `../../../domain.md` — canonical positive-flow Domain model;
-2. `../../handoff.md` — active design target and boundaries;
-3. this file — current correction semantics;
-4. `correction-cases.md` — concrete cases used to challenge the model.
+Do **not** restart the current design from the provisional `Supports(H_rep, H_true)` abstraction or the whole-History-replacement model below. The material is retained only for rationale and ideas that may become relevant to a concrete unresolved question.
 
-This file does **not** define a correction API and does **not** override `domain.md`.
+This file does **not** override `domain.md`.
 
 ## Goal
 
