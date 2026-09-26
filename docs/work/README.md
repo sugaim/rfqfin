@@ -111,3 +111,4 @@ The following working method proved useful during the RfqCase/RfqDraft redesign 
 - `sessions/05-operational-history-restore-trace.md` — completion record for the operational chronology / Restore / durable Trace foundation.
 - `sessions/06-first-class-case-operations.md` — completion record for the first-class CaseOperation / replayable operation refinement.
 - `sessions/07-reopen-and-activity-digest-trace.md` — completion record for genuine Reopen semantics and the TraceRecord / CaseActivityDigest redesign.
+- `sessions/08-trace-api-and-revision-checkpoint.md` — completion/checkpoint record for the History-based Trace API refinement and the pending TraceRevision redesign handoff.
