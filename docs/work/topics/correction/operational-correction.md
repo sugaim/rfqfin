@@ -2,7 +2,9 @@
 
 ## Status
 
-This is a non-canonical working note for the next RfqCase design unit.
+This is a completed/superseded working note for the operational-correction design unit.
+
+The resolved model is captured in `case-history-and-trace.md` and incorporated into `../../../domain.md`.
 
 It concerns **operational correction of an active Case**, not historical reconstruction of the business history that should permanently be represented.
 
