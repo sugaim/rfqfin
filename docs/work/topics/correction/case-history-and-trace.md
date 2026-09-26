@@ -1,16 +1,16 @@
-# Case History, Restore, Trace, and Replayable Operations
+# Case History, Restore, Reopen, Trace, and Replayable Operations
 
 ## Status
 
-Active retained rationale for the canonical RfqCaseRevision / Operational Restore / TraceData foundation.
+Active retained rationale for the canonical RfqCaseRevision / Restore / Reopen / TraceRecord foundation.
 
-The canonical authority is `../../../domain.md`. This note explains why the current model has its shape and records the bridge into historical correction.
+The canonical authority is `../../../domain.md`. This note preserves the reasoning bridge into historical correction without duplicating the full canonical model.
 
-The earlier abstract correction-history model is not the starting point for current work.
+The earlier abstract correction-history model is not the current semantic starting point.
 
 ## 1. Layered model
 
-The current model separates four concepts:
+The current model separates:
 
     RfqCase
       = one complete valid business state
@@ -19,21 +19,22 @@ The current model separates four concepts:
       = one immutable operational occurrence of that state
 
     RfqCaseHistory
-      = retained chronology of revisions for one CaseId
+      = retained operational chronology for one CaseId
 
-    TraceData
-      = durable self-contained business representation
-        materialized from operational history
+    TraceRecord
+      = one durable record materializing a CaseActivityDigest
 
-RfqCase does not itself mean "the latest operational record."
+    CaseActivityDigest
+      = compressed, business-semantic activity representation
+        resolved from the effective operational path
 
-RfqCaseHistory is a Domain chronology concept, not a requirement to eagerly load one in-memory collection.
+RfqCaseHistory is operational chronology. CaseActivityDigest is not an event-store copy and intentionally omits some operational detail.
 
-TraceData may outlive RfqCaseHistory, so it cannot depend on Case-local child IDs or version chronology for interpretation.
+TraceRecord may outlive RfqCaseHistory.
 
 ## 2. First-class ordinary Case operations
 
-The positive-flow model now treats ordinary business operations as first-class Domain Objects.
+Ordinary business operations are first-class Domain Objects.
 
 Conceptually:
 
@@ -41,30 +42,28 @@ Conceptually:
         RfqCase x CaseOperation
         -> RfqCase
 
-This is a partial function: every operation has documented valid source-state shapes and invariants.
-
-The operation definition is canonical. The state graph is retained as a state-centric view of the same semantics because it is useful for understanding lifecycle reachability.
-
-Current hierarchy:
+The operation set is:
 
     CaseOperation
     = Open(OpenOperation)
     | Terminal(TerminalOperation)
+    | Reopen(ReopenOperation)
 
-The same fully resolved CaseOperation value is used for live positive flow and retained/replayed operational history.
+with:
 
-Application request models are separate. Application resolves:
+    OpenOperation     : Open -> Open
+    TerminalOperation : Open -> Terminal
+    ReopenOperation   : Terminal -> Open
 
-- current authenticated actor into the business ActorId where relevant;
-- business/action Timepoint and BusinessEntityLocalDate values;
-- generated Case-local IDs;
-- external calendar/calculation or other context;
+The same fully resolved CaseOperation value is used for:
 
-then constructs the fully resolved Domain Operation.
+- live Domain processing;
+- RfqCaseRevision.Applied provenance;
+- future retained-history replay/correction.
 
-A CaseOperation contains every exogenous argument needed to deterministically apply it to a valid source RfqCase. It does not duplicate values that are deterministically derivable from the source RfqCase merely for replay.
+Application request models are separate. Application resolves actor/time/date values, generated Case-local IDs, external context, and other exogenous inputs before constructing the Domain Operation.
 
-This removes the earlier need for a separate replay-only CaseCommand representation.
+Values deterministically available from the source RfqCase are not duplicated merely for replay convenience.
 
 ## 3. Revision transition provenance
 
@@ -75,23 +74,17 @@ Canonical transition provenance is:
     | Applied(CaseOperation)
     | RestoredFrom(TargetVersion)
 
-Published creates the initial revision.
+Reopen is genuine positive-flow business activity and therefore creates:
 
-For every accepted ordinary Domain Operation after publication:
+    Applied(Reopen(...))
 
-    next.Version == current.Version.Next()
-    next.CaseId == current.CaseId
-    next.Transition == Applied(operation)
+Operational Restore is different: it selects an earlier valid Open revision and therefore uses RestoredFrom.
 
-Rejected operations and pure Application/UI work create no revision.
-
-One accepted Domain Operation creates exactly one next revision. An Application composite may therefore create several revisions even when persistence commits them atomically.
-
-Applied(CaseOperation) stores the same fully resolved Domain Operation used by live processing, including generated identities and supplied actor/time/date values required for deterministic replay.
+One accepted CaseOperation creates exactly one next revision.
 
 ## 4. Operational Restore
 
-Operational Restore means abandoning the currently effective operational path and returning to a previously valid Open Case state so ordinary positive flow can continue.
+Restore means the currently effective operational path was mistaken.
 
 Given:
 
@@ -102,401 +95,305 @@ Given:
 Restore(v10) creates:
 
     v21
-    - Version = v20.Version.Next()
     - Case = v10.Case
     - Transition = RestoredFrom(v10.Version)
 
-The target:
+The abandoned chronology remains immutable.
 
-- belongs to the same Case chronology;
-- is earlier than current;
-- is Open;
-- may itself belong to a path previously superseded.
+Restore is not a CaseActivityDigest activity. It changes which operational path is current.
 
-The current revision may be Open or Terminal.
+Restore produces one:
 
-Terminal revisions are not Restore targets.
+    TraceRecord
+    Kind = RestoreSnapshot
 
-Case-local child identities from the selected target revision are reused exactly.
+whose Digest represents the abandoned path immediately before Restore. Digest.EndContext is the abandoned path endpoint, not the restored target.
 
-Restore is not an inverse CaseOperation and does not remove the mistaken path from operational chronology.
+Restore does not create another TraceRecord merely to restate the restored Open revision.
 
-A genuinely correct Away/Close followed later by renewed customer interest is not automatically Restore. Restore represents correction of a mistaken operational path; renewed business after a correct terminal outcome has different meaning.
+## 5. Genuine Reopen
 
-## 5. Operation API boundary and terminal Trace
+Reopen means the terminal occurrence was correct and remains genuine business activity, but the same negotiation context later resumes.
 
-The pure underlying business semantics can be reasoned about as:
+The same CaseId continues. Whether resumed activity belongs to the same negotiation context is a business assertion by the operator/Application; it is not inferred from matching fields.
 
-    RfqCase x OpenOperation
-        -> Open RfqCase
+Normal Reopen variants are:
 
-    RfqCase x TerminalOperation
-        -> Terminal RfqCase
+    ReopenOperation
+    = ReopenAway
+    | ReopenUnpresented
+    | ReopenCancellation
 
-but this does not imply that every internal factorization should become public API.
+Positive-flow applicability:
 
-Ordinary Open processing is conceptually:
+    Closed(Presented(Away))
+        -> ReopenAway
+        -> Negotiating.Pricing
 
-    ApplyOpen(
-        currentRevision,
-        openOperation
-    ) -> nextRevision
+    Closed(Unpresented)
+        -> ReopenUnpresented
+        -> Inquiry.Pricing
 
-Terminal processing is:
+    Cancelled(Withdrawn), PriorPresentation=None
+        -> ReopenCancellation
+        -> Inquiry.Pricing
 
-    ApplyTerminal(
-        currentRevision,
-        terminalOperation,
-        terminalTraceContext
-    ) -> TerminalResult
+    Cancelled(Withdrawn), PriorPresentation=Some
+        -> ReopenCancellation
+        -> Negotiating.Pricing
 
-    TerminalResult
-    - Revision
-    - Trace
+Closed(Hit) is not reopenable through ordinary positive flow.
 
-terminalTraceContext supplies the retained/resolved historical facts and Trace-recording context needed for materialization.
+Cancelled(CreatedInError) is not reopenable through ordinary positive flow.
 
-The exact loaded representation is implementation-specific.
+Every Reopen creates a fresh PricingEpisode and never restores a FirmQuote.
 
-The important API invariant is that callers should not casually be able to:
+## 6. Terminal pricing context
 
-- create a terminal revision while omitting its Trace;
-- materialize TraceData from arbitrary snapshots disconnected from the Domain operation that makes the representation effective.
+Terminal state retains a logically meaningful pricing context rather than a Reopen-specific cache:
 
-Revision and Trace produced by one terminal operation should be persisted atomically.
+    TerminalPricingContext
+    - PricingEpisode
+    - PriorPresentation?
 
-Restore similarly returns Revision + one superseding Trace.
+    PriorPresentation
+    - Presentation
+    - AwayOutcome?
 
-## 6. Current terminal-operation model
+All terminal states carry TerminalPricingContext, including Hit.
 
-Terminal operations are:
+It records the pricing lineage from which the Case terminated. Reopen merely consumes that already-meaningful terminal fact.
 
-    TerminalOperation
-    = CloseCase
-    | Cancel
+For cancellation, presentation context is preserved when one existed. Cancellation does not erase a prior customer Presentation.
 
-CloseCase contains:
+## 7. Reopen pricing provenance
 
-    CaseClose
-    - CloseDate
-    - ClosedBy
-    - ClosedAt
+New Reopen Episodes use:
 
-    CloseOutcome
-    = Hit(HitDate, HitAt)
-    | Away(AwayClosure)
-    | Unpresented(Feedback?)
-
-    AwayClosure
-    = AlreadyRecorded
-    | RecordNow(AwayDate, Feedback?)
-
-Hit and Away are Presentation outcomes.
-
-Hit is terminal in normal positive flow.
-
-Away is not necessarily terminal. It may already have been recorded by RequestRepricingOnAway and followed by another pricing round.
-
-For CloseCase(Away):
-
-- AlreadyRecorded reuses the latest Presentation's existing immutable Away outcome;
-- RecordNow establishes the Away outcome as part of closure.
-
-These are not two business kinds of Away. They only describe whether the Away fact already exists in the source state.
-
-## 7. Away recording semantics
-
-PresentationAwayOutcome now carries:
-
-    PresentationAwayOutcome
-    - PresentationId
-    - AwayDate
-    - RecordedBy
-    - RecordedAt
-    - Feedback?
-
-AwayDate is the business-effective local date attributed to the Away outcome.
-
-RecordedBy / RecordedAt describe the internal actor and absolute time at which that Away fact was established in the Domain. They do not claim that this actor caused the client to go Away or that RecordedAt is the exact external customer-event time.
-
-For RequestRepricingOnAway:
-
-    RecordedBy = RequestedBy
-    RecordedAt = RequestedAt
-
-For CloseCase(Away.RecordNow):
-
-    RecordedBy = ClosedBy
-    RecordedAt = ClosedAt
-
-No separate AwayAt is currently modeled.
-
-## 8. Quote invalidation and validity extension
-
-ExpireQuote is no longer a separate operation.
-
-    QuoteInvalidationReason
-    = Expired
-    | Withdrawn
-
-    InvalidateQuote
-    - InvalidatedBy
-    - InvalidatedAt
-    - Reason
-
-Expired requires:
-
-    InvalidatedAt >= current ValidUntil
-
-Withdrawn has no expiry-time precondition.
-
-Clock passage alone never mutates RfqCase.
-
-ExtendValidity is:
-
-    ExtendValidity
-    - NewValidUntil
-    - ExtendedBy
-    - ExtendedAt
-
-with:
-
-    NewValidUntil > CurrentValidUntil
-
-Extension may occur after the old ValidUntil has already elapsed.
-
-No current invariant relates ExtendedAt to NewValidUntil.
-
-The broader operation design intentionally keeps operation-specific actor/time names rather than introducing a generic Stamp type, because these Timepoint/ActorId values are logical Domain facts rather than technical audit metadata.
-
-## 9. PricingEpisode provenance
-
-The operation that records an Away and begins the next pricing round is:
-
-    RequestRepricingOnAway
-
-The new PricingEpisode uses:
-
-    PricingEpisodeOrigin.Away(
+    ReopenedFromAway(
         PreviousPricingEpisodeId,
         PresentationAwayOutcome
     )
 
-This distinction is intentional:
+    ReopenedFromUnpresented(
+        PreviousPricingEpisodeId,
+        Feedback?
+    )
 
-- operation names describe business actions;
-- PricingEpisodeOrigin names describe the business fact from which an Episode arose.
+    ReopenedFromCancellation(
+        PreviousPricingEpisodeId,
+        PriorPresentation?
+    )
 
-Ordinary RequestRepricing remains distinct and applies to an unpresented current FirmQuote.
+A Reopen operation explicitly supplies:
 
-## 10. Durable TraceData
+- NewPricingEpisodeId;
+- ReopenDate;
+- NewAssumedTradeDate;
+- ReopenedBy;
+- ReopenedAt.
 
-TraceData is a compact durable business-activity representation, not a copy of the operational log.
+The new Episode preserves current RfqTerms and prior QuoteOwner, sets PricingDate=ReopenDate, and uses the explicit NewAssumedTradeDate.
 
-Top-level metadata:
+No chronology invariant requires ReopenDate / ReopenedAt to be after the prior terminal date/time.
 
-    TraceData
+Application/UI may provide a convenience default for NewAssumedTradeDate, but the Domain receives the resolved explicit value.
+
+## 8. Cancellation reason boundary
+
+The current minimal positive-flow taxonomy is:
+
+    CancellationReason
+    = Withdrawn
+    | CreatedInError
+
+Withdrawn means a genuine Case was stopped and is the only ordinary cancellation reason eligible for Reopen.
+
+CreatedInError includes duplicate or mistaken creation cases. If that classification itself was wrong, correction/Restore semantics apply rather than ordinary Reopen.
+
+Future business/statistical requirements may refine the non-reopenable taxonomy.
+
+## 9. TraceRecord and CaseActivityDigest
+
+TraceRecord is now centered on business activities rather than an outer Open/Terminal trace-state hierarchy.
+
+    TraceRecord
     - RecordedBy
     - RecordedAt
     - RecordedBusinessDate
-    - Origin
-    - Representation
+    - Kind
+    - Digest : CaseActivityDigest
 
-These Recorded* fields describe production of this TraceData record and are distinct from business-event/action timestamps inside the represented activity.
+    TraceRecordKind
+    = HitClose
+    | AwayClose
+    | UnpresentedClose
+    | Cancelled
+    | Reopened
+    | RestoreSnapshot
 
-Current state structure:
+    CaseActivityDigest
+    - CaseId
+    - BusinessEntity
+    - OpenDate
+    - InitialContext
+    - EndContext
+    - Activities : TraceActivity[]
 
-    TraceState
-    = Effective(TerminalTrace)
-    | Superseded(
-          Snapshot : TraceSnapshot,
-          Reason : SupersessionReason
-      )
+    CaseContext
+    - ContactOwnerId
+    - QuoteOwnerId
+    - Terms
 
-    TraceSnapshot
-    = Open(OpenTrace)
-    | Terminal(TerminalTrace)
+InitialContext is publication context.
 
-    TerminalTrace
-    = PresentedClosed(PresentedClosedTrace)
-    | UnpresentedClosed(UnpresentedClosedTrace)
-    | Cancelled(CancelledTrace)
+EndContext is the endpoint context of the path represented by that Digest. For RestoreSnapshot it is the abandoned path endpoint.
 
-Effective is necessarily terminal.
+Open/Terminal is derived from the activity chronology; it is not redundantly encoded by separate OpenTrace / TerminalTrace wrappers.
 
-Superseded may contain the Open or Terminal representation that ceased to be effective.
+## 10. Flat Trace activity chronology
 
-A superseding Trace repeats the business representation rather than linking to an older TraceData by TraceId.
+TraceActivity is an ordered semantic digest.
 
-## 11. Trace activity retention
+Important variants include:
 
-Trace detailed customer/pricing activity starts at the first Presentation.
+- FirstPresentation;
+- Presentation;
+- RepricingRequested;
+- RepricingRequestedOnAway;
+- QuoteOwnerChanged;
+- PricingDateRolled;
+- AssumedTradeDateChanged;
+- ValidityExtended;
+- HitClose;
+- AwayClose;
+- UnpresentedClose;
+- Cancelled;
+- Reopened.
 
-Before first Presentation, pricing/workflow changes are intentionally compressed away.
+Terminal occurrences are first-class activities. A genuine terminal followed by Reopen therefore remains visibly present in later Digests:
 
-After first Presentation, current ActivityChange variants are:
+    Presentation
+    AwayClose
+    Reopened
+    Presentation
+    HitClose
 
-    ActivityChange
-    = RepricingRequested(...)
-    | RepricingRequestedOnAway(...)
-    | QuoteOwnerChanged(...)
-    | PricingDateRolled(...)
-    | AssumedTradeDateChanged(...)
-    | ValidityExtended(...)
+Reopen does not contain the prior terminal as nested payload. The terminal and Reopen are independent ordered business occurrences.
 
-ActivityChange uses past-tense business-fact names. It is not a CaseOperation copy.
+Restore is intentionally absent from TraceActivity because it is operational path selection rather than genuine business activity.
 
-For activities retained in TraceData, actor/time is retained with the activity.
+## 11. First Presentation boundary
 
-Current important payload choices:
+FirstPresentation is a distinct Trace activity because it is the Inquiry -> Negotiating boundary.
 
-    RepricingRequested(
-        RejectedQuoteValue,
-        Feedback?,
-        RequestedBy,
-        RequestedAt
-    )
+It carries:
 
-    RepricingRequestedOnAway(
-        PreviousQuoteValue,
-        AwayDate,
-        Feedback?,
-        RequestedBy,
-        RequestedAt
-    )
+- durable Terms;
+- ContactOwnerId;
+- Presentation pricing context;
+- Quote;
+- Presentation.
 
-    QuoteOwnerChanged(
-        PreviousQuoteOwnerId,
-        ChangedBy,
-        ChangedAt
-    )
+This records the Terms/context under which customer negotiation first began.
 
-    PricingDateRolled(
-        PreviousPricingDate,
-        RolledBy,
-        RolledAt
-    )
+Same-Case Notional / SettlementDateRule changes are prohibited after first Presentation. There is therefore no artificial FixTerms activity.
 
-    AssumedTradeDateChanged(
-        PreviousAssumedTradeDate,
-        ChangedBy,
-        ChangedAt
-    )
+Later Presentation activities do not repeat Terms/ContactOwner merely because the first one did.
 
-    ValidityExtended(
-        PreviousValidUntil,
-        NewValidUntil,
-        ExtendedBy,
-        ExtendedAt
-    )
+## 12. Compression rules
 
-TraceQuote still materializes EffectiveValidUntil.
+Trace remains a digest, not a full event log.
 
-ValidityExtended is retained only after the first Presentation; pre-Presentation extension history remains compressed.
+Before FirstPresentation:
 
-ReplaceFirmQuote and InvalidateQuote are currently not retained as separate ActivityChange values.
+- ordinary pricing/context changes are compressed;
+- this remains true even after a pre-Presentation Cancel/Reopen cycle;
+- FirstPresentation records the relevant boundary context.
 
-These are deliberate compression choices, not claims of semantic equivalence.
+Lifecycle milestones are never compressed merely because no Presentation has yet occurred:
 
-## 12. Identity resolution and retention
+- UnpresentedClose;
+- Cancelled;
+- Reopened.
 
-TraceData removes Case-local:
+After FirstPresentation, the selected pricing/customer semantic changes retained by the canonical model are kept in ordered TraceActivity form.
 
-- RfqTermsId;
-- PricingEpisodeId;
-- QuoteId;
-- PresentationId.
+Terminal activities do not duplicate their historical CaseContext. The milestone TraceRecord created at that time remains durable and holds that endpoint context.
 
-Construction resolves those identities to durable business values while operational history is available.
+## 13. History resolution and retention
 
-Repeated use of one immutable Case-local ID across revisions must resolve to the same value.
+TraceRecord construction resolves Case-local IDs to durable business values while RfqCaseHistory is available.
 
-Some Trace facts, such as EffectiveValidUntil and ordered ActivityChange, are chronological rather than simple ID lookups.
+Reopen state construction itself uses the current TerminalPricingContext.
 
-Operational history may have finite retention. It must remain available while a still-supported history-dependent operation requires it to construct TraceData.
+Reopened TraceRecord construction is different: it is independently materialized from retained operational History. It is not copied from the prior terminal TraceRecord.
 
-## 13. Newly identified positive-flow question: Reopen
+This preserves audit value: the terminal-time representation and reopen-time representation are independent durable observations of the resolved chronology.
 
-Before continuing historical-correction replay design, one positive-flow lifecycle question remains newly identified:
+There is no fallback from missing History to copying an older TraceRecord.
 
-> can a genuinely correct terminal Case later reopen because business activity resumes?
+Retention rules therefore preserve operational History while any supported history-dependent operation still needs it:
 
-This is deliberately distinct from Operational Restore.
+- Open Cases retain enough History for the next terminal/Restore TraceRecord;
+- terminal Cases retain enough History for the supported Reopen/Restore window;
+- after Reopen, pre-Reopen History remains retained while the Case is Open so a later terminal/Restore digest can still be constructed from History alone.
 
-Restore means the prior operational path was mistaken and returns to an earlier valid Open revision.
+The Reopen window is operational/Persistence policy, not a Domain chronology invariant.
 
-Reopen, if admitted, would mean the terminal outcome remains a true historical business fact, but later business activity begins again on the same Case.
+## 14. Revision + Trace API
 
-The cases must not be assumed symmetric:
+Open-only operations return the next revision.
 
-- Closed(Away) may plausibly reopen when the client genuinely went Away and later returns;
-- Cancelled requires deciding whether cancellation semantics ever permit the same Case identity to become active again;
-- Closed(Hit) may have booking/downstream consequences and should not inherit Away semantics automatically.
+Terminal, Reopen, and Restore operations return:
 
-Admitting Reopen would affect the current operation taxonomy because it introduces a potential Terminal -> Open Domain operation in addition to:
+    RevisionTraceResult
+    - Revision
+    - Trace : TraceRecord
 
-    OpenOperation : Open -> Open
-    TerminalOperation : Open -> Terminal
+with operation-specific historical context inputs:
 
-It would also require explicit revision-provenance and TraceData semantics so that the original terminal fact is not rewritten as though it had been mistaken.
+- TerminalTraceContext;
+- ReopenTraceContext;
+- RestoreTraceContext.
 
-This question should be resolved as positive-flow Domain semantics before replay-path selection for historical correction.
+Do not collapse those contexts into one large generic context merely because the result shape is shared.
 
-## 14. Bridge to historical correction
+Revision + TraceRecord produced by one Domain operation should be persisted atomically.
 
-The ordinary replay language is now concrete:
+## 15. Bridge to historical correction
+
+The concrete retained foundation is now:
 
     initial Published revision
       + Applied(CaseOperation)
       + RestoredFrom provenance
+      + durable TraceRecord milestones
 
-Historical correction may reuse ordinary CaseOperation semantics while the corrected business history remains expressible by RfqCase.
+Reopen is no longer an unresolved prerequisite.
 
-Replay is a construction/validation mechanism; it is not automatically a claim that a corrected operation sequence literally happened.
+The next historical-correction question is replay source/path selection when RfqCaseHistory contains:
 
-The remaining historical-correction design problems are:
+- physical v1..vn chronology;
+- RestoredFrom edges;
+- paths that were once effective and later abandoned;
+- terminal/Reopen milestone TraceRecords.
 
-- selecting the correct replay source/path when Restore/superseded paths exist;
-- defining allowed edits to the retained CaseOperation program;
-- determining the boundary where ordinary RfqCase replay is no longer expressive;
-- defining the minimal Trace-side correction state;
-- defining any EffectiveCommand language;
-- materializing Superseded + corrected Effective Trace records;
-- correction-of-correction;
-- deciding whether any explicit adequacy relation is needed.
+Do not assume that the physical revision sequence is one linear replay program.
 
-Do not restart from the old Supports(H_rep, H_true) abstraction.
+The next design unit must determine:
 
-## 15. Domain/Application/Persistence boundary
+- what semantic ancestry/path is selected when correcting a historical business occurrence;
+- how RestoredFrom participates in replay;
+- how current effective-state reconstruction differs from reconstruction of an abandoned historical path;
+- how correction targets a path that is no longer current but was once effective.
 
-Domain owns:
-
-- CaseOperation business validity and deterministic meaning;
-- resulting RfqCase;
-- Version.Next() and RfqCaseTransition provenance;
-- Restore business semantics;
-- Trace business representation for terminal/Restore operations.
-
-Application owns:
-
-- authorization;
-- CurrentUser resolution;
-- external context/calendar/calculation;
-- ID allocation before constructing fully resolved Domain Operations;
-- orchestration/composites.
-
-Persistence owns:
-
-- stale-write protection;
-- physical storage;
-- atomic append of Domain-produced Revision + Trace facts.
-
-External customer communications, notifications, booking, and other irreversible side effects are not reversed automatically by Restore or historical correction.
+Use the concrete correction catalog rather than restarting from the old Supports(H_rep, H_true) abstraction.
 
 ## 16. Canonical incorporation
 
 The decisions in this note are incorporated into `../../../domain.md`.
 
-The completed operational-history foundation from Design Session 05 remains useful historical rationale. The first-class CaseOperation refinement and related positive-flow/Trace changes are recorded separately in Design Session 06.
+Design Sessions 05 and 06 remain historical rationale for the operational-history and first-class-operation foundations. Session 07 records the Reopen and CaseActivityDigest refinement.
 
-Historical correction itself remains the active next design unit.
+Historical correction replay source/path selection remains the active next design problem.
