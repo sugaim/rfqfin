@@ -582,18 +582,16 @@ Cases 3A, 5, 12B, 25, and 27 expose a distinction between:
 
 Exactly where identity is business-significant remains open.
 
-### Command sequences remain useful without being historical truth
+### Operation sequences remain useful without being historical truth
 
-Cases 14–17 suggest that ordinary Domain operations and their invariants may be reusable to construct corrected Histories.
+Cases 14–17 suggest that ordinary CaseOperation semantics and invariants may be reusable to construct corrected business histories.
 
-A command sequence generated during correction should be treated as a construction/replay witness unless there is independent reason to assert that it is the actual historical sequence.
+An operation sequence produced during correction should be treated as a construction/replay witness unless there is independent reason to assert that it is the literal historical sequence.
 
 ## Immediate use in the next discussion
 
-The next correction discussion should take candidate definitions of:
+Use this catalog first to test replay source/path selection over retained RfqCaseRevision chronology, especially when RestoredFrom creates superseded operational paths.
 
-    Supports(H_rep, H_true)
+After the replay source/path is clear, use the same cases to test allowed edits to Applied(CaseOperation) sequences and to identify the point where ordinary RfqCase replay is no longer expressive enough.
 
-and apply them to this catalog.
-
-The first goal is not to define correction APIs. It is to determine which business observations or relationships must be preserved so that one valid History is a sufficient corrected representation of another.
+Do not begin by defining Supports(H_rep, H_true). Introduce an explicit adequacy relation only if concrete cases later show that one is needed.
