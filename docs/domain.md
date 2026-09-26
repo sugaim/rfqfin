@@ -1457,7 +1457,7 @@ The current operational state is the RfqCase contained in the current/latest rev
     RfqCaseTransition
     = Published(DraftId)
     | Applied(CaseOperation)
-    | RestoredFrom(TargetVersion)
+    | Restored(RestoreOperation)
 
 Published(DraftId) is used only for the initial revision created by PublishDraft:
 
@@ -1472,7 +1472,7 @@ For every accepted ordinary operation after publication:
     next.Version == current.Version.Next()
     next.Transition == Applied(operation)
 
-This includes ReopenOperation. Reopen is genuine positive-flow business activity and therefore uses Applied(Reopen(...)); it does not use RestoredFrom.
+This includes ReopenOperation. Reopen is genuine positive-flow business activity and therefore uses Applied(Reopen(...)); it does not use Restored(RestoreOperation).
 
 One accepted Domain Operation creates exactly one next revision. Rejected operations and pure UI/Application work do not create revisions. An Application composite that executes several accepted Domain operations therefore creates several revisions even if they are persisted in one transaction.
 
@@ -1497,7 +1497,7 @@ ApplyRestore creates:
     - CaseId = v20.CaseId
     - Version = v20.Version.Next()
     - Case = v10.Case
-    - Transition = RestoredFrom(v10.Version)
+    - Transition = Restored(operation)
 
 Restore semantics:
 
@@ -2146,7 +2146,7 @@ The current foundation allows historical-correction design to start from concret
 
     initial Published revision
       + Applied(CaseOperation) chronology
-      + RestoredFrom provenance
+      + RestoreOperation provenance
       + durable TraceRecord milestones
 
 Ordinary CaseOperation replay/correction may be reused while the intended corrected history remains expressible by the positive-flow RfqCase model. A correction-native representation may still be required for business histories that cannot be represented by ordinary RfqCase states/operations.
