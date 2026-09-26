@@ -1333,8 +1333,8 @@ Reinstating an earlier terminal business outcome is a different meaning from ope
 
 Restore additionally produces exactly one superseding TraceData record for the path that was effective immediately before Restore:
 
-- restoring while current is Open produces a superseded Open representation;
-- restoring while current is Terminal produces a superseded Effective representation.
+- restoring while current is Open produces a Superseded(Open(...), OperationalRestore) representation;
+- restoring while current is Terminal produces a Superseded(Terminal(...), OperationalRestore) representation.
 
 Restore does not itself produce a new Effective terminal representation because the target is Open. A later terminal operation after restored processing produces the next Effective TraceData.
 
