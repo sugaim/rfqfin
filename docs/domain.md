@@ -84,7 +84,7 @@ Examples:
 - current BusinessEntityLocalDate, external calculation, ID allocation, persistence, transaction management, and purely technical audit metadata belong outside Domain;
 - an Application use case may compose multiple Domain operations atomically.
 
-Conversely, two operations may share the same source and target state but remain different Domain operations when their business meaning differs. In particular, ExpireQuote and InvalidateQuote are not collapsed merely because both remove the current FirmQuote; expiry and an explicit business withdrawal are different facts.
+Conversely, two operation variants or typed reasons may share the same source and target state while preserving different business meaning. Invalidation because validity elapsed and explicit withdrawal are represented as distinct QuoteInvalidationReason values under one InvalidateQuote operation.
 
 ### 3.3 Application composites do not redefine Domain semantics
 
@@ -110,7 +110,7 @@ The following remain outside the positive-flow RfqCase state itself:
 
 Operational correction is no longer wholly Domain-external: operational Restore, RfqCaseRevision chronology, and durable TraceData are defined below.
 
-The broader historical-correction command language remains deliberately deferred. In particular, the exact replayable CaseCommand representation and the Trace-native EffectiveCommand model are not yet canonicalized beyond the minimum chronology semantics required here.
+The ordinary replayable CaseOperation language is canonicalized below and is used by accepted revision provenance. The broader historical-correction construction model, including any Trace-native EffectiveCommand language, remains deliberately deferred.
 
 ## 4. Naming and notation
 
@@ -120,7 +120,7 @@ Use:
 
 - RfqCase, RfqDraft, RfqTerms, PricingEpisode;
 - CaseId, DraftId, QuoteId, PresentationId;
-- CommitQuote, PresentQuote, ContinueAfterAway, PublishDraft.
+- CommitQuote, PresentQuote, RequestRepricingOnAway, PublishDraft.
 
 Do not mix snake_case into the domain vocabulary.
 
@@ -358,6 +358,7 @@ In particular it does not contain:
 - UI state;
 - audit actor/time.
 
+
 ### 9.1 PricingEpisodeOrigin
 
     PricingEpisodeOrigin
@@ -371,7 +372,7 @@ In particular it does not contain:
           QuoteId,
           Feedback?
       )
-    | ContinuedAfterAway(
+    | Away(
           PreviousPricingEpisodeId,
           PresentationAwayOutcome
       )
@@ -380,7 +381,9 @@ Origin is exactly one variant, not a bag/list of causes.
 
 If an Application composite performs two episode-changing Domain operations, two episodes are created in sequence. The current episode is the latest one.
 
-Origin stores only information needed to explain why the new pricing round exists. Most variants identify the previous PricingEpisode so the Episode lineage remains explicit. ContinuedAfterAway additionally retains the immutable PresentationAwayOutcome that caused continuation; this intentional value duplication keeps the Episode's business provenance stable even after the Case moves on to later Presentations.
+Origin stores only information needed to explain why the new pricing round exists. Most variants identify the previous PricingEpisode so Episode lineage remains explicit. Away additionally retains the immutable PresentationAwayOutcome that caused the new pricing round; this intentional value duplication keeps the Episode's business provenance stable even after the Case moves on to later Presentations.
+
+The operation that creates an Away-origin Episode is RequestRepricingOnAway. The operation name describes the business action; PricingEpisodeOrigin.Away describes the business fact from which the new Episode originated.
 
 ## 10. Quote and FirmQuote
 
@@ -406,21 +409,28 @@ CommittedBy and CommittedAt record who actually committed the Quote and when tha
 
 A Quote means a price condition produced in a specific PricingEpisode. It does not by itself mean that the price is current, firm, or customer-visible.
 
+
 ### 10.1 FirmQuote
 
     FirmQuote
     - Quote
     - ValidUntil : Timepoint
 
-FirmQuote is current-state data meaning that the Quote is currently firm.
+FirmQuote is current-state data meaning that the Quote is currently firm according to the currently recorded validity.
 
 At most one FirmQuote is current in a Case.
 
-ValidUntil is not part of Quote identity. A still-valid FirmQuote may have ValidUntil extended while retaining the same QuoteId.
+ValidUntil is not part of Quote identity. ExtendValidity may move ValidUntil later while retaining the same QuoteId.
 
-An expired quote is not revived by extending ValidUntil. A new Quote is required after expiry.
+Time passing does not automatically mutate Domain state. An expired FirmQuote may therefore remain structurally current until another explicit operation changes the Case.
 
-Time passing does not automatically mutate Domain state. ExpireQuote is an explicit operation.
+ExtendValidity may be accepted even after the previously recorded ValidUntil has elapsed. Its current invariant is only:
+
+    NewValidUntil > CurrentValidUntil
+
+No ordering invariant is currently imposed between ExtendedAt and NewValidUntil.
+
+InvalidateQuote with Reason=Expired represents explicit Domain recognition that the current FirmQuote is being invalidated because its validity elapsed.
 
 ## 11. QuotePresentation
 
@@ -471,22 +481,41 @@ Meaning:
 
 Hit is terminal for the Case in normal flow.
 
+
 ### 12.2 PresentationAwayOutcome
 
     PresentationAwayOutcome
     - PresentationId
     - AwayDate : BusinessEntityLocalDate
+    - RecordedBy : ActorId
+    - RecordedAt : Timepoint
     - Feedback : string?
 
-AwayDate is the date on which that Presentation became known/recorded as Away.
+AwayDate is the BusinessEntity-local date to which the Presentation's Away outcome is attributed.
 
-Away is not necessarily terminal for the Case. It may create a new PricingEpisode through ContinueAfterAway.
+RecordedBy and RecordedAt identify the internal actor and absolute time at which the Away outcome was established in the Domain. They do not claim that this actor caused the customer to go Away, nor that RecordedAt is the exact external customer-event time.
 
-AwayDate is not required to equal PresentationDate or PricingDate.
+For RequestRepricingOnAway, RecordedBy / RecordedAt come from RequestedBy / RequestedAt. When CloseCase records an Away outcome as part of closure, they come from ClosedBy / ClosedAt.
+
+Away is not necessarily terminal for the Case. RequestRepricingOnAway may establish the Away outcome and create a new PricingEpisode.
+
+AwayDate is not required to equal PresentationDate, PricingDate, or the local date corresponding to RecordedAt.
+
 
 ## 13. Case outcome and terminal state
 
 The outcome of a valid RFQ Case is modeled separately from cancellation.
+
+    CaseClose
+    - CloseDate : BusinessEntityLocalDate
+    - ClosedBy : ActorId
+    - ClosedAt : Timepoint
+
+    Cancellation
+    - CancellationDate : BusinessEntityLocalDate
+    - CancelledBy : ActorId
+    - CancelledAt : Timepoint
+    - CancellationReason
 
     CaseOutcome
     = Presented(PresentationOutcome)
@@ -494,17 +523,10 @@ The outcome of a valid RFQ Case is modeled separately from cancellation.
 
     TerminalState
     = Closed(
-          CloseDate : BusinessEntityLocalDate,
-          ClosedBy : ActorId,
-          ClosedAt : Timepoint,
+          Close : CaseClose,
           Outcome : CaseOutcome
       )
-    | Cancelled(
-          CancellationDate : BusinessEntityLocalDate,
-          CancelledBy : ActorId,
-          CancelledAt : Timepoint,
-          CancellationReason
-      )
+    | Cancelled(Cancellation)
 
 Semantics:
 
@@ -513,25 +535,25 @@ Semantics:
 - exact CancellationReason variants are intentionally deferred until exception/correction requirements are designed;
 - CancellationReason is expected to be typed, not an unrestricted string.
 
-CloseDate is the BusinessEntity-local date the Case itself was closed. ClosedAt is the absolute time of the closing action and ClosedBy is the actual actor that performed it. These are distinct from HitDate and AwayDate.
+CloseDate is the BusinessEntity-local date the Case itself was closed. ClosedAt is the absolute time of the closing action and ClosedBy is the internal actor that performed it. These are distinct from HitDate and AwayDate.
 
-CancellationDate is likewise the BusinessEntity-local cancellation date, while CancelledAt and CancelledBy record the absolute action time and actor.
+CancellationDate is likewise the BusinessEntity-local cancellation date, while CancelledAt and CancelledBy record the cancellation action time and actor.
 
 Examples:
 
 - a customer may Hit on one date and operational Case closure may be recorded later;
 - a Presentation may go Away, pricing may continue, and the Case may be closed on a later date.
 
-### 13.1 Presented Case close and existing Away outcomes
+### 13.1 Presented Case close and Away outcomes
 
 When a Negotiating Case closes Away:
 
-- use the latest QuotePresentation;
-- if that Presentation already has a PresentationAwayOutcome, reuse it;
-- otherwise create the PresentationAwayOutcome as part of the close operation;
-- CaseOutcome is Presented(Away(...)).
+- the outcome applies to the latest QuotePresentation;
+- if that Presentation already has a PresentationAwayOutcome, CloseCase uses the already-recorded outcome;
+- otherwise CloseCase records the PresentationAwayOutcome as part of closure;
+- the resulting CaseOutcome is Presented(Away(...)) in either path.
 
-This rule avoids manufacturing a second Away result for a Presentation that already went Away and triggered continued pricing.
+Whether the Away outcome was already recorded is an operation-construction distinction, not a different business kind of Away.
 
 ### 13.2 Unpresented close
 
@@ -541,7 +563,13 @@ A Case that has never reached a customer Presentation closes as:
 
 There is no PresentationOutcome because no Presentation exists.
 
-### 13.3 Deferred close classification
+### 13.3 Genuine renewed interest after terminal close
+
+A later customer return after a genuinely correct Away/Close is not treated as Operational Restore merely because the business resumes.
+
+Operational Restore means abandoning a mistaken operational path and returning to an earlier valid Open revision. A genuinely correct terminal outcome followed by renewed customer interest is a different business meaning; it may require a new RFQ/Case or a future explicit reopen concept if a concrete requirement demands one.
+
+### 13.4 Deferred close classification
 
 The model does not yet carry a separate Case-level Away classification/reason for a Presented Case after the latest Presentation already went Away.
 
@@ -683,19 +711,22 @@ Normal chronology requires PresentationHitOutcome.HitDate not to precede Present
 
 PricingDate, PresentationDate, and HitDate are distinct business facts. The Domain does not require equality between them.
 
+
 ### 16.6 Away timing
 
 AwayDate need not equal PricingDate or PresentationDate.
 
 Normal chronology requires the Away outcome not to precede its Presentation.
 
+PresentationAwayOutcome.RecordedAt is the internal recording/establishment time of the Away fact, not an asserted external customer-event time. No equality or ordering relation between AwayDate and the local date corresponding to RecordedAt is currently required beyond the normal business chronology constraints on AwayDate.
+
 ### 16.7 Close timing
 
-CloseDate is separate from outcome date.
+CaseClose.CloseDate is separate from outcome date.
 
-In normal flow, a Presented outcome must exist no later than Case CloseDate.
+In normal flow, a Presented outcome must exist no later than CaseClose.CloseDate.
 
-CancellationDate is the date of Case cancellation, not a Presentation outcome date.
+Cancellation.CancellationDate is the date of Case cancellation, not a Presentation outcome date.
 
 ### 16.8 PricingDate roll
 
@@ -733,134 +764,379 @@ TradeDateLag does not require an equivalent cross-field check because Settlement
 
 This invariant applies to every Domain operation that can establish a new current Terms/Episode combination, including PublishDraft, ChangeRfqTerms, and ChangeAssumedTradeDate.
 
+
 ### 16.11 Time does not mutate state
 
 Clock passage alone does not change Domain state.
 
-An expired FirmQuote may remain structurally current until ExpireQuote or another explicit operation occurs.
+An expired FirmQuote may remain structurally current until InvalidateQuote(Reason=Expired) or another explicit operation changes the Case.
 
-Hit always checks HitAt against ValidUntil, so delayed expiry processing cannot allow an invalid Hit.
+InvalidateQuote(Reason=Expired) requires:
 
-## 17. Transition graph
+    InvalidatedAt >= FirmQuote.ValidUntil
 
-Every distinct positive-flow RfqCase operation in this graph is numbered even when two operations share the same source and target. Operational Restore is defined separately in Section 23.
+Hit always checks HitAt against the current FirmQuote.ValidUntil, so delayed expiry processing cannot allow an invalid Hit.
 
-### Inquiry transitions
+ExtendValidity may extend a structurally current FirmQuote even when ExtendedAt is later than the previous ValidUntil, provided:
 
-    [T01] PublishDraft / initial Case creation
-          -> Inquiry.Pricing
+    NewValidUntil > CurrentValidUntil
 
-T01 is the Case-side effect of D10 PublishDraft. There is no separate normal RfqCase creation path in the current model.
+
+## 17. RfqCase Domain operations
+
+### 17.1 Operation model
+
+Ordinary RfqCase business operations are first-class Domain Objects.
+
+Conceptually, the underlying state transition is a partial function:
+
+    Apply :
+        RfqCase x CaseOperation
+        -> RfqCase
+
+"Partial" means that an operation is valid only for its documented source-state shapes and invariants. CaseOperation is not an unrestricted function over every RfqCase variant.
+
+The function-like model is the canonical semantic definition. The state graph in Section 18 is retained as a state-centric view of the same semantics because it is useful for understanding lifecycle reachability.
+
+Application request models are not CaseOperation values. Application resolves external context before constructing a fully resolved Domain Operation, including supplied/generated Case-local identities, business ActorId/Timepoint values, business dates, and other exogenous arguments required by the operation.
+
+A CaseOperation:
+
+- is the same Domain value whether used by live positive flow or retained/replayed from operational history;
+- contains every exogenous argument required to deterministically apply that operation to a valid source RfqCase;
+- does not duplicate values that are deterministically derivable from the source RfqCase merely for replay convenience;
+- contains business actor/time facts where the accepted business action itself has such facts;
+- has no hidden dependency on current user, clock, ID allocation, database state, or external services.
+
+Conceptually:
+
+    application request
+      + resolved actor/time/date
+      + allocated IDs
+      + external context
+        -> fully resolved CaseOperation
+        -> Domain application
+
+Current operation hierarchy:
+
+    CaseOperation
+    = Open(OpenOperation)
+    | Terminal(TerminalOperation)
+
+OpenOperation always produces another Open RfqCase. TerminalOperation produces a Terminal RfqCase.
+
+PublishDraft is not a CaseOperation. It creates the initial RfqCaseRevision with Published(DraftId). Operational Restore is also separate because it selects an earlier revision rather than applying an ordinary business operation to the current Case state.
+
+### 17.2 OpenOperation shapes
+
+    OpenOperation
+    = CommitQuote(CommitQuote)
+    | ReplaceFirmQuote(ReplaceFirmQuote)
+    | InvalidateQuote(InvalidateQuote)
+    | RequestRepricing(RequestRepricing)
+    | ChangeRfqTerms(ChangeRfqTerms)
+    | ChangeQuoteOwner(ChangeQuoteOwner)
+    | RollPricingDate(RollPricingDate)
+    | ChangeAssumedTradeDate(ChangeAssumedTradeDate)
+    | PresentQuote(PresentQuote)
+    | ExtendValidity(ExtendValidity)
+    | RequestRepricingOnAway(RequestRepricingOnAway)
+    | ChangeContactOwner(ChangeContactOwner)
+
+    CommitQuote
+    - QuoteId
+    - Value : QuoteValue
+    - ValidUntil : Timepoint
+    - CommittedBy : ActorId
+    - CommittedAt : Timepoint
+
+    ReplaceFirmQuote
+    - QuoteId
+    - Value : QuoteValue
+    - ValidUntil : Timepoint
+    - CommittedBy : ActorId
+    - CommittedAt : Timepoint
+
+    QuoteInvalidationReason
+    = Expired
+    | Withdrawn
+
+    InvalidateQuote
+    - InvalidatedBy : ActorId
+    - InvalidatedAt : Timepoint
+    - Reason : QuoteInvalidationReason
+
+    RequestRepricing
+    - NewPricingEpisodeId
+    - Feedback?
+    - RequestedBy : ActorId
+    - RequestedAt : Timepoint
+
+    ChangeRfqTerms
+    - NewRfqTermsId
+    - NewPricingEpisodeId
+    - Notional : NotionalAmount
+    - SettlementDateRule
+    - ChangedBy : ActorId
+    - ChangedAt : Timepoint
+
+    ChangeQuoteOwner
+    - NewPricingEpisodeId
+    - NewQuoteOwnerId
+    - ChangedBy : ActorId
+    - ChangedAt : Timepoint
+
+    RollPricingDate
+    - NewPricingEpisodeId
+    - NewPricingDate : BusinessEntityLocalDate
+    - RolledBy : ActorId
+    - RolledAt : Timepoint
+
+    ChangeAssumedTradeDate
+    - NewPricingEpisodeId
+    - NewAssumedTradeDate : BusinessEntityLocalDate
+    - ChangedBy : ActorId
+    - ChangedAt : Timepoint
+
+    PresentQuote
+    - PresentationId
+    - PresentationDate : BusinessEntityLocalDate
+    - PresentedBy : ActorId
+    - PresentedAt : Timepoint
+
+    ExtendValidity
+    - NewValidUntil : Timepoint
+    - ExtendedBy : ActorId
+    - ExtendedAt : Timepoint
+
+    RequestRepricingOnAway
+    - NewPricingEpisodeId
+    - AwayDate : BusinessEntityLocalDate
+    - Feedback?
+    - RequestedBy : ActorId
+    - RequestedAt : Timepoint
+
+    ChangeContactOwner
+    - NewContactOwnerId
+    - ChangedBy : ActorId
+    - ChangedAt : Timepoint
+
+Generated Case-local IDs are supplied by the fully resolved operation when the result creates a new immutable child Entity. Previous/current IDs and values are omitted when they are deterministically available from the source RfqCase.
+
+Examples:
+
+- CommitQuote derives PricingEpisodeId from the source current Episode;
+- ChangeQuoteOwner derives the previous Episode, current RfqTermsId, PricingDate, and AssumedTradeDate from the source;
+- RequestRepricing derives the rejected current QuoteId and previous Episode from the source;
+- RequestRepricingOnAway derives the current PresentationId and previous Episode from the source.
+
+Operation actor/time fields are Domain business facts, not generic persistence audit metadata. They intentionally use operation-specific names rather than one generic Stamp type.
+
+### 17.3 OpenOperation semantics
+
+CommitQuote creates a new Quote and makes it the current FirmQuote. ReplaceFirmQuote creates a new Quote and atomically replaces the current FirmQuote without manufacturing a separate invalidation or Away outcome.
+
+InvalidateQuote removes the current FirmQuote while preserving the current PricingEpisode. Reason=Expired requires InvalidatedAt >= current ValidUntil. Reason=Withdrawn has no expiry-time precondition.
+
+RequestRepricing rejects the current unpresented firm price as the starting point for a new pricing round. It creates a new PricingEpisode with Origin=RepricingRequested(previous Episode, rejected QuoteId, Feedback?).
+
+ChangeRfqTerms creates new RfqTerms and a new PricingEpisode. Only Notional and SettlementDateRule may change within the same Case; ClientId, Side, and SecurityId are preserved from the source RfqTerms.
+
+ChangeQuoteOwner, RollPricingDate, and ChangeAssumedTradeDate each create one new PricingEpisode with the corresponding Origin. Values not changed by the operation are preserved from the source Episode.
+
+PresentQuote creates a QuotePresentation for the current FirmQuote.
+
+ExtendValidity preserves QuoteId and moves ValidUntil later. Its current invariant is:
+
+    NewValidUntil > CurrentValidUntil
+
+The operation is allowed even when ExtendedAt is later than the previous ValidUntil. No current invariant relates ExtendedAt to NewValidUntil.
+
+RequestRepricingOnAway establishes an Away outcome for the current Presentation and creates a new PricingEpisode with Origin=Away(previous Episode, PresentationAwayOutcome). The generated PresentationAwayOutcome uses:
+
+    RecordedBy = RequestedBy
+    RecordedAt = RequestedAt
+
+ChangeContactOwner changes only ContactOwnerId and preserves the current lifecycle-state shape and all pricing/presentation objects.
+
+### 17.4 TerminalOperation shapes
+
+    TerminalOperation
+    = CloseCase(CloseCase)
+    | Cancel(Cancel)
+
+    CloseCase
+    - Close : CaseClose
+    - Outcome : CloseOutcome
+
+    CloseOutcome
+    = Hit(
+          HitDate : BusinessEntityLocalDate,
+          HitAt : Timepoint
+      )
+    | Away(AwayClosure)
+    | Unpresented(Feedback?)
+
+    AwayClosure
+    = AlreadyRecorded
+    | RecordNow(
+          AwayDate : BusinessEntityLocalDate,
+          Feedback?
+      )
+
+    Cancel
+    - Cancellation : Cancellation
+
+CloseCase has one business meaning: establish the normal final Case outcome and close the Case.
+
+CloseCase(Hit) is valid only from Negotiating.Presented. It creates PresentationHitOutcome for the current Presentation. HitAt remains the business agreement time used for the validity invariant and is distinct from CaseClose.ClosedAt.
+
+CloseCase(Away) applies to the latest Presentation:
+
+- AlreadyRecorded requires the latest Presentation to already have PresentationAwayOutcome and reuses that same immutable fact;
+- RecordNow requires that no Away outcome is already recorded for the latest Presentation and creates one using AwayDate / Feedback with RecordedBy=Close.ClosedBy and RecordedAt=Close.ClosedAt.
+
+CloseCase(Unpresented) is valid only when the Case has never reached a Presentation.
+
+Cancel creates TerminalState.Cancelled(Cancellation) and does not manufacture a Hit/Away outcome.
+
+The AlreadyRecorded / RecordNow distinction does not define two kinds of business Away. It states only whether the Away fact already exists in the source Case or is established by this CloseCase operation.
+
+### 17.5 Revision-level operation API
+
+The pure business-state semantics above may be implemented internally, but the public Domain API does not need to expose arbitrary terminal-state application or standalone Trace materialization.
+
+Conceptually, ordinary Open processing is:
+
+    ApplyOpen(
+        currentRevision,
+        operation : OpenOperation
+    ) -> nextRevision
+
+Terminal processing is:
+
+    ApplyTerminal(
+        currentRevision,
+        operation : TerminalOperation,
+        terminalTraceContext
+    ) -> TerminalResult
+
+    TerminalResult
+    - Revision : RfqCaseRevision
+    - Trace : TraceData
+
+terminalTraceContext contains the retained/resolved historical facts and Trace-recording context needed to materialize the durable terminal Trace. Its exact loaded representation is an implementation concern.
+
+The API boundary should preserve the Domain invariant that a terminal accepted operation produces its terminal revision and corresponding Trace together. The fact that transition semantics can be reasoned about as RfqCase x TerminalOperation -> RfqCase does not imply that callers should be able to create a terminal revision without Trace or materialize TraceData from arbitrary snapshots.
+
+## 18. Operation applicability and state graph
+
+### 18.1 Applicability table
+
+The operation definition is canonical; this table lists valid source/target state shapes and notable state-dependent effects.
+
+| Operation | Valid source | Result | Important state-dependent effect |
+| --- | --- | --- | --- |
+| CommitQuote | Inquiry.Pricing | Inquiry.PendingPresentation | create current Quote/FirmQuote |
+| CommitQuote | Negotiating.Pricing | Negotiating.PendingPresentation | preserve latest Presentation/outcome |
+| ReplaceFirmQuote | Inquiry.PendingPresentation | Inquiry.PendingPresentation | replace unpresented current FirmQuote |
+| ReplaceFirmQuote | Negotiating.PendingPresentation | Negotiating.PendingPresentation | preserve latest Presentation/outcome |
+| ReplaceFirmQuote | Negotiating.Presented | Negotiating.PendingPresentation | previous Presentation becomes latest; new Quote is unpresented |
+| InvalidateQuote | Inquiry.PendingPresentation | Inquiry.Pricing | remove current FirmQuote |
+| InvalidateQuote | Negotiating.PendingPresentation | Negotiating.Pricing | preserve latest Presentation/outcome |
+| InvalidateQuote | Negotiating.Presented | Negotiating.Pricing | current Presentation becomes latest; no Away fabricated |
+| RequestRepricing | Inquiry.PendingPresentation | Inquiry.Pricing | new Episode; rejected Quote referenced by Origin |
+| RequestRepricing | Negotiating.PendingPresentation | Negotiating.Pricing | new Episode; latest Presentation/outcome preserved |
+| ChangeRfqTerms | Inquiry.Pricing | Inquiry.Pricing | new Terms + Episode |
+| ChangeRfqTerms | Inquiry.PendingPresentation | Inquiry.Pricing | new Terms + Episode; FirmQuote not carried |
+| ChangeQuoteOwner | Inquiry.Pricing | Inquiry.Pricing | new Episode |
+| ChangeQuoteOwner | Negotiating.Pricing | Negotiating.Pricing | new Episode; latest Presentation/outcome preserved |
+| RollPricingDate | Inquiry.Pricing | Inquiry.Pricing | new Episode |
+| RollPricingDate | Inquiry.PendingPresentation | Inquiry.Pricing | new Episode; FirmQuote not carried |
+| RollPricingDate | Negotiating.Pricing | Negotiating.Pricing | new Episode |
+| RollPricingDate | Negotiating.PendingPresentation | Negotiating.Pricing | new Episode; FirmQuote not carried |
+| RollPricingDate | Negotiating.Presented | Negotiating.Pricing | current Presentation becomes latest; no Away fabricated |
+| ChangeAssumedTradeDate | Inquiry.Pricing | Inquiry.Pricing | new Episode |
+| ChangeAssumedTradeDate | Inquiry.PendingPresentation | Inquiry.Pricing | new Episode; FirmQuote not carried |
+| ChangeAssumedTradeDate | Negotiating.Pricing | Negotiating.Pricing | new Episode |
+| ChangeAssumedTradeDate | Negotiating.PendingPresentation | Negotiating.Pricing | new Episode; FirmQuote not carried |
+| ChangeAssumedTradeDate | Negotiating.Presented | Negotiating.Pricing | current Presentation becomes latest; no Away fabricated |
+| PresentQuote | Inquiry.PendingPresentation | Negotiating.Presented | first Presentation |
+| PresentQuote | Negotiating.PendingPresentation | Negotiating.Presented | new current Presentation |
+| ExtendValidity | Inquiry.PendingPresentation | Inquiry.PendingPresentation | preserve QuoteId |
+| ExtendValidity | Negotiating.PendingPresentation | Negotiating.PendingPresentation | preserve QuoteId |
+| ExtendValidity | Negotiating.Presented | Negotiating.Presented | preserve QuoteId and Presentation |
+| RequestRepricingOnAway | Negotiating.Presented | Negotiating.Pricing | create Away + new Away-origin Episode |
+| ChangeContactOwner | any Open | same Open state shape | change ContactOwnerId only |
+| CloseCase(Unpresented) | Inquiry.Pricing / Inquiry.PendingPresentation | Terminal.Closed | no PresentationOutcome |
+| CloseCase(Hit) | Negotiating.Presented | Terminal.Closed | create Hit outcome for current Presentation |
+| CloseCase(Away.RecordNow) | Negotiating.Presented | Terminal.Closed | create Away outcome for current Presentation |
+| CloseCase(Away.RecordNow) | Negotiating.Pricing / Negotiating.PendingPresentation | Terminal.Closed | create Away for latest Presentation when none recorded |
+| CloseCase(Away.AlreadyRecorded) | Negotiating.Pricing / Negotiating.PendingPresentation | Terminal.Closed | reuse latest Presentation's existing Away |
+| Cancel | any Open | Terminal.Cancelled | no ordinary Presentation outcome fabricated |
+
+Within any row, normal cross-field invariants still apply.
+
+### 18.2 State-centric graph
+
+The graph is a cognitive/reference view of the operation definitions above. Repeated edges with the same operation name are not distinct Domain operation types.
+
+    PublishDraft
+      -> Inquiry.Pricing
 
     Inquiry.Pricing
-      --[T02 CommitQuote]---------> Inquiry.PendingPresentation
-      --[T07 ChangeRfqTerms]-----> Inquiry.Pricing
-      --[T09 ChangeQuoteOwner]---> Inquiry.Pricing
-      --[T10 RollPricingDate]----> Inquiry.Pricing
-      --[T38 ChangeAssumedTradeDate]--> Inquiry.Pricing
-      --[T31 CloseAway]----------> Terminal.Closed
-      --[T36 Cancel]-------------> Terminal.Cancelled
+      --CommitQuote--------------> Inquiry.PendingPresentation
+      --ChangeRfqTerms-----------> Inquiry.Pricing
+      --ChangeQuoteOwner---------> Inquiry.Pricing
+      --RollPricingDate----------> Inquiry.Pricing
+      --ChangeAssumedTradeDate---> Inquiry.Pricing
+      --CloseCase(Unpresented)---> Terminal.Closed
+      --Cancel-------------------> Terminal.Cancelled
 
     Inquiry.PendingPresentation
-      --[T03 ReplaceFirmQuote]---> Inquiry.PendingPresentation
-      --[T04 InvalidateQuote]----> Inquiry.Pricing
-      --[T05 ExpireQuote]--------> Inquiry.Pricing
-      --[T06 RequestRepricing]---> Inquiry.Pricing
-      --[T08 ChangeRfqTerms]-----> Inquiry.Pricing
-      --[T11 RollPricingDate]----> Inquiry.Pricing
-      --[T39 ChangeAssumedTradeDate]--> Inquiry.Pricing
-      --[T12 PresentQuote]-------> Negotiating.Presented
-      --[T13 ExtendValidUntil]---> Inquiry.PendingPresentation
-      --[T32 CloseAway]----------> Terminal.Closed
-      --[T36 Cancel]-------------> Terminal.Cancelled
-
-### Negotiating transitions
+      --ReplaceFirmQuote---------> Inquiry.PendingPresentation
+      --InvalidateQuote----------> Inquiry.Pricing
+      --RequestRepricing---------> Inquiry.Pricing
+      --ChangeRfqTerms-----------> Inquiry.Pricing
+      --RollPricingDate----------> Inquiry.Pricing
+      --ChangeAssumedTradeDate---> Inquiry.Pricing
+      --PresentQuote-------------> Negotiating.Presented
+      --ExtendValidity-----------> Inquiry.PendingPresentation
+      --CloseCase(Unpresented)---> Terminal.Closed
+      --Cancel-------------------> Terminal.Cancelled
 
     Negotiating.Pricing
-      --[T14 CommitQuote]--------> Negotiating.PendingPresentation
-      --[T21 ChangeQuoteOwner]---> Negotiating.Pricing
-      --[T22 RollPricingDate]----> Negotiating.Pricing
-      --[T40 ChangeAssumedTradeDate]--> Negotiating.Pricing
-      --[T33 CloseAway]----------> Terminal.Closed
-      --[T36 Cancel]-------------> Terminal.Cancelled
+      --CommitQuote--------------> Negotiating.PendingPresentation
+      --ChangeQuoteOwner---------> Negotiating.Pricing
+      --RollPricingDate----------> Negotiating.Pricing
+      --ChangeAssumedTradeDate---> Negotiating.Pricing
+      --CloseCase(Away)----------> Terminal.Closed
+      --Cancel-------------------> Terminal.Cancelled
 
     Negotiating.PendingPresentation
-      --[T15 ReplaceFirmQuote]---> Negotiating.PendingPresentation
-      --[T16 InvalidateQuote]----> Negotiating.Pricing
-      --[T17 ExpireQuote]--------> Negotiating.Pricing
-      --[T18 RequestRepricing]---> Negotiating.Pricing
-      --[T19 PresentQuote]-------> Negotiating.Presented
-      --[T20 ExtendValidUntil]---> Negotiating.PendingPresentation
-      --[T23 RollPricingDate]----> Negotiating.Pricing
-      --[T41 ChangeAssumedTradeDate]--> Negotiating.Pricing
-      --[T34 CloseAway]----------> Terminal.Closed
-      --[T36 Cancel]-------------> Terminal.Cancelled
+      --ReplaceFirmQuote---------> Negotiating.PendingPresentation
+      --InvalidateQuote----------> Negotiating.Pricing
+      --RequestRepricing---------> Negotiating.Pricing
+      --PresentQuote-------------> Negotiating.Presented
+      --ExtendValidity-----------> Negotiating.PendingPresentation
+      --RollPricingDate----------> Negotiating.Pricing
+      --ChangeAssumedTradeDate---> Negotiating.Pricing
+      --CloseCase(Away)----------> Terminal.Closed
+      --Cancel-------------------> Terminal.Cancelled
 
     Negotiating.Presented
-      --[T24 ReplaceFirmQuote]---> Negotiating.PendingPresentation
-      --[T25 InvalidateQuote]----> Negotiating.Pricing
-      --[T26 ExpireQuote]--------> Negotiating.Pricing
-      --[T27 ContinueAfterAway]--> Negotiating.Pricing
-      --[T28 RollPricingDate]----> Negotiating.Pricing
-      --[T42 ChangeAssumedTradeDate]--> Negotiating.Pricing
-      --[T29 ExtendValidUntil]---> Negotiating.Presented
-      --[T30 Hit]----------------> Terminal.Closed
-      --[T35 CloseAway]----------> Terminal.Closed
-      --[T36 Cancel]-------------> Terminal.Cancelled
+      --ReplaceFirmQuote---------> Negotiating.PendingPresentation
+      --InvalidateQuote----------> Negotiating.Pricing
+      --RequestRepricingOnAway---> Negotiating.Pricing
+      --RollPricingDate----------> Negotiating.Pricing
+      --ChangeAssumedTradeDate---> Negotiating.Pricing
+      --ExtendValidity-----------> Negotiating.Presented
+      --CloseCase(Hit)-----------> Terminal.Closed
+      --CloseCase(Away)----------> Terminal.Closed
+      --Cancel-------------------> Terminal.Cancelled
 
-### Case-level operation independent of lifecycle subtype
-
-    [T37] ChangeContactOwner
-          Open -> same Open state shape
-
-ChangeContactOwner changes ContactOwnerId but does not change PricingEpisode, Quote, Presentation, or lifecycle state.
-
-## 18. Transition semantics table
-
-| No. | Operation | Main semantic effect | PricingEpisode | Important invariants / generated facts |
-| --- | --- | --- | --- | --- |
-| T01 | PublishDraft / initial Case creation | Create the valid initial RfqCase in Inquiry.Pricing as the Case-side effect of D10 PublishDraft | new, Origin=Initial | initial RfqCaseRevision uses Published(DraftId); QuoteOwner already known |
-| T02 | CommitQuote | Make a new Quote current and firm | preserve | Quote.PricingEpisodeId=current Episode |
-| T03 | ReplaceFirmQuote | Replace unpresented current FirmQuote | preserve | old Quote becomes historical; no Away outcome |
-| T04 | InvalidateQuote | Explicitly withdraw unpresented FirmQuote | preserve | no automatic outcome |
-| T05 | ExpireQuote | Remove unpresented FirmQuote because validity has elapsed | preserve | semantically different from InvalidateQuote |
-| T06 | RequestRepricing | Reject current unpresented firm price as the next pricing-round starting point | new, Origin=RepricingRequested | Origin references old QuoteId; optional Feedback; no Presentation outcome |
-| T07 | ChangeRfqTerms | Change permitted Terms while Inquiry/Pricing | new, Origin=RfqTermsChanged | create new RfqTermsId; only Notional/SettlementDateRule may change |
-| T08 | ChangeRfqTerms | Change permitted Terms while Inquiry/Pending | new, Origin=RfqTermsChanged | current FirmQuote is not carried forward |
-| T09 | ChangeQuoteOwner | Change pricing responsibility in Inquiry.Pricing | new, Origin=QuoteOwnerChanged | only allowed when no current FirmQuote |
-| T10 | RollPricingDate | Start pricing on later local date | new, Origin=PricingDateRolled | NewPricingDate > old; no FirmQuote carried |
-| T11 | RollPricingDate | Roll date from Inquiry/Pending | new, Origin=PricingDateRolled | old unpresented FirmQuote is not current in new Episode |
-| T12 | PresentQuote | First customer presentation | preserve | create QuotePresentation; phase becomes Negotiating |
-| T13 | ExtendValidUntil | Extend current unpresented FirmQuote | preserve | same QuoteId; only before expiry; new validity later than old |
-| T14 | CommitQuote | Create current firm price after prior presentation history | preserve | preserves LatestPresentation information |
-| T15 | ReplaceFirmQuote | Replace current unpresented FirmQuote | preserve | prior latest customer Presentation remains unchanged |
-| T16 | InvalidateQuote | Withdraw current unpresented FirmQuote | preserve | returns to Pricing; latest Presentation/outcome preserved |
-| T17 | ExpireQuote | Remove expired current unpresented FirmQuote | preserve | latest Presentation/outcome preserved |
-| T18 | RequestRepricing | Start new pricing round after rejecting unpresented firm price | new, Origin=RepricingRequested | latest prior Presentation/outcome preserved |
-| T19 | PresentQuote | Present current FirmQuote after previous customer proposal(s) | preserve | create new QuotePresentation; becomes current Presentation |
-| T20 | ExtendValidUntil | Extend current unpresented FirmQuote | preserve | same QuoteId |
-| T21 | ChangeQuoteOwner | Change pricing responsibility in Negotiating.Pricing | new, Origin=QuoteOwnerChanged | latest Presentation/outcome preserved |
-| T22 | RollPricingDate | Roll later while already Pricing | new, Origin=PricingDateRolled | latest Presentation/outcome preserved |
-| T23 | RollPricingDate | Roll later from Pending | new, Origin=PricingDateRolled | FirmQuote removed; latest Presentation/outcome preserved |
-| T24 | ReplaceFirmQuote | Commit a new firm price while a previous quote is Presented | preserve | current Presentation becomes LatestPresentation with no outcome; new FirmQuote is PendingPresentation |
-| T25 | InvalidateQuote | Withdraw the currently Presented FirmQuote | preserve | current Presentation becomes LatestPresentation with no outcome |
-| T26 | ExpireQuote | Presented FirmQuote expires | preserve | current Presentation becomes LatestPresentation with no outcome |
-| T27 | ContinueAfterAway | Customer proposal goes Away but Case continues | new, Origin=ContinuedAfterAway | create PresentationAwayOutcome; retain that Away outcome in Origin; carry Presentation + Away outcome as latest |
-| T28 | RollPricingDate | Start a later-date pricing round from Presented | new, Origin=PricingDateRolled | current Presentation becomes latest; no Away outcome is fabricated |
-| T29 | ExtendValidUntil | Extend still-valid Presented FirmQuote | preserve | same Quote and same Presentation |
-| T30 | Hit | Customer accepts current Presented FirmQuote | preserve/terminal | create PresentationHitOutcome; HitDate does not precede PresentationDate; HitAt<=ValidUntil |
-| T31 | CloseAway | Close an Inquiry Case before any Presentation | terminal | CaseOutcome.Unpresented(Feedback?) |
-| T32 | CloseAway | Close an Inquiry Case with unpresented FirmQuote | terminal | still CaseOutcome.Unpresented; current Quote gets no Presentation outcome |
-| T33 | CloseAway | Close Negotiating.Pricing as Away | terminal | use LatestPresentation Away outcome if present; otherwise create it |
-| T34 | CloseAway | Close Negotiating.PendingPresentation as Away | terminal | outcome applies to LatestPresentation, not current unpresented FirmQuote |
-| T35 | CloseAway | Close current Presented proposal as Away | terminal | create PresentationAwayOutcome for current Presentation |
-| T36 | Cancel | Mark Case invalid/non-normal outcome | terminal | no ordinary Hit/Away result is manufactured; typed reason details deferred |
-| T37 | ChangeContactOwner | Reassign customer-contact ownership | preserve | state shape and PricingEpisode unchanged |
-| T38 | ChangeAssumedTradeDate | Change trade-date assumption in Inquiry.Pricing | new, Origin=AssumedTradeDateChanged | PricingDate preserved; no FirmQuote to carry |
-| T39 | ChangeAssumedTradeDate | Change trade-date assumption from Inquiry.Pending | new, Origin=AssumedTradeDateChanged | PricingDate preserved; current FirmQuote is not carried forward |
-| T40 | ChangeAssumedTradeDate | Change trade-date assumption in Negotiating.Pricing | new, Origin=AssumedTradeDateChanged | PricingDate and latest Presentation/outcome preserved |
-| T41 | ChangeAssumedTradeDate | Change trade-date assumption from Negotiating.Pending | new, Origin=AssumedTradeDateChanged | PricingDate preserved; FirmQuote removed; latest Presentation/outcome preserved |
-| T42 | ChangeAssumedTradeDate | Change trade-date assumption from Presented | new, Origin=AssumedTradeDateChanged | PricingDate preserved; current Presentation becomes latest; no Away outcome is fabricated |
+    any Open
+      --ChangeContactOwner-------> same Open state shape
 
 ## 19. PricingEpisode creation matrix
 
@@ -874,7 +1150,7 @@ Operations that create a new PricingEpisode:
 | RollPricingDate | no | PricingDateRolled(previous Episode) |
 | ChangeAssumedTradeDate | no | AssumedTradeDateChanged(previous Episode) |
 | RequestRepricing | no | RepricingRequested(previous Episode, QuoteId, Feedback?) |
-| ContinueAfterAway | no | ContinuedAfterAway(previous Episode, PresentationAwayOutcome) |
+| RequestRepricingOnAway | no | Away(previous Episode, PresentationAwayOutcome) |
 
 PublishDraft supplies the initial PricingDate and AssumedTradeDate for the new Case. RollPricingDate changes PricingDate and preserves AssumedTradeDate. ChangeAssumedTradeDate changes AssumedTradeDate and preserves PricingDate. Other Episode-creating operations preserve both date fields from the previous Episode.
 
@@ -884,10 +1160,9 @@ Operations that preserve the Episode:
 - ReplaceFirmQuote;
 - PresentQuote;
 - InvalidateQuote;
-- ExpireQuote;
-- ExtendValidUntil;
+- ExtendValidity;
 - ChangeContactOwner;
-- Hit/Close/Cancel terminate rather than create another Episode.
+- CloseCase/Cancel terminate rather than create another Episode.
 
 ## 20. Why some apparently similar operations remain distinct
 
@@ -899,24 +1174,26 @@ Do not model it as an explicit Invalidate followed by Commit. Replacement does n
 
 From Presented, replacement immediately makes the new Quote the current FirmQuote and moves to PendingPresentation. The old Presentation remains historical/latest and the old Quote is no longer normally Hit-eligible.
 
-### InvalidateQuote versus ExpireQuote
+### Expired versus withdrawn invalidation
 
-Both can lead to Pricing, but:
+Both remove the current FirmQuote through InvalidateQuote, but QuoteInvalidationReason preserves the business distinction:
 
-- InvalidateQuote is a business decision to withdraw;
-- ExpireQuote is validity/time semantics.
+- Expired means validity elapsed and requires InvalidatedAt >= ValidUntil;
+- Withdrawn means the firm condition is explicitly withdrawn for another reason and has no expiry-time precondition.
 
-They remain distinct Domain operations.
+Do not create a separate ExpireQuote operation merely because the trigger differs.
 
 ### RequestRepricing versus InvalidateQuote
 
-RequestRepricing creates a new PricingEpisode because customer/contact feedback starts a new logical pricing round before presentation.
+RequestRepricing creates a new PricingEpisode because a new logical pricing round is being requested before presentation.
 
 InvalidateQuote preserves the current PricingEpisode.
 
-### ContinueAfterAway versus simple repricing
+### RequestRepricingOnAway versus ordinary repricing
 
-ContinueAfterAway creates a PresentationAwayOutcome and a new PricingEpisode whose Origin retains that immutable Away outcome value.
+RequestRepricingOnAway both establishes the current Presentation's Away outcome and creates a new PricingEpisode whose Origin retains that immutable Away outcome.
+
+Ordinary RequestRepricing applies to an unpresented current FirmQuote and creates no Presentation outcome.
 
 Application-side work on a better price while the current Presented FirmQuote remains live does not change Domain state at all.
 
@@ -936,7 +1213,8 @@ Therefore:
 
 This avoids a two-axis Domain state model while preserving the real workflow.
 
-## 22. Date semantics summary
+
+## 22. Date and action-time semantics summary
 
 All local dates below are BusinessEntityLocalDate and are interpreted under RfqCase.BusinessEntity.
 
@@ -945,19 +1223,27 @@ All local dates below are BusinessEntityLocalDate and are interpreted under RfqC
 - AssumedTradeDate: trade date assumed for the PricingEpisode when evaluating trade-date-dependent terms; it is not the eventual executed TradeDate.
 - PresentationDate: local date on which the Quote was presented to the customer.
 - HitDate: local date on which the customer and desk agreed.
-- AwayDate: local date on which a specific Presentation became Away.
+- AwayDate: business-effective local date attributed to a specific Presentation's Away outcome.
 - CloseDate: local date on which the Case itself was closed.
 - CancellationDate: local date on which the Case was cancelled.
 
-PricingDate, AssumedTradeDate, PresentationDate, and HitDate are distinct business concepts. The current Domain does not require equality among them.
+PricingDate, AssumedTradeDate, PresentationDate, HitDate, AwayDate, CloseDate, and CancellationDate are distinct business concepts. The current Domain does not require equality among them.
 
-For Hit, normal chronology requires HitDate not to precede PresentationDate. CloseDate remains separate.
+Timepoint fields describe absolute business-action or business-event time where that distinction matters:
 
-Normal Away does not require:
+- CommittedAt: Quote commitment action;
+- PresentedAt: Presentation action;
+- HitAt: customer agreement time used by the validity invariant;
+- PresentationAwayOutcome.RecordedAt: internal recording/establishment of the Away outcome;
+- InvalidatedAt / RequestedAt / ChangedAt / RolledAt / ExtendedAt: accepted Domain-operation action times;
+- ClosedAt / CancelledAt: Case terminal actions;
+- TraceData.RecordedAt: creation/recording of that Trace representation.
 
-    AwayDate == PresentationDate
+These Timepoint values are Domain business facts, not persistence insertion timestamps.
 
-Timepoint is used where absolute time matters, including Quote commitment, Presentation, Hit, FirmQuote validity, Case close/cancellation, and Trace recording.
+A business-effective local date and an operation/action Timepoint may intentionally differ. In particular, AwayDate may be attributed to an earlier business day than the day on which the internal actor records the Away outcome.
+
+For Hit, normal chronology requires HitDate not to precede PresentationDate and HitAt <= current ValidUntil. CloseDate remains separate.
 
 ## 23. Operational revision chronology, restore, and durable TraceData
 
@@ -985,11 +1271,12 @@ RfqCaseHistory denotes the retained chronology of RfqCaseRevision values for one
 
 The current operational state is the RfqCase contained in the current/latest revision.
 
+
 ### 23.2 Revision transition provenance
 
     RfqCaseTransition
     = Published(DraftId)
-    | Applied(CaseCommand)
+    | Applied(CaseOperation)
     | RestoredFrom(TargetVersion)
 
 Published(DraftId) is used only for the initial revision created by PublishDraft:
@@ -997,17 +1284,19 @@ Published(DraftId) is used only for the initial revision created by PublishDraft
     transition == Published(...)
     => Version == InitialVersion
 
-Applied(CaseCommand) means an accepted ordinary Domain operation was applied to the immediately preceding revision.
+Applied(CaseOperation) means an accepted ordinary fully resolved Domain Operation was applied to the immediately preceding revision.
 
 For every accepted ordinary operation after publication:
 
     next.CaseId == current.CaseId
     next.Version == current.Version.Next()
-    next.Transition == Applied(command)
+    next.Transition == Applied(operation)
 
-One accepted Domain operation creates exactly one next revision. Rejected operations and pure UI/Application work do not create revisions. An Application composite that executes several accepted Domain operations therefore creates several revisions even if they are persisted in one transaction.
+One accepted Domain Operation creates exactly one next revision. Rejected operations and pure UI/Application work do not create revisions. An Application composite that executes several accepted Domain operations therefore creates several revisions even if they are persisted in one transaction.
 
-CaseCommand denotes the replayable accepted Domain-operation input needed to reproduce the transition. The exact closed command sum type and its serialization/versioning are deferred to the historical-correction design, but the chronology must preserve enough supplied facts to reproduce the accepted business transition.
+The retained CaseOperation is the same Domain value used by live positive-flow semantics. It preserves generated Case-local IDs, supplied actor/time/date values, and other exogenous inputs required for deterministic replay, while values deterministically derivable from the source RfqCase are not duplicated merely for replay.
+
+RfqCaseTransition therefore retains replayable business-operation provenance without introducing a separate replay DTO or command language for ordinary Case semantics.
 
 ### 23.3 Operational Restore
 
@@ -1049,20 +1338,23 @@ Restore additionally produces exactly one superseding TraceData record for the p
 
 Restore does not itself produce a new Effective terminal representation because the target is Open. A later terminal operation after restored processing produces the next Effective TraceData.
 
+
 ### 23.4 Loading, persistence, and concurrency boundary
 
-Ordinary operations normally require only the current RfqCaseRevision.
+Ordinary Open operations normally require only the current RfqCaseRevision.
 
-History-dependent operations may require more:
+History-dependent revision-level operations may require more:
 
 - Restore requires current revision, target Open revision, and enough retained history to construct the superseding Trace;
-- Hit, CloseAway, and Cancel require current revision plus enough retained history to construct the terminal Trace.
+- TerminalOperation requires current revision, its TerminalOperation value, and TerminalTraceContext containing enough retained/resolved history plus Trace-recording context to construct the terminal Trace.
 
-This does not imply eager loading or whole-history rewrite. Implementation may query, index, stream, or materialize only the required history.
+This does not imply eager loading or whole-history rewrite. Implementation may query, index, stream, or materialize only the required historical facts.
 
 Application/Persistence owns stale-write protection. For example, a Restore requested while v20 is current should commit only if v20 is still current. A stale request is rejected rather than silently applied against a different current revision.
 
 A Domain operation that returns both a new RfqCaseRevision and TraceData should have those facts persisted atomically.
+
+The internal ability to reason about TerminalOperation as RfqCase x TerminalOperation -> RfqCase does not require a public API that can create terminal state without Trace or materialize TraceData from arbitrary snapshots.
 
 Restore does not reverse external side effects such as already-sent customer communications, downstream notifications, or booking/integration effects. Such reconciliation belongs to Application/integration workflows.
 
@@ -1100,34 +1392,36 @@ TraceRepresentation is the durable business representation. InitialContactOwnerI
 
 RecordedBusinessDate is an explicitly supplied BusinessEntity-local business date. It is not required to be mechanically derived from RecordedAt.
 
+
 ### 23.6 Trace state
 
     TraceState
-    = Effective(EffectiveTrace)
-    | Superseded(SupersededTrace)
-
-    EffectiveTrace
-    = PresentedClosedTrace
-    | UnpresentedClosedTrace
-    | CancelledTrace
-
-    SupersededTrace
-    = Effective(
-          EffectiveTrace,
+    = Effective(TerminalTrace)
+    | Superseded(
+          Snapshot : TraceSnapshot,
           Reason : SupersessionReason
       )
-    | Open(
-          OpenTrace,
-          Reason : SupersessionReason
-      )
+
+    TraceSnapshot
+    = Open(OpenTrace)
+    | Terminal(TerminalTrace)
+
+    TerminalTrace
+    = PresentedClosed(PresentedClosedTrace)
+    | UnpresentedClosed(UnpresentedClosedTrace)
+    | Cancelled(CancelledTrace)
 
     SupersessionReason
     = OperationalRestore
     | HistoricalCorrection
 
-A superseding TraceData does not reference a previous TraceData by TraceId. It repeats the prior business representation as Superseded so the new record remains self-contained after operational history is deleted.
+Effective is necessarily terminal. Ordinary Open processing is represented by RfqCaseRevision rather than by an Effective Open TraceData record.
+
+A superseding TraceData does not reference a previous TraceData by TraceId. It repeats the prior business representation under Superseded so the new record remains self-contained after operational history is deleted.
 
 The earlier TraceData record remains immutable. Its Recorded* metadata is not copied as part of the business representation being superseded.
+
+Operational Restore of an Open current revision produces Superseded(Open(...), OperationalRestore). Restore of a Terminal current revision produces Superseded(Terminal(...), OperationalRestore).
 
 ### 23.7 Durable terms and terminal shapes
 
@@ -1143,13 +1437,8 @@ Trace terms remove Case-local RfqTermsId while retaining the durable business va
     PresentedClosedTrace
     - Terms : TraceTerms
     - Presentations : NonEmpty<PresentationActivity>
-    - Terminal : PresentedClose
-
-    PresentedClose
     - ChangesBeforeTerminal : ActivityChange[]
-    - CaseCloseDate : BusinessEntityLocalDate
-    - ClosedBy : ActorId
-    - ClosedAt : Timepoint
+    - Close : CaseClose
     - Outcome : Hit | Away
 
     Hit
@@ -1158,38 +1447,37 @@ Trace terms remove Case-local RfqTermsId while retaining the durable business va
 
     Away
     - AwayDate
+    - RecordedBy : ActorId
+    - RecordedAt : Timepoint
     - Feedback?
 
     UnpresentedClosedTrace
     - Terms : TraceTerms
-    - CaseCloseDate : BusinessEntityLocalDate
-    - ClosedBy : ActorId
-    - ClosedAt : Timepoint
+    - Close : CaseClose
     - Feedback?
 
     CancelledTrace
     - Terms : TraceTerms
     - Presentations : PresentationActivity[]
-    - Terminal : Cancellation
-
-    Cancellation
     - ChangesBeforeTerminal : ActivityChange[]
-    - CaseCancellationDate : BusinessEntityLocalDate
-    - CancelledBy : ActorId
-    - CancelledAt : Timepoint
-    - CancellationReason
+    - Cancellation
 
     OpenTrace
     - Terms : TraceTerms
     - Presentations : PresentationActivity[]
     - ChangesBeforeSupersession : ActivityChange[]
 
-OpenTrace currently appears only under TraceState.Superseded. Ordinary Open processing is represented by RfqCaseRevision rather than by an Effective Open TraceData record.
+A Restore of an Open Case that has never had a Presentation still produces:
 
-A Restore of an Open Case that has never had a Presentation still produces a superseded Open Trace with:
-
-    Presentations = []
-    ChangesBeforeSupersession = []
+    Superseded(
+        Open(
+            OpenTrace(
+                Presentations = [],
+                ChangesBeforeSupersession = []
+            )
+        ),
+        OperationalRestore
+    )
 
 ### 23.8 PresentationActivity and ActivityChange
 
@@ -1217,33 +1505,55 @@ A Restore of an Open Case that has never had a Presentation still produces a sup
 
 TraceQuote and TracePresentation are descriptive names for the durable value shapes; Case-local QuoteId and PresentationId are not retained.
 
-EffectiveValidUntil is materialized from operational chronology. FirmQuote.ValidUntil remains the canonical source-state field. ExtendValidUntil does not move validity onto QuotePresentation and the sequence of extension operations is not currently retained in TraceData.
+EffectiveValidUntil is materialized from operational chronology. FirmQuote.ValidUntil remains the canonical source-state field.
 
 Current ActivityChange variants are:
 
     ActivityChange
-    = ContinuedAfterAway(
+    = RepricingRequested(
+          RejectedQuoteValue,
+          Feedback?,
+          RequestedBy,
+          RequestedAt
+      )
+    | RepricingRequestedOnAway(
           PreviousQuoteValue,
           AwayDate,
-          Feedback?
-      )
-    | RepricingRequested(
-          RejectedQuoteValue,
-          Feedback?
+          Feedback?,
+          RequestedBy,
+          RequestedAt
       )
     | QuoteOwnerChanged(
-          PreviousQuoteOwnerId
+          PreviousQuoteOwnerId,
+          ChangedBy,
+          ChangedAt
       )
     | PricingDateRolled(
-          PreviousPricingDate
+          PreviousPricingDate,
+          RolledBy,
+          RolledAt
       )
     | AssumedTradeDateChanged(
-          PreviousAssumedTradeDate
+          PreviousAssumedTradeDate,
+          ChangedBy,
+          ChangedAt
+      )
+    | ValidityExtended(
+          PreviousValidUntil,
+          NewValidUntil,
+          ExtendedBy,
+          ExtendedAt
       )
 
-ActivityChange is a business-semantic digest, not a copy of CaseCommand or PricingEpisodeOrigin.
+ActivityChange is a business-semantic digest, not a copy of CaseOperation or PricingEpisodeOrigin.
+
+For activity facts retained in TraceData, actor/time is retained with the activity. This does not mean every CaseOperation appears in TraceData.
 
 Multiple changes between two Presentations are retained in order. The later Presentation carries the resulting current values; ActivityChange retains enough previous value/provenance to explain the path.
+
+RepricingRequestedOnAway carries RequestedBy / RequestedAt; those same values are the RecordedBy / RecordedAt of the PresentationAwayOutcome created by RequestRepricingOnAway.
+
+ValidityExtended retains each post-Presentation extension as a distinct activity while TraceQuote.EffectiveValidUntil remains the materialized effective value for the corresponding presentation interval.
 
 ### 23.9 Intentional Trace compression
 
@@ -1253,12 +1563,17 @@ Before the first Presentation:
 
 - pricing/workflow changes are not retained as ActivityChange;
 - the first Presentation has ChangesBeforePresentation=[];
-- RfqTerms changes, QuoteOwner changes, PricingDate rolls, AssumedTradeDate changes, and Inquiry-phase RepricingRequested are compressed away;
+- RfqTerms changes, QuoteOwner changes, PricingDate rolls, AssumedTradeDate changes, RequestRepricing, and ExtendValidity are compressed away;
 - ContactOwner is represented only by InitialContactOwnerId and FirstPresentedContactOwnerId?.
 
-After the first Presentation, RepricingRequested is retained because an unpresented rejected FirmQuote value could otherwise disappear from the durable activity record.
+After the first Presentation:
 
-The current Trace also does not preserve separate activity variants for ReplaceFirmQuote, InvalidateQuote, ExpireQuote, or ExtendValidUntil. Their distinctions remain important to positive-flow Domain behavior but are not currently required in the durable business-activity digest.
+- RepricingRequested is retained because an unpresented rejected FirmQuote value could otherwise disappear from the durable activity record;
+- RepricingRequestedOnAway retains the transition from an Away customer proposal into a new pricing round;
+- QuoteOwnerChanged, PricingDateRolled, AssumedTradeDateChanged, and ValidityExtended are retained with actor/time;
+- ReplaceFirmQuote and InvalidateQuote remain compressed in the current Trace model.
+
+TraceData preserves business-semantic activity, not every accepted operation. These are information-compression choices, not claims that omitted operations are semantically identical in positive flow.
 
 Two distinct customer Presentations remain distinct PresentationActivity values even if their numerical Quote values are equal.
 
@@ -1274,13 +1589,20 @@ Some Trace facts are chronological rather than simple ID lookups. EffectiveValid
 
 Because TraceData may outlive RfqCaseHistory, it must not require the retained revision chronology for interpretation.
 
-Historical correction may later replay Applied(CaseCommand) transitions while operational history remains available. The exact correction language, including any one-way switch into Trace-native EffectiveCommand processing, is intentionally deferred.
+Historical correction may later replay/correct Applied(CaseOperation) transitions while operational history remains available. The exact corrected-replay construction semantics, including any one-way switch into Trace-native EffectiveCommand processing, remain intentionally deferred.
+
 
 ### 23.11 Terminal operation results
 
-Hit, CloseAway, and Cancel are still positive-flow business transitions on RfqCase, but at the revision level they additionally materialize durable TraceData.
+CloseCase and Cancel are ordinary positive-flow TerminalOperation values on RfqCase. At the revision/API boundary they additionally materialize durable TraceData.
 
 Conceptually:
+
+    ApplyTerminal(
+        currentRevision,
+        operation : TerminalOperation,
+        terminalTraceContext
+    ) -> TerminalResult
 
     TerminalResult
     - Revision : RfqCaseRevision
@@ -1292,7 +1614,9 @@ Operational Restore similarly returns:
     - Revision : RfqCaseRevision
     - Trace : TraceData
 
-Persistence appends the Domain-produced facts. The Domain determines Version.Next(), transition provenance, restored Case content, and Trace business meaning; persistence does not reconstruct those semantics after the fact.
+Persistence appends the Domain-produced facts. The Domain determines Version.Next(), transition provenance, terminal/restored Case content, and Trace business meaning; persistence does not reconstruct those semantics after the fact.
+
+The Domain API should preserve atomic semantic production of Revision + Trace for terminal/Restore operations even if internal transition kernels and Trace materializers are factored separately.
 
 ## 24. Intentional negative decisions
 
@@ -1338,9 +1662,10 @@ Simplified into:
 
 - PresentationOutcome;
 - CaseOutcome;
+- CaseClose;
 - TerminalState.
 
-This preserves the two levels of meaning without unnecessary wrapper types.
+CaseClose is retained as the shared close-action value, while PresentationOutcome and CaseOutcome preserve the two levels of outcome meaning without a separate hierarchy of terminal wrappers.
 
 ### Orthogonal ClientState x QuoteWorkState
 
@@ -1620,27 +1945,25 @@ Application/audit persistence may record source-to-derived relationships so prov
 
 The following topics are deliberately not completed in this document.
 
+
 ### 26.1 Correction / reversal / historical amendment
 
-Positive flow is intentionally completed first.
+Operational Restore, RfqCaseRevision chronology, CaseOperation provenance, and durable TraceData are now canonical.
 
-Already-discussed candidate models include:
+Broader historical correction remains intentionally incomplete.
 
-- operation reversal / Revert-style correction;
-- historical-state restore/jump;
-- direct amendment/correction of historical facts;
-- combinations of reversal plus explicit amendment.
+The current foundation allows historical-correction design to start from concrete retained material:
 
-No option is selected yet.
+    initial Published revision
+      + Applied(CaseOperation) chronology
+      + RestoredFrom provenance
+      + durable TraceData
 
-Important concerns already identified:
+Ordinary CaseOperation replay/correction may be reused while the intended corrected history remains expressible by the positive-flow RfqCase model. A Trace-native correction language may still be required for business histories that cannot be represented by ordinary RfqCase states/operations.
 
-- correction must preserve auditability;
-- historical-state jumps complicate interpretation of effective history;
-- "undo the most recent reversible operation" is attractive for simple operational mistakes;
-- some true historical corrections need direct fact amendment rather than pretending the original operation never happened;
-- external/irreversible side effects must be separated from in-memory state reversal;
-- correction must not become a generic mutation escape hatch.
+The exact replay path selection, allowed edits to the operation program, Trace-side correction state, EffectiveCommand semantics, correction-of-correction, and output records remain deferred to the active historical-correction design.
+
+Correction must preserve auditability and must not become a generic mutation escape hatch. External/irreversible side effects remain distinct from historical business representation.
 
 ### 26.2 CancellationReason taxonomy
 
@@ -1695,7 +2018,7 @@ Before changing the RFQ Domain implementation:
 3. do not preserve an old abstraction solely because it exists in persistence or API;
 4. keep Application authorization separate from Domain state validity;
 5. do not introduce generic setters/update methods to make migration easier;
-6. implement typed RfqCase states and operations from the transition table;
+6. implement typed RfqCase states and first-class CaseOperation semantics from Section 17, using the applicability table/state graph as the valid source-target view;
 7. wrap accepted Case operations in RfqCaseRevision chronology with Domain-declared Version.Next() and RfqCaseTransition provenance;
 8. preserve explicit Case-local child identity, the separate DraftId identity, and TraceData's deliberate removal of Case-local references;
 9. implement RfqDraft as a separate pre-publication model with DraftField/RfqDraftData semantics rather than reviving the old Draft-as-RfqCase-state model;
