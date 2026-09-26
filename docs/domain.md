@@ -53,7 +53,7 @@ The current model therefore distinguishes:
 - retained operational chronology from durable TraceRecord that may outlive that chronology;
 - Domain history requirements from implementation loading strategy: a history-dependent operation does not imply eager loading or whole-history rewrite for every operation;
 - absolute time from Business-Entity-local calendar dates;
-- a responsibility owner from the ActorId that actually performed a durable business action;
+- a responsibility owner from the InternalActorId that actually performed a durable business action;
 - a quote from the act of presenting that quote;
 - the outcome of a presentation from the final closure of the Case.
 
@@ -80,7 +80,7 @@ Examples:
 
 - a user handoff, a management reassignment, and a takeover workflow may all ultimately invoke the same Domain ownership-change operation if their Domain effect is identical;
 - authorization such as "only the Contact Owner may present" belongs in Application;
-- resolving the current authenticated actor belongs in Application, while a supplied ActorId may become a Domain fact when the identity of the actual committer/presenter/closer/canceller is part of durable business meaning;
+- resolving the current authenticated actor belongs in Application, while a supplied InternalActorId may become a Domain fact when the identity of the actual committer/presenter/closer/canceller is part of durable business meaning;
 - current BusinessEntityLocalDate, external calculation, ID allocation, persistence, transaction management, and purely technical audit metadata belong outside Domain;
 - an Application use case may compose multiple Domain operations atomically.
 
@@ -200,21 +200,37 @@ The Domain model must not expose DateTimeOffset as the conceptual type. C# may u
 Current uses include:
 
 - FirmQuote.ValidUntil;
-- Quote.CommittedAt;
-- QuotePresentation.PresentedAt;
-- PresentationHitOutcome.HitAt;
-- TerminalState.Closed.ClosedAt;
-- TerminalState.Cancelled.CancelledAt;
-- ReopenOperation.ReopenedAt;
-- TraceRecord.RecordedAt.
+- Quote.Committed.At;
+- QuotePresentation.Presented.At;
+- PresentationHitOutcome.Received.At;
+- TerminalState.Closed.Closed.At;
+- TerminalState.Cancelled.Cancelled.At;
+- ReopenOperation.Reopened.At;
+- TraceRecord.Recorded.At.
 
-### 6.4 ActorId
+### 6.4 InternalActorId and ActorStamp
 
-ActorId identifies the actual human or service actor that performed a durable business action.
+InternalActorId identifies the actual internal human or service actor associated with a durable business action. It is distinct from responsibility identities such as ClientContactOwnerId and PricingOwnerId. The current model does not split InternalActorId into Human/System variants.
 
-ActorId is distinct from responsibility identities such as ContactOwnerId and QuoteOwnerId. For example, a dealer may remain QuoteOwner while a Sales user or an automated service commits a price that the dealer authorized.
+    ActorStamp
+    - Actor : InternalActorId
+    - At : Timepoint
 
-The current model does not split ActorId into Human/System variants. Introduce actor-kind variants only if actor kind itself becomes business-significant.
+ActorStamp groups the internal actor and absolute time of a business fact. The containing field name preserves semantics: Committed, Presented, Requested, Recorded, Closed, Cancelled, Reopened, Restored, and similar names are intentionally not collapsed into a generic Performed field.
+
+### 6.4.1 RfqRequestReceipt
+
+    RfqRequestReceipt
+    - Received : ActorStamp
+
+RfqRequestReceipt is the immutable structured receipt fact for one RFQ request. Received identifies the internal actor who actually received the RFQ and the absolute receipt time. Application may default these to the Draft creator and creation time, but later/proxy entry may supply the actual receiver/time. It is required at CreateDraft, immutable for that Draft, and carried unchanged into the published Case. CopyDraft and SeedDraftFromCase require a new receipt because they create a new RFQ.
+
+### 6.4.2 RestoreReason
+
+    RestoreReason
+    - Value : non-empty string
+
+RestoreReason records why an operational Restore was performed. No Domain taxonomy is currently imposed. Application may default a practical value such as "Operational error"; a typed taxonomy should be introduced only when concrete requirements justify one.
 
 ### 6.5 CityCalendarSymbol
 
@@ -256,28 +272,31 @@ The current RfqCase shape is:
     RfqCase
     - CaseId
     - BusinessEntity
+    - ClientId
     - OpenDate : BusinessEntityLocalDate
+    - RequestReceipt : RfqRequestReceipt
     - RfqTerms : RfqTerms
-    - ContactOwnerId
+    - ClientContactOwnerId
     - State
 
 Semantics:
 
 - OpenDate is the local date on which the Case was opened/initiated;
-- BusinessEntity is immutable;
-- RfqTerms is the current Terms entity;
-- ContactOwnerId is mutable through an explicit Domain operation;
+- BusinessEntity, ClientId, OpenDate, and RequestReceipt are immutable for the Case chronology;
+- ClientId identifies the customer/counterparty and is not part of RfqTerms;
+- RequestReceipt is inherited unchanged from the published Draft;
+- RfqTerms is the current client-originated RFQ transaction/request Terms entity;
+- ClientContactOwnerId is mutable through an explicit Domain operation;
 - State changes only through explicit Domain transitions.
 
 OpenDate and the initial PricingEpisode.PricingDate normally match in ordinary creation flows, but equality is not currently a Domain invariant. The business consequence of differing values is not strong enough to reject an otherwise valid Case. Application may default them to the same date.
 
 ## 8. RfqTerms
 
-RfqTerms is an immutable Case-local child Entity.
+RfqTerms is an immutable Case-local child Entity representing the client-originated transaction/request terms for the RFQ.
 
     RfqTerms
     - RfqTermsId
-    - ClientId
     - Side
     - SecurityId
     - Notional : NotionalAmount
@@ -287,9 +306,9 @@ All fields are immutable on a particular RfqTerms instance.
 
 "Changeable" means that a Domain operation may create a new RfqTerms with a new RfqTermsId and make it current. It never means mutating an existing RfqTerms.
 
-Current same-Case change policy:
+ClientId is deliberately not a Terms field; it is immutable RfqCase context.
 
-- ClientId: no normal change operation;
+Current same-Case amendment policy:
 - Side: no normal change operation;
 - SecurityId: no normal change operation;
 - Notional: may change only while the Case is in Inquiry phase;
@@ -336,14 +355,14 @@ PricingEpisode is an immutable Case-local child Entity.
     PricingEpisode
     - PricingEpisodeId
     - RfqTermsId
-    - QuoteOwnerId
+    - PricingOwnerId
     - PricingDate : BusinessEntityLocalDate
     - AssumedTradeDate : BusinessEntityLocalDate
     - Origin : PricingEpisodeOrigin
 
 Meaning:
 
-A PricingEpisode is one logical pricing round for one RfqTerms, owned by one QuoteOwner, attributed to one PricingDate, and evaluated under one AssumedTradeDate.
+A PricingEpisode is one logical pricing round for one RfqTerms, owned by one PricingOwner, attributed to one PricingDate, and evaluated under one AssumedTradeDate.
 
 PricingDate and AssumedTradeDate are distinct business concepts:
 
@@ -366,8 +385,8 @@ In particular it does not contain:
 
     PricingEpisodeOrigin
     = Initial
-    | RfqTermsChanged(PreviousPricingEpisodeId)
-    | QuoteOwnerChanged(PreviousPricingEpisodeId)
+    | RfqTermsAmended(PreviousPricingEpisodeId)
+    | PricingOwnerChanged(PreviousPricingEpisodeId)
     | PricingDateRolled(PreviousPricingEpisodeId)
     | AssumedTradeDateChanged(PreviousPricingEpisodeId)
     | RepricingRequested(
@@ -410,8 +429,7 @@ Quote is an immutable Case-local child Entity.
     - QuoteId
     - PricingEpisodeId
     - Value : QuoteValue
-    - CommittedBy : ActorId
-    - CommittedAt : Timepoint
+    - Committed : ActorStamp
 
 Current QuoteValue:
 
@@ -422,7 +440,7 @@ Current QuoteValue:
           YieldConventionId
       )
 
-CommittedBy and CommittedAt record who actually committed the Quote and when that commitment occurred. They are durable business facts and do not replace QuoteOwnerId, which remains pricing responsibility on PricingEpisode.
+CommittedBy and CommittedAt record who actually committed the Quote and when that commitment occurred. They are durable business facts and do not replace PricingOwnerId, which remains pricing responsibility on PricingEpisode.
 
 A Quote means a price condition produced in a specific PricingEpisode. It does not by itself mean that the price is current, firm, or customer-visible.
 
@@ -457,12 +475,11 @@ QuotePresentation is an immutable Case-local child Entity.
     - PresentationId
     - QuoteId
     - PresentationDate : BusinessEntityLocalDate
-    - PresentedBy : ActorId
-    - PresentedAt : Timepoint
+    - Presented : ActorStamp
 
 A QuotePresentation represents a business proposal event: the Quote was actually presented to the customer.
 
-PresentedBy and PresentedAt record the actor and absolute time of that presentation action. They are distinct from ContactOwnerId, which represents customer-contact responsibility.
+PresentedBy and PresentedAt record the actor and absolute time of that presentation action. They are distinct from ClientContactOwnerId, which represents customer-contact responsibility.
 
 Quote and QuotePresentation are deliberately separate because:
 
@@ -489,12 +506,12 @@ No independent OutcomeId exists.
     PresentationHitOutcome
     - PresentationId
     - HitDate : BusinessEntityLocalDate
-    - HitAt : Timepoint
+    - Received : ActorStamp
 
 Meaning:
 
 - HitDate is the BusinessEntity-local date on which the customer and desk agreed;
-- HitAt is the absolute timepoint used for validity checks.
+- Received.At is the absolute timepoint used for validity checks.
 
 Hit is terminal for the Case in normal flow.
 
@@ -504,8 +521,7 @@ Hit is terminal for the Case in normal flow.
     PresentationAwayOutcome
     - PresentationId
     - AwayDate : BusinessEntityLocalDate
-    - RecordedBy : ActorId
-    - RecordedAt : Timepoint
+    - Recorded : ActorStamp
     - Feedback : string?
 
 AwayDate is the BusinessEntity-local date to which the Presentation's Away outcome is attributed.
@@ -525,17 +541,15 @@ The outcome of a valid RFQ Case is modeled separately from cancellation.
 
     CaseClose
     - CloseDate : BusinessEntityLocalDate
-    - ClosedBy : ActorId
-    - ClosedAt : Timepoint
+    - Closed : ActorStamp
 
     CancellationReason
-    = Withdrawn
+    = Discontinued
     | CreatedInError
 
     Cancellation
     - CancellationDate : BusinessEntityLocalDate
-    - CancelledBy : ActorId
-    - CancelledAt : Timepoint
+    - Cancelled : ActorStamp
     - Reason : CancellationReason
 
     CaseOutcome
@@ -567,7 +581,7 @@ Semantics:
 
 - Closed means a valid RFQ Case reached a normal business conclusion;
 - Cancelled means the Case terminated without an ordinary CaseOutcome;
-- Withdrawn means a genuine Case was withdrawn/stopped and may later be eligible to reopen as the same negotiation context;
+- Discontinued means a genuine Case was withdrawn/stopped and may later be eligible to reopen as the same negotiation context;
 - CreatedInError means the Case itself should not have been established as genuine business activity, including duplicate or mistaken creation cases; it is not reopenable in normal positive flow.
 
 CloseDate is the BusinessEntity-local date the Case itself was closed. ClosedAt is the absolute time of the closing action and ClosedBy is the internal actor that performed it. These are distinct from HitDate and AwayDate.
@@ -578,7 +592,7 @@ Examples:
 
 - a customer may Hit on one date and operational Case closure may be recorded later;
 - a Presentation may go Away, pricing may continue, and the Case may be closed on a later date;
-- a genuine Withdrawn cancellation may later be reopened without implying that the cancellation was mistaken.
+- a genuine Discontinued cancellation may later be reopened without implying that the cancellation was mistaken.
 
 ### 13.1 Terminal pricing context
 
@@ -627,7 +641,7 @@ Normal positive-flow Reopen applicability is:
 
 - Closed(Presented(Away(...))) -> ReopenOperation -> Negotiating.Pricing;
 - Closed(Unpresented(...)) -> ReopenOperation -> Inquiry.Pricing;
-- Cancelled(Reason=Withdrawn) -> ReopenOperation -> Inquiry.Pricing when PriorPresentation=None, otherwise Negotiating.Pricing;
+- Cancelled(Reason=Discontinued) -> ReopenOperation -> Inquiry.Pricing when PriorPresentation=None, otherwise Negotiating.Pricing;
 - Closed(Presented(Hit(...))) is not reopenable through ordinary positive flow;
 - Cancelled(Reason=CreatedInError) is not reopenable through ordinary positive flow.
 
@@ -653,7 +667,7 @@ Do not overload PresentationAwayOutcome.Feedback with this separate future meani
 
 Draft is not an RfqCase state.
 
-RfqCase begins only after a QuoteOwner has been established and the Case is published/created into the RFQ Domain.
+RfqCase begins only after a PricingOwner has been established and the Case is published/created into the RFQ Domain.
 
 Conceptual hierarchy:
 
@@ -674,7 +688,7 @@ Inquiry means no QuotePresentation has ever occurred in the Case.
 
 Negotiating means at least one QuotePresentation has occurred.
 
-Pricing means no current FirmQuote exists and pricing responsibility is with the QuoteOwner side. It does not assert that a trader is actively typing or calculating at that instant.
+Pricing means no current FirmQuote exists and pricing responsibility is with the PricingOwner side. It does not assert that a trader is actively typing or calculating at that instant.
 
 PendingPresentation means a current FirmQuote exists but that FirmQuote has not yet been presented to the customer.
 
@@ -773,7 +787,7 @@ For a normal Hit:
     PresentationHitOutcome.PresentationId
     == Presentation.PresentationId
 
-    PresentationHitOutcome.HitAt
+    PresentationHitOutcome.Received.At
     <= FirmQuote.ValidUntil
 
 Normal chronology requires PresentationHitOutcome.HitDate not to precede Presentation.PresentationDate.
@@ -787,7 +801,7 @@ AwayDate need not equal PricingDate or PresentationDate.
 
 Normal chronology requires the Away outcome not to precede its Presentation.
 
-PresentationAwayOutcome.RecordedAt is the internal recording/establishment time of the Away fact, not an asserted external customer-event time. No equality or ordering relation between AwayDate and the local date corresponding to RecordedAt is currently required beyond the normal business chronology constraints on AwayDate.
+PresentationAwayOutcome.Recorded.At is the internal recording/establishment time of the Away fact, not an asserted external customer-event time. No equality or ordering relation between AwayDate and the local date corresponding to RecordedAt is currently required beyond the normal business chronology constraints on AwayDate.
 
 ### 16.7 Close timing
 
@@ -831,7 +845,7 @@ the following must hold:
 
 TradeDateLag does not require an equivalent cross-field check because SettlementLag has a non-negative BusinessDayCount and Following semantics.
 
-This invariant applies to every Domain operation that can establish a new current Terms/Episode combination, including PublishDraft, ChangeRfqTerms, ChangeAssumedTradeDate, and every ReopenOperation.
+This invariant applies to every Domain operation that can establish a new current Terms/Episode combination, including PublishDraft, AmendRfqTerms, ChangeAssumedTradeDate, and every ReopenOperation.
 
 
 ### 16.11 Time does not mutate state
@@ -844,7 +858,7 @@ InvalidateQuote(Reason=Expired) requires:
 
     InvalidatedAt >= FirmQuote.ValidUntil
 
-Hit always checks HitAt against the current FirmQuote.ValidUntil, so delayed expiry processing cannot allow an invalid Hit.
+Hit always checks Received.At against the current FirmQuote.ValidUntil, so delayed expiry processing cannot allow an invalid Hit.
 
 ExtendValidity may extend a structurally current FirmQuote even when ExtendedAt is later than the previous ValidUntil, provided:
 
@@ -872,7 +886,7 @@ Cancelled preserves the source Open state's Presentation context and does not ma
 Reopen always creates a new PricingEpisode with:
 
     RfqTermsId       = source current RfqTerms.RfqTermsId
-    QuoteOwnerId     = source TerminalPricingContext.PricingEpisode.QuoteOwnerId
+    PricingOwnerId     = source TerminalPricingContext.PricingEpisode.PricingOwnerId
     PricingDate      = ReopenDate
     AssumedTradeDate = NewAssumedTradeDate
 
@@ -897,7 +911,7 @@ Conceptually, the underlying state transition is a partial function:
 
 The function-like model is the canonical semantic definition. The state graph in Section 18 is retained as a state-centric view of the same semantics because it is useful for understanding lifecycle reachability.
 
-Application request models are not CaseOperation values. Application resolves external context before constructing a fully resolved Domain Operation, including supplied/generated Case-local identities, business ActorId/Timepoint values, business dates, and other exogenous arguments required by the operation.
+Application request models are not CaseOperation values. Application resolves external context before constructing a fully resolved Domain Operation, including supplied/generated Case-local identities, business InternalActorId/Timepoint values, business dates, and other exogenous arguments required by the operation.
 
 A CaseOperation:
 
@@ -934,99 +948,87 @@ PublishDraft is not a CaseOperation. It creates the initial RfqCaseRevision with
     | ReplaceFirmQuote(ReplaceFirmQuote)
     | InvalidateQuote(InvalidateQuote)
     | RequestRepricing(RequestRepricing)
-    | ChangeRfqTerms(ChangeRfqTerms)
-    | ChangeQuoteOwner(ChangeQuoteOwner)
+    | AmendRfqTerms(AmendRfqTerms)
+    | ChangePricingOwner(ChangePricingOwner)
     | RollPricingDate(RollPricingDate)
     | ChangeAssumedTradeDate(ChangeAssumedTradeDate)
     | PresentQuote(PresentQuote)
     | ExtendValidity(ExtendValidity)
     | RequestRepricingOnAway(RequestRepricingOnAway)
-    | ChangeContactOwner(ChangeContactOwner)
+    | ChangeClientContactOwner(ChangeClientContactOwner)
 
     CommitQuote
     - QuoteId
     - Value : QuoteValue
     - ValidUntil : Timepoint
-    - CommittedBy : ActorId
-    - CommittedAt : Timepoint
+    - Committed : ActorStamp
 
     ReplaceFirmQuote
     - QuoteId
     - Value : QuoteValue
     - ValidUntil : Timepoint
-    - CommittedBy : ActorId
-    - CommittedAt : Timepoint
+    - Committed : ActorStamp
 
     QuoteInvalidationReason
     = Expired
-    | Withdrawn
+    | Discontinued
 
     InvalidateQuote
-    - InvalidatedBy : ActorId
-    - InvalidatedAt : Timepoint
+    - Invalidated : ActorStamp
     - Reason : QuoteInvalidationReason
 
     RequestRepricing
     - NewPricingEpisodeId
     - Feedback?
-    - RequestedBy : ActorId
-    - RequestedAt : Timepoint
+    - Requested : ActorStamp
 
-    ChangeRfqTerms
+    AmendRfqTerms
     - NewRfqTermsId
     - NewPricingEpisodeId
     - Notional : NotionalAmount
     - SettlementDateRule
-    - ChangedBy : ActorId
-    - ChangedAt : Timepoint
+    - Changed : ActorStamp
 
-    ChangeQuoteOwner
+    ChangePricingOwner
     - NewPricingEpisodeId
-    - NewQuoteOwnerId
-    - ChangedBy : ActorId
-    - ChangedAt : Timepoint
+    - NewPricingOwnerId
+    - Changed : ActorStamp
 
     RollPricingDate
     - NewPricingEpisodeId
     - NewPricingDate : BusinessEntityLocalDate
-    - RolledBy : ActorId
-    - RolledAt : Timepoint
+    - Rolled : ActorStamp
 
     ChangeAssumedTradeDate
     - NewPricingEpisodeId
     - NewAssumedTradeDate : BusinessEntityLocalDate
-    - ChangedBy : ActorId
-    - ChangedAt : Timepoint
+    - Changed : ActorStamp
 
     PresentQuote
     - PresentationId
     - PresentationDate : BusinessEntityLocalDate
-    - PresentedBy : ActorId
-    - PresentedAt : Timepoint
+    - Presented : ActorStamp
 
     ExtendValidity
     - NewValidUntil : Timepoint
-    - ExtendedBy : ActorId
-    - ExtendedAt : Timepoint
+    - Extended : ActorStamp
 
     RequestRepricingOnAway
     - NewPricingEpisodeId
     - AwayDate : BusinessEntityLocalDate
     - Feedback?
-    - RequestedBy : ActorId
-    - RequestedAt : Timepoint
+    - Recorded : ActorStamp
 
-    ChangeContactOwner
-    - NewContactOwnerId
-    - ChangedBy : ActorId
-    - ChangedAt : Timepoint
+    ChangeClientContactOwner
+    - NewClientContactOwnerId
+    - Changed : ActorStamp
 
 Generated Case-local IDs are supplied by the fully resolved operation when the result creates a new immutable child Entity. Previous/current IDs and values are omitted when they are deterministically available from the source RfqCase.
 
 Examples:
 
 - CommitQuote derives PricingEpisodeId from the source current Episode;
-- ChangeQuoteOwner derives the previous Episode, current RfqTermsId, PricingDate, and AssumedTradeDate from the source;
+- ChangePricingOwner derives the previous Episode, current RfqTermsId, PricingDate, and AssumedTradeDate from the source;
 - RequestRepricing derives the rejected current QuoteId and previous Episode from the source;
 - RequestRepricingOnAway derives the current PresentationId and previous Episode from the source.
 
@@ -1036,13 +1038,13 @@ Operation actor/time fields are Domain business facts, not generic persistence a
 
 CommitQuote creates a new Quote and makes it the current FirmQuote. ReplaceFirmQuote creates a new Quote and atomically replaces the current FirmQuote without manufacturing a separate invalidation or Away outcome.
 
-InvalidateQuote removes the current FirmQuote while preserving the current PricingEpisode. Reason=Expired requires InvalidatedAt >= current ValidUntil. Reason=Withdrawn has no expiry-time precondition.
+InvalidateQuote removes the current FirmQuote while preserving the current PricingEpisode. Reason=Expired requires InvalidatedAt >= current ValidUntil. Reason=Discontinued has no expiry-time precondition.
 
 RequestRepricing rejects the current unpresented firm price as the starting point for a new pricing round. It creates a new PricingEpisode with Origin=RepricingRequested(previous Episode, rejected QuoteId, Feedback?).
 
-ChangeRfqTerms creates new RfqTerms and a new PricingEpisode. Only Notional and SettlementDateRule may change within the same Case; ClientId, Side, and SecurityId are preserved from the source RfqTerms.
+AmendRfqTerms creates new RfqTerms and a new PricingEpisode. Only Notional and SettlementDateRule may change within the same Case; ClientId, Side, and SecurityId are preserved from the source RfqTerms.
 
-ChangeQuoteOwner, RollPricingDate, and ChangeAssumedTradeDate each create one new PricingEpisode with the corresponding Origin. Values not changed by the operation are preserved from the source Episode.
+ChangePricingOwner, RollPricingDate, and ChangeAssumedTradeDate each create one new PricingEpisode with the corresponding Origin. Values not changed by the operation are preserved from the source Episode.
 
 PresentQuote creates a QuotePresentation for the current FirmQuote.
 
@@ -1057,7 +1059,7 @@ RequestRepricingOnAway establishes an Away outcome for the current Presentation 
     RecordedBy = RequestedBy
     RecordedAt = RequestedAt
 
-ChangeContactOwner changes only ContactOwnerId and preserves the current lifecycle-state shape and all pricing/presentation objects.
+ChangeClientContactOwner changes only ClientContactOwnerId and preserves the current lifecycle-state shape and all pricing/presentation objects.
 
 ### 17.4 TerminalOperation shapes
 
@@ -1072,7 +1074,7 @@ ChangeContactOwner changes only ContactOwnerId and preserves the current lifecyc
     CloseOutcome
     = Hit(
           HitDate : BusinessEntityLocalDate,
-          HitAt : Timepoint
+          Received : ActorStamp
       )
     | Away(AwayClosure)
     | Unpresented(Feedback?)
@@ -1089,12 +1091,12 @@ ChangeContactOwner changes only ContactOwnerId and preserves the current lifecyc
 
 CloseCase has one business meaning: establish the normal final Case outcome and close the Case.
 
-CloseCase(Hit) is valid only from Negotiating.Presented. It creates PresentationHitOutcome for the current Presentation. HitAt remains the business agreement time used for the validity invariant and is distinct from CaseClose.ClosedAt.
+CloseCase(Hit) is valid only from Negotiating.Presented. It creates PresentationHitOutcome for the current Presentation. Received identifies the internal actor who received the customer acceptance and its receipt time. Received.At is the acceptance time used for the validity invariant and is distinct from CaseClose.Closed.At.
 
 CloseCase(Away) applies to the latest Presentation:
 
 - AlreadyRecorded requires the latest Presentation to already have PresentationAwayOutcome and reuses that same immutable fact;
-- RecordNow requires that no Away outcome is already recorded for the latest Presentation and creates one using AwayDate / Feedback with RecordedBy=Close.ClosedBy and RecordedAt=Close.ClosedAt.
+- RecordNow requires that no Away outcome is already recorded for the latest Presentation and creates one using AwayDate / Feedback with RecordedBy=Close.Closed.Actor and RecordedAt=Close.Closed.At.
 
 CloseCase(Unpresented) is valid only when the Case has never reached a Presentation.
 
@@ -1110,8 +1112,7 @@ The AlreadyRecorded / RecordNow distinction does not define two kinds of busines
     - NewPricingEpisodeId
     - ReopenDate : BusinessEntityLocalDate
     - NewAssumedTradeDate : BusinessEntityLocalDate
-    - ReopenedBy : ActorId
-    - ReopenedAt : Timepoint
+    - Reopened : ActorStamp
 
 ReopenOperation is one business operation. Its source Terminal state determines the reopen provenance and the resulting Open state; the caller does not select a separate reopen variant.
 
@@ -1119,7 +1120,7 @@ ReopenOperation applies only to:
 
 - Closed(Presented(Away(...))). It creates Negotiating.Pricing with a fresh PricingEpisode using ReopenedFromAway(previous Episode, terminal Away outcome), and preserves the prior Presentation/Away as latest customer context.
 - Closed(Unpresented(...)). It creates Inquiry.Pricing with a fresh PricingEpisode using ReopenedFromUnpresented(previous Episode, Feedback?).
-- Cancelled(Reason=Withdrawn). It creates a fresh PricingEpisode using ReopenedFromCancellation(previous Episode, PriorPresentation). The result is Inquiry.Pricing when PriorPresentation=None and Negotiating.Pricing when PriorPresentation exists.
+- Cancelled(Reason=Discontinued). It creates a fresh PricingEpisode using ReopenedFromCancellation(previous Episode, PriorPresentation). The result is Inquiry.Pricing when PriorPresentation=None and Negotiating.Pricing when PriorPresentation exists.
 
 Closed(Presented(Hit(...))) and Cancelled(Reason=CreatedInError) do not accept ordinary ReopenOperation.
 
@@ -1151,8 +1152,7 @@ Operations that create a durable TraceRecord use one common result shape:
 Trace recording metadata is represented explicitly and is shared by every Trace-producing revision-level operation:
 
     TraceContext
-    - RecordedBy : ActorId
-    - RecordedAt : Timepoint
+    - Recorded : ActorStamp
     - RecordedBusinessDate : BusinessEntityLocalDate
 
 Terminal processing is:
@@ -1175,6 +1175,8 @@ Operational Restore has its own revision-level Domain operation value:
 
     RestoreOperation
     - TargetVersion : CaseVersionNumber
+    - Restored : ActorStamp
+    - Reason : RestoreReason
 
 and is applied as:
 
@@ -1208,10 +1210,10 @@ The operation definition is canonical; this table lists valid source/target stat
 | InvalidateQuote | Negotiating.Presented | Negotiating.Pricing | current Presentation becomes latest; no Away fabricated |
 | RequestRepricing | Inquiry.PendingPresentation | Inquiry.Pricing | new Episode; rejected Quote referenced by Origin |
 | RequestRepricing | Negotiating.PendingPresentation | Negotiating.Pricing | new Episode; latest Presentation/outcome preserved |
-| ChangeRfqTerms | Inquiry.Pricing | Inquiry.Pricing | new Terms + Episode |
-| ChangeRfqTerms | Inquiry.PendingPresentation | Inquiry.Pricing | new Terms + Episode; FirmQuote not carried |
-| ChangeQuoteOwner | Inquiry.Pricing | Inquiry.Pricing | new Episode |
-| ChangeQuoteOwner | Negotiating.Pricing | Negotiating.Pricing | new Episode; latest Presentation/outcome preserved |
+| AmendRfqTerms | Inquiry.Pricing | Inquiry.Pricing | new Terms + Episode |
+| AmendRfqTerms | Inquiry.PendingPresentation | Inquiry.Pricing | new Terms + Episode; FirmQuote not carried |
+| ChangePricingOwner | Inquiry.Pricing | Inquiry.Pricing | new Episode |
+| ChangePricingOwner | Negotiating.Pricing | Negotiating.Pricing | new Episode; latest Presentation/outcome preserved |
 | RollPricingDate | Inquiry.Pricing | Inquiry.Pricing | new Episode |
 | RollPricingDate | Inquiry.PendingPresentation | Inquiry.Pricing | new Episode; FirmQuote not carried |
 | RollPricingDate | Negotiating.Pricing | Negotiating.Pricing | new Episode |
@@ -1228,7 +1230,7 @@ The operation definition is canonical; this table lists valid source/target stat
 | ExtendValidity | Negotiating.PendingPresentation | Negotiating.PendingPresentation | preserve QuoteId |
 | ExtendValidity | Negotiating.Presented | Negotiating.Presented | preserve QuoteId and Presentation |
 | RequestRepricingOnAway | Negotiating.Presented | Negotiating.Pricing | create Away + new Away-origin Episode |
-| ChangeContactOwner | any Open | same Open state shape | change ContactOwnerId only |
+| ChangeClientContactOwner | any Open | same Open state shape | change ClientContactOwnerId only |
 | CloseCase(Unpresented) | Inquiry.Pricing / Inquiry.PendingPresentation | Terminal.Closed | no PresentationOutcome |
 | CloseCase(Hit) | Negotiating.Presented | Terminal.Closed | create Hit outcome for current Presentation |
 | CloseCase(Away.RecordNow) | Negotiating.Presented | Terminal.Closed | create Away outcome for current Presentation |
@@ -1237,8 +1239,8 @@ The operation definition is canonical; this table lists valid source/target stat
 | Cancel | any Open | Terminal.Cancelled | capture TerminalPricingContext; no ordinary Presentation outcome fabricated |
 | Reopen | Terminal.Closed(Presented(Away)) | Negotiating.Pricing | new Episode; preserve prior Presentation/Away; no FirmQuote |
 | Reopen | Terminal.Closed(Unpresented) | Inquiry.Pricing | new Episode; preserve close Feedback in Origin |
-| Reopen | Terminal.Cancelled(Withdrawn), PriorPresentation=None | Inquiry.Pricing | new Episode; genuine withdrawal resumes |
-| Reopen | Terminal.Cancelled(Withdrawn), PriorPresentation=Some | Negotiating.Pricing | new Episode; preserve prior Presentation context |
+| Reopen | Terminal.Cancelled(Discontinued), PriorPresentation=None | Inquiry.Pricing | new Episode; genuine withdrawal resumes |
+| Reopen | Terminal.Cancelled(Discontinued), PriorPresentation=Some | Negotiating.Pricing | new Episode; preserve prior Presentation context |
 
 Within any row, normal cross-field invariants still apply. Closed(Hit) and Cancelled(CreatedInError) have no ordinary Reopen transition.
 
@@ -1251,8 +1253,8 @@ The graph is a cognitive/reference view of the operation definitions above. Repe
 
     Inquiry.Pricing
       --CommitQuote--------------> Inquiry.PendingPresentation
-      --ChangeRfqTerms-----------> Inquiry.Pricing
-      --ChangeQuoteOwner---------> Inquiry.Pricing
+      --AmendRfqTerms-----------> Inquiry.Pricing
+      --ChangePricingOwner---------> Inquiry.Pricing
       --RollPricingDate----------> Inquiry.Pricing
       --ChangeAssumedTradeDate---> Inquiry.Pricing
       --CloseCase(Unpresented)---> Terminal.Closed
@@ -1262,7 +1264,7 @@ The graph is a cognitive/reference view of the operation definitions above. Repe
       --ReplaceFirmQuote---------> Inquiry.PendingPresentation
       --InvalidateQuote----------> Inquiry.Pricing
       --RequestRepricing---------> Inquiry.Pricing
-      --ChangeRfqTerms-----------> Inquiry.Pricing
+      --AmendRfqTerms-----------> Inquiry.Pricing
       --RollPricingDate----------> Inquiry.Pricing
       --ChangeAssumedTradeDate---> Inquiry.Pricing
       --PresentQuote-------------> Negotiating.Presented
@@ -1272,7 +1274,7 @@ The graph is a cognitive/reference view of the operation definitions above. Repe
 
     Negotiating.Pricing
       --CommitQuote--------------> Negotiating.PendingPresentation
-      --ChangeQuoteOwner---------> Negotiating.Pricing
+      --ChangePricingOwner---------> Negotiating.Pricing
       --RollPricingDate----------> Negotiating.Pricing
       --ChangeAssumedTradeDate---> Negotiating.Pricing
       --CloseCase(Away)----------> Terminal.Closed
@@ -1301,7 +1303,7 @@ The graph is a cognitive/reference view of the operation definitions above. Repe
       --Cancel-------------------> Terminal.Cancelled
 
     any Open
-      --ChangeContactOwner-------> same Open state shape
+      --ChangeClientContactOwner-------> same Open state shape
 
     Terminal.Closed(Presented(Away))
       --Reopen-------------------> Negotiating.Pricing
@@ -1309,10 +1311,10 @@ The graph is a cognitive/reference view of the operation definitions above. Repe
     Terminal.Closed(Unpresented)
       --Reopen-------------------> Inquiry.Pricing
 
-    Terminal.Cancelled(Withdrawn, PriorPresentation=None)
+    Terminal.Cancelled(Discontinued, PriorPresentation=None)
       --Reopen-------------------> Inquiry.Pricing
 
-    Terminal.Cancelled(Withdrawn, PriorPresentation=Some)
+    Terminal.Cancelled(Discontinued, PriorPresentation=Some)
       --Reopen-------------------> Negotiating.Pricing
 
 ## 19. PricingEpisode creation matrix
@@ -1322,8 +1324,8 @@ Operations that create a new PricingEpisode:
 | Operation | New RfqTerms? | Origin |
 | --- | --- | --- |
 | PublishDraft / initial Case creation | yes, initial | Initial |
-| ChangeRfqTerms | yes | RfqTermsChanged(previous Episode) |
-| ChangeQuoteOwner | no | QuoteOwnerChanged(previous Episode) |
+| AmendRfqTerms | yes | RfqTermsAmended(previous Episode) |
+| ChangePricingOwner | no | PricingOwnerChanged(previous Episode) |
 | RollPricingDate | no | PricingDateRolled(previous Episode) |
 | ChangeAssumedTradeDate | no | AssumedTradeDateChanged(previous Episode) |
 | RequestRepricing | no | RepricingRequested(previous Episode, QuoteId, Feedback?) |
@@ -1336,7 +1338,7 @@ PublishDraft supplies the initial PricingDate and AssumedTradeDate for the new C
 
 Every Reopen sets PricingDate=ReopenDate and uses the explicitly supplied NewAssumedTradeDate.
 
-CommitQuote, ReplaceFirmQuote, PresentQuote, InvalidateQuote, ExtendValidity, and ChangeContactOwner preserve the current Open Episode.
+CommitQuote, ReplaceFirmQuote, PresentQuote, InvalidateQuote, ExtendValidity, and ChangeClientContactOwner preserve the current Open Episode.
 
 CloseCase and Cancel terminate while retaining their source PricingEpisode inside TerminalPricingContext. Reopen then creates a new Episode from that terminal pricing context.
 
@@ -1355,7 +1357,7 @@ From Presented, replacement immediately makes the new Quote the current FirmQuot
 Both remove the current FirmQuote through InvalidateQuote, but QuoteInvalidationReason preserves the business distinction:
 
 - Expired means validity elapsed and requires InvalidatedAt >= ValidUntil;
-- Withdrawn means the firm condition is explicitly withdrawn for another reason and has no expiry-time precondition.
+- Discontinued means the firm condition is explicitly withdrawn for another reason and has no expiry-time precondition.
 
 Do not create a separate ExpireQuote operation merely because the trigger differs.
 
@@ -1410,18 +1412,18 @@ Timepoint fields describe absolute business-action or business-event time where 
 
 - CommittedAt: Quote commitment action;
 - PresentedAt: Presentation action;
-- HitAt: customer agreement time used by the validity invariant;
-- PresentationAwayOutcome.RecordedAt: internal recording/establishment of the Away outcome;
+- Received.At: customer agreement time used by the validity invariant;
+- PresentationAwayOutcome.Recorded.At: internal recording/establishment of the Away outcome;
 - InvalidatedAt / RequestedAt / ChangedAt / RolledAt / ExtendedAt: accepted Domain-operation action times;
 - ClosedAt / CancelledAt: Case terminal actions;
 - ReopenedAt: accepted Reopen action;
-- TraceRecord.RecordedAt: creation/recording of that durable Trace record.
+- TraceRecord.Recorded.At: creation/recording of that durable Trace record.
 
 These Timepoint values are Domain business facts, not persistence insertion timestamps.
 
 A business-effective local date and an operation/action Timepoint may intentionally differ. In particular, AwayDate may be attributed to an earlier business day than the day on which the internal actor records the Away outcome.
 
-For Hit, normal chronology requires HitDate not to precede PresentationDate and HitAt <= current ValidUntil. CloseDate remains separate.
+For Hit, normal chronology requires HitDate not to precede PresentationDate and Received.At <= current ValidUntil. CloseDate remains separate.
 
 ## 23. Operational revision chronology, restore, and durable TraceRecord
 
@@ -1559,8 +1561,7 @@ The Reopen support window is a Persistence/operational retention policy, not a D
 TraceRecord is a durable materialization of a business-semantic Case activity digest. It is intentionally smaller than full RfqCaseHistory and may outlive the operational chronology from which it was constructed.
 
     TraceRecord
-    - RecordedBy : ActorId
-    - RecordedAt : Timepoint
+    - Recorded : ActorStamp
     - RecordedBusinessDate : BusinessEntityLocalDate
     - Trigger : TraceTrigger
     - Digest : CaseActivityDigest
@@ -1577,15 +1578,17 @@ TraceRecord is a durable materialization of a business-semantic Case activity di
     CaseActivityDigest
     - CaseId
     - BusinessEntity
+    - ClientId
     - OpenDate : BusinessEntityLocalDate
+    - RequestReceipt : RfqRequestReceipt
     - InitialContext : TraceCaseContext
     - EndContext : TraceCaseContext
     - Activities : TraceActivity[]
 
     TraceCaseContext
     - Terms : TraceTerms
-    - ContactOwnerId
-    - QuoteOwnerId
+    - ClientContactOwnerId
+    - PricingOwnerId
     - PricingDate : BusinessEntityLocalDate
     - AssumedTradeDate : BusinessEntityLocalDate
 
@@ -1618,7 +1621,6 @@ No separate TraceId is currently required. Persistence may add storage identity 
 Trace terms remove Case-local RfqTermsId while retaining durable business values:
 
     TraceTerms
-    - ClientId
     - Side
     - SecurityId
     - Notional : NotionalAmount
@@ -1626,41 +1628,37 @@ Trace terms remove Case-local RfqTermsId while retaining durable business values
 
     TraceQuote
     - Value : QuoteValue
-    - CommittedBy : ActorId
-    - CommittedAt : Timepoint
+    - Committed : ActorStamp
     - EffectiveValidUntil : Timepoint
 
     TermsAmendedActivity
     - Terms : TraceTerms
-    - AmendedBy : ActorId
-    - AmendedAt : Timepoint
+    - Amended : ActorStamp
 
     PresentedActivity
     - Terms : TraceTerms
-    - ContactOwnerId
-    - QuoteOwnerId
+    - ClientContactOwnerId
+    - PricingOwnerId
     - PricingDate : BusinessEntityLocalDate
     - AssumedTradeDate : BusinessEntityLocalDate
     - Quote : TraceQuote
     - PresentationDate : BusinessEntityLocalDate
-    - PresentedBy : ActorId
-    - PresentedAt : Timepoint
+    - Presented : ActorStamp
 
     AwayActivity
     - AwayDate : BusinessEntityLocalDate
-    - RecordedBy : ActorId
-    - RecordedAt : Timepoint
+    - Recorded : ActorStamp
     - Feedback?
 
     RepricingRequestedActivity
-    - RejectedQuoteValue : QuoteValue
+    - RejectedQuote : TraceQuote
+    - PricingOwnerId
     - Feedback?
-    - RequestedBy : ActorId
-    - RequestedAt : Timepoint
+    - Requested : ActorStamp
 
     HitActivity
     - HitDate : BusinessEntityLocalDate
-    - HitAt : Timepoint
+    - Received : ActorStamp
 
     UnpresentedCloseFeedback
     - Value : string
@@ -1674,8 +1672,7 @@ Trace terms remove Case-local RfqTermsId while retaining durable business values
 
     ReopenActivity
     - ReopenDate : BusinessEntityLocalDate
-    - ReopenedBy : ActorId
-    - ReopenedAt : Timepoint
+    - Reopened : ActorStamp
 
     TraceActivity
     = TermsAmended(TermsAmendedActivity)
@@ -1723,14 +1720,14 @@ For the current CaseOperation model:
 | ReplaceFirmQuote | none |
 | InvalidateQuote | none |
 | RequestRepricing | RepricingRequested |
-| ChangeRfqTerms | TermsAmended |
-| ChangeQuoteOwner | none |
+| AmendRfqTerms | TermsAmended |
+| ChangePricingOwner | none |
 | RollPricingDate | none |
 | ChangeAssumedTradeDate | none |
 | PresentQuote | Presented |
 | ExtendValidity | none directly; affects Presented.Quote.EffectiveValidUntil |
 | RequestRepricingOnAway | Away |
-| ChangeContactOwner | none |
+| ChangeClientContactOwner | none |
 | CloseCase(Hit) | Hit, then Closed |
 | CloseCase(Away.RecordNow) | Away, then Closed |
 | CloseCase(Away.AlreadyRecorded) | Closed |
@@ -1744,9 +1741,9 @@ RequestRepricing represents an internal repricing request for an unpresented Fir
 
 RequestRepricingOnAway represents the customer proposal becoming Away and therefore materializes Away, not RepricingRequested. The new PricingEpisode created by that operation remains operational-history semantics rather than a separate public Trace milestone.
 
-ChangeRfqTerms is retained as TermsAmended even though the positive-flow model currently allows it only before the first Presentation. That timing is a consequence of RfqCase applicability, not a special Trace compression rule.
+AmendRfqTerms is retained as TermsAmended even though the positive-flow model currently allows it only before the first Presentation. That timing is a consequence of RfqCase applicability, not a special Trace compression rule.
 
-ChangeContactOwner, ChangeQuoteOwner, RollPricingDate, and ChangeAssumedTradeDate are not separate Trace activities. Relevant point-in-time values remain available in InitialContext, EndContext, and every Presented snapshot. ReplaceFirmQuote and InvalidateQuote are likewise not separate public Trace milestones.
+ChangeClientContactOwner, ChangePricingOwner, RollPricingDate, and ChangeAssumedTradeDate are not separate Trace activities. Relevant point-in-time values remain available in InitialContext, EndContext, and every Presented snapshot. ReplaceFirmQuote and InvalidateQuote are likewise not separate public Trace milestones.
 
 These are deliberate information-compression choices, not claims that omitted operations are semantically equivalent.
 
@@ -1756,13 +1753,13 @@ CaseActivityDigest exposes no Case-local RfqTermsId, PricingEpisodeId, QuoteId, 
 
 Construction resolves those identities to durable business values while operational history is available. The implementation may use Case-local IDs internally as temporary lookup/projection keys even though those IDs are absent from the resulting public Trace.
 
-InitialContext is resolved from the initial Published revision. EndContext is resolved from the endpoint Case of the represented effective path. A common Case-to-TraceCaseContext projection can resolve Terms / ContactOwnerId and the current or terminal PricingEpisode's QuoteOwnerId / PricingDate / AssumedTradeDate.
+CaseActivityDigest.ClientId and RequestReceipt are resolved from the immutable Case origin in the initial Published revision. InitialContext is resolved from the initial Published revision. EndContext is resolved from the endpoint Case of the represented effective path. A common Case-to-TraceCaseContext projection can resolve Terms / ClientContactOwnerId and the current or terminal PricingEpisode's PricingOwnerId / PricingDate / AssumedTradeDate.
 
-TermsAmended can be materialized from the resulting revision's current RfqTerms plus the ChangeRfqTerms actor/time.
+TermsAmended can be materialized from the resulting revision's current RfqTerms plus the AmendRfqTerms actor/time.
 
-Presented resolves its Terms, ContactOwnerId, PricingEpisode, and FirmQuote from the source state at PresentQuote. Its EffectiveValidUntil may require looking forward along the represented effective path to incorporate later ExtendValidity operations on the same Quote/Presentation.
+Presented resolves its Terms, ClientContactOwnerId, PricingEpisode, and FirmQuote from the source state at PresentQuote. Its EffectiveValidUntil may require looking forward along the represented effective path to incorporate later ExtendValidity operations on the same Quote/Presentation.
 
-RepricingRequested.RejectedQuoteValue is resolved from the source PendingPresentation state's current FirmQuote for RequestRepricing.
+RepricingRequested.RejectedQuote is resolved from the source PendingPresentation state's current FirmQuote, including quote provenance/effective validity, and PricingOwnerId is resolved from the source PricingEpisode.
 
 Away, Hit, Cancelled, and Reopened obtain their payloads directly from the accepted Domain operation or the immutable business outcome it establishes. CloseCase(Away.AlreadyRecorded) creates no duplicate Away activity.
 
@@ -1814,7 +1811,7 @@ The following earlier ideas were considered and rejected or deferred. Do not res
 
 Rejected for the current RfqCase model.
 
-RfqCase enters Domain only after QuoteOwner is known. Pre-publication work belongs to the separate RfqDraft aggregate and its Application workflows.
+RfqCase enters Domain only after PricingOwner is known. Pre-publication work belongs to the separate RfqDraft aggregate and its Application workflows.
 
 ### Draft as RfqCase state
 
@@ -1890,7 +1887,6 @@ Determined(T) assumes T is already a valid value of its own Domain type. RfqDraf
 RfqDraftData represents the RFQ content being assembled before publication:
 
     RfqDraftData
-    - ClientId : DraftField<ClientId>
     - Side : DraftField<Side>
     - SecurityId : DraftField<SecurityId>
     - Notional : DraftField<NotionalAmount>
@@ -1899,7 +1895,7 @@ RfqDraftData represents the RFQ content being assembled before publication:
 
 AssumedTradeDate is included in RfqDraftData because it is part of the RFQ input being established before publication. It is not an RfqTerms field: after publication it becomes a PricingEpisode assumption used when evaluating trade-date-dependent terms such as TradeDateLag settlement.
 
-ContactOwnerId and QuoteOwnerId are not part of RfqDraftData. They represent distinct responsibility assignments rather than RFQ content, and they have their own Domain operations.
+ClientContactOwnerId and PricingOwnerId are not part of RfqDraftData. They represent distinct responsibility assignments rather than RFQ content, and they have their own Domain operations.
 
 A future field that is genuinely optional even for publication should be modeled as such rather than overloading Undetermined.
 
@@ -1908,22 +1904,24 @@ RfqDraft itself is:
     RfqDraft
     - DraftId
     - BusinessEntity
+    - RequestReceipt : RfqRequestReceipt
     - DraftOwnerId
+    - ClientId : DraftField<ClientId>
     - Data : RfqDraftData
-    - ContactOwnerId : DraftField<ContactOwnerId>
-    - QuoteOwnerId : DraftField<QuoteOwnerId>
+    - ClientContactOwnerId : DraftField<ClientContactOwnerId>
+    - PricingOwnerId : DraftField<PricingOwnerId>
     - State : RfqDraftState
 
 Semantics:
 
-- BusinessEntity is required and immutable for the Draft lifetime;
+- BusinessEntity and RequestReceipt are required and immutable for the Draft lifetime;
 - DraftOwnerId is required and may change only while Active;
-- Data, ContactOwnerId, and QuoteOwnerId are retained in every Draft state;
-- Data may change only while Active through AmendDraftData;
-- ContactOwnerId and QuoteOwnerId may change only while Active through their dedicated operations;
+- RequestReceipt, ClientId, Data, ClientContactOwnerId, and PricingOwnerId are retained in every Draft state;
+- ClientId and Data may change only while Active through AmendDraftData; RequestReceipt never changes;
+- ClientContactOwnerId and PricingOwnerId may change only while Active through their dedicated operations;
 - DraftOwner is responsibility for the pre-publication Draft and is not copied into RfqCase on publication;
-- ContactOwner is customer-facing responsibility for the RFQ;
-- QuoteOwner is pricing responsibility for the RFQ.
+- ClientContactOwner is customer-facing responsibility for the RFQ;
+- PricingOwner is pricing responsibility for the RFQ.
 
 ### 25.2 RfqDraft lifecycle
 
@@ -1936,7 +1934,7 @@ Active is the editable pre-publication state.
 
 Deleted is a logical deletion, not physical removal. Draft content and responsibility assignments are retained so the Draft can be restored or copied.
 
-Published means the Draft has already created the identified Case chronology. Published is terminal for that Draft. Its Data, ContactOwnerId, and QuoteOwnerId remain as the publication-time Draft snapshot and may be used as the source of CopyDraft; subsequent business state is carried by the Case's RfqCaseRevision chronology.
+Published means the Draft has already created the identified Case chronology. Published is terminal for that Draft. Its Data, ClientContactOwnerId, and PricingOwnerId remain as the publication-time Draft snapshot and may be used as the source of CopyDraft; subsequent business state is carried by the Case's RfqCaseRevision chronology.
 
 ### 25.3 RfqDraft operations
 
@@ -1948,8 +1946,8 @@ Domain operations are defined by their semantic effect; this notation does not r
     Active
       --[D02 AmendDraftData]-----------> Active
       --[D03 ChangeDraftOwner]---------> Active
-      --[D04 ChangeDraftContactOwner]--> Active
-      --[D05 ChangeDraftQuoteOwner]----> Active
+      --[D04 ChangeDraftClientContactOwner]--> Active
+      --[D05 ChangeDraftPricingOwner]----> Active
       --[D06 DeleteDraft]--------------> Deleted
       --[D10 PublishDraft]-------------> Published(CaseId)
 
@@ -1972,11 +1970,11 @@ Operation semantics:
 
 | No. | Operation | Source | Main semantic effect |
 | --- | --- | --- | --- |
-| D01 | CreateDraft | none | Create Active Draft from given DraftId, BusinessEntity, DraftOwnerId, RfqDraftData, ContactOwnerId field, and QuoteOwnerId field |
+| D01 | CreateDraft | none | Create Active Draft from given DraftId, BusinessEntity, RequestReceipt, DraftOwnerId, ClientId field, RfqDraftData, ClientContactOwnerId field, and PricingOwnerId field |
 | D02 | AmendDraftData | Active | Replace Data with a new RfqDraftData; Data fields may move between Undetermined and Determined |
 | D03 | ChangeDraftOwner | Active | Change DraftOwnerId without changing RFQ content, responsibility assignments, or lifecycle state |
-| D04 | ChangeDraftContactOwner | Active | Change ContactOwnerId between Undetermined and Determined states without changing Data |
-| D05 | ChangeDraftQuoteOwner | Active | Change QuoteOwnerId between Undetermined and Determined states without changing Data |
+| D04 | ChangeDraftClientContactOwner | Active | Change ClientContactOwnerId between Undetermined and Determined states without changing Data |
+| D05 | ChangeDraftPricingOwner | Active | Change PricingOwnerId between Undetermined and Determined states without changing Data |
 | D06 | DeleteDraft | Active | Logically delete the Draft while retaining content and responsibility assignments |
 | D07 | RestoreDraft | Deleted | Restore the same Draft and retained fields to Active |
 | D08 | CopyDraft | any Draft state | Create a new Active Draft using field-specific copy/reset rules; source is unchanged |
@@ -1985,13 +1983,13 @@ Operation semantics:
 
 Deleted permits no content amendment, responsibility change, owner change, or publish operation. Published is terminal and permits no operation on that Draft other than acting as a CopyDraft source.
 
-The dedicated ContactOwner/QuoteOwner operations express different Domain meanings from changing RFQ content. They do not imply actor-specific authorization rules. Actor authorization, edit delegation, audit actor/time, ID allocation, external routing, optimistic concurrency, and persistence transaction management remain Application/Persistence concerns.
+The dedicated ClientContactOwner/PricingOwner operations express different Domain meanings from changing RFQ content. They do not imply actor-specific authorization rules. Actor authorization, edit delegation, technical audit metadata, ID allocation, external routing, optimistic concurrency, and persistence transaction management remain Application/Persistence concerns. RfqRequestReceipt is a Domain business fact, not technical Draft audit metadata.
 
 ### 25.4 CreateDraft and AmendDraftData
 
-CreateDraft receives DraftId, BusinessEntity, DraftOwnerId, an RfqDraftData, a DraftField<ContactOwnerId>, and a DraftField<QuoteOwnerId>. Any DraftField may initially be Undetermined or Determined. CreateDraft does not require publication completeness or RfqCase cross-field consistency.
+CreateDraft receives DraftId, BusinessEntity, RequestReceipt, DraftOwnerId, DraftField<ClientId>, an RfqDraftData, DraftField<ClientContactOwnerId>, and DraftField<PricingOwnerId>. RequestReceipt is required and immutable; Application may default it from the Draft creator and creation time. Any DraftField may initially be Undetermined or Determined. CreateDraft does not require publication completeness or RfqCase cross-field consistency.
 
-AmendDraftData receives a replacement RfqDraftData for an Active Draft. It may change multiple RFQ-content fields atomically and may return previously Determined Data fields to Undetermined. It does not change DraftOwnerId, ContactOwnerId, or QuoteOwnerId.
+AmendDraftData receives a DraftField<ClientId> and replacement RfqDraftData for an Active Draft. It may change multiple RFQ-content fields atomically and may return previously Determined Data fields to Undetermined. It does not change RequestReceipt, DraftOwnerId, ClientContactOwnerId, or PricingOwnerId.
 
 This permissiveness is intentional. RfqDraft represents pre-publication work; it is not a partially valid RfqCase.
 
@@ -1999,25 +1997,25 @@ This permissiveness is intentional. RfqDraft represents pre-publication work; it
 
 ChangeDraftOwner changes responsibility for managing the Draft itself.
 
-ChangeDraftContactOwner changes the customer-facing responsibility assignment:
+ChangeDraftClientContactOwner changes the customer-facing responsibility assignment:
 
-    DraftField<ContactOwnerId>
+    DraftField<ClientContactOwnerId>
     = Undetermined
-    | Determined(ContactOwnerId)
+    | Determined(ClientContactOwnerId)
 
-ChangeDraftQuoteOwner changes the pricing responsibility assignment:
+ChangeDraftPricingOwner changes the pricing responsibility assignment:
 
-    DraftField<QuoteOwnerId>
+    DraftField<PricingOwnerId>
     = Undetermined
-    | Determined(QuoteOwnerId)
+    | Determined(PricingOwnerId)
 
-Both ContactOwnerId and QuoteOwnerId may therefore move:
+Both ClientContactOwnerId and PricingOwnerId may therefore move:
 
 - Undetermined -> Determined;
 - Determined -> another Determined value;
 - Determined -> Undetermined.
 
-No SecurityId-to-QuoteOwner eligibility invariant is currently imposed by Domain. Automatic QuoteOwner routing, clearing/re-routing after SecurityId changes, and authorization for manual responsibility assignment are Application concerns.
+No SecurityId-to-PricingOwner eligibility invariant is currently imposed by Domain. Automatic PricingOwner routing, clearing/re-routing after SecurityId changes, and authorization for manual responsibility assignment are Application concerns.
 
 ### 25.6 DeleteDraft and RestoreDraft
 
@@ -2029,7 +2027,7 @@ RestoreDraft restores the same Draft:
 
     Deleted -> Active
 
-Both operations preserve DraftId, BusinessEntity, DraftOwnerId, RfqDraftData, ContactOwnerId, and QuoteOwnerId.
+Both operations preserve DraftId, BusinessEntity, RequestReceipt, DraftOwnerId, ClientId, RfqDraftData, ClientContactOwnerId, and PricingOwnerId.
 
 No DeletionReason is currently modeled. Actor, reason, and timestamp may be retained as audit/Application facts unless a concrete requirement makes them Domain-significant.
 
@@ -2041,14 +2039,15 @@ The new Draft:
 
 - receives a new DraftId;
 - receives a supplied DraftOwnerId;
+- receives a newly supplied RequestReceipt;
 - preserves BusinessEntity;
 - is Active;
-- copies ClientId, Side, SecurityId, Notional, and SettlementDateRule exactly as DraftField values from source Data;
+- copies ClientId from the source root field and Side, SecurityId, Notional, and SettlementDateRule exactly as DraftField values;
 - sets Data.AssumedTradeDate to Undetermined;
-- sets ContactOwnerId to Undetermined;
-- sets QuoteOwnerId to Undetermined.
+- sets ClientContactOwnerId to Undetermined;
+- sets PricingOwnerId to Undetermined.
 
-AssumedTradeDate and responsibility assignments are deliberately re-established for the new RFQ rather than inherited.
+RequestReceipt, AssumedTradeDate, and responsibility assignments are deliberately re-established for the new RFQ rather than inherited.
 
 Copy semantics are field-specific. When a new RfqDraftData or root-level DraftField is added, its copy/reset behavior must be decided explicitly rather than implicitly copying every future field.
 
@@ -2061,15 +2060,16 @@ It is not a complete reverse mapping from RfqCase to RfqDraft. It seeds only fac
 Current mapping:
 
 - BusinessEntity <- source RfqCase.BusinessEntity;
-- Data.ClientId <- Determined(source current RfqTerms.ClientId);
+- ClientId <- Determined(source RfqCase.ClientId);
 - Data.Side <- Determined(source current RfqTerms.Side);
 - Data.SecurityId <- Determined(source current RfqTerms.SecurityId);
 - Data.Notional <- Determined(source current RfqTerms.Notional);
 - Data.SettlementDateRule <- Determined(source current RfqTerms.SettlementDateRule);
 - Data.AssumedTradeDate <- Undetermined;
+- RequestReceipt <- newly supplied for the new RFQ;
 - DraftOwnerId <- supplied for the new Draft;
-- ContactOwnerId <- Undetermined;
-- QuoteOwnerId <- Undetermined;
+- ClientContactOwnerId <- Undetermined;
+- PricingOwnerId <- Undetermined;
 - State <- Active.
 
 PricingDate is not a Draft field and is not seeded.
@@ -2080,7 +2080,7 @@ Future Draft fields are not assumed to be reconstructible from every RfqCase sta
 
 PublishDraft is allowed only from Active.
 
-Publication requires every RfqDraftData field modeled as DraftField<T>, ContactOwnerId, and QuoteOwnerId to be Determined.
+Publication requires ClientId, every RfqDraftData field modeled as DraftField<T>, ClientContactOwnerId, and PricingOwnerId to be Determined.
 
 PublishDraft receives or is supplied externally with the identities and dates required to construct the Case, including CaseId, the initial Case-local RfqTermsId and PricingEpisodeId, OpenDate, and PricingDate. ID allocation and supplying BusinessEntityLocalDate values remain Application/external-context responsibilities.
 
@@ -2089,11 +2089,16 @@ The generated RfqCase mapping is:
     RfqDraft.BusinessEntity
         -> RfqCase.BusinessEntity
 
-    RfqDraft.ContactOwnerId
-        -> RfqCase.ContactOwnerId
+    RfqDraft.ClientId
+        -> RfqCase.ClientId
+
+    RfqDraft.RequestReceipt
+        -> RfqCase.RequestReceipt
+
+    RfqDraft.ClientContactOwnerId
+        -> RfqCase.ClientContactOwnerId
 
     RfqDraft.Data.{
-        ClientId,
         Side,
         SecurityId,
         Notional,
@@ -2101,7 +2106,7 @@ The generated RfqCase mapping is:
     }
         -> initial RfqTerms
 
-    RfqDraft.QuoteOwnerId
+    RfqDraft.PricingOwnerId
     RfqDraft.Data.AssumedTradeDate
     supplied PricingDate
         -> initial PricingEpisode
@@ -2158,10 +2163,10 @@ Correction must preserve auditability and must not become a generic mutation esc
 The current positive-flow taxonomy is intentionally minimal:
 
     CancellationReason
-    = Withdrawn
+    = Discontinued
     | CreatedInError
 
-Withdrawn is the only ordinary cancellation reason eligible for Reopen. CreatedInError includes duplicate/mistaken creation cases and is not reopenable through ordinary positive flow.
+Discontinued means that a genuine RFQ Case was stopped without establishing a normal Hit/Away close outcome; it does not assert that the client was the actor who withdrew. Discontinued is the only ordinary cancellation reason eligible for Reopen. CreatedInError includes duplicate/mistaken creation cases and is not reopenable through ordinary positive flow.
 
 Future business/statistical requirements may refine or extend the non-reopenable reason taxonomy. Such extension should be driven by concrete operational/reporting needs rather than speculative enumeration.
 
@@ -2183,7 +2188,7 @@ Known examples include:
 
 - Contact Owner handoff/takeover/management reassign;
 - Quote Owner handoff;
-- composites that first return a Case to Pricing then change QuoteOwner;
+- composites that first return a Case to Pricing then change PricingOwner;
 - current local-date roll + commit;
 - Draft publish/copy workflows.
 
