@@ -1068,6 +1068,8 @@ Restore does not reverse external side effects such as already-sent customer com
 
 Operational RfqCaseHistory may have finite retention and may eventually be deleted.
 
+Retention must nevertheless preserve enough operational history to execute any still-supported history-dependent Domain operation. In particular, an Open Case must retain the history required to construct a later terminal or Restore TraceData. Once the required durable Trace has been materialized and no supported operation still depends on the source chronology, retention policy may remove that chronology.
+
 ### 23.5 TraceData purpose and top-level structure
 
 TraceData is a durable, self-contained business-activity representation materialized from operational history. It is intentionally smaller than the full operational chronology and is expected to outlive RfqCaseHistory.
