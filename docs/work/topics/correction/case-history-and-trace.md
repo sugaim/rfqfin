@@ -453,10 +453,23 @@ This keeps two concerns separate:
 - `Effective` / `Superseded` says how this durable representation should be interpreted;
 - PresentedClosed / UnpresentedClosed / Cancelled / Open describes the represented business shape.
 
-### 7.1 PresentedClosedTrace
+### 7.1 TraceTerms
+
+Trace representations use a durable value form of RfqTerms with the Case-local identity removed:
+
+    TraceTerms
+    - ClientId
+    - Side
+    - SecurityId
+    - Notional : NotionalAmount
+    - SettlementDateRule
+
+This preserves the business terms required after operational history is deleted while deliberately omitting `RfqTermsId`.
+
+### 7.2 PresentedClosedTrace
 
     PresentedClosedTrace
-    - Terms
+    - Terms : TraceTerms
     - Presentations : NonEmpty<PresentationActivity>
     - Terminal : PresentedClose
 
@@ -477,10 +490,10 @@ This keeps two concerns separate:
 
 The explicit name `CaseCloseDate` distinguishes Case closure from HitDate/AwayDate.
 
-### 7.2 UnpresentedClosedTrace
+### 7.3 UnpresentedClosedTrace
 
     UnpresentedClosedTrace
-    - Terms
+    - Terms : TraceTerms
     - CaseCloseDate
     - ClosedBy : ActorId
     - ClosedAt : Timepoint
@@ -488,10 +501,10 @@ The explicit name `CaseCloseDate` distinguishes Case closure from HitDate/AwayDa
 
 No pre-Presentation pricing/change history is retained here.
 
-### 7.3 CancelledTrace
+### 7.4 CancelledTrace
 
     CancelledTrace
-    - Terms
+    - Terms : TraceTerms
     - Presentations : PresentationActivity[]
     - Terminal : Cancellation
 
@@ -504,10 +517,10 @@ No pre-Presentation pricing/change history is retained here.
 
 If cancellation occurs before any Presentation, `Presentations` is empty and no pre-Presentation pricing/change history is retained.
 
-### 7.4 OpenTrace
+### 7.5 OpenTrace
 
     OpenTrace
-    - Terms
+    - Terms : TraceTerms
     - Presentations : PresentationActivity[]
     - ChangesBeforeSupersession : ActivityChange[]
 
@@ -522,7 +535,7 @@ In that case:
 
 because pre-Presentation pricing workflow is intentionally not part of the durable activity digest.
 
-### 7.5 SupersessionReason
+### 7.6 SupersessionReason
 
 Current reason model:
 
@@ -687,7 +700,9 @@ If a future concrete analytics/regulatory requirement needs those distinctions, 
 
 ### 10.3 RepricingRequested
 
-RepricingRequested is retained because it can concern an unpresented firm Quote. Without a Trace-level change, the rejected quote value could otherwise disappear entirely from the durable activity record.
+RepricingRequested is retained when it occurs after the first Presentation, because it can concern an unpresented firm Quote in the Negotiating phase. Without a Trace-level change, the rejected quote value could otherwise disappear entirely from the durable activity record.
+
+A RepricingRequested operation that occurs during Inquiry, before any Presentation has ever happened, is compressed away with the other pre-Presentation pricing/workflow changes.
 
 ### 10.4 Repeated numerical values
 
