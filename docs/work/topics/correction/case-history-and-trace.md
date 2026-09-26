@@ -367,20 +367,26 @@ Current working shape:
     - RecordedAt : Timepoint
     - RecordedBusinessDate : BusinessEntityLocalDate
     - Origin : TraceOrigin
-    - Representation : TraceRepresentation<TraceBody>
+    - Representation : TraceRepresentation
 
-    TraceRepresentation<TBody>
+    TraceRepresentation
     - CaseId
     - BusinessEntity
     - CaseOpenDate : BusinessEntityLocalDate
     - InitialContactOwnerId
     - FirstPresentedContactOwnerId?
-    - Body : TBody
+    - State : TraceState
+
+    TraceState
+    = Effective(EffectiveTrace)
+    | Superseded(SupersededTrace)
 
 This distinction is intentional:
 
 - `Recorded*` and `Origin` describe when, by whom, and why this TraceData record was produced;
 - `TraceRepresentation` is the self-contained business representation that must remain meaningful after operational history is deleted.
+
+A superseding TraceData record does not point to an older TraceData record. Instead, it records the previously effective/open business representation again, now under `TraceState.Superseded`. This preserves self-containment without introducing TraceId / PreviousTraceId relationships.
 
 `InitialContactOwnerId` is the ContactOwner at Case publication/open.
 
@@ -419,13 +425,13 @@ They are distinct from business-event facts such as:
 
 Even when the values happen to coincide during ordinary same-day processing, equality is not a general invariant.
 
-## 7. Trace body
+## 7. Trace representation state
 
 Current type hierarchy:
 
-    TraceBody
-    = EffectiveTrace
-    | SupersededTrace
+    TraceState
+    = Effective(EffectiveTrace)
+    | Superseded(SupersededTrace)
 
     EffectiveTrace
     = PresentedClosedTrace
@@ -433,8 +439,19 @@ Current type hierarchy:
     | CancelledTrace
 
     SupersededTrace
-    = SupersededEffectiveTrace
-    | SupersededOpenTrace
+    = Effective(
+          EffectiveTrace,
+          Reason : SupersessionReason
+      )
+    | Open(
+          OpenTrace,
+          Reason : SupersessionReason
+      )
+
+This keeps two concerns separate:
+
+- `Effective` / `Superseded` says how this durable representation should be interpreted;
+- PresentedClosed / UnpresentedClosed / Cancelled / Open describes the represented business shape.
 
 ### 7.1 PresentedClosedTrace
 
@@ -487,13 +504,14 @@ No pre-Presentation pricing/change history is retained here.
 
 If cancellation occurs before any Presentation, `Presentations` is empty and no pre-Presentation pricing/change history is retained.
 
-### 7.4 SupersededOpenTrace
+### 7.4 OpenTrace
 
-    SupersededOpenTrace
+    OpenTrace
     - Terms
     - Presentations : PresentationActivity[]
     - ChangesBeforeSupersession : ActivityChange[]
-    - Reason : SupersessionReason
+
+`OpenTrace` appears only inside `TraceState.Superseded` in the current model. There is no durable Effective(OpenTrace) record because ordinary open processing is represented operationally by RfqCaseRevision rather than by TraceData.
 
 A Trace is still created when restore supersedes an Open Case that has never had a Presentation.
 
@@ -504,11 +522,7 @@ In that case:
 
 because pre-Presentation pricing workflow is intentionally not part of the durable activity digest.
 
-### 7.5 SupersededEffectiveTrace
-
-    SupersededEffectiveTrace
-    - Previous : TraceRepresentation<EffectiveTrace>
-    - Reason : SupersessionReason
+### 7.5 SupersessionReason
 
 Current reason model:
 
@@ -516,15 +530,11 @@ Current reason model:
     = OperationalRestore
     | HistoricalCorrection
 
-`Previous` contains the complete prior business representation, not only its EffectiveTrace body.
+A superseding TraceData record repeats the relevant prior business representation under `TraceState.Superseded` rather than embedding or referencing the previous TraceData record itself.
 
-This matters because a later historical correction may change Case-level durable facts such as `CaseOpenDate` or `InitialContactOwnerId`. A superseding record must preserve the representation that was previously treated as effective, including those top-level business facts.
+For example, if historical correction changes `CaseOpenDate`, the superseding record carries the old `CaseOpenDate` in its own TraceRepresentation, while the new effective record carries the corrected value.
 
-Embedding the previous representation duplicates data that may already exist as an earlier TraceData record. This duplication is currently intentional because each durable TraceData should remain self-contained after operational history is deleted and should not require a TraceId/TraceRevision lookup to interpret what was superseded.
-
-The previous record's `Recorded*` metadata and `Origin` are **not** embedded into `Previous`; those describe the creation of that earlier record rather than the business representation that was superseded.
-
-A later historical-correction design may revisit this if a stronger durable Trace-record identity model becomes necessary.
+The earlier record's `Recorded*` metadata and `Origin` are not copied into the superseding record. They describe creation of that earlier TraceData record, not the business representation being superseded.
 
 ## 8. PresentationActivity
 
@@ -807,7 +817,7 @@ Later historical correction may add further TraceData records.
 
 This is append-only business history. A later Trace does not rewrite an older TraceData record.
 
-A superseding Trace may therefore embed the complete previously effective `TraceRepresentation` even though that representation also exists in an older TraceData record. The duplication is deliberate self-containment, not an indication that the older record was rewritten.
+A superseding Trace may therefore repeat the complete previously effective/open business representation even though the same facts also exist in an older TraceData record. The duplication is deliberate self-containment, not an indication that the older record was rewritten.
 
 The exact persistence-level revision/sequence wrapper for Trace records is intentionally not decided here. TraceData itself remains identity-light and self-contained.
 
