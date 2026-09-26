@@ -2,289 +2,174 @@
 
 This is the single active working handoff. It is non-canonical.
 
+## Why this handoff exists
+
+The previous discussion made useful progress, but late in the session the conversational context became mixed: canonical facts, already-settled changes, and new proposals were repeatedly conflated.
+
+Therefore:
+
+- treat canonical `../domain.md` as authoritative;
+- treat the pending Trace simplification / TraceRevision conclusions as working decisions to be **reconfirmed in a fresh session**;
+- do not copy those pending conclusions mechanically into canonical docs;
+- after reconfirmation, update canonical docs before treating them as settled.
+
 ## Read first
 
 Read in this order:
 
 1. `../domain.md` — canonical Domain authority.
 2. `README.md` — working-document roles and discussion method.
-3. `topics/correction/case-history-and-trace.md` — current retained rationale for revision / Restore / Trace / replayable CaseOperation semantics.
-4. `topics/correction/correction-cases.md` — concrete historical-correction regression catalog.
+3. `topics/correction/case-history-and-trace.md` — active working summary, including the pending Trace simplification / TraceRevision checkpoint.
+4. `sessions/08-trace-api-and-revision-checkpoint.md` — why the current API shape is canonical and why the remaining Trace work is being rechecked.
+5. `topics/correction/correction-cases.md` — concrete correction regression catalog when correction scenarios are discussed.
 
-Read `sessions/06-first-class-case-operations.md` when the rationale for the current CaseOperation model is needed.
+Use Sessions 05–07 only when earlier rationale is needed.
 
-Read `sessions/05-operational-history-restore-trace.md` only when the earlier chronology/Restore/Trace checkpoint itself is useful.
+Do not restart from the old abstract `Supports(H_rep, H_true)` correction model.
 
-Do **not** restart the next discussion from:
+## Canonical foundation already settled
 
-- `topics/correction/correction-history-model.md`;
-- `sessions/03-rfqcase-correction-foundation.md`.
+The following is already incorporated into `domain.md`.
 
-Those files preserve an earlier abstract correction exploration centered on whole-History replacement and a provisional `Supports(H_rep, H_true)` relation. Several assumptions from that exploration have now been replaced by the concrete RfqCaseRevision / CaseOperation / TraceData model.
+### Ordinary business operations
 
-When working material disagrees with `../domain.md`, the canonical Domain wins.
+    Apply :
+        RfqCase x CaseOperation
+        -> RfqCase
 
-## Current status
+    CaseOperation
+    = Open(OpenOperation)
+    | Terminal(TerminalOperation)
+    | Reopen(ReopenOperation)
 
-Completed design units:
+Reopen is one flat operation:
 
-- positive-flow RfqCase;
-- pre-publication RfqDraft;
-- correction-foundation exploration;
-- Away/repricing provenance refinement;
-- operational revision chronology / Restore / durable TraceData;
-- first-class RfqCase CaseOperation model and replayable operation payloads.
+    ReopenOperation
+    - NewPricingEpisodeId
+    - ReopenDate
+    - NewAssumedTradeDate
+    - ReopenedBy
+    - ReopenedAt
 
-The current canonical foundation is:
+The source Terminal state determines reopen provenance and target Open state.
 
-    RfqCase
-      = one complete valid business state
+### Operational revision chronology
 
     RfqCaseRevision
-      = one immutable operational occurrence
+    - CaseId
+    - Version : CaseVersionNumber
+    - Case
+    - Transition
 
-    RfqCaseHistory
-      = retained revision chronology for one CaseId
-
-    TraceData
-      = durable self-contained business representation
-        that may outlive operational history
-
-Revision provenance is:
+    CaseVersionNumber
+    - Value
+    - New()
+    - Next()
+    - Prev()
 
     RfqCaseTransition
     = Published(DraftId)
     | Applied(CaseOperation)
     | RestoredFrom(TargetVersion)
 
-## CaseOperation foundation
+Restore is not CaseOperation.
 
-Ordinary Domain operations are first-class Domain Objects.
+    RestoreOperation
+    - TargetVersion : CaseVersionNumber
 
-Conceptually:
+### Trace-producing revision-level API
 
-    Apply :
-        RfqCase x CaseOperation
-        -> RfqCase
+RfqCaseHistory is the source of current state and retained chronology.
 
-This is a partial function: every operation has explicit valid source-state shapes and invariants.
-
-Current hierarchy:
-
-    CaseOperation
-    = Open(OpenOperation)
-    | Terminal(TerminalOperation)
-
-The operation definition is canonical. The state graph remains a state-centric reference view.
-
-Application request models are separate from CaseOperation. Application resolves actor/time/date, generated IDs, and external context before constructing a fully resolved Domain Operation.
-
-The same fully resolved CaseOperation is used for:
-
-- live positive flow;
-- Applied(CaseOperation) revision provenance;
-- future retained-history replay/correction.
-
-Values deterministically derivable from the source RfqCase are not duplicated merely for replay.
-
-There is no separate ordinary replay-only CaseCommand model.
-
-## Important positive-flow refinements now canonical
-
-- ExpireQuote is removed; InvalidateQuote has Reason = Expired | Withdrawn.
-- ExtendValidUntil is renamed ExtendValidity.
-- ExtendValidity may occur after the old ValidUntil elapsed; current invariant is only NewValidUntil > CurrentValidUntil.
-- ContinueAfterAway is replaced by RequestRepricingOnAway.
-- PricingEpisodeOrigin for that operation is Away(...).
-- PresentationAwayOutcome now includes AwayDate + RecordedBy / RecordedAt + Feedback?.
-- Away RecordedBy / RecordedAt come from the operation that establishes the Away fact.
-- Hit / old CloseAway are reorganized under TerminalOperation.CloseCase with CloseOutcome = Hit | Away | Unpresented.
-- Away closure distinguishes AlreadyRecorded versus RecordNow only as operation-construction semantics, not as different business Away kinds.
-- all accepted Case operations carry operation-specific business actor/time fields where relevant; no generic Stamp type is used.
-
-## Terminal and Trace boundary
-
-Terminal operations are:
-
-    TerminalOperation
-    = CloseCase
-    | Cancel
-
-The underlying business-state semantics can be reasoned about as:
-
-    RfqCase x TerminalOperation
-        -> Terminal RfqCase
-
-but the public Domain API need not expose terminal-state creation separately from Trace generation.
-
-Conceptually:
+    TraceContext
+    - RecordedBy
+    - RecordedAt
+    - RecordedBusinessDate
 
     ApplyTerminal(
-        currentRevision,
-        terminalOperation,
-        terminalTraceContext
-    ) -> TerminalResult {
-         Revision,
-         Trace
-       }
+        history : RfqCaseHistory,
+        operation : TerminalOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
 
-The API boundary should preserve semantic production of terminal Revision + Trace together.
+    ApplyReopen(
+        history : RfqCaseHistory,
+        operation : ReopenOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
 
-Trace state is:
+    ApplyRestore(
+        history : RfqCaseHistory,
+        operation : RestoreOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
 
-    TraceState
-    = Effective(TerminalTrace)
-    | Superseded(TraceSnapshot, Reason)
+Do not reintroduce separate current Case/current revision inputs unless a concrete contradiction requires it; History is deliberately the source of truth.
 
-    TraceSnapshot
-    = Open(OpenTrace)
-    | Terminal(TerminalTrace)
+Restore still materializes the abandoned effective path into the durable TraceRecord, while the new RfqCaseRevision selects the target Open revision.
 
-Trace remains intentionally compressed.
+## Pending working decisions — reconfirm before canonical update
 
-Detailed ActivityChange begins at first Presentation.
+The previous session reached the following working conclusions, but they are intentionally not yet canonical because of the context-mixing issue.
 
-Current retained post-Presentation activities are:
+Re-read the full working summary in `topics/correction/case-history-and-trace.md`, then explicitly confirm or revise these points before editing `domain.md`.
 
-- RepricingRequested;
-- RepricingRequestedOnAway;
-- QuoteOwnerChanged;
-- PricingDateRolled;
-- AssumedTradeDateChanged;
-- ValidityExtended.
+Current checkpoint includes:
 
-For activity facts retained in TraceData, actor/time is retained with the activity.
+- simplify public/business Trace to a small set of business milestones rather than operational changes;
+- candidate TraceActivity set: TermsAmended, Presented, Away, InternalRepricingRequested, Hit, Closed, Cancelled, Reopened;
+- Restore is not a TraceActivity;
+- Presented becomes a self-contained snapshot;
+- public Trace does not expose PresentationId;
+- Hit/Away and Closed remain separate facts;
+- InitialContext / EndContext remain and include Terms, ContactOwnerId, QuoteOwnerId, PricingDate, AssumedTradeDate;
+- TraceRecord becomes a versioned Domain concept, tentatively TraceRevision;
+- TraceRevision chronology is independent from RfqCaseRevision chronology;
+- outer reason is named Trigger rather than Kind;
+- Restore / HistoricalCorrection triggers carry actor/time and CorrectionReason;
+- initial CorrectionReason taxonomy is DataError | OperationalError | Other plus Note.
 
-## Operational Restore
+These are strong working decisions, but the next session must validate them once more against canonical Domain semantics before incorporation.
 
-Operational Restore:
+## Start here
 
-- may start from Open or Terminal current state;
-- targets an earlier same-Case **Open** revision;
-- creates one new revision at current.Version.Next();
-- reuses the target revision's exact Case-local identities;
-- creates one Superseded TraceData;
-- does not reinstate earlier terminal outcomes;
-- does not reverse external side effects.
+First finish the TraceRevision/version/API boundary.
 
-A genuinely correct terminal Away/Close followed later by renewed customer interest is not automatically Restore.
+Questions to answer:
 
-## Current design target
+1. What is TraceVersionNumber / TraceRevision identity and sequence semantics?
+2. How does a Trace-producing operation obtain the previous/latest Trace revision or version?
+3. How do we preserve the History-as-single-source-of-truth principle and avoid inconsistent duplicated inputs?
+4. What is the final RevisionTraceResult after TraceRecord -> TraceRevision?
+5. What is the HistoricalCorrection API when RfqCaseHistory remains immutable and correction appends a new corrected Trace revision?
 
-Design **historical correction** on top of the canonical revision / CaseOperation / Trace foundation.
+Do not move to broad historical-correction machinery until this boundary is coherent.
 
-The practical scope is initially one Case whose operational RfqCaseHistory is still retained.
+## After TraceRevision/API is closed
 
-Historical correction should answer:
+Then test representative correction scenarios:
 
-> given investigation of a previously recorded Case, how do we construct a corrected durable business representation while reusing ordinary Domain semantics wherever they remain expressive?
+- wrong value;
+- extra activity;
+- missing activity;
+- wrong activity kind;
+- correction that changes later business history;
+- business truth not representable by the current RfqCase / CaseOperation model.
 
-The ordinary replay language is now concrete:
+Only then choose among:
 
-    initial Published revision
-      + Applied(CaseOperation)
-      + RestoredFrom provenance
-
-Replay is a construction/validation mechanism, not automatically a claim that the corrected operation sequence literally happened.
-
-## Next question — start here
-
-### 1. Reopen after a genuine terminal outcome
-
-A newly identified positive-flow question should be resolved before historical-correction replay design:
-
-> when a terminal outcome was genuinely correct at the time, can the same RfqCase later become Open again because business activity resumes?
-
-This is **not** Operational Restore:
-
-- Restore means the prior operational path/outcome was mistaken and an earlier valid Open revision is selected;
-- Reopen would mean the terminal fact remains historically correct, but later business activity starts again.
-
-Discuss at least these cases separately:
-
-- `Closed(Presented(Away(...))) -> Open`: client genuinely went Away, then later returns and asks to resume/reprice;
-- `Cancelled -> Open`: determine whether any cancellation meanings permit later reopening of the same Case, or whether cancellation means the Case identity itself should remain dead;
-- `Closed(Presented(Hit(...)))`: do not assume symmetry with Away; Hit may already have booking/downstream effects and likely needs a separate business rule.
-
-If Reopen is admitted, determine:
-
-- whether the same CaseId continues or a new Case is required;
-- which terminal facts remain durable/history-visible;
-- what Open state/PricingEpisode is created on reopen;
-- whether a new PricingEpisode is always required;
-- whether Reopen is a CaseOperation and, if so, how the current `OpenOperation : Open -> Open` / `TerminalOperation : Open -> Terminal` hierarchy should change;
-- how Reopen produces/updates durable TraceData;
-- how Reopen differs from correction/Restore in revision provenance.
-
-Do not modify Restore semantics merely to absorb genuine resumed business.
-
-### 2. Replay source/path selection
-
-After Reopen semantics are settled, continue historical-correction design.
-
-RfqCaseHistory may contain:
-
-- a physical v1..vn chronology;
-- RestoredFrom edges;
-- paths that were once effective and later superseded;
-- terminal occurrences with already-materialized TraceData.
-
-Do not assume that the physical revision sequence itself is one linear replay program.
-
-Determine:
-
-- what path/program is selected when correcting a particular historical business occurrence;
-- how RestoredFrom is interpreted during replay;
-- how current effective-state reconstruction differs, if at all, from reconstruction of historical paths needed for corrected durable Trace;
-- how a correction targets a path that is no longer current but was historically effective.
-
-Use concrete correction cases while deciding this.
-
-## Questions after replay-path selection
-
-3. **What edits are allowed to the ordinary CaseOperation program?**  
-   Test value correction, operation deletion, insertion, and cases where corrected replay changes later applicability.
-
-4. **When does ordinary replay stop being expressive enough?**  
-   Use the correction catalog to find business truth that cannot be represented by valid RfqCase states/CaseOperation values.
-
-5. **What is the Trace-side intermediate state?**  
-   Define the smallest state needed by any Trace-native correction language.
-
-6. **What is EffectiveCommand, if still needed?**  
-   Define business-semantic Trace-native transitions only for cases ordinary replay cannot express.
-
-7. **What records does one Historical Correction produce?**  
-   Determine Superseded + corrected Effective Trace behavior, including correction-of-correction.
-
-8. **What validation/adequacy relation is actually needed?**  
-   Introduce one only if concrete cases require it; do not restart from Supports(H_rep,H_true).
-
-9. **What remains outside the single-Case unit?**  
-   Split/merge/reassociation across CaseIds, downstream reconciliation, authorization/approval workflow, and physical persistence schema remain separate unless a concrete dependency forces them in.
-
-## Concrete regression material
-
-Use `topics/correction/correction-cases.md`.
-
-In particular test:
-
-- wrong/missing Hit or Away;
-- wrong presented value or timing;
-- wrong/missing pricing rounds;
-- Terms/owner/date mistakes;
-- correction that changes history while leaving a similar current/final state;
-- ValidUntil-dependent validity;
-- correction-of-correction.
-
-Cross-Case split/merge/reassociation remains deferred.
+- ordinary CaseOperation replay;
+- hybrid replay + correction-native construction;
+- Trace-native construction;
+- a minimal ephemeral TraceProjectionState, if concrete cases require it.
 
 ## Working discipline
 
-- preserve canonical positive-flow semantics unless a concrete correction case exposes a contradiction;
-- do not reintroduce CaseCommand;
-- do not turn TraceData into a complete operational log;
-- keep Domain validity distinct from Application authorization and Persistence mechanics;
-- do not expose internal transition/Trace factorization as public API merely because it is useful for reasoning;
-- do not start by formalizing a general equivalence relation;
-- when the next coherent design unit is complete, update canonical docs first, then write a new session record, then update this handoff.
+- canonical first;
+- distinguish canonical facts from pending working decisions;
+- because this handoff exists due to context mixing, re-confirm pending decisions before canonical edits;
+- preserve settled positive-flow semantics unless a concrete contradiction appears;
+- keep RfqCaseHistory immutable during historical correction unless a new requirement explicitly overturns that premise;
+- do not expand public Trace merely to reproduce operational History;
+- discuss one coherent question at a time;
+- when the TraceRevision/API unit is complete, update canonical docs first, then session/topic/handoff.
