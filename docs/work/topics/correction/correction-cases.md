@@ -8,7 +8,7 @@ It preserves the concrete cases used to test correction models. It is intentiona
 
 Use it together with:
 
-- `../../../domain.md` for the canonical RfqCaseRevision / Restore / Trace foundation;
+- `../../../domain.md` for the canonical RfqCaseRevision / CaseOperation / Restore / Trace foundation;
 - `../../handoff.md` for the active historical-correction target;
 - `case-history-and-trace.md` for rationale when needed.
 
@@ -18,13 +18,14 @@ The catalog exists because correction abstractions should be tested against conc
 
 ## How to use this catalog
 
-For each proposed correction rule or `Supports(H_rep, H_true)` definition:
+For each proposed historical-correction/replay rule:
 
 1. identify the expected business truth for the case;
-2. construct one or more candidate corrected Histories;
-3. check that the candidates remain valid under the positive-flow business transition model;
-4. check that the proposed Support rule accepts the intended candidate and rejects materially wrong alternatives;
-5. do not infer a new Domain rule from one case unless the business distinction is actually required.
+2. construct one or more candidate corrected representations or replay programs;
+3. check that ordinary-replay candidates remain valid under the canonical CaseOperation model;
+4. check that the candidate preserves the business distinctions the case is intended to test;
+5. introduce an explicit adequacy/Support relation only if a concrete case requires one;
+6. do not infer a new Domain rule from one case unless the business distinction is actually required.
 
 The "What this tests" notes below are design pressures and observations. They are not themselves settled requirements.
 
