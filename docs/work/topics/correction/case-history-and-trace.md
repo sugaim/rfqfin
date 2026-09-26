@@ -72,13 +72,13 @@ Canonical transition provenance is:
     RfqCaseTransition
     = Published(DraftId)
     | Applied(CaseOperation)
-    | RestoredFrom(TargetVersion)
+    | Restored(RestoreOperation)
 
 Reopen is genuine positive-flow business activity and therefore creates:
 
     Applied(Reopen(...))
 
-Operational Restore is different: it selects an earlier valid Open revision and therefore uses RestoredFrom.
+Operational Restore is different: it selects an earlier valid Open revision and therefore uses Restored(RestoreOperation).
 
 One accepted CaseOperation creates exactly one next revision.
 
@@ -115,7 +115,7 @@ ApplyRestore creates:
 
     v21
     - Case = v10.Case
-    - Transition = RestoredFrom(v10.Version)
+    - Transition = Restored(operation)
 
 The abandoned chronology remains immutable.
 
@@ -428,7 +428,7 @@ The concrete retained foundation is now:
 
     initial Published revision
       + Applied(CaseOperation)
-      + RestoredFrom provenance
+      + RestoreOperation provenance
       + durable TraceRecord milestones
 
 Reopen is no longer an unresolved prerequisite.
@@ -436,7 +436,7 @@ Reopen is no longer an unresolved prerequisite.
 The next historical-correction question is replay source/path selection when RfqCaseHistory contains:
 
 - physical v1..vn chronology;
-- RestoredFrom edges;
+- Restored(RestoreOperation) edges;
 - paths that were once effective and later abandoned;
 - terminal/Reopen milestone TraceRecords.
 
@@ -445,7 +445,7 @@ Do not assume that the physical revision sequence is one linear replay program.
 The next design unit must determine:
 
 - what semantic ancestry/path is selected when correcting a historical business occurrence;
-- how RestoredFrom participates in replay;
+- how Restored(RestoreOperation) participates in replay;
 - how current effective-state reconstruction differs from reconstruction of an abandoned historical path;
 - how correction targets a path that is no longer current but was once effective.
 
