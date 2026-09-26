@@ -405,7 +405,92 @@ History is not duplicated inside TraceContext. Supplying History as the revision
 
 Revision + TraceRecord produced by one Domain operation should be persisted atomically.
 
-## 15. Bridge to historical correction
+## 15. Working Trace simplification / TraceRevision conclusions awaiting reconfirmation
+
+The discussion after the revision-level API refinement explored a substantially simpler public/business Trace model and a versioned Trace concept.
+
+These conclusions are **working decisions, not yet canonical**. The conversation context became unreliable late in the session, so the next session must re-read canonical material, re-check these decisions explicitly, and only then update `domain.md`.
+
+Current working conclusions to re-check:
+
+- Trace should be the public/analysis-oriented business milestone representation, not a full copy of RfqCaseHistory.
+- Candidate simplified TraceActivity set:
+
+      TraceActivity
+      = TermsAmended
+      | Presented
+      | Away
+      | InternalRepricingRequested
+      | Hit
+      | Closed
+      | Cancelled
+      | Reopened
+
+- Restore remains absent from TraceActivity.
+- RequestRepricingOnAway should contribute Away, not InternalRepricingRequested.
+- InternalRepricingRequested is for ordinary RequestRepricing and should carry PreviousQuoteValue, optional Feedback, RequestedBy, and RequestedAt.
+- Presented should become a self-contained snapshot carrying Terms, ContactOwnerId, QuoteOwnerId, PricingDate, AssumedTradeDate, Quote, PresentationDate, PresentedBy, and PresentedAt.
+- The public Trace should not expose PresentationId; Hit/Away association should be resolved from ordered business chronology.
+- Hit/Away and Case closure should remain distinct public facts so Away-followed-by-continued-pricing is distinguishable from Away-close.
+- InitialContext and EndContext should remain, with CaseContext expanded to Terms, ContactOwnerId, QuoteOwnerId, PricingDate, and AssumedTradeDate.
+- TraceRecord should become a versioned Domain concept, tentatively TraceRevision, with an independent chronology from RfqCaseRevision.
+- The outer classification should be called Trigger rather than Kind.
+- Working trigger shape:
+
+      TraceRevisionTrigger
+      = HitClose
+      | AwayClose
+      | UnpresentedClose
+      | Cancelled
+      | Reopened
+      | Restore(...)
+      | HistoricalCorrection(...)
+
+- Restore and HistoricalCorrection triggers should carry actor/time plus a typed CorrectionReason.
+- Working CorrectionReason shape:
+
+      CorrectionReason
+      - Code : DataError | OperationalError | Other
+      - Note : string
+
+The above should not be copied mechanically into canonical documentation. Reconfirm semantics first.
+
+## 16. Next unresolved design questions
+
+After reconfirming the working conclusions above, continue with:
+
+1. TraceRevision version semantics:
+   - TraceVersionNumber shape;
+   - initial/new version construction;
+   - successor/predecessor semantics;
+   - how the latest Trace revision is supplied to a Trace-producing Domain operation.
+
+2. Revision-level API after TraceRecord -> TraceRevision:
+   - final RevisionTraceResult shape;
+   - how ApplyTerminal / ApplyReopen / ApplyRestore obtain the prior Trace revision/version without introducing inconsistent duplicated inputs.
+
+3. HistoricalCorrection API:
+   - operational RfqCaseHistory remains immutable;
+   - correction appends a new corrected Trace revision;
+   - exact source inputs and correction provenance are not yet designed.
+
+4. Representative correction scenarios:
+   - wrong value;
+   - extra activity;
+   - missing activity;
+   - wrong activity kind;
+   - correction that changes later business history;
+   - business truth not expressible by the current RfqCase / CaseOperation model.
+
+5. Construction strategy:
+   - ordinary CaseOperation replay where expressive;
+   - hybrid replay + correction-native construction;
+   - Trace-native construction;
+   - handling currently unmodeled business flows.
+
+6. Introduce an ephemeral TraceProjectionState only if the concrete scenarios require it.
+
+## 17. Bridge to historical correction
 
 The concrete retained foundation is now:
 
@@ -434,7 +519,7 @@ The next design unit must determine:
 
 Use the concrete correction catalog rather than restarting from the old Supports(H_rep, H_true) abstraction.
 
-## 16. Canonical incorporation
+## 18. Canonical incorporation
 
 The decisions in this note are incorporated into `../../../domain.md`.
 
