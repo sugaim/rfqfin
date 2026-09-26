@@ -110,7 +110,7 @@ The following remain outside the positive-flow RfqCase state itself:
 
 Operational correction is no longer wholly Domain-external: operational Restore, RfqCaseRevision chronology, and durable TraceRecord are defined below.
 
-The ordinary replayable CaseOperation language is canonicalized below and is used by accepted revision provenance. The broader historical-correction construction model, including any Trace-native EffectiveCommand language, remains deliberately deferred.
+The ordinary replayable CaseOperation language is canonicalized below and is used by accepted revision provenance. The broader historical-correction construction model, including replay source/path selection and any correction-native representation needed beyond ordinary CaseOperation semantics, remains deliberately deferred.
 
 ## 4. Naming and notation
 
@@ -125,6 +125,8 @@ Use:
 Do not mix snake_case into the domain vocabulary.
 
 Use Id rather than ID in type/member names.
+
+Use the RfqCase prefix for the aggregate and top-level operational chronology types whose names must identify the RFQ Case independently, such as RfqCase, RfqCaseRevision, and RfqCaseHistory. Case-scoped Domain vocabulary may use the shorter Case prefix when unambiguous within this bounded context, such as CaseId, CaseOperation, CaseClose, CaseOutcome, and CaseActivityDigest.
 
 Variation names should describe the semantic variant, not implementation mechanics.
 
@@ -829,7 +831,7 @@ the following must hold:
 
 TradeDateLag does not require an equivalent cross-field check because SettlementLag has a non-negative BusinessDayCount and Following semantics.
 
-This invariant applies to every Domain operation that can establish a new current Terms/Episode combination, including PublishDraft, ChangeRfqTerms, and ChangeAssumedTradeDate.
+This invariant applies to every Domain operation that can establish a new current Terms/Episode combination, including PublishDraft, ChangeRfqTerms, ChangeAssumedTradeDate, and every ReopenOperation.
 
 
 ### 16.11 Time does not mutate state
@@ -1408,7 +1410,7 @@ Timepoint fields describe absolute business-action or business-event time where 
 - InvalidatedAt / RequestedAt / ChangedAt / RolledAt / ExtendedAt: accepted Domain-operation action times;
 - ClosedAt / CancelledAt: Case terminal actions;
 - ReopenedAt: accepted Reopen action;
-- TraceRecord.RecordedAt: creation/recording of that Trace representation.
+- TraceRecord.RecordedAt: creation/recording of that durable Trace record.
 
 These Timepoint values are Domain business facts, not persistence insertion timestamps.
 
