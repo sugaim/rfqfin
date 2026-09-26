@@ -463,7 +463,7 @@ ExtendValidity may be accepted even after the previously recorded ValidUntil has
 
     NewValidUntil > CurrentValidUntil
 
-No ordering invariant is currently imposed between ExtendedAt and NewValidUntil.
+No ordering invariant is currently imposed between Extended.At and NewValidUntil.
 
 InvalidateQuote with Reason=Expired represents explicit Domain recognition that the current FirmQuote is being invalidated because its validity elapsed.
 
@@ -479,7 +479,7 @@ QuotePresentation is an immutable Case-local child Entity.
 
 A QuotePresentation represents a business proposal event: the Quote was actually presented to the customer.
 
-PresentedBy and PresentedAt record the actor and absolute time of that presentation action. They are distinct from ClientContactOwnerId, which represents customer-contact responsibility.
+PresentedBy and Presented.At record the actor and absolute time of that presentation action. They are distinct from ClientContactOwnerId, which represents customer-contact responsibility.
 
 Quote and QuotePresentation are deliberately separate because:
 
@@ -526,13 +526,13 @@ Hit is terminal for the Case in normal flow.
 
 AwayDate is the BusinessEntity-local date to which the Presentation's Away outcome is attributed.
 
-RecordedBy and RecordedAt identify the internal actor and absolute time at which the Away outcome was established in the Domain. They do not claim that this actor caused the customer to go Away, nor that RecordedAt is the exact external customer-event time.
+Recorded identifies the internal actor and absolute time at which the Away outcome was established in the Domain. It does not claim that this actor caused the customer to go Away, nor that Recorded.At is the exact external customer-event time.
 
-For RequestRepricingOnAway, RecordedBy / RecordedAt come from RequestedBy / RequestedAt. When CloseCase records an Away outcome as part of closure, they come from ClosedBy / ClosedAt.
+RequestRepricingOnAway supplies Recorded directly. When CloseCase records an Away outcome as part of closure, the outcome reuses Close.Closed as its Recorded ActorStamp.
 
 Away is not necessarily terminal for the Case. RequestRepricingOnAway may establish the Away outcome and create a new PricingEpisode.
 
-AwayDate is not required to equal PresentationDate, PricingDate, or the local date corresponding to RecordedAt.
+AwayDate is not required to equal PresentationDate, PricingDate, or the local date corresponding to Recorded.At.
 
 
 ## 13. Case outcome and terminal state
@@ -581,12 +581,12 @@ Semantics:
 
 - Closed means a valid RFQ Case reached a normal business conclusion;
 - Cancelled means the Case terminated without an ordinary CaseOutcome;
-- Discontinued means a genuine Case was withdrawn/stopped and may later be eligible to reopen as the same negotiation context;
+- Discontinued means a genuine Case was stopped without an ordinary CaseOutcome and may later be eligible to reopen as the same negotiation context;
 - CreatedInError means the Case itself should not have been established as genuine business activity, including duplicate or mistaken creation cases; it is not reopenable in normal positive flow.
 
-CloseDate is the BusinessEntity-local date the Case itself was closed. ClosedAt is the absolute time of the closing action and ClosedBy is the internal actor that performed it. These are distinct from HitDate and AwayDate.
+CloseDate is the BusinessEntity-local date the Case itself was closed. Closed.At is the absolute time of the closing action and Closed.Actor is the internal actor that performed it. These are distinct from HitDate and AwayDate.
 
-CancellationDate is likewise the BusinessEntity-local cancellation date, while CancelledAt and CancelledBy record the cancellation action time and actor.
+CancellationDate is likewise the BusinessEntity-local cancellation date, while Cancelled records the cancellation action actor/time.
 
 Examples:
 
@@ -641,7 +641,7 @@ Normal positive-flow Reopen applicability is:
 
 - Closed(Presented(Away(...))) -> ReopenOperation -> Negotiating.Pricing;
 - Closed(Unpresented(...)) -> ReopenOperation -> Inquiry.Pricing;
-- Cancelled(Reason=Discontinued) -> ReopenOperation -> Inquiry.Pricing when PriorPresentation=None, otherwise Negotiating.Pricing;
+- Cancelled(Reason=Withdrawn) -> ReopenOperation -> Inquiry.Pricing when PriorPresentation=None, otherwise Negotiating.Pricing;
 - Closed(Presented(Hit(...))) is not reopenable through ordinary positive flow;
 - Cancelled(Reason=CreatedInError) is not reopenable through ordinary positive flow.
 
@@ -801,7 +801,7 @@ AwayDate need not equal PricingDate or PresentationDate.
 
 Normal chronology requires the Away outcome not to precede its Presentation.
 
-PresentationAwayOutcome.Recorded.At is the internal recording/establishment time of the Away fact, not an asserted external customer-event time. No equality or ordering relation between AwayDate and the local date corresponding to RecordedAt is currently required beyond the normal business chronology constraints on AwayDate.
+PresentationAwayOutcome.Recorded.At is the internal recording/establishment time of the Away fact, not an asserted external customer-event time. No equality or ordering relation between AwayDate and the local date corresponding to Recorded.At is currently required beyond the normal business chronology constraints on AwayDate.
 
 ### 16.7 Close timing
 
@@ -856,11 +856,11 @@ An expired FirmQuote may remain structurally current until InvalidateQuote(Reaso
 
 InvalidateQuote(Reason=Expired) requires:
 
-    InvalidatedAt >= FirmQuote.ValidUntil
+    Invalidated.At >= FirmQuote.ValidUntil
 
 Hit always checks Received.At against the current FirmQuote.ValidUntil, so delayed expiry processing cannot allow an invalid Hit.
 
-ExtendValidity may extend a structurally current FirmQuote even when ExtendedAt is later than the previous ValidUntil, provided:
+ExtendValidity may extend a structurally current FirmQuote even when Extended.At is later than the previous ValidUntil, provided:
 
     NewValidUntil > CurrentValidUntil
 
@@ -892,7 +892,7 @@ Reopen always creates a new PricingEpisode with:
 
 The new Episode uses the corresponding ReopenedFrom... PricingEpisodeOrigin and carries no FirmQuote.
 
-No Domain chronology invariant requires ReopenDate or ReopenedAt to be on or after the preceding CloseDate / CancellationDate / ClosedAt / CancelledAt.
+No Domain chronology invariant requires ReopenDate or ReopenedAt to be on or after the preceding CloseDate / CancellationDate / Closed.At / CancelledAt.
 
 
 ## 17. RfqCase Domain operations
@@ -971,7 +971,7 @@ PublishDraft is not a CaseOperation. It creates the initial RfqCaseRevision with
 
     QuoteInvalidationReason
     = Expired
-    | Discontinued
+    | Withdrawn
 
     InvalidateQuote
     - Invalidated : ActorStamp
@@ -987,7 +987,7 @@ PublishDraft is not a CaseOperation. It creates the initial RfqCaseRevision with
     - NewPricingEpisodeId
     - Notional : NotionalAmount
     - SettlementDateRule
-    - Changed : ActorStamp
+    - Amended : ActorStamp
 
     ChangePricingOwner
     - NewPricingEpisodeId
@@ -1032,17 +1032,17 @@ Examples:
 - RequestRepricing derives the rejected current QuoteId and previous Episode from the source;
 - RequestRepricingOnAway derives the current PresentationId and previous Episode from the source.
 
-Operation actor/time fields are Domain business facts, not generic persistence audit metadata. They intentionally use operation-specific names rather than one generic Stamp type.
+Operation actor/time fields are Domain business facts, not generic persistence audit metadata. They use ActorStamp for representation while the containing field name preserves operation-specific semantics.
 
 ### 17.3 OpenOperation semantics
 
 CommitQuote creates a new Quote and makes it the current FirmQuote. ReplaceFirmQuote creates a new Quote and atomically replaces the current FirmQuote without manufacturing a separate invalidation or Away outcome.
 
-InvalidateQuote removes the current FirmQuote while preserving the current PricingEpisode. Reason=Expired requires InvalidatedAt >= current ValidUntil. Reason=Discontinued has no expiry-time precondition.
+InvalidateQuote removes the current FirmQuote while preserving the current PricingEpisode. Reason=Expired requires Invalidated.At >= current ValidUntil. Reason=Withdrawn has no expiry-time precondition.
 
 RequestRepricing rejects the current unpresented firm price as the starting point for a new pricing round. It creates a new PricingEpisode with Origin=RepricingRequested(previous Episode, rejected QuoteId, Feedback?).
 
-AmendRfqTerms creates new RfqTerms and a new PricingEpisode. Only Notional and SettlementDateRule may change within the same Case; ClientId, Side, and SecurityId are preserved from the source RfqTerms.
+AmendRfqTerms creates new RfqTerms and a new PricingEpisode. Only Notional and SettlementDateRule may be amended within the same Case; Side and SecurityId are preserved from the source RfqTerms, while RfqCase.ClientId remains immutable at the Case root.
 
 ChangePricingOwner, RollPricingDate, and ChangeAssumedTradeDate each create one new PricingEpisode with the corresponding Origin. Values not changed by the operation are preserved from the source Episode.
 
@@ -1052,12 +1052,9 @@ ExtendValidity preserves QuoteId and moves ValidUntil later. Its current invaria
 
     NewValidUntil > CurrentValidUntil
 
-The operation is allowed even when ExtendedAt is later than the previous ValidUntil. No current invariant relates ExtendedAt to NewValidUntil.
+The operation is allowed even when Extended.At is later than the previous ValidUntil. No current invariant relates Extended.At to NewValidUntil.
 
-RequestRepricingOnAway establishes an Away outcome for the current Presentation and creates a new PricingEpisode with Origin=Away(previous Episode, PresentationAwayOutcome). The generated PresentationAwayOutcome uses:
-
-    RecordedBy = RequestedBy
-    RecordedAt = RequestedAt
+RequestRepricingOnAway establishes an Away outcome for the current Presentation and creates a new PricingEpisode with Origin=Away(previous Episode, PresentationAwayOutcome). The generated PresentationAwayOutcome uses the operation's Recorded ActorStamp unchanged.
 
 ChangeClientContactOwner changes only ClientContactOwnerId and preserves the current lifecycle-state shape and all pricing/presentation objects.
 
@@ -1096,7 +1093,7 @@ CloseCase(Hit) is valid only from Negotiating.Presented. It creates Presentation
 CloseCase(Away) applies to the latest Presentation:
 
 - AlreadyRecorded requires the latest Presentation to already have PresentationAwayOutcome and reuses that same immutable fact;
-- RecordNow requires that no Away outcome is already recorded for the latest Presentation and creates one using AwayDate / Feedback with RecordedBy=Close.Closed.Actor and RecordedAt=Close.Closed.At.
+- RecordNow requires that no Away outcome is already recorded for the latest Presentation and creates one using AwayDate / Feedback with Recorded.Actor=Close.Closed.Actor and Recorded.At=Close.Closed.At.
 
 CloseCase(Unpresented) is valid only when the Case has never reached a Presentation.
 
@@ -1120,7 +1117,7 @@ ReopenOperation applies only to:
 
 - Closed(Presented(Away(...))). It creates Negotiating.Pricing with a fresh PricingEpisode using ReopenedFromAway(previous Episode, terminal Away outcome), and preserves the prior Presentation/Away as latest customer context.
 - Closed(Unpresented(...)). It creates Inquiry.Pricing with a fresh PricingEpisode using ReopenedFromUnpresented(previous Episode, Feedback?).
-- Cancelled(Reason=Discontinued). It creates a fresh PricingEpisode using ReopenedFromCancellation(previous Episode, PriorPresentation). The result is Inquiry.Pricing when PriorPresentation=None and Negotiating.Pricing when PriorPresentation exists.
+- Cancelled(Reason=Withdrawn). It creates a fresh PricingEpisode using ReopenedFromCancellation(previous Episode, PriorPresentation). The result is Inquiry.Pricing when PriorPresentation=None and Negotiating.Pricing when PriorPresentation exists.
 
 Closed(Presented(Hit(...))) and Cancelled(Reason=CreatedInError) do not accept ordinary ReopenOperation.
 
@@ -1356,7 +1353,7 @@ From Presented, replacement immediately makes the new Quote the current FirmQuot
 
 Both remove the current FirmQuote through InvalidateQuote, but QuoteInvalidationReason preserves the business distinction:
 
-- Expired means validity elapsed and requires InvalidatedAt >= ValidUntil;
+- Expired means validity elapsed and requires Invalidated.At >= ValidUntil;
 - Discontinued means the firm condition is explicitly withdrawn for another reason and has no expiry-time precondition.
 
 Do not create a separate ExpireQuote operation merely because the trigger differs.
@@ -1411,11 +1408,11 @@ PricingDate, AssumedTradeDate, PresentationDate, HitDate, AwayDate, CloseDate, C
 Timepoint fields describe absolute business-action or business-event time where that distinction matters:
 
 - CommittedAt: Quote commitment action;
-- PresentedAt: Presentation action;
+- Presented.At: Presentation action;
 - Received.At: customer agreement time used by the validity invariant;
 - PresentationAwayOutcome.Recorded.At: internal recording/establishment of the Away outcome;
-- InvalidatedAt / RequestedAt / ChangedAt / RolledAt / ExtendedAt: accepted Domain-operation action times;
-- ClosedAt / CancelledAt: Case terminal actions;
+- Invalidated.At / RequestedAt / ChangedAt / RolledAt / Extended.At: accepted Domain-operation action times;
+- Closed.At / CancelledAt: Case terminal actions;
 - ReopenedAt: accepted Reopen action;
 - TraceRecord.Recorded.At: creation/recording of that durable Trace record.
 
@@ -1592,7 +1589,7 @@ TraceRecord is a durable materialization of a business-semantic Case activity di
     - PricingDate : BusinessEntityLocalDate
     - AssumedTradeDate : BusinessEntityLocalDate
 
-RecordedBy / RecordedAt / RecordedBusinessDate describe production of this TraceRecord. They are distinct from action/event actor/time values inside the Digest.
+Recorded / RecordedBusinessDate describe production of this TraceRecord. Recorded is the Trace-recording ActorStamp and is distinct from action/event ActorStamp values inside the Digest.
 
 TraceTrigger states why this durable record was materialized. It is provenance for the record, not a classification of the final TraceActivity. Trigger payload/provenance beyond the trigger variant itself is not currently modeled.
 
@@ -1688,7 +1685,7 @@ TraceActivity is an ordered business-semantic representation, not a copy of Case
 
 Presented is a self-contained representation of one customer proposal. It resolves the Terms, responsibility context, pricing context, Quote, and presentation facts needed to interpret that proposal without Case-local identity.
 
-TraceQuote.EffectiveValidUntil is not necessarily the ValidUntil value that existed exactly at PresentedAt. It is the effective firm-validity value for that Presented proposal on the business path represented by the Trace, after resolving any later ExtendValidity operations that apply to that same Quote/Presentation.
+TraceQuote.EffectiveValidUntil is not necessarily the ValidUntil value that existed exactly at Presented.At. It is the effective firm-validity value for that Presented proposal on the business path represented by the Trace, after resolving any later ExtendValidity operations that apply to that same Quote/Presentation.
 
 TermsAmended carries the complete post-amendment TraceTerms snapshot, not a delta and not PreviousTerms.
 
@@ -1737,7 +1734,7 @@ For the current CaseOperation model:
 
 Operational Restore is not a CaseOperation and creates no TraceActivity.
 
-RequestRepricing represents an internal repricing request for an unpresented FirmQuote. RepricingRequested therefore retains the rejected Quote value and the request feedback/actor/time.
+RequestRepricing represents an internal repricing request for an unpresented FirmQuote. RepricingRequested therefore retains the rejected TraceQuote, point-in-time PricingOwnerId, and the request feedback/actor/time.
 
 RequestRepricingOnAway represents the customer proposal becoming Away and therefore materializes Away, not RepricingRequested. The new PricingEpisode created by that operation remains operational-history semantics rather than a separate public Trace milestone.
 
