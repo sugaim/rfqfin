@@ -347,23 +347,31 @@ It intentionally compresses or discards operational details that have no current
 
 TraceData must remain interpretable after RfqCaseHistory is deleted.
 
-### 6.2 Top-level fields
+### 6.2 Trace record metadata and durable representation
+
+TraceData separates metadata about **this record** from the business representation carried by the record.
 
 Current working shape:
 
     TraceData
+    - RecordedBy : ActorId
+    - RecordedAt : Timepoint
+    - RecordedBusinessDate : BusinessEntityLocalDate
+    - Origin : TraceOrigin
+    - Representation : TraceRepresentation<TraceBody>
+
+    TraceRepresentation<TBody>
     - CaseId
     - BusinessEntity
     - CaseOpenDate : BusinessEntityLocalDate
     - InitialContactOwnerId
     - FirstPresentedContactOwnerId?
+    - Body : TBody
 
-    - RecordedBy : ActorId
-    - RecordedAt : Timepoint
-    - RecordedBusinessDate : BusinessEntityLocalDate
-    - Origin : TraceOrigin
+This distinction is intentional:
 
-    - Body : TraceBody
+- `Recorded*` and `Origin` describe when, by whom, and why this TraceData record was produced;
+- `TraceRepresentation` is the self-contained business representation that must remain meaningful after operational history is deleted.
 
 `InitialContactOwnerId` is the ContactOwner at Case publication/open.
 
@@ -490,7 +498,7 @@ because pre-Presentation pricing workflow is intentionally not part of the durab
 ### 7.5 SupersededEffectiveTrace
 
     SupersededEffectiveTrace
-    - Previous : EffectiveTrace
+    - Previous : TraceRepresentation<EffectiveTrace>
     - Reason : SupersessionReason
 
 Current reason model:
@@ -499,7 +507,13 @@ Current reason model:
     = OperationalRestore
     | HistoricalCorrection
 
-Embedding the previous EffectiveTrace duplicates data that may already exist as an earlier TraceData record. This duplication is currently intentional because each durable TraceData should remain self-contained after operational history is deleted and should not require a TraceId/TraceRevision lookup to interpret what was superseded.
+`Previous` contains the complete prior business representation, not only its EffectiveTrace body.
+
+This matters because a later historical correction may change Case-level durable facts such as `CaseOpenDate` or `InitialContactOwnerId`. A superseding record must preserve the representation that was previously treated as effective, including those top-level business facts.
+
+Embedding the previous representation duplicates data that may already exist as an earlier TraceData record. This duplication is currently intentional because each durable TraceData should remain self-contained after operational history is deleted and should not require a TraceId/TraceRevision lookup to interpret what was superseded.
+
+The previous record's `Recorded*` metadata and `Origin` are **not** embedded into `Previous`; those describe the creation of that earlier record rather than the business representation that was superseded.
 
 A later historical-correction design may revisit this if a stronger durable Trace-record identity model becomes necessary.
 
@@ -783,6 +797,8 @@ Example:
 Later historical correction may add further TraceData records.
 
 This is append-only business history. A later Trace does not rewrite an older TraceData record.
+
+A superseding Trace may therefore embed the complete previously effective `TraceRepresentation` even though that representation also exists in an older TraceData record. The duplication is deliberate self-containment, not an indication that the older record was rewritten.
 
 The exact persistence-level revision/sequence wrapper for Trace records is intentionally not decided here. TraceData itself remains identity-light and self-contained.
 
