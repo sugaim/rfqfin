@@ -109,3 +109,4 @@ The following working method proved useful during the RfqCase/RfqDraft redesign 
 - `sessions/03-rfqcase-correction-foundation.md` — earlier abstract correction-foundation completion record; historical rationale only for the current unit.
 - `sessions/04-continued-after-away-provenance.md` — completion record for the ContinuedAfterAway/Away-outcome refinement.
 - `sessions/05-operational-history-restore-trace.md` — completion record for the operational chronology / Restore / durable Trace foundation.
+- `sessions/06-first-class-case-operations.md` — completion record for the first-class CaseOperation / replayable operation refinement.
