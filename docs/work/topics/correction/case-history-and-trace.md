@@ -108,6 +108,8 @@ It is a Domain concept, but this does **not** mean that every operation must eag
 
 Operational history may also have finite retention. It is expected that sufficiently old RfqCaseHistory may eventually be deleted.
 
+However, history cannot be discarded while a still-supported Domain operation requires it. In particular, an Open Case must retain enough chronology to construct a later terminal or Restore TraceData.
+
 Therefore:
 
 - ordinary operations normally need only the current revision;
