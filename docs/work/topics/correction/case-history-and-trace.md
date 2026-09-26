@@ -121,12 +121,7 @@ The abandoned chronology remains immutable.
 
 Restore is not a CaseActivityDigest activity. It changes which operational path is current.
 
-Restore produces one:
-
-    TraceRecord
-    Kind = RestoreSnapshot
-
-whose Digest represents the abandoned path immediately before Restore. Digest.EndContext is the abandoned path endpoint, not the restored target.
+Restore produces one TraceRecord with Trigger=Restore whose Digest represents the abandoned path immediately before Restore. Digest.EndContext is the abandoned path endpoint, not the restored target.
 
 Restore does not create another TraceRecord merely to restate the restored Open revision.
 
@@ -236,145 +231,143 @@ CreatedInError includes duplicate or mistaken creation cases. If that classifica
 
 Future business/statistical requirements may refine the non-reopenable taxonomy.
 
-## 9. TraceRecord and CaseActivityDigest
+## 9. Canonical simplified Trace model
 
-TraceRecord is now centered on business activities rather than an outer Open/Terminal trace-state hierarchy.
+The simplified Trace semantics discussed after Session 08 have now been reconfirmed and incorporated into canonical `../../../domain.md`.
+
+Trace is the public/analysis-oriented business representation of the effective Case path. It is intentionally not a copy of RfqCaseHistory.
+
+The durable outer record currently remains:
 
     TraceRecord
     - RecordedBy
     - RecordedAt
     - RecordedBusinessDate
-    - Kind
+    - Trigger : TraceTrigger
     - Digest : CaseActivityDigest
 
-    TraceRecordKind
+    TraceTrigger
     = HitClose
     | AwayClose
     | UnpresentedClose
     | Cancelled
     | Reopened
-    | RestoreSnapshot
+    | Restore
+    | HistoricalCorrection
+
+Trigger describes why the Trace was materialized. It constrains the represented Digest in the forward direction, but activity shape does not uniquely determine Trigger. This is important for HistoricalCorrection.
+
+The current trigger variants carry no payload. Additional correction/audit provenance is deferred.
+
+## 10. Canonical Trace contexts
 
     CaseActivityDigest
     - CaseId
     - BusinessEntity
     - OpenDate
-    - InitialContext
-    - EndContext
+    - InitialContext : TraceCaseContext
+    - EndContext : TraceCaseContext
     - Activities : TraceActivity[]
 
-    CaseContext
+    TraceCaseContext
+    - Terms
     - ContactOwnerId
     - QuoteOwnerId
-    - Terms
+    - PricingDate
+    - AssumedTradeDate
 
-InitialContext is publication context.
+InitialContext is publication context. EndContext is the endpoint context of the represented effective path.
 
-EndContext is the endpoint context of the path represented by that Digest. For RestoreSnapshot it is the abandoned path endpoint.
+For Trigger=Restore, EndContext is the abandoned path endpoint immediately before Restore, not the restored target.
 
-Open/Terminal is derived from the activity chronology; it is not redundantly encoded by separate OpenTrace / TerminalTrace wrappers.
+## 11. Canonical Trace activities
 
-## 10. Flat Trace activity chronology
+The canonical activity set is now:
 
-TraceActivity is an ordered semantic digest.
+    TraceActivity
+    = TermsAmended
+    | Presented
+    | Away
+    | RepricingRequested
+    | Hit
+    | Closed
+    | Cancelled
+    | Reopened
 
-Important variants include:
+Important semantics:
 
-- FirstPresentation;
-- Presentation;
-- RepricingRequested;
-- RepricingRequestedOnAway;
-- QuoteOwnerChanged;
-- PricingDateRolled;
-- AssumedTradeDateChanged;
-- ValidityExtended;
-- HitClose;
-- AwayClose;
-- UnpresentedClose;
-- Cancelled;
-- Reopened.
+- TermsAmended carries the full post-change TraceTerms snapshot plus actor/time;
+- Presented is self-contained and carries Terms, ContactOwnerId, QuoteOwnerId, PricingDate, AssumedTradeDate, Quote, and presentation actor/date/time;
+- Presented.Quote.EffectiveValidUntil is resolved from the represented effective path and may incorporate later ExtendValidity;
+- Away carries AwayDate, RecordedBy, RecordedAt, and optional Feedback;
+- RepricingRequested represents ordinary RequestRepricing and carries RejectedQuoteValue, optional Feedback, RequestedBy, and RequestedAt;
+- Hit carries HitDate and HitAt;
+- Closed carries CaseClose plus optional typed CloseFeedback; current CloseFeedback is UnpresentedCloseFeedback only;
+- Cancelled reuses Cancellation;
+- Reopened carries ReopenDate, ReopenedBy, and ReopenedAt.
 
-Terminal occurrences are first-class activities. A genuine terminal followed by Reopen therefore remains visibly present in later Digests:
+Restore is not a TraceActivity.
 
-    Presentation
-    AwayClose
-    Reopened
-    Presentation
-    HitClose
+Hit/Away association is chronological rather than identity-based:
 
-Reopen does not contain the prior terminal as nested payload. The terminal and Reopen are independent ordered business occurrences.
+- every Hit/Away requires at least one preceding Presented;
+- it applies to the latest preceding Presented;
+- one Presented may have at most one Hit/Away outcome.
 
-Restore is intentionally absent from TraceActivity because it is operational path selection rather than genuine business activity.
+The public Trace therefore exposes no PresentationId.
 
-## 11. First Presentation boundary
+Every Reopened follows a reopenable Closed or Cancelled terminal occurrence.
 
-FirstPresentation is a distinct Trace activity because it is the Inquiry -> Negotiating boundary.
+## 12. Canonical operation-to-activity mapping
 
-It carries:
+Trace activity selection is mapping-based rather than split by a FirstPresentation compression boundary.
 
-- durable Terms;
-- ContactOwnerId;
-- Presentation pricing context;
-- Quote;
-- Presentation.
+| Accepted operation | Trace activities |
+| --- | --- |
+| CommitQuote | none |
+| ReplaceFirmQuote | none |
+| InvalidateQuote | none |
+| RequestRepricing | RepricingRequested |
+| ChangeRfqTerms | TermsAmended |
+| ChangeQuoteOwner | none |
+| RollPricingDate | none |
+| ChangeAssumedTradeDate | none |
+| PresentQuote | Presented |
+| ExtendValidity | none directly; updates Presented.Quote.EffectiveValidUntil |
+| RequestRepricingOnAway | Away |
+| ChangeContactOwner | none |
+| CloseCase(Hit) | Hit, Closed |
+| CloseCase(Away.RecordNow) | Away, Closed |
+| CloseCase(Away.AlreadyRecorded) | Closed |
+| CloseCase(Unpresented) | Closed |
+| Cancel | Cancelled |
+| Reopen | Reopened |
 
-This records the Terms/context under which customer negotiation first began.
+Operational Restore creates no TraceActivity.
 
-Same-Case Notional / SettlementDateRule changes are prohibited after first Presentation. There is therefore no artificial FixTerms activity.
-
-Later Presentation activities do not repeat Terms/ContactOwner merely because the first one did.
-
-## 12. Compression rules
-
-Trace remains a digest, not a full event log.
-
-Before FirstPresentation:
-
-- ordinary pricing/context changes are compressed;
-- this remains true even after a pre-Presentation Cancel/Reopen cycle;
-- FirstPresentation records the relevant boundary context.
-
-Lifecycle milestones are never compressed merely because no Presentation has yet occurred:
-
-- UnpresentedClose;
-- Cancelled;
-- Reopened.
-
-After FirstPresentation, the selected pricing/customer semantic changes retained by the canonical model are kept in ordered TraceActivity form.
-
-Terminal activities do not duplicate their historical CaseContext. The milestone TraceRecord created at that time remains durable and holds that endpoint context.
+There is no special Trace rule for pre-Presentation chronology. ChangeRfqTerms happens pre-Presentation because of RfqCase applicability, not because Trace treats that phase specially.
 
 ## 13. History resolution and retention
 
-TraceRecord construction resolves Case-local IDs to durable business values while RfqCaseHistory is available.
+Trace construction resolves Case-local IDs to durable business values while RfqCaseHistory is available. Internal materialization may still use those IDs as temporary lookup keys.
 
-Reopen state construction itself uses the current TerminalPricingContext.
+Presented requires source-state resolution for Terms/owners/pricing/Quote and may require forward path resolution for EffectiveValidUntil.
 
-Reopened TraceRecord construction is different: it is independently materialized from retained operational History. It is not copied from the prior terminal TraceRecord.
+RepricingRequested resolves RejectedQuoteValue from the source PendingPresentation FirmQuote.
 
-This preserves audit value: the terminal-time representation and reopen-time representation are independent durable observations of the resolved chronology.
+TermsAmended may use the resulting revision's RfqTerms as the full post-change snapshot.
 
-There is no fallback from missing History to copying an older TraceRecord.
+Reopened TraceRecord construction remains independently materialized from retained operational History rather than copied from an earlier TraceRecord.
 
-Retention rules therefore preserve operational History while any supported history-dependent operation still needs it:
-
-- Open Cases retain enough History for the next terminal/Restore TraceRecord;
-- terminal Cases retain enough History for the supported Reopen/Restore window;
-- after Reopen, pre-Reopen History remains retained while the Case is Open so a later terminal/Restore digest can still be constructed from History alone.
-
-The Reopen window is operational/Persistence policy, not a Domain chronology invariant.
+There is no fallback from missing History to copying an older TraceRecord. Retention must therefore preserve operational History while a supported history-dependent operation still needs it.
 
 ## 14. Revision + Trace API
 
-Open-only operations remain revision-local.
-
-Terminal, Reopen, and Restore operations return:
+The canonical revision-level API remains:
 
     RevisionTraceResult
     - Revision
     - Trace : TraceRecord
-
-Trace-producing revision-level APIs take RfqCaseHistory as the source of the current revision and retained chronology:
 
     ApplyTerminal(
         history : RfqCaseHistory,
@@ -394,101 +387,40 @@ Trace-producing revision-level APIs take RfqCaseHistory as the source of the cur
         traceContext : TraceContext
     ) -> RevisionTraceResult
 
-The shared Trace recording context is:
-
     TraceContext
     - RecordedBy : ActorId
     - RecordedAt : Timepoint
     - RecordedBusinessDate : BusinessEntityLocalDate
 
-History is not duplicated inside TraceContext. Supplying History as the revision-level source avoids separately supplied current Case/revision values that could disagree with that chronology.
+RfqCaseHistory remains the single source of current revision/current Case and retained chronology. Do not reintroduce separately supplied current Case/revision values.
 
 Revision + TraceRecord produced by one Domain operation should be persisted atomically.
 
-## 15. Working Trace simplification / TraceRevision conclusions awaiting reconfirmation
+## 15. Deferred audit/business facts
 
-The discussion after the revision-level API refinement explored a substantially simpler public/business Trace model and a versioned Trace concept.
+A multi-jurisdiction regulatory review identified several business facts worth later consideration, but they are intentionally not part of the current canonical Trace update:
 
-These conclusions are **working decisions, not yet canonical**. The conversation context became unreliable late in the session, so the next session must re-read canonical material, re-check these decisions explicitly, and only then update `domain.md`.
+- initial customer instruction originator / ReceivedBy / ReceivedAt;
+- receipt metadata for customer-originated amendment or withdrawal;
+- the desk-side actor who received/executed a Hit, if Hit is intended to represent trade execution rather than only customer outcome;
+- richer Trigger/correction provenance such as actor/time/reason.
 
-Current working conclusions to re-check:
-
-- Trace should be the public/analysis-oriented business milestone representation, not a full copy of RfqCaseHistory.
-- Candidate simplified TraceActivity set:
-
-      TraceActivity
-      = TermsAmended
-      | Presented
-      | Away
-      | InternalRepricingRequested
-      | Hit
-      | Closed
-      | Cancelled
-      | Reopened
-
-- Restore remains absent from TraceActivity.
-- RequestRepricingOnAway should contribute Away, not InternalRepricingRequested.
-- InternalRepricingRequested is for ordinary RequestRepricing and should carry PreviousQuoteValue, optional Feedback, RequestedBy, and RequestedAt.
-- Presented should become a self-contained snapshot carrying Terms, ContactOwnerId, QuoteOwnerId, PricingDate, AssumedTradeDate, Quote, PresentationDate, PresentedBy, and PresentedAt.
-- The public Trace should not expose PresentationId; Hit/Away association should be resolved from ordered business chronology.
-- Hit/Away and Case closure should remain distinct public facts so Away-followed-by-continued-pricing is distinguishable from Away-close.
-- InitialContext and EndContext should remain, with CaseContext expanded to Terms, ContactOwnerId, QuoteOwnerId, PricingDate, and AssumedTradeDate.
-- TraceRecord should become a versioned Domain concept, tentatively TraceRevision, with an independent chronology from RfqCaseRevision.
-- The outer classification should be called Trigger rather than Kind.
-- Working trigger shape:
-
-      TraceRevisionTrigger
-      = HitClose
-      | AwayClose
-      | UnpresentedClose
-      | Cancelled
-      | Reopened
-      | Restore(...)
-      | HistoricalCorrection(...)
-
-- Restore and HistoricalCorrection triggers should carry actor/time plus a typed CorrectionReason.
-- Working CorrectionReason shape:
-
-      CorrectionReason
-      - Code : DataError | OperationalError | Other
-      - Note : string
-
-The above should not be copied mechanically into canonical documentation. Reconfirm semantics first.
+Communication infrastructure, message archives, voice recording, venue routing, and similar infrastructure records remain outside this Trace model.
 
 ## 16. Next unresolved design questions
 
-After reconfirming the working conclusions above, continue with:
+The Trace semantic model itself is now canonical. The remaining active boundary is TraceRevision.
 
-1. TraceRevision version semantics:
-   - TraceVersionNumber shape;
-   - initial/new version construction;
-   - successor/predecessor semantics;
-   - how the latest Trace revision is supplied to a Trace-producing Domain operation.
+Next questions:
 
-2. Revision-level API after TraceRecord -> TraceRevision:
-   - final RevisionTraceResult shape;
-   - how ApplyTerminal / ApplyReopen / ApplyRestore obtain the prior Trace revision/version without introducing inconsistent duplicated inputs.
+1. TraceRevision / TraceVersionNumber identity and sequence semantics;
+2. how Trace-producing Domain operations obtain the latest/previous Trace revision without reintroducing inconsistent duplicated inputs;
+3. the final RevisionTraceResult shape after TraceRecord becomes TraceRevision;
+4. HistoricalCorrection production API while RfqCaseHistory remains immutable;
+5. Trigger/correction provenance payloads, including the deferred audit review;
+6. concrete historical-correction construction strategy and regression cases.
 
-3. HistoricalCorrection API:
-   - operational RfqCaseHistory remains immutable;
-   - correction appends a new corrected Trace revision;
-   - exact source inputs and correction provenance are not yet designed.
-
-4. Representative correction scenarios:
-   - wrong value;
-   - extra activity;
-   - missing activity;
-   - wrong activity kind;
-   - correction that changes later business history;
-   - business truth not expressible by the current RfqCase / CaseOperation model.
-
-5. Construction strategy:
-   - ordinary CaseOperation replay where expressive;
-   - hybrid replay + correction-native construction;
-   - Trace-native construction;
-   - handling currently unmodeled business flows.
-
-6. Introduce an ephemeral TraceProjectionState only if the concrete scenarios require it.
+Do not treat the earlier working Trace-simplification section as pending anymore; those semantics are now canonical.
 
 ## 17. Bridge to historical correction
 
