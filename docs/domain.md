@@ -731,7 +731,7 @@ the following must hold:
 
 TradeDateLag does not require an equivalent cross-field check because SettlementLag has a non-negative BusinessDayCount and Following semantics.
 
-This invariant applies to every Domain operation that can establish a new current Terms/Episode combination, including CreateCase, ChangeRfqTerms, ChangeAssumedTradeDate, and PublishDraft through the RfqCase it creates.
+This invariant applies to every Domain operation that can establish a new current Terms/Episode combination, including PublishDraft, ChangeRfqTerms, and ChangeAssumedTradeDate.
 
 ### 16.11 Time does not mutate state
 
@@ -743,7 +743,7 @@ Hit always checks HitAt against ValidUntil, so delayed expiry processing cannot 
 
 ## 17. Transition graph
 
-Every distinct Domain operation is numbered even when two operations share the same source and target.
+Every distinct positive-flow RfqCase operation in this graph is numbered even when two operations share the same source and target. Operational Restore is defined separately in Section 23.
 
 ### Inquiry transitions
 
@@ -957,7 +957,7 @@ Normal Away does not require:
 
     AwayDate == PresentationDate
 
-Timepoint is used only where absolute time matters, currently HitAt and ValidUntil.
+Timepoint is used where absolute time matters, including Quote commitment, Presentation, Hit, FirmQuote validity, Case close/cancellation, and Trace recording.
 
 ## 23. Operational revision chronology, restore, and durable TraceData
 
