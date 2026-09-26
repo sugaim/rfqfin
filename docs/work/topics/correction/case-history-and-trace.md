@@ -212,15 +212,19 @@ Important semantics:
 - the mistaken v11..v20 path remains in operational chronology;
 - the exact Case-local child identities from v10 are reused;
 - subsequent positive-flow operations create new identities normally;
-- a terminal Case may be restored to an earlier Open revision;
-- a revision on a previously superseded path may itself later be selected as a restore target;
+- the current revision may be Open or Terminal;
+- restore always targets an earlier **Open** revision, because operational restore means returning to a workable state and continuing ordinary positive flow;
+- a previously superseded Open revision may itself later be selected as a restore target;
+- terminal revisions are not restore targets;
 - no explicit Branch/Worldline Domain object is currently required.
 
 Restore targets must:
 
 - belong to the same Case chronology;
 - be earlier than the current revision;
-- identify an existing valid RfqCaseRevision.
+- identify an existing valid **Open** RfqCaseRevision.
+
+This distinction is intentional. Restoring from a terminal current state back to an earlier Open state remains valid operational correction. Reinstating an earlier terminal outcome is a different business meaning and is deferred unless a concrete requirement appears.
 
 ## 4. Version semantics
 
@@ -315,9 +319,14 @@ Conceptually:
     - Revision : RfqCaseRevision
     - Trace : TraceData
 
-The returned revision re-adopts the target Case state at `current.Version.Next()`.
+The returned revision re-adopts the target **Open** Case state at `current.Version.Next()`.
 
-The returned Trace records that the previously effective/open business representation was superseded by operational restore.
+Because the target is always Open, operational restore produces one superseding Trace record for the path that was effective immediately before restore:
+
+- `SupersededOpenTrace` when the current revision was Open;
+- `SupersededEffectiveTrace` when the current revision was Terminal.
+
+Operational restore does not directly create a new EffectiveTrace. A later terminal operation after restored processing will create the next effective Trace.
 
 ### 5.4 Persistence and concurrency
 
@@ -908,7 +917,7 @@ At this point, operational restore and ordinary Trace generation are treated as 
 - Published, Applied, and RestoredFrom explain revision provenance;
 - ordinary operations produce the next revision;
 - terminal and restore operations additionally produce durable TraceData;
-- restore may re-adopt any earlier same-Case revision, including Open state or previously superseded paths;
+- restore may re-adopt any earlier same-Case **Open** revision, including an Open revision on a previously superseded path;
 - prior chronology remains immutable;
 - no explicit branch model is needed;
 - TraceData is a compact, self-contained business record and may outlive the operational chronology from which it was materialized;
