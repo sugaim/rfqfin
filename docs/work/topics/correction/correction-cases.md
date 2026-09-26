@@ -120,8 +120,8 @@ Recorded:
 Expected truth:
 
     ... -> Presented(P1)
-        -> Away(P1)
-        -> ContinueAfterAway -> E2
+        -> RequestRepricingOnAway
+           => Away(P1) + E2
         -> Q2/P2 or later open state
 
 What this tests:
@@ -138,8 +138,8 @@ Recorded:
 Expected truth:
 
     ... -> Presented(P1)
-        -> Away(P1)
-        -> ContinueAfterAway -> E2
+        -> RequestRepricingOnAway
+           => Away(P1) + E2
         -> Q2
         -> Presented(P2)
         -> Hit(P2)
@@ -158,7 +158,7 @@ What this tests:
 Recorded:
 
     E1 -> Q1 -> P1 -> Away(P1)
-       -> ContinueAfterAway -> E2
+       -> RequestRepricingOnAway -> E2
        -> Q2 -> P2
 
 Expected truth:
@@ -466,17 +466,17 @@ What this tests:
 - correcting one fact can invalidate dependent facts;
 - corrected History must satisfy the business invariants as a whole.
 
-### Case 11B — Premature ExpireQuote
+### Case 11B — Premature expired invalidation
 
-If ExpireQuote was invoked before validity elapsed, the normal Domain should reject it.
+If InvalidateQuote(Reason=Expired) was invoked before validity elapsed, the normal Domain should reject it.
 
 What this tests:
 
 - operations prohibited by normal invariants should preferably remain impossible rather than become routine correction cases.
 
-### Case 11C — Earlier ValidUntil was wrong, making a previously recorded expiry appear valid/invalid
+### Case 11C — Earlier ValidUntil was wrong, making a previously recorded expired invalidation appear valid/invalid
 
-The expiry operation may have been legal relative to the recorded value but wrong relative to corrected business truth.
+InvalidateQuote(Reason=Expired) may have been legal relative to the recorded value but wrong relative to corrected business truth.
 
 What this tests:
 
