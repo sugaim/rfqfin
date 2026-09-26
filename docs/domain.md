@@ -1463,7 +1463,7 @@ The current operational state is the RfqCase contained in the current/latest rev
 Published(DraftId) is used only for the initial revision created by PublishDraft:
 
     transition == Published(...)
-    => Version == InitialVersion
+    => Version == CaseVersionNumber.New()
 
 Applied(CaseOperation) means an accepted ordinary fully resolved Domain Operation was applied to the immediately preceding revision.
 
@@ -1490,9 +1490,6 @@ Given:
     v10 = earlier Open revision
     ...
     v20 = current revision
-
-Given:
-
     operation = RestoreOperation(TargetVersion = v10.Version)
 
 ApplyRestore creates:
@@ -1538,7 +1535,7 @@ This does not imply eager loading or whole-history rewrite. Implementation may q
 
 A Reopened TraceRecord is materialized from retained operational history at Reopen time. It is not copied from an earlier Close/Cancel TraceRecord. The earlier record and the new Reopened record are independently materialized durable evidence; if their resolved representations differ, that discrepancy remains observable.
 
-There is no fallback rule that switches Reopen Trace construction to an older TraceRecord when required operational history has already been removed. If retention no longer supports construction of ReopenTraceContext, Reopen is operationally unavailable.
+There is no fallback rule that switches Reopen Trace construction to an older TraceRecord when required operational history has already been removed. If retention no longer supports the history required to materialize the Reopened TraceRecord, Reopen is operationally unavailable.
 
 Application/Persistence owns stale-write protection. A request observed against one current version commits only if that revision is still current.
 
@@ -2119,7 +2116,7 @@ The resulting RfqCase must satisfy every normal RfqCase invariant. In particular
 
 An Active Draft may temporarily contain Determined values that fail this cross-field Case invariant; such a Draft is simply not publishable until amended.
 
-PublishDraft has one indivisible Domain meaning: the source Draft becomes Published(CaseId) and the initial RfqCaseRevision is created with Version=InitialVersion and Transition=Published(DraftId). Its contained RfqCase is the valid Inquiry.Pricing state described above. Persisting both effects atomically, ensuring single publication, and rejecting publication based on a stale observed Draft version are Application/Persistence responsibilities.
+PublishDraft has one indivisible Domain meaning: the source Draft becomes Published(CaseId) and the initial RfqCaseRevision is created with Version=CaseVersionNumber.New() and Transition=Published(DraftId). Its contained RfqCase is the valid Inquiry.Pricing state described above. Persisting both effects atomically, ensuring single publication, and rejecting publication based on a stale observed Draft version are Application/Persistence responsibilities.
 
 ### 25.10 Draft provenance and lineage
 
