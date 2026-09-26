@@ -415,7 +415,34 @@ Some Trace facts, such as EffectiveValidUntil and ordered ActivityChange, are ch
 
 Operational history may have finite retention. It must remain available while a still-supported history-dependent operation requires it to construct TraceData.
 
-## 13. Bridge to historical correction
+## 13. Newly identified positive-flow question: Reopen
+
+Before continuing historical-correction replay design, one positive-flow lifecycle question remains newly identified:
+
+> can a genuinely correct terminal Case later reopen because business activity resumes?
+
+This is deliberately distinct from Operational Restore.
+
+Restore means the prior operational path was mistaken and returns to an earlier valid Open revision.
+
+Reopen, if admitted, would mean the terminal outcome remains a true historical business fact, but later business activity begins again on the same Case.
+
+The cases must not be assumed symmetric:
+
+- Closed(Away) may plausibly reopen when the client genuinely went Away and later returns;
+- Cancelled requires deciding whether cancellation semantics ever permit the same Case identity to become active again;
+- Closed(Hit) may have booking/downstream consequences and should not inherit Away semantics automatically.
+
+Admitting Reopen would affect the current operation taxonomy because it introduces a potential Terminal -> Open Domain operation in addition to:
+
+    OpenOperation : Open -> Open
+    TerminalOperation : Open -> Terminal
+
+It would also require explicit revision-provenance and TraceData semantics so that the original terminal fact is not rewritten as though it had been mistaken.
+
+This question should be resolved as positive-flow Domain semantics before replay-path selection for historical correction.
+
+## 14. Bridge to historical correction
 
 The ordinary replay language is now concrete:
 
@@ -440,7 +467,7 @@ The remaining historical-correction design problems are:
 
 Do not restart from the old Supports(H_rep, H_true) abstraction.
 
-## 14. Domain/Application/Persistence boundary
+## 15. Domain/Application/Persistence boundary
 
 Domain owns:
 
@@ -466,7 +493,7 @@ Persistence owns:
 
 External customer communications, notifications, booking, and other irreversible side effects are not reversed automatically by Restore or historical correction.
 
-## 15. Canonical incorporation
+## 16. Canonical incorporation
 
 The decisions in this note are incorporated into `../../../domain.md`.
 
