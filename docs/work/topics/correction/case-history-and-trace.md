@@ -82,6 +82,16 @@ Operational Restore is different: it selects an earlier valid Open revision and 
 
 One accepted CaseOperation creates exactly one next revision.
 
+CaseVersionNumber provides the version-sequence operations used by revision chronology:
+
+    CaseVersionNumber
+    - Value
+    - New()
+    - Next()
+    - Prev() : CaseVersionNumber?
+
+New() creates the initial Case version. Prev() has no value at that initial version.
+
 ## 4. Operational Restore
 
 Restore means the currently effective operational path was mistaken.
@@ -92,7 +102,16 @@ Given:
     ...
     v20 = current revision
 
-Restore(v10) creates:
+the revision-level Domain operation is:
+
+    RestoreOperation
+    - TargetVersion : CaseVersionNumber
+
+with:
+
+    operation.TargetVersion = v10.Version
+
+ApplyRestore creates:
 
     v21
     - Case = v10.Case
@@ -117,29 +136,33 @@ Reopen means the terminal occurrence was correct and remains genuine business ac
 
 The same CaseId continues. Whether resumed activity belongs to the same negotiation context is a business assertion by the operator/Application; it is not inferred from matching fields.
 
-Normal Reopen variants are:
+Reopen is one ordinary business operation:
 
     ReopenOperation
-    = ReopenAway
-    | ReopenUnpresented
-    | ReopenCancellation
+    - NewPricingEpisodeId
+    - ReopenDate : BusinessEntityLocalDate
+    - NewAssumedTradeDate : BusinessEntityLocalDate
+    - ReopenedBy : ActorId
+    - ReopenedAt : Timepoint
+
+The source Terminal state determines the reopen provenance and resulting Open state; the caller does not choose a reopen variant.
 
 Positive-flow applicability:
 
     Closed(Presented(Away))
-        -> ReopenAway
+        -> Reopen
         -> Negotiating.Pricing
 
     Closed(Unpresented)
-        -> ReopenUnpresented
+        -> Reopen
         -> Inquiry.Pricing
 
     Cancelled(Withdrawn), PriorPresentation=None
-        -> ReopenCancellation
+        -> Reopen
         -> Inquiry.Pricing
 
     Cancelled(Withdrawn), PriorPresentation=Some
-        -> ReopenCancellation
+        -> Reopen
         -> Negotiating.Pricing
 
 Closed(Hit) is not reopenable through ordinary positive flow.
@@ -343,7 +366,7 @@ The Reopen window is operational/Persistence policy, not a Domain chronology inv
 
 ## 14. Revision + Trace API
 
-Open-only operations return the next revision.
+Open-only operations remain revision-local.
 
 Terminal, Reopen, and Restore operations return:
 
@@ -351,13 +374,34 @@ Terminal, Reopen, and Restore operations return:
     - Revision
     - Trace : TraceRecord
 
-with operation-specific historical context inputs:
+Trace-producing revision-level APIs take RfqCaseHistory as the source of the current revision and retained chronology:
 
-- TerminalTraceContext;
-- ReopenTraceContext;
-- RestoreTraceContext.
+    ApplyTerminal(
+        history : RfqCaseHistory,
+        operation : TerminalOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
 
-Do not collapse those contexts into one large generic context merely because the result shape is shared.
+    ApplyReopen(
+        history : RfqCaseHistory,
+        operation : ReopenOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
+
+    ApplyRestore(
+        history : RfqCaseHistory,
+        operation : RestoreOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
+
+The shared Trace recording context is:
+
+    TraceContext
+    - RecordedBy : ActorId
+    - RecordedAt : Timepoint
+    - RecordedBusinessDate : BusinessEntityLocalDate
+
+History is not duplicated inside TraceContext. Supplying History as the revision-level source avoids separately supplied current Case/revision values that could disagree with that chronology.
 
 Revision + TraceRecord produced by one Domain operation should be persisted atomically.
 
