@@ -42,29 +42,33 @@ The same CaseId continues on Reopen. Whether later activity belongs to the same 
 
 ## Reopen applicability
 
-Normal positive-flow variants are:
+Reopen was subsequently simplified to one flat ordinary business operation:
 
     ReopenOperation
-    = ReopenAway
-    | ReopenUnpresented
-    | ReopenCancellation
+    - NewPricingEpisodeId
+    - ReopenDate : BusinessEntityLocalDate
+    - NewAssumedTradeDate : BusinessEntityLocalDate
+    - ReopenedBy : ActorId
+    - ReopenedAt : Timepoint
+
+The earlier ReopenAway / ReopenUnpresented / ReopenCancellation variants were removed. Their distinction was not caller intent: the source Terminal state already determines the applicable reopen provenance and resulting Open state.
 
 Applicability:
 
     Closed(Presented(Away))
-        -> ReopenAway
+        -> Reopen
         -> Negotiating.Pricing
 
     Closed(Unpresented)
-        -> ReopenUnpresented
+        -> Reopen
         -> Inquiry.Pricing
 
     Cancelled(Withdrawn), PriorPresentation=None
-        -> ReopenCancellation
+        -> Reopen
         -> Inquiry.Pricing
 
     Cancelled(Withdrawn), PriorPresentation=Some
-        -> ReopenCancellation
+        -> Reopen
         -> Negotiating.Pricing
 
 Closed(Hit) is not reopenable through ordinary positive flow.
@@ -334,7 +338,7 @@ The Reopen support window is operational/Persistence policy, not a Domain date i
 
 ## Revision-level API
 
-Open-only operations return the next revision.
+Open-only operations remain revision-local.
 
 Terminal, Reopen, and Restore use one common result shape:
 
@@ -342,7 +346,37 @@ Terminal, Reopen, and Restore use one common result shape:
     - Revision
     - Trace : TraceRecord
 
-Their historical context inputs remain operation-specific rather than one generic TraceContext.
+A later API refinement made RfqCaseHistory the single revision-level source for current state and retained chronology, and made Trace recording metadata explicit and shared:
+
+    TraceContext
+    - RecordedBy : ActorId
+    - RecordedAt : Timepoint
+    - RecordedBusinessDate : BusinessEntityLocalDate
+
+    ApplyTerminal(
+        history : RfqCaseHistory,
+        operation : TerminalOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
+
+    ApplyReopen(
+        history : RfqCaseHistory,
+        operation : ReopenOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
+
+Operational Restore is represented separately from CaseOperation:
+
+    RestoreOperation
+    - TargetVersion : CaseVersionNumber
+
+    ApplyRestore(
+        history : RfqCaseHistory,
+        operation : RestoreOperation,
+        traceContext : TraceContext
+    ) -> RevisionTraceResult
+
+CaseVersionNumber supports New(), Next(), and Prev(); New() creates the initial Case version and Prev() has no value at the initial version.
 
 Revision + TraceRecord produced by one Domain operation should be persisted atomically.
 
