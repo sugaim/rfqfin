@@ -189,7 +189,38 @@ Replay is a construction/validation mechanism, not automatically a claim that th
 
 ## Next question — start here
 
-### 1. Replay source/path selection
+### 1. Reopen after a genuine terminal outcome
+
+A newly identified positive-flow question should be resolved before historical-correction replay design:
+
+> when a terminal outcome was genuinely correct at the time, can the same RfqCase later become Open again because business activity resumes?
+
+This is **not** Operational Restore:
+
+- Restore means the prior operational path/outcome was mistaken and an earlier valid Open revision is selected;
+- Reopen would mean the terminal fact remains historically correct, but later business activity starts again.
+
+Discuss at least these cases separately:
+
+- `Closed(Presented(Away(...))) -> Open`: client genuinely went Away, then later returns and asks to resume/reprice;
+- `Cancelled -> Open`: determine whether any cancellation meanings permit later reopening of the same Case, or whether cancellation means the Case identity itself should remain dead;
+- `Closed(Presented(Hit(...)))`: do not assume symmetry with Away; Hit may already have booking/downstream effects and likely needs a separate business rule.
+
+If Reopen is admitted, determine:
+
+- whether the same CaseId continues or a new Case is required;
+- which terminal facts remain durable/history-visible;
+- what Open state/PricingEpisode is created on reopen;
+- whether a new PricingEpisode is always required;
+- whether Reopen is a CaseOperation and, if so, how the current `OpenOperation : Open -> Open` / `TerminalOperation : Open -> Terminal` hierarchy should change;
+- how Reopen produces/updates durable TraceData;
+- how Reopen differs from correction/Restore in revision provenance.
+
+Do not modify Restore semantics merely to absorb genuine resumed business.
+
+### 2. Replay source/path selection
+
+After Reopen semantics are settled, continue historical-correction design.
 
 RfqCaseHistory may contain:
 
@@ -211,25 +242,25 @@ Use concrete correction cases while deciding this.
 
 ## Questions after replay-path selection
 
-2. **What edits are allowed to the ordinary CaseOperation program?**  
+3. **What edits are allowed to the ordinary CaseOperation program?**  
    Test value correction, operation deletion, insertion, and cases where corrected replay changes later applicability.
 
-3. **When does ordinary replay stop being expressive enough?**  
+4. **When does ordinary replay stop being expressive enough?**  
    Use the correction catalog to find business truth that cannot be represented by valid RfqCase states/CaseOperation values.
 
-4. **What is the Trace-side intermediate state?**  
+5. **What is the Trace-side intermediate state?**  
    Define the smallest state needed by any Trace-native correction language.
 
-5. **What is EffectiveCommand, if still needed?**  
+6. **What is EffectiveCommand, if still needed?**  
    Define business-semantic Trace-native transitions only for cases ordinary replay cannot express.
 
-6. **What records does one Historical Correction produce?**  
+7. **What records does one Historical Correction produce?**  
    Determine Superseded + corrected Effective Trace behavior, including correction-of-correction.
 
-7. **What validation/adequacy relation is actually needed?**  
+8. **What validation/adequacy relation is actually needed?**  
    Introduce one only if concrete cases require it; do not restart from Supports(H_rep,H_true).
 
-8. **What remains outside the single-Case unit?**  
+9. **What remains outside the single-Case unit?**  
    Split/merge/reassociation across CaseIds, downstream reconciliation, authorization/approval workflow, and physical persistence schema remain separate unless a concrete dependency forces them in.
 
 ## Concrete regression material
