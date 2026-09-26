@@ -424,9 +424,10 @@ Expected truth:
 
 What this tests:
 
-- abnormal invalid/duplicate disposition differs from ordinary business outcome.
+- Cancelled remains distinct from an ordinary Case outcome;
+- Withdrawn cancellation and normal Away close are not interchangeable merely because both terminate the Case.
 
-### Case 9C — Recorded ordinary close; Case was actually invalid/duplicate
+### Case 9C — Recorded ordinary close; Case was actually created in error
 
 Recorded:
 
@@ -434,12 +435,14 @@ Recorded:
 
 Expected truth:
 
-    Cancelled(reason = duplicate/invalid/created-in-error or future typed reason)
+    Cancelled(Reason = CreatedInError)
+
+CreatedInError currently includes duplicate/mistaken creation cases; later business requirements may refine that non-reopenable taxonomy.
 
 What this tests:
 
 - the inverse classification error also occurs;
-- exact CancellationReason taxonomy remains deferred until correction requirements justify it.
+- correction must distinguish genuine business termination from a Case that should not have been established as genuine activity.
 
 ### Case 10A — Close timing wrong
 
