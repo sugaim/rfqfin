@@ -453,8 +453,8 @@ Use the concrete correction catalog rather than restarting from the old Supports
 
 ## 18. Canonical incorporation
 
-The decisions in this note are incorporated into `../../../domain.md`.
+The decisions in this note through the simplified Trace semantic model are incorporated into `../../../domain.md`.
 
-Design Sessions 05 and 06 remain historical rationale for the operational-history and first-class-operation foundations. Session 07 records the Reopen and CaseActivityDigest refinement.
+Design Sessions 05 and 06 remain historical rationale for the operational-history and first-class-operation foundations. Session 07 records the earlier Reopen / CaseActivityDigest model, Session 08 records the Trace API checkpoint, and Session 09 records the canonical Trace simplification.
 
-Historical correction replay source/path selection remains the active next design problem.
+TraceRevision version/API semantics are the active next design problem. Historical-correction replay/source selection follows after that boundary is coherent.
