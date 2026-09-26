@@ -2,15 +2,17 @@
 
 ## Status and purpose
 
-This is a non-canonical working catalog for the RfqCase correction design unit.
+This is the active non-canonical regression catalog for the historical-correction design unit.
 
 It preserves the concrete cases used to test correction models. It is intentionally **not** a list of accepted correction operations and must not be read as canonical Domain behavior.
 
 Use it together with:
 
-- `correction-history-model.md` for the current semantic model;
-- `../../handoff.md` for the active design target;
-- `../../../domain.md` for canonical positive-flow Domain semantics.
+- `../../../domain.md` for the canonical RfqCaseRevision / Restore / Trace foundation;
+- `../../handoff.md` for the active historical-correction target;
+- `case-history-and-trace.md` for rationale when needed.
+
+`correction-history-model.md` is an older abstract exploration and is not the current semantic starting point.
 
 The catalog exists because correction abstractions should be tested against concrete failures rather than designed from a generic undo mechanism.
 
