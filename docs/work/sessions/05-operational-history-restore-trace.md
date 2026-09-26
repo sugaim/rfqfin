@@ -115,7 +115,7 @@ Restore does not unsend customer communication or reverse downstream integration
 
 Restore exposed a second requirement: operational history is not the durable business record.
 
-RfqCaseHistory may eventually be deleted. TraceData is expected to remain.
+RfqCaseHistory may eventually be deleted. TraceData is expected to remain. History must nevertheless be retained while an Open Case or another still-supported history-dependent operation needs it to construct a later Trace.
 
 Therefore TraceData:
 
